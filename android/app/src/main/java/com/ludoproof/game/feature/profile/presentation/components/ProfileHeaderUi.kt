@@ -1,31 +1,32 @@
 package com.ludoproof.game.feature.profile.presentation.components
 
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
+import android.view.View
 import android.widget.Button
 import android.widget.FrameLayout
-import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.LudoProofTheme
+import com.ludoproof.game.LudoPawsCharacterAvatarView
 import com.ludoproof.game.core.ui.components.AppFocusRing
 import com.ludoproof.game.core.ui.components.appIconActionButton
 import com.ludoproof.game.core.ui.icons.AppIconName
-import com.ludoproof.game.LudoPawsCharacterAvatarView
 import com.ludoproof.game.feature.characters.data.local.CharacterSelectionStore
-import com.ludoproof.game.feature.profile.domain.ProfileProgression
+import com.ludoproof.game.feature.characters.domain.ProfileProgression
+import com.ludoproof.game.feature.characters.domain.catalog.LudoPawsCharacterCatalog
 import com.ludoproof.game.feature.profile.domain.model.ProfileSnapshot
 import com.ludoproof.game.feature.profile.presentation.ProfileActivity
+import com.ludoproof.game.feature.store.domain.model.StoreTab
+import com.ludoproof.game.feature.store.presentation.StoreActivity
 
-internal fun ProfileActivity.profileTopBar():
-    LinearLayout =
+internal fun ProfileActivity.profileTopBar(): LinearLayout =
     LinearLayout(this).apply {
-        orientation =
-            LinearLayout.HORIZONTAL
-        gravity =
-            Gravity.CENTER_VERTICAL
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
 
         addView(
             appIconActionButton(
@@ -33,243 +34,188 @@ internal fun ProfileActivity.profileTopBar():
                 contentDescription = "Back",
                 iconName = AppIconName.CHEVRON_LEFT,
                 sizeDp = 50,
-            ) {
-                finish()
-            },
-            LinearLayout.LayoutParams(
-                dp(50),
-                dp(50),
-            ),
+            ) { finish() },
+            LinearLayout.LayoutParams(dp(50), dp(50)),
         )
 
         addView(
-            TextView(
-                this@profileTopBar,
-            ).apply {
-                text =
-                    "Profile"
-                textSize =
-                    25f
-                setTypeface(
-                    Typeface.DEFAULT_BOLD,
-                )
-                setTextColor(
-                    Color.WHITE,
-                )
-                gravity =
-                    Gravity.CENTER_VERTICAL
-                setPadding(
-                    dp(12),
-                    0,
-                    0,
-                    0,
-                )
+            TextView(this@profileTopBar).apply {
+                text = "Profile"
+                textSize = 25f
+                setTypeface(Typeface.DEFAULT_BOLD)
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(12), 0, 0, 0)
             },
-            LinearLayout.LayoutParams(
-                0,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                1f,
-            ),
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f),
         )
 
         addView(
-            Button(
-                this@profileTopBar,
-            ).apply {
-                text =
-                    when {
-                        !isPlayGamesConfigured -> "SETUP"
-                        playGamesSignInInProgress -> "CONNECTING…"
-                        playGamesAuthenticated -> "CONNECTED"
-                        else -> "G  SIGN IN"
-                    }
-                textSize =
-                    11f
-                setTypeface(
-                    Typeface.DEFAULT_BOLD,
+            Button(this@profileTopBar).apply {
+                text = "⚙  SETUP"
+                textSize = 13f
+                setTypeface(Typeface.DEFAULT_BOLD)
+                setTextColor(0xFF303846.toInt())
+                minWidth = 0
+                minHeight = 0
+                setPadding(dp(10), 0, dp(10), 0)
+                background = LudoProofTheme.rounded(
+                    0xFFF3F5F8.toInt(),
+                    12f,
+                    0xFFDCE4EF.toInt(),
+                    1f,
+                    this@profileTopBar,
                 )
-                setTextColor(
-                    0xFF4A4A4A.toInt(),
-                )
-                minWidth =
-                    0
-                minHeight =
-                    0
-                setPadding(
-                    dp(12),
-                    0,
-                    dp(12),
-                    0,
-                )
-                background =
-                    LudoProofTheme
-                        .rounded(
-                            Color.WHITE,
-                            11f,
-                            0xFFDDDDDD.toInt(),
-                            1f,
-                            this@profileTopBar,
-                        )
-                isEnabled =
-                    isPlayGamesConfigured &&
-                        !playGamesAuthenticated &&
-                        !playGamesSignInInProgress
-                alpha = if (isEnabled) 1f else .72f
-                setOnClickListener {
-                    beginPlayGamesSignIn()
-                }
-                AppFocusRing.apply(this, cornerRadiusDp = 11f)
+                contentDescription = "Profile and Play Games setup"
+                isEnabled = !playGamesSignInInProgress
+                alpha = if (isEnabled) 1f else 0.72f
+                setOnClickListener { beginPlayGamesSignIn() }
+                AppFocusRing.apply(this, cornerRadiusDp = 12f)
             },
-            LinearLayout.LayoutParams(
-                dp(104),
-                dp(42),
-            ),
+            LinearLayout.LayoutParams(dp(104), dp(42)),
         )
     }
 
-internal fun ProfileActivity.profileIdentityPanel(
-    profile: ProfileSnapshot,
-):
-    LinearLayout =
+// Character personality is presentation-only and never changes dice or legal moves.
+internal fun ProfileActivity.profileIdentityPanel(profile: ProfileSnapshot): LinearLayout =
     LinearLayout(this).apply {
-        orientation =
-            LinearLayout.VERTICAL
+        orientation = LinearLayout.VERTICAL
+        setPadding(dp(10), dp(10), dp(10), dp(10))
+        background = GradientDrawable(
+            GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(0xFF0876E0.toInt(), 0xFF0649A8.toInt()),
+        ).apply {
+            cornerRadius = dp(20).toFloat()
+            setStroke(dp(2), 0xFF21C8FF.toInt())
+        }
+        elevation = dp(6).toFloat()
 
-        val identity =
-            LinearLayout(
-                this@profileIdentityPanel,
+        val selection = CharacterSelectionStore(this@profileIdentityPanel).load()
+        val character = LudoPawsCharacterCatalog.character(selection.characterId)
+            ?: LudoPawsCharacterCatalog.character(LudoPawsCharacterCatalog.DEFAULT_CHARACTER_ID)
+
+        val heroRow = LinearLayout(this@profileIdentityPanel).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+        // One portrait only: the persisted in-game Paw selection. No separate profile-photo avatar.
+        val pawColumn = LinearLayout(this@profileIdentityPanel).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+        }
+        val pawFrame = FrameLayout(this@profileIdentityPanel).apply {
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(0xFF149CFF.toInt(), 0xFF0751B5.toInt()),
             ).apply {
-                orientation =
-                    LinearLayout.HORIZONTAL
-                gravity =
-                    Gravity.CENTER_VERTICAL
+                cornerRadius = dp(18).toFloat()
+                setStroke(dp(1), 0xFF63DFFF.toInt())
             }
-        val selectedCharacterId =
-            CharacterSelectionStore(
-                this@profileIdentityPanel,
-            ).load().characterId
-
-        val avatar =
-            FrameLayout(
-                this@profileIdentityPanel,
-            ).apply {
-                background =
-                    GradientDrawable(
-                        GradientDrawable.Orientation.TOP_BOTTOM,
-                        intArrayOf(
-                            0xFF168EEA.toInt(),
-                            0xFF083D91.toInt(),
-                        ),
-                    ).apply {
-                        cornerRadius =
-                            dp(14)
-                                .toFloat()
-                        setStroke(
-                            dp(2),
-                            0xFF5BE0FF.toInt(),
-                        )
-                    }
-
-                val animalAvatar =
-                    LudoPawsCharacterAvatarView(
-                        this@profileIdentityPanel,
-                    ).apply {
-                        bind(
-                            characterId = selectedCharacterId,
-                            ringColor = 0xFFFFD34A.toInt(),
-                            highlighted = true,
-                        )
-                    }
-                addView(
-                    animalAvatar,
-                    FrameLayout.LayoutParams(
-                        FrameLayout.LayoutParams.MATCH_PARENT,
-                        FrameLayout.LayoutParams.MATCH_PARENT,
-                    ),
+        }
+        pawFrame.addView(
+            LudoPawsCharacterAvatarView(this@profileIdentityPanel).apply {
+                setPadding(dp(3), dp(3), dp(3), dp(3))
+                bind(
+                    characterId = selection.characterId,
+                    ringColor = 0xFFFFD34A.toInt(),
+                    highlighted = true,
                 )
-
-                profilePhotoUri?.let { savedUri ->
-                    loadProfilePhoto(savedUri)?.let { bitmap ->
-                        addView(
-                            ImageView(this@profileIdentityPanel).apply {
-                                setImageBitmap(bitmap)
-                                scaleType = ImageView.ScaleType.CENTER_CROP
-                                background = LudoProofTheme.rounded(
-                                    0xFF0B397A.toInt(),
-                                    14f,
-                                    0xFF5BE0FF.toInt(),
-                                    1f,
-                                    this@profileIdentityPanel,
-                                )
-                                clipToOutline = true
-                                contentDescription = "Profile picture"
-                            },
-                            FrameLayout.LayoutParams(
-                                FrameLayout.LayoutParams.MATCH_PARENT,
-                                FrameLayout.LayoutParams.MATCH_PARENT,
-                            ),
-                        )
-                    }
-                }
-
-                addView(
-                    Button(this@profileIdentityPanel).apply {
-                        text = "✎"
-                        textSize = 14f
-                        setTextColor(Color.WHITE)
-                        minWidth = 0
-                        minHeight = 0
-                        setPadding(0, 0, 0, 0)
-                        background = GradientDrawable().apply {
-                            shape = GradientDrawable.OVAL
-                            setColor(0xFF087FC4.toInt())
-                            setStroke(dp(1), 0xFFFFFFFF.toInt())
-                        }
-                        contentDescription = "Change profile picture"
-                        setOnClickListener {
-                            chooseProfilePhoto()
-                        }
-                        AppFocusRing.apply(this, cornerRadiusDp = 999f)
-                    },
-                    FrameLayout.LayoutParams(
-                        dp(32),
-                        dp(32),
-                        Gravity.BOTTOM or Gravity.END,
-                    ),
-                )
-            }
-
-        identity.addView(
-            avatar,
-            LinearLayout.LayoutParams(
-                dp(112),
-                dp(112),
+                contentDescription = "Selected Paw: ${character?.displayName ?: "Paw"}"
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+            },
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT,
             ),
         )
-
-        val copy =
-            LinearLayout(
-                this@profileIdentityPanel,
-            ).apply {
-                orientation =
-                    LinearLayout.VERTICAL
-                setPadding(
-                    dp(14),
-                    0,
-                    0,
-                    0,
+        pawColumn.addView(
+            pawFrame,
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(132)),
+        )
+        pawColumn.addView(
+            Button(this@profileIdentityPanel).apply {
+                text = "✎  Change"
+                textSize = 12f
+                setTypeface(Typeface.DEFAULT_BOLD)
+                setTextColor(Color.WHITE)
+                minWidth = 0
+                minHeight = 0
+                setPadding(dp(6), 0, dp(6), 0)
+                background = LudoProofTheme.rounded(
+                    0xFF064EAE.toInt(),
+                    999f,
+                    0xFF2ED3FF.toInt(),
+                    1.5f,
+                    this@profileIdentityPanel,
                 )
-            }
+                contentDescription = "Change selected Paw"
+                setOnClickListener {
+                    startActivity(
+                        Intent(this@profileIdentityPanel, StoreActivity::class.java)
+                            .putExtra(StoreActivity.EXTRA_INITIAL_TAB, StoreTab.PAWS.name),
+                    )
+                }
+                AppFocusRing.apply(this, cornerRadiusDp = 999f)
+            },
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(36),
+            ).apply { topMargin = dp(6) },
+        )
+        heroRow.addView(
+            pawColumn,
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.43f),
+        )
 
-        val nameRow =
-            LinearLayout(this@profileIdentityPanel).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-            }
+        val details = LinearLayout(this@profileIdentityPanel).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(9), 0, 0, 0)
+        }
+        val signInRow = LinearLayout(this@profileIdentityPanel).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.END or Gravity.CENTER_VERTICAL
+        }
+        signInRow.addView(
+            Button(this@profileIdentityPanel).apply {
+                text = when {
+                    playGamesSignInInProgress -> "CONNECTING…"
+                    playGamesAuthenticated -> "✓  CONNECTED"
+                    else -> "▶  SIGN IN"
+                }
+                textSize = 11f
+                setTypeface(Typeface.DEFAULT_BOLD)
+                setTextColor(Color.WHITE)
+                minWidth = 0
+                minHeight = 0
+                setPadding(dp(8), 0, dp(8), 0)
+                background = LudoProofTheme.rounded(
+                    0xFF058A69.toInt(),
+                    13f,
+                    0xFF20E1C0.toInt(),
+                    1.5f,
+                    this@profileIdentityPanel,
+                )
+                contentDescription = "Sign in to Google Play Games"
+                isEnabled = !playGamesAuthenticated && !playGamesSignInInProgress
+                alpha = if (isEnabled || playGamesAuthenticated) 1f else 0.78f
+                setOnClickListener { beginPlayGamesSignIn() }
+                AppFocusRing.apply(this, cornerRadiusDp = 13f)
+            },
+            LinearLayout.LayoutParams(dp(126), dp(38)),
+        )
+        details.addView(signInRow)
+
+        val nameRow = LinearLayout(this@profileIdentityPanel).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(4), 0, 0)
+        }
         nameRow.addView(
             TextView(this@profileIdentityPanel).apply {
                 text = profile.displayName
-                textSize = 22f
+                textSize = 21f
                 maxLines = 1
                 ellipsize = android.text.TextUtils.TruncateAt.END
                 setTypeface(Typeface.DEFAULT_BOLD)
@@ -281,14 +227,14 @@ internal fun ProfileActivity.profileIdentityPanel(
             Button(this@profileIdentityPanel).apply {
                 text = "✎"
                 textSize = 15f
-                setTextColor(0xFF9BE8FF.toInt())
+                setTextColor(0xFFE2F8FF.toInt())
                 minWidth = 0
                 minHeight = 0
-                setPadding(dp(7), 0, dp(7), 0)
+                setPadding(dp(6), 0, dp(6), 0)
                 background = LudoProofTheme.rounded(
                     0x3327C6F4,
                     8f,
-                    0x6656D9FF,
+                    0xAA55DFFF.toInt(),
                     1f,
                     this@profileIdentityPanel,
                 )
@@ -296,198 +242,166 @@ internal fun ProfileActivity.profileIdentityPanel(
                 setOnClickListener { showNameEditor() }
                 AppFocusRing.apply(this, cornerRadiusDp = 8f)
             },
-            LinearLayout.LayoutParams(dp(34), dp(32)).apply {
-                marginStart = dp(6)
-            },
+            LinearLayout.LayoutParams(dp(32), dp(30)).apply { marginStart = dp(4) },
         )
-        copy.addView(nameRow)
+        details.addView(nameRow)
 
-        val progress =
-            ProfileProgression
-                .levelProgress(
-                    profile.totalXp,
-                )
-        val levelRow =
-            LinearLayout(
-                this@profileIdentityPanel,
-            ).apply {
-                orientation =
-                    LinearLayout.HORIZONTAL
-                gravity =
-                    Gravity.CENTER_VERTICAL
-                setPadding(
-                    0,
-                    dp(10),
-                    0,
-                    0,
-                )
-            }
-
-        levelRow.addView(
-            TextView(
-                this@profileIdentityPanel,
-            ).apply {
-                text =
-                    "★" +
-                        progress.level
-                textSize =
-                    22f
-                setTypeface(
-                    Typeface.DEFAULT_BOLD,
-                )
-                setTextColor(
-                    LudoProofTheme.GOLD,
-                )
-                gravity =
-                    Gravity.CENTER
+        val progress = ProfileProgression.levelProgress(profile.totalXp)
+        val xpRow = LinearLayout(this@profileIdentityPanel).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(5), 0, 0)
+        }
+        xpRow.addView(
+            TextView(this@profileIdentityPanel).apply {
+                text = "★${progress.level}"
+                textSize = 21f
+                setTypeface(Typeface.DEFAULT_BOLD)
+                setTextColor(0xFFFFD43B.toInt())
+                gravity = Gravity.CENTER
             },
-            LinearLayout.LayoutParams(
-                dp(58),
-                dp(38),
-            ),
+            LinearLayout.LayoutParams(dp(43), dp(34)),
         )
 
-        val track =
-            FrameLayout(
+        val track = FrameLayout(this@profileIdentityPanel).apply {
+            background = LudoProofTheme.rounded(
+                0xFF052E78.toInt(),
+                999f,
+                0xFF3185D5.toInt(),
+                1f,
                 this@profileIdentityPanel,
-            ).apply {
-                background =
-                    LudoProofTheme
-                        .rounded(
-                            0xD908245B.toInt(),
-                            999f,
-                            0xFF4A91D9.toInt(),
-                            1f,
-                            this@profileIdentityPanel,
-                        )
-            }
+            )
+            clipToOutline = true
+        }
+        val fill = View(this@profileIdentityPanel).apply {
+            background = GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                intArrayOf(0xFFFFD83D.toInt(), 0xFFFFB812.toInt()),
+            ).apply { cornerRadius = dp(999).toFloat() }
+        }
         track.addView(
-            TextView(
-                this@profileIdentityPanel,
-            ).apply {
-                text =
-                    progress.xpIntoLevel
-                        .toString() +
-                        " / " +
-                        progress.xpForNextLevel +
-                        " XP"
-                textSize =
-                    11f
-                setTypeface(
-                    Typeface.DEFAULT_BOLD,
-                )
-                setTextColor(
-                    Color.WHITE,
-                )
-                gravity =
-                    Gravity.CENTER
-                background =
-                    GradientDrawable(
-                        GradientDrawable.Orientation.LEFT_RIGHT,
-                        intArrayOf(
-                            0xFF35D4C7.toInt(),
-                            0xFF168FE5.toInt(),
-                        ),
-                    ).apply {
-                        cornerRadius =
-                            dp(999)
-                                .toFloat()
-                    }
-            },
-            FrameLayout.LayoutParams(
-                0,
-                FrameLayout.LayoutParams.MATCH_PARENT,
-            ).apply {
-                width =
-                    dp(
-                        (
-                            180 *
-                                progress.fraction
-                            )
-                            .toInt()
-                            .coerceAtLeast(
-                                32,
-                            ),
-                    )
-            },
+            fill,
+            FrameLayout.LayoutParams(0, FrameLayout.LayoutParams.MATCH_PARENT, Gravity.START),
         )
         track.addView(
-            TextView(
-                this@profileIdentityPanel,
-            ).apply {
-                text =
-                    progress.xpIntoLevel
-                        .toString() +
-                        " / " +
-                        progress.xpForNextLevel +
-                        " XP"
-                textSize =
-                    11f
-                setTypeface(
-                    Typeface.DEFAULT_BOLD,
-                )
-                setTextColor(
-                    Color.WHITE,
-                )
-                gravity =
-                    Gravity.CENTER
+            TextView(this@profileIdentityPanel).apply {
+                text = "${progress.xpIntoLevel} / ${progress.xpForNextLevel} XP"
+                textSize = 10.5f
+                setTypeface(Typeface.DEFAULT_BOLD)
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
+                maxLines = 1
             },
             FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT,
             ),
         )
-
-        levelRow.addView(
+        track.post {
+            if (track.width > 0) {
+                val params = fill.layoutParams as FrameLayout.LayoutParams
+                params.width = (track.width * progress.fraction).toInt()
+                    .coerceIn(0, track.width)
+                fill.layoutParams = params
+            }
+        }
+        xpRow.addView(
             track,
-            LinearLayout.LayoutParams(
-                0,
-                dp(30),
-                1f,
-            ),
+            LinearLayout.LayoutParams(0, dp(32), 1f),
         )
-        copy.addView(
-            levelRow,
-        )
+        details.addView(xpRow)
 
-        identity.addView(
-            copy,
-            LinearLayout.LayoutParams(
-                0,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
+        val statsStrip = LinearLayout(this@profileIdentityPanel).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(dp(2), dp(7), dp(2), dp(7))
+            background = LudoProofTheme.rounded(
+                0xC9082A69.toInt(),
+                14f,
+                0xFF176FCC.toInt(),
                 1f,
-            ),
-        )
-        addView(
-            identity,
-        )
-
-        addView(
-            TextView(
                 this@profileIdentityPanel,
-            ).apply {
-                text =
-                    profile.totalGames
-                        .toString() +
-                        " games · " +
-                        profile.currentDayStreak +
-                        " day streak · " +
-                        profile.totalWins +
-                        " wins"
-                textSize =
-                    16f
-                setTypeface(
-                    Typeface.DEFAULT_BOLD,
-                )
-                setTextColor(
-                    Color.WHITE,
-                )
-                setPadding(
-                    0,
-                    dp(16),
-                    0,
-                    0,
-                )
-            },
+            )
+        }
+        statsStrip.addView(
+            statCell("🎮", profile.totalGames.toString(), "Games"),
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f),
         )
+        statsStrip.addView(statDivider())
+        statsStrip.addView(
+            statCell("🔥", profile.currentDayStreak.toString(), "Day Streak"),
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f),
+        )
+        statsStrip.addView(statDivider())
+        statsStrip.addView(
+            statCell("🏆", profile.totalWins.toString(), "Wins"),
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f),
+        )
+        details.addView(
+            statsStrip,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply { topMargin = dp(8) },
+        )
+
+        heroRow.addView(
+            details,
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.57f),
+        )
+        addView(
+            heroRow,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ),
+        )
+    }
+
+private fun ProfileActivity.statCell(symbol: String, value: String, label: String): LinearLayout =
+    LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        gravity = Gravity.CENTER
+        addView(
+            TextView(this@statCell).apply {
+                text = symbol
+                textSize = 17f
+                gravity = Gravity.CENTER
+                setTextColor(Color.WHITE)
+                contentDescription = label
+            },
+            LinearLayout.LayoutParams(dp(26), dp(22)),
+        )
+        addView(
+            TextView(this@statCell).apply {
+                text = value
+                textSize = 17f
+                setTypeface(Typeface.DEFAULT_BOLD)
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
+            },
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ),
+        )
+        addView(
+            TextView(this@statCell).apply {
+                text = label
+                textSize = 9f
+                maxLines = 1
+                setTextColor(0xFFD5F0FF.toInt())
+                gravity = Gravity.CENTER
+            },
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ),
+        )
+    }
+
+private fun ProfileActivity.statDivider(): View =
+    View(this).apply {
+        setBackgroundColor(0xFF176FC2.toInt())
+        layoutParams = LinearLayout.LayoutParams(dp(1), dp(48))
     }
