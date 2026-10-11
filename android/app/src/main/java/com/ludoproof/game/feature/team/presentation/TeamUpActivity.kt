@@ -73,6 +73,7 @@ class TeamUpActivity : Activity() {
     @Volatile
     private var requestInFlight = false
     private var stopped = false
+    private var validatingRestoredSearch = false
 
     private lateinit var quickTeamButton: FrameLayout
     private lateinit var cancelButton: Button
@@ -88,7 +89,7 @@ class TeamUpActivity : Activity() {
             override fun run() {
                 if (!stopped && ticketStore.load() != null) {
                     pollSearch()
-                    updateTimer()
+                    if (!validatingRestoredSearch) updateTimer()
                 }
                 if (!stopped) {
                     handler.postDelayed(this, POLL_MS)
@@ -100,6 +101,9 @@ class TeamUpActivity : Activity() {
         super.onCreate(savedInstanceState)
         LudoProofTheme.configureWindow(this)
         selectedCharacterId = CharacterSelectionStore(this).load().characterId
+        // A persisted ticket may belong to an earlier app session. Keep its old
+        // elapsed time hidden until the server confirms that the search is active.
+        validatingRestoredSearch = ticketStore.load() != null
         buildUi()
         renderSearchState()
     }
@@ -653,6 +657,7 @@ class TeamUpActivity : Activity() {
             displayName = displayName,
             startedAt = System.currentTimeMillis(),
         )
+        validatingRestoredSearch = false
         runCatching { ticketStore.save(ticket) }
             .onFailure {
                 showStatus("Could not save Team Up search. Try again.")
@@ -718,11 +723,13 @@ class TeamUpActivity : Activity() {
     }
 
     private fun applyMatchmakingResponse(response: JSONObject) {
+        validatingRestoredSearch = false
         when (response.optString("status")) {
             "MATCHED" -> openMatchedGame(response)
             "SEARCHING" -> {
                 val queued = response.optInt("queuedPlayers", 1).coerceIn(1, 4)
                 renderQueuedPlayers(queued, queuedCharacterIds(response))
+                updateTimer()
             }
             "IDLE" -> {
                 ticketStore.clear()
@@ -857,7 +864,11 @@ class TeamUpActivity : Activity() {
         searchPanel.visibility = if (searching) View.VISIBLE else View.GONE
         if (searching) {
             renderQueuedPlayers(1)
-            updateTimer()
+            if (validatingRestoredSearch) {
+                timerText.text = "SEARCH  CHECKING..."
+            } else {
+                updateTimer()
+            }
         }
         updateButtons()
     }
