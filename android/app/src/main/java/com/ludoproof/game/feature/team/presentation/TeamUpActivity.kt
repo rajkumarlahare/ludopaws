@@ -14,8 +14,8 @@ import android.os.SystemClock
 import android.view.Gravity
 import android.view.View
 import android.view.WindowInsets
-import android.widget.Button
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -65,7 +65,7 @@ class TeamUpActivity : Activity() {
     private var requestInFlight = false
     private var stopped = false
 
-    private lateinit var quickTeamButton: Button
+    private lateinit var quickTeamButton: FrameLayout
     private lateinit var cancelButton: Button
     private lateinit var setupContent: LinearLayout
     private lateinit var searchPanel: LinearLayout
@@ -204,18 +204,48 @@ class TeamUpActivity : Activity() {
         setupContent = teamSetupPanel()
         teamPanel.addView(setupContent)
 
-        quickTeamButton = Button(this).apply {
-            text = "FIND A TEAM"
-            textSize = 18f
-            setTypeface(Typeface.DEFAULT_BOLD)
-            setTextColor(Color.WHITE)
-            background = playGamesSignInBackground(this@TeamUpActivity)
-            val playIcon = context.getDrawable(com.ludoproof.game.R.drawable.ic_play_triangle_white)?.mutate()
-            playIcon?.setBounds(0, 0, dp(20), dp(20))
-            setCompoundDrawablesRelative(playIcon, null, null, null)
-            compoundDrawablePadding = dp(8)
+        quickTeamButton = FrameLayout(this).apply {
+            isClickable = true
+            isFocusable = true
             contentDescription = "Find a team online"
-            AppFocusRing.apply(this, cornerRadiusDp = 999f, strokeWidthDp = 3f)
+            background = playGamesSignInBackground(this@TeamUpActivity)
+
+            val label = TextView(this@TeamUpActivity).apply {
+                text = "FIND A TEAM"
+                textSize = 18f
+                setTypeface(Typeface.DEFAULT_BOLD)
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
+                includeFontPadding = false
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }
+            addView(
+                label,
+                FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                ),
+            )
+
+            val playIconSize = dp(36)
+            val playIcon = ImageView(this@TeamUpActivity).apply {
+                setImageDrawable(
+                    context.getDrawable(com.ludoproof.game.R.drawable.ic_play_triangle_white)?.mutate(),
+                )
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                translationX =
+                    label.paint.measureText(label.text.toString()) / 2f + dp(6) + playIconSize / 2f
+            }
+            addView(
+                playIcon,
+                FrameLayout.LayoutParams(
+                    playIconSize,
+                    playIconSize,
+                    Gravity.CENTER,
+                ),
+            )
+            AppFocusRing.apply(this, cornerRadiusDp = 13f, strokeWidthDp = 3f)
             setOnClickListener { playSelectionPopAnimation { beginSearch() } }
         }
         setupContent.addView(
@@ -412,60 +442,38 @@ class TeamUpActivity : Activity() {
      * Uses the same square, recessed-plywood character tiles as Online Match.
      * The current player's chosen paw leads, followed by the other starter paws.
      */
-    private fun teamCharacterTiles(): LinearLayout =
-        LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-            clipChildren = false
-            clipToPadding = false
-
-            val catalogIds = LudoPawsCharacterCatalog
-                .charactersForPack(LudoPawsCharacterCatalog.STARTER_PACK_ID)
-                .map { it.id }
-            val firstCharacterId =
+    /**
+     * Shows only the character chosen in the player's profile, using Online Match's
+     * square recessed-plywood avatar treatment.
+     */
+    private fun teamCharacterTiles(): FrameLayout =
+        FrameLayout(this).apply {
+            val profileCharacterId =
                 LudoPawsCharacterCatalog.canonicalCharacterId(selectedCharacterId)
-                    ?.takeIf { it in catalogIds }
                     ?: LudoPawsCharacterCatalog.DEFAULT_CHARACTER_ID
-            val displayedCharacterIds = buildList {
-                add(firstCharacterId)
-                addAll(catalogIds.filterNot { it == firstCharacterId })
-            }.take(4)
+            val character =
+                LudoPawsCharacterCatalog.character(profileCharacterId)
+                    ?: LudoPawsCharacterCatalog.character(LudoPawsCharacterCatalog.DEFAULT_CHARACTER_ID)
+                    ?: return@apply
 
-            val screenWidthDp =
-                resources.displayMetrics.widthPixels / resources.displayMetrics.density
-            val tileSizeDp = ((screenWidthDp - 102f) / 4f).toInt().coerceIn(52, 72)
-
-            displayedCharacterIds.forEachIndexed { index, characterId ->
-                val character =
-                    LudoPawsCharacterCatalog.character(characterId) ?: return@forEachIndexed
-                val characterTile = FrameLayout(this@TeamUpActivity).apply {
-                    background = recessedPlywoodBackground(
-                        context = this@TeamUpActivity,
-                        outerCornerRadiusDp = 14f,
+            background = recessedPlywoodBackground(
+                context = this@TeamUpActivity,
+                outerCornerRadiusDp = 18f,
+            )
+            setPadding(dp(3), dp(3), dp(3), dp(3))
+            contentDescription = "Your selected character: ${character.displayName}"
+            addView(
+                LudoPawsCharacterAvatarView(this@TeamUpActivity).apply {
+                    bind(
+                        characterId = character.id,
+                        showCircularChrome = false,
                     )
-                    setPadding(dp(3), dp(3), dp(3), dp(3))
-                    contentDescription = "${character.displayName} character"
-                    addView(
-                        LudoPawsCharacterAvatarView(this@TeamUpActivity).apply {
-                            bind(
-                                characterId = characterId,
-                                showCircularChrome = false,
-                            )
-                        },
-                        FrameLayout.LayoutParams(
-                            FrameLayout.LayoutParams.MATCH_PARENT,
-                            FrameLayout.LayoutParams.MATCH_PARENT,
-                        ),
-                    )
-                }
-                addView(
-                    characterTile,
-                    LinearLayout.LayoutParams(dp(tileSizeDp), dp(tileSizeDp)).apply {
-                        marginStart = dp(if (index == 2) 9 else 3)
-                        marginEnd = dp(3)
-                    },
-                )
-            }
+                },
+                FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                ),
+            )
         }
 
     private fun teamSetupPanel(): LinearLayout =
@@ -474,7 +482,9 @@ class TeamUpActivity : Activity() {
             gravity = Gravity.CENTER_HORIZONTAL
             addView(
                 teamCharacterTiles(),
-                LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(88)),
+                LinearLayout.LayoutParams(dp(96), dp(96)).apply {
+                    gravity = Gravity.CENTER_HORIZONTAL
+                },
             )
             addView(
                 TextView(this@TeamUpActivity).apply {
@@ -500,20 +510,6 @@ class TeamUpActivity : Activity() {
                     topMargin = dp(8)
                 },
             )
-            val ruleRow =
-                LinearLayout(this@TeamUpActivity).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    gravity = Gravity.CENTER
-                    setPadding(0, dp(14), 0, 0)
-                    addView(ruleChip("NO FRIENDLY CAPTURE"))
-                    addView(
-                        ruleChip("BOTH PARTNERS FINISH"),
-                        LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(34)).apply {
-                            marginStart = dp(7)
-                        },
-                    )
-                }
-            addView(ruleRow)
         }
 
     private fun teamLabelRow(
@@ -550,19 +546,6 @@ class TeamUpActivity : Activity() {
                 },
                 LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f),
             )
-        }
-
-    private fun ruleChip(value: String): TextView =
-        TextView(this).apply {
-            text = value
-            LudoProofTheme.body(this, 8.5f, centered = true, bright = true)
-            setTypeface(Typeface.DEFAULT_BOLD)
-            setPadding(dp(8), dp(7), dp(8), dp(7))
-            background =
-                transparentDarkBlueStrokeBackground(
-                    context = this@TeamUpActivity,
-                    cornerRadiusDp = 999f,
-                )
         }
 
     private fun beginSearch() {
