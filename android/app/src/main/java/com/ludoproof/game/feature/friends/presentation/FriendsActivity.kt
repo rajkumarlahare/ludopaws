@@ -610,8 +610,37 @@ class FriendsActivity : Activity() {
                 }
             })
         }
+        search.setPadding(
+            search.paddingLeft,
+            search.paddingTop,
+            dp(31),
+            search.paddingBottom,
+        )
+        val searchInputWithIcon = FrameLayout(this).apply {
+            addView(
+                search,
+                FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                ),
+            )
+            addView(
+                FriendsVisualKit.iconView(this@FriendsActivity, FriendsIcon.SEARCH, Color.WHITE).apply {
+                    isClickable = false
+                    isFocusable = false
+                    importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                },
+                FrameLayout.LayoutParams(
+                    dp(if (isCompact()) 16 else 18),
+                    dp(if (isCompact()) 16 else 18),
+                    Gravity.END or Gravity.CENTER_VERTICAL,
+                ).apply {
+                    marginEnd = dp(9)
+                },
+            )
+        }
         header.addView(
-            search,
+            searchInputWithIcon,
             LinearLayout.LayoutParams(if (isCompact()) dp(132) else dp(180), dp(36))
                 .apply { marginStart = dp(6) },
         )
