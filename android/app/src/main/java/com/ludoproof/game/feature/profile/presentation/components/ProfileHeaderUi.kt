@@ -122,37 +122,33 @@ internal fun ProfileActivity.profileIdentityPanel(profile: ProfileSnapshot): Lin
             gravity = Gravity.CENTER_HORIZONTAL
         }
         val pawFrame = FrameLayout(this@profileIdentityPanel).apply {
-            background = GradientDrawable(
-                GradientDrawable.Orientation.TOP_BOTTOM,
-                intArrayOf(0xFF149CFF.toInt(), 0xFF0751B5.toInt()),
-            ).apply {
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                setGradientType(GradientDrawable.RADIAL_GRADIENT)
+                gradientRadius = dp(125).toFloat()
+                setColors(
+                    intArrayOf(
+                        0xFF168FF5.toInt(),
+                        0xFF0755B8.toInt(),
+                        0xFF031B45.toInt(),
+                    ),
+                )
                 cornerRadius = dp(18).toFloat()
-                setStroke(dp(1), 0xFF63DFFF.toInt())
             }
+            clipChildren = false
+            clipToPadding = false
         }
-        // A subtle neon paw stage echoes the reference artwork without adding a second character.
-        pawFrame.addView(
-            View(this@profileIdentityPanel).apply {
-                background = GradientDrawable(
-                    GradientDrawable.Orientation.LEFT_RIGHT,
-                    intArrayOf(0xFF35C9FF.toInt(), 0xFF75F4FF.toInt(), 0xFF167FFF.toInt()),
-                ).apply {
-                    shape = GradientDrawable.OVAL
-                    setStroke(dp(1), 0xFFB0FFFF.toInt())
-                }
-                elevation = dp(2).toFloat()
-            },
-            FrameLayout.LayoutParams(dp(104), dp(16), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply {
-                bottomMargin = dp(7)
-            },
-        )
+        // Reuse the existing production 3D character portrait. On this screen,
+        // render it directly over the blue glow without the generic white disc,
+        // coloured selection ring, or the flat decorative oval.
         pawFrame.addView(
             LudoPawsCharacterAvatarView(this@profileIdentityPanel).apply {
-                setPadding(dp(3), dp(3), dp(3), dp(3))
+                setPadding(0, 0, 0, 0)
                 bind(
                     characterId = selection.characterId,
-                    ringColor = 0xFFFFD34A.toInt(),
-                    highlighted = true,
+                    ringColor = 0xFF5BE0FF.toInt(),
+                    highlighted = false,
+                    showCircularChrome = false,
                 )
                 contentDescription = "Selected Paw: ${character?.displayName ?: "Paw"}"
                 importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
@@ -160,21 +156,28 @@ internal fun ProfileActivity.profileIdentityPanel(profile: ProfileSnapshot): Lin
             FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT,
+                Gravity.TOP or Gravity.CENTER_HORIZONTAL,
             ),
         )
-        pawColumn.addView(
-            pawFrame,
-            LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(132)),
-        )
-        pawColumn.addView(
+        pawFrame.addView(
             Button(this@profileIdentityPanel).apply {
-                text = "✎  Change"
+                text = "Change"
                 textSize = 12f
+                isAllCaps = false
                 setTypeface(Typeface.DEFAULT_BOLD)
                 setTextColor(Color.WHITE)
                 minWidth = 0
                 minHeight = 0
-                setPadding(dp(6), 0, dp(6), 0)
+                val pencil = context
+                    .getDrawable(com.ludoproof.game.R.drawable.ic_profile_edit_pen)
+                    ?.mutate()
+                    ?.apply {
+                        setTint(Color.WHITE)
+                        setBounds(0, 0, dp(16), dp(16))
+                    }
+                setCompoundDrawablesRelative(pencil, null, null, null)
+                compoundDrawablePadding = dp(5)
+                setPadding(dp(10), 0, dp(10), 0)
                 background = LudoProofTheme.rounded(
                     0xFF064EAE.toInt(),
                     999f,
@@ -191,10 +194,19 @@ internal fun ProfileActivity.profileIdentityPanel(profile: ProfileSnapshot): Lin
                 }
                 AppFocusRing.apply(this, cornerRadiusDp = 999f)
             },
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
                 dp(36),
-            ).apply { topMargin = dp(6) },
+                Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL,
+            ).apply {
+                leftMargin = dp(8)
+                rightMargin = dp(8)
+                bottomMargin = dp(3)
+            },
+        )
+        pawColumn.addView(
+            pawFrame,
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(178)),
         )
         heroRow.addView(
             pawColumn,
