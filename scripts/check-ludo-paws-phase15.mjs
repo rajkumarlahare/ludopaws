@@ -83,7 +83,7 @@ requireText(
 );
 rejectText(
   profileActivity,
-  "profilePawIdentityPanel()",
+  "profileHeaderIdentityPanel()",
   "Profile must not render a duplicate Paw identity panel.",
 );
 requireText(
@@ -97,17 +97,17 @@ requireText(
   "The Profile hero Paw must come from the real persisted character selection.",
 );
 requireText(
-  profilePaw,
+  profileHeader,
   "importantForAccessibility",
   "The Profile hero character portrait must be exposed to accessibility services.",
 );
 requireText(
-  profilePaw,
+  profileHeader,
   "Character personality is presentation-only and never changes dice or legal moves.",
   "Profile must keep the cosmetic/gameplay trust boundary explicit.",
 );
 requireText(
-  profilePaw,
+  profileHeader,
   "StoreActivity.EXTRA_INITIAL_TAB",
   "The Change Paw control must deep-link to the Paws store instead of dropping users into an unrelated tab.",
 );
