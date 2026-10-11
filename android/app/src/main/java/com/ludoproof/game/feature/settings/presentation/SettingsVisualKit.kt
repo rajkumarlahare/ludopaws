@@ -123,7 +123,7 @@ private class SettingsCloseButton(
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = 0xFFFF3030.toInt()
             style = Paint.Style.STROKE
-            strokeWidth = settingsDp(context, 3f)
+            strokeWidth = settingsDp(context, 3f).toFloat()
             strokeCap = Paint.Cap.ROUND
             strokeJoin = Paint.Join.ROUND
         }
