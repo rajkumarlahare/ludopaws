@@ -26,6 +26,9 @@ import com.ludoproof.game.GameMode
 import com.ludoproof.game.GameModeIntent
 import com.ludoproof.game.LudoProofTheme
 import com.ludoproof.game.core.ui.components.AppFocusRing
+import com.ludoproof.game.core.ui.art.plywoodBackground
+import com.ludoproof.game.core.ui.art.recessedPlywoodBackground
+import com.ludoproof.game.core.ui.art.transparentDarkBlueStrokeBackground
 import com.ludoproof.game.core.ui.icons.AppIconName
 import com.ludoproof.game.core.ui.icons.AppIconView
 import com.ludoproof.game.MainActivity
@@ -153,12 +156,9 @@ class TeamUpActivity : Activity() {
                         setTextColor(0xFF62E9FF.toInt())
                         setPadding(dp(12), dp(2), dp(12), dp(2))
                         background =
-                            LudoProofTheme.rounded(
-                                0xCC071C49.toInt(),
-                                999f,
-                                0x6647D7FF,
-                                1f,
-                                this@TeamUpActivity,
+                            transparentDarkBlueStrokeBackground(
+                                context = this@TeamUpActivity,
+                                cornerRadiusDp = 999f,
                             )
                     },
                     LinearLayout.LayoutParams(
@@ -190,7 +190,11 @@ class TeamUpActivity : Activity() {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER_HORIZONTAL
                 setPadding(dp(18), dp(18), dp(18), dp(18))
-                background = teamPanelBackground()
+                background =
+                    plywoodBackground(
+                        context = this@TeamUpActivity,
+                        cornerRadiusDp = 24f,
+                    )
             }
         setupContent = teamSetupPanel()
         teamPanel.addView(setupContent)
@@ -231,7 +235,13 @@ class TeamUpActivity : Activity() {
         searchPanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(0, dp(4), 0, 0)
+            setPadding(dp(12), dp(14), dp(12), dp(14))
+            // The search content is recessed into the outer plywood board.
+            background =
+                recessedPlywoodBackground(
+                    context = this@TeamUpActivity,
+                    outerCornerRadiusDp = 20f,
+                )
             visibility = View.GONE
 
             addView(
@@ -356,7 +366,16 @@ class TeamUpActivity : Activity() {
                 onSettings = {
                     com.ludoproof.game.ArcadeDialogs.showSettings(this)
                 },
-            )
+            ).apply {
+                // Match the Online page's reusable plywood skin on Back and Settings.
+                for (index in 0 until childCount) {
+                    getChildAt(index).background =
+                        plywoodBackground(
+                            context = this@TeamUpActivity,
+                            cornerRadiusDp = 999f,
+                        )
+                }
+            }
         setContentView(root)
         root.setOnApplyWindowInsetsListener { _, insets ->
             val cutoutTop =
@@ -443,13 +462,10 @@ class TeamUpActivity : Activity() {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(12), dp(6), dp(12), dp(6))
             background =
-                GradientDrawable(
-                    GradientDrawable.Orientation.LEFT_RIGHT,
-                    intArrayOf(0xCC071A3A.toInt(), 0xAA0A2B58.toInt()),
-                ).apply {
-                    cornerRadius = dp(13).toFloat()
-                    setStroke(dp(1), 0x4459D9FF)
-                }
+                recessedPlywoodBackground(
+                    context = this@TeamUpActivity,
+                    outerCornerRadiusDp = 13f,
+                )
             addView(TeamColorTokenView(this@TeamUpActivity, firstColor, secondColor), LinearLayout.LayoutParams(dp(38), dp(30)))
             addView(
                 TextView(this@TeamUpActivity).apply {
@@ -478,22 +494,10 @@ class TeamUpActivity : Activity() {
             setTypeface(Typeface.DEFAULT_BOLD)
             setPadding(dp(8), dp(7), dp(8), dp(7))
             background =
-                LudoProofTheme.rounded(
-                    0xAA071A3A.toInt(),
-                    999f,
-                    0x5569DFFF,
-                    1f,
-                    this@TeamUpActivity,
+                transparentDarkBlueStrokeBackground(
+                    context = this@TeamUpActivity,
+                    cornerRadiusDp = 999f,
                 )
-        }
-
-    private fun teamPanelBackground(): GradientDrawable =
-        GradientDrawable(
-            GradientDrawable.Orientation.TOP_BOTTOM,
-            intArrayOf(0xF20A2856.toInt(), 0xF2081B3D.toInt()),
-        ).apply {
-            cornerRadius = dp(22).toFloat()
-            setStroke(dp(2), 0xFF40CFFF.toInt())
         }
 
     private fun beginSearch() {
