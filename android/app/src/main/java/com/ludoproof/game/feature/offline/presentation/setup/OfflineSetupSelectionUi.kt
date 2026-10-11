@@ -27,7 +27,7 @@ import com.ludoproof.game.feature.offline.*
 import com.ludoproof.game.ui.offline.common.*
 
 internal fun OfflineGameActivity.playersPanel(
-    embeddedInComputerPanel: Boolean = false,
+    embeddedInCombinedPanel: Boolean = false,
 ):
     LinearLayout =
     selectionPanel(
@@ -37,7 +37,7 @@ internal fun OfflineGameActivity.playersPanel(
         } else {
             "Choose 2–4 players on this device."
         },
-        embeddedInComputerPanel = embeddedInComputerPanel,
+        embeddedInCombinedPanel = embeddedInCombinedPanel,
     ).apply {
         val playersRow = LinearLayout(this@playersPanel).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -116,11 +116,14 @@ internal fun OfflineGameActivity.playersPanel(
         addView(playersRow)
     }
 
-internal fun OfflineGameActivity.colorPanel():
+internal fun OfflineGameActivity.colorPanel(
+    embeddedInCombinedPanel: Boolean = false,
+):
     LinearLayout =
     selectionPanel(
         "CHOOSE YOUR COLOR",
         "Your color will rotate to the bottom-left side.",
+        embeddedInCombinedPanel = embeddedInCombinedPanel,
     ).apply {
         val colorRow = LinearLayout(this@colorPanel).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -284,25 +287,25 @@ internal fun OfflineGameActivity.localTrustStrip():
 internal fun OfflineGameActivity.selectionPanel(
     title: String,
     subtitle: String,
-    embeddedInComputerPanel: Boolean = false,
+    embeddedInCombinedPanel: Boolean = false,
 ):
     LinearLayout =
     LudoProofTheme.panel(this).apply {
-        val horizontalPadding = if (embeddedInComputerPanel) {
+        val horizontalPadding = if (embeddedInCombinedPanel) {
             dp(if (isCompactSetup()) 4 else 6)
         } else {
             dp(if (isCompactSetup()) 10 else 14)
         }
-        val verticalPadding = if (embeddedInComputerPanel) {
+        val verticalPadding = if (embeddedInCombinedPanel) {
             dp(if (isCompactSetup()) 3 else 5)
         } else {
             dp(if (isCompactSetup()) 10 else 14)
         }
         setPadding(horizontalPadding, verticalPadding, horizontalPadding, verticalPadding)
-        // Embedded subsections are transparent: the shared Computer parent is
-        // the sole recessed plywood surface. Other modes retain their own panels.
+        // Embedded subsections are transparent: their shared parent supplies
+        // the single plywood surface for the combined setup.
         background = when {
-            embeddedInComputerPanel -> ColorDrawable(Color.TRANSPARENT)
+            embeddedInCombinedPanel -> ColorDrawable(Color.TRANSPARENT)
             isComputerMode -> recessedPlywoodBackground(
                 context = this@selectionPanel,
                 outerCornerRadiusDp = 20f,
@@ -312,7 +315,7 @@ internal fun OfflineGameActivity.selectionPanel(
                 outerCornerRadiusDp = 20f,
             )
         }
-        if (embeddedInComputerPanel) elevation = 0f
+        if (embeddedInCombinedPanel) elevation = 0f
 
         val heading = LinearLayout(this@selectionPanel).apply {
             orientation = LinearLayout.HORIZONTAL

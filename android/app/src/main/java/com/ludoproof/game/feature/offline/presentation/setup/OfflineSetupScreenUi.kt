@@ -72,10 +72,9 @@ internal fun OfflineGameActivity.showSetup() {
                 if (isComputerMode) 0 else dp(8),
                 if (isComputerMode) 0 else dp(24),
             )
-            background = if (isComputerMode) null else plywoodBackground(
-                context = this@showSetup,
-                cornerRadiusDp = 24f,
-            )
+            // The page itself has no backing panel. Pass & Play's three setup
+            // sections are grouped inside their own shared selection surface below.
+            background = null
         }
     contentHost.addView(
         content,
@@ -166,14 +165,14 @@ internal fun OfflineGameActivity.showSetup() {
             )
         }
         combinedSelectionPanel.addView(
-            characterPanel(embeddedInComputerPanel = true),
+            characterPanel(embeddedInCombinedPanel = true),
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
             ),
         )
         combinedSelectionPanel.addView(
-            playersPanel(embeddedInComputerPanel = true),
+            playersPanel(embeddedInCombinedPanel = true),
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -186,16 +185,50 @@ internal fun OfflineGameActivity.showSetup() {
             setupSectionParams(if (isCompactSetup()) 10 else 12),
         )
     } else {
-        content.addView(
-            characterPanel(),
-            setupSectionParams(if (isCompactSetup()) 12 else 14),
+        // One shared plywood surface for all three Pass & Play setup sections.
+        // The children are transparent so they read as one connected panel.
+        val combinedSelectionPanel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            clipChildren = false
+            clipToPadding = false
+            setPadding(
+                dp(8),
+                dp(if (isCompactSetup()) 6 else 8),
+                dp(8),
+                dp(if (isCompactSetup()) 8 else 10),
+            )
+            background = plywoodBackground(
+                context = this@showSetup,
+                cornerRadiusDp = 24f,
+            )
+        }
+        combinedSelectionPanel.addView(
+            characterPanel(embeddedInCombinedPanel = true),
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ),
+        )
+        combinedSelectionPanel.addView(
+            playersPanel(embeddedInCombinedPanel = true),
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                topMargin = dp(if (isCompactSetup()) 2 else 4)
+            },
+        )
+        combinedSelectionPanel.addView(
+            colorPanel(embeddedInCombinedPanel = true),
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                topMargin = dp(if (isCompactSetup()) 2 else 4)
+            },
         )
         content.addView(
-            playersPanel(),
-            setupSectionParams(if (isCompactSetup()) 10 else 12),
-        )
-        content.addView(
-            colorPanel(),
+            combinedSelectionPanel,
             setupSectionParams(if (isCompactSetup()) 10 else 12),
         )
     }

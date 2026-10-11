@@ -113,7 +113,7 @@ internal fun OfflineGameActivity.persistActiveCharacterSetup() {
 }
 
 internal fun OfflineGameActivity.characterPanel(
-    embeddedInComputerPanel: Boolean = false,
+    embeddedInCombinedPanel: Boolean = false,
 ): LinearLayout =
     selectionPanel(
         "CHOOSE YOUR PAW",
@@ -122,7 +122,7 @@ internal fun OfflineGameActivity.characterPanel(
         } else {
             "Give every player a different animal."
         },
-        embeddedInComputerPanel = embeddedInComputerPanel,
+        embeddedInCombinedPanel = embeddedInCombinedPanel,
     ).apply {
         if (isComputerMode) {
             // Computer mode needs no YOU/character slot tab; paw selection is direct.
