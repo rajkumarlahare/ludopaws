@@ -44,7 +44,7 @@ class GameTopActionsUiInstrumentedTest {
             assertTrue(settingsButton.background is StateListDrawable)
             assertNotNull(backButton.foreground)
             assertNotNull(settingsButton.foreground)
-            assertEquals(AppIconName.BACK, (backButton.getChildAt(0) as AppIconView).iconName)
+            assertEquals(AppIconName.BACK_ARROW, (backButton.getChildAt(0) as AppIconView).iconName)
             assertEquals(AppIconName.SETTINGS, (settingsButton.getChildAt(0) as AppIconView).iconName)
 
             backButton.performClick()
