@@ -814,7 +814,11 @@ internal fun MainActivity.stylePublicPlayerCountButton(
         playerCountSelectionBackground(
             context = button.context,
             selected = selected,
-            outerCornerRadiusDp = 20f,
+            outerCornerRadiusDp = 12f,
+            checkBadgeAtTopEnd = true,
+            emphasizeSelected = true,
+            showCheckBadge = true,
+            checkMarkScale = 3f,
         )
 }
 
