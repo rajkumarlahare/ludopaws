@@ -10,6 +10,8 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.LudoProofTheme
 import com.ludoproof.game.core.ui.components.AppFocusRing
+import com.ludoproof.game.core.ui.components.appIconActionButton
+import com.ludoproof.game.core.ui.icons.AppIconName
 import com.ludoproof.game.LudoPawsCharacterAvatarView
 import com.ludoproof.game.feature.characters.data.local.CharacterSelectionStore
 import com.ludoproof.game.feature.profile.domain.ProfileProgression
@@ -25,49 +27,13 @@ internal fun ProfileActivity.profileTopBar():
             Gravity.CENTER_VERTICAL
 
         addView(
-            Button(
-                this@profileTopBar,
-            ).apply {
-                text =
-                    "‹"
-                textSize =
-                    30f
-                setTypeface(
-                    Typeface.DEFAULT_BOLD,
-                )
-                setTextColor(
-                    Color.WHITE,
-                )
-                minWidth =
-                    0
-                minHeight =
-                    0
-                setPadding(
-                    0,
-                    0,
-                    0,
-                    dp(3),
-                )
-                background =
-                    GradientDrawable(
-                        GradientDrawable.Orientation.TOP_BOTTOM,
-                        intArrayOf(
-                            0xFFFFC928.toInt(),
-                            0xFFF07A00.toInt(),
-                        ),
-                    ).apply {
-                        shape =
-                            GradientDrawable.OVAL
-                        setStroke(
-                            dp(2),
-                            0xFFFFE47A.toInt(),
-                        )
-                    }
-                setOnClickListener {
-                    finish()
-                }
-                contentDescription = "Back"
-                AppFocusRing.apply(this, cornerRadiusDp = 999f)
+            appIconActionButton(
+                context = this@profileTopBar,
+                contentDescription = "Back",
+                iconName = AppIconName.CHEVRON_LEFT,
+                sizeDp = 50,
+            ) {
+                finish()
             },
             LinearLayout.LayoutParams(
                 dp(50),
