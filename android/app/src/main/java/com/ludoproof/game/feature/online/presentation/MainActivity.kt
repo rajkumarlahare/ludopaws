@@ -21,6 +21,7 @@ import androidx.activity.OnBackPressedCallback
 import org.json.JSONObject
 import java.util.concurrent.Executors
 import com.ludoproof.game.ui.game.addGameTopActions
+import com.ludoproof.game.core.ui.art.plywoodBackground
 import com.ludoproof.game.ui.online.*
 import com.ludoproof.game.feature.online.*
 import com.ludoproof.game.feature.online.FriendsVoiceChatSession
@@ -678,21 +679,30 @@ class MainActivity : ComponentActivity() {
 
         val topActionsBar =
             addGameTopActions(
-            host = host,
-            context = this,
-            onBack = { requestRemoteExit() },
-            onSettings = {
-                ArcadeDialogs.showSettings(this) {
-                    currentState?.let { state ->
-                        OnlineLudoPawsPresentation.render(
-                            activity = this,
-                            previous = state,
-                            current = state,
-                        )
+                host = host,
+                context = this,
+                onBack = { requestRemoteExit() },
+                onSettings = {
+                    ArcadeDialogs.showSettings(this) {
+                        currentState?.let { state ->
+                            OnlineLudoPawsPresentation.render(
+                                activity = this,
+                                previous = state,
+                                current = state,
+                            )
+                        }
                     }
+                },
+            ).apply {
+                // Use the shared plywood skin only for the Online screen's Back and Settings.
+                for (index in 0 until childCount) {
+                    getChildAt(index).background =
+                        plywoodBackground(
+                            context = this@MainActivity,
+                            cornerRadiusDp = 999f,
+                        )
                 }
-            },
-        )
+            }
 
         setContentView(root)
         root.setOnApplyWindowInsetsListener { _, insets ->
