@@ -102,7 +102,7 @@ private fun HomeActivity.homeIdentityRow(): LinearLayout =
             homeProfilePill(),
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
-                dp(if (isCompact()) 46 else 50),
+                dp(if (isCompact()) 35 else 38),
             ),
         )
     }
@@ -180,10 +180,10 @@ private fun HomeActivity.homeCurrencyPill(): LinearLayout =
                 isFocusable = true
                 contentDescription = "Add currency"
                 setPadding(
-                    dp(4),
-                    dp(4),
-                    dp(4),
-                    dp(4),
+                    dp(6),
+                    dp(6),
+                    dp(6),
+                    dp(6),
                 )
                 background =
                     homeGlassBackground(
@@ -219,7 +219,7 @@ private fun HomeActivity.homeProfilePill(): LinearLayout =
                 context = this@homeProfilePill,
                 shape = HomeGlassShape.PILL,
             )
-        elevation = dp(7).toFloat()
+        elevation = dp(5).toFloat()
 
         setPadding(
             dp(8),
@@ -277,10 +277,10 @@ private fun HomeActivity.homeProfilePill(): LinearLayout =
                     highlighted = true,
                 )
                 setPadding(
-                    dp(6),
-                    dp(6),
-                    dp(6),
-                    dp(6),
+                    dp(4),
+                    dp(4),
+                    dp(4),
+                    dp(4),
                 )
                 background =
                     homeGlassBackground(
