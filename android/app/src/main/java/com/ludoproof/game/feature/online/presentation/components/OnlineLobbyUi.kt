@@ -16,6 +16,7 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.ludoproof.game.GameMode
 import com.ludoproof.game.LudoProofTheme
 import com.ludoproof.game.ModeArtView
 import com.ludoproof.game.core.ui.art.plywoodBackground
@@ -30,6 +31,36 @@ import com.ludoproof.game.feature.characters.data.local.CharacterSelectionStore
 import com.ludoproof.game.feature.online.beginPublicMatchmaking
 import com.ludoproof.game.feature.online.cancelPublicMatchmaking
 import com.ludoproof.game.feature.online.selectPublicPlayerCount
+
+private fun MainActivity.onlineModePanelHeader(): LinearLayout =
+    LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER
+        val compact = isCompactOnline()
+        addView(
+            ModeArtView(this@onlineModePanelHeader).apply {
+                mode = if (gameMode == GameMode.TEAM_UP) ModeArtView.Mode.TEAM_UP else ModeArtView.Mode.ONLINE
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            },
+            LinearLayout.LayoutParams(
+                dp(if (compact) 34 else 38),
+                dp(if (compact) 34 else 38),
+            ).apply { marginEnd = dp(8) },
+        )
+        addView(
+            TextView(this@onlineModePanelHeader).apply {
+                text = if (gameMode == GameMode.TEAM_UP) "TEAM UP" else "ONLINE"
+                LudoProofTheme.title(this, if (compact) 20f else 23f)
+                gravity = Gravity.CENTER_VERTICAL
+                maxLines = 1
+                includeFontPadding = false
+            },
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ),
+        )
+    }
 
 internal fun MainActivity.onlineLobbyPanel():
     LinearLayout =
@@ -115,6 +146,14 @@ internal fun MainActivity.onlineLobbyPanel():
                         context = this@onlineLobbyPanel,
                         cornerRadiusDp = 24f,
                     )
+
+                addView(
+                    onlineModePanelHeader(),
+                    LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                    ).apply { bottomMargin = dp(8) },
+                )
 
                 // Show the selected Ludo Paws character here as well as during matchmaking.
                 val selectionOwnAvatar =
@@ -388,6 +427,14 @@ internal fun MainActivity.onlineLobbyPanel():
                         context = this@onlineLobbyPanel,
                         cornerRadiusDp = 24f,
                     )
+
+                addView(
+                    onlineModePanelHeader(),
+                    LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                    ).apply { bottomMargin = dp(8) },
+                )
 
                 val ownAvatar =
                     FrameLayout(

@@ -189,13 +189,7 @@ class TeamUpActivity : Activity() {
                     },
                 )
             }
-        content.addView(
-            headerTitle,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(52),
-            ),
-        )
+
         content.addView(
             View(this),
             LinearLayout.LayoutParams(
@@ -216,6 +210,13 @@ class TeamUpActivity : Activity() {
                         cornerRadiusDp = 24f,
                     )
             }
+        teamPanel.addView(
+            headerTitle,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(52),
+            ).apply { bottomMargin = dp(10) },
+        )
         setupContent = teamSetupPanel()
         teamPanel.addView(setupContent)
 

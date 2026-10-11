@@ -100,31 +100,9 @@ internal fun OfflineGameActivity.showSetup() {
     )
 
     var fixedTopActionsBar: FrameLayout? = null
-    var fixedTitleBar: FrameLayout? = null
     if (isComputerMode) {
-        // Match Online: Back/Settings are fixed to the screen, not the centered
-        // scrolling setup. Keep the title centered on the full device width.
-        val titleBar = FrameLayout(this).apply {
-            clipChildren = false
-            clipToPadding = false
-            addView(
-                centeredSetupTitle("ROBOT"),
-                FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.MATCH_PARENT,
-                    FrameLayout.LayoutParams.MATCH_PARENT,
-                    Gravity.CENTER,
-                ),
-            )
-        }
-        fixedTitleBar = titleBar
-        host.addView(
-            titleBar,
-            FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                dp(52),
-                Gravity.TOP,
-            ).apply { topMargin = dp(14) },
-        )
+        // Back/Settings stay fixed to the screen; ROBOT now sits inside
+        // the Computer plywood selection panel, like the Friends title.
         fixedTopActionsBar = addGameTopActions(
             host = host,
             context = this,
@@ -164,6 +142,13 @@ internal fun OfflineGameActivity.showSetup() {
                 cornerRadiusDp = 24f,
             )
         }
+        combinedSelectionPanel.addView(
+            centeredSetupTitle("ROBOT"),
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply { bottomMargin = dp(8) },
+        )
         combinedSelectionPanel.addView(
             characterPanel(embeddedInCombinedPanel = true),
             LinearLayout.LayoutParams(
@@ -297,7 +282,6 @@ internal fun OfflineGameActivity.showSetup() {
             if (isComputerMode) 0 else content.paddingBottom,
         )
         fixedTopActionsBar?.translationY = safeTopInset.toFloat()
-        fixedTitleBar?.translationY = safeTopInset.toFloat()
         insets
     }
     root.requestApplyInsets()
