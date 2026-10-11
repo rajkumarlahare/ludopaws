@@ -5,9 +5,7 @@ import android.content.Intent
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import android.graphics.Path
 import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -29,6 +27,7 @@ import com.ludoproof.game.GameModeIntent
 import com.ludoproof.game.LudoProofTheme
 import com.ludoproof.game.core.ui.components.AppFocusRing
 import com.ludoproof.game.core.ui.art.plywoodBackground
+import com.ludoproof.game.core.ui.art.playGamesSignInBackground
 import com.ludoproof.game.core.ui.art.recessedPlywoodBackground
 import com.ludoproof.game.core.ui.art.transparentDarkBlueStrokeBackground
 import com.ludoproof.game.core.ui.icons.AppIconName
@@ -206,18 +205,15 @@ class TeamUpActivity : Activity() {
         teamPanel.addView(setupContent)
 
         quickTeamButton = Button(this).apply {
-            text = "▶   FIND A TEAM"
+            text = "FIND A TEAM"
             textSize = 18f
             setTypeface(Typeface.DEFAULT_BOLD)
-            setTextColor(0xFF342000.toInt())
-            background =
-                GradientDrawable(
-                    GradientDrawable.Orientation.TOP_BOTTOM,
-                    intArrayOf(0xFFFFD642.toInt(), 0xFFFF9D00.toInt()),
-                ).apply {
-                    cornerRadius = dp(999).toFloat()
-                    setStroke(dp(2), 0xFFFFF0A0.toInt())
-                }
+            setTextColor(Color.WHITE)
+            background = playGamesSignInBackground(this@TeamUpActivity)
+            val playIcon = context.getDrawable(com.ludoproof.game.R.drawable.ic_play_triangle_white)?.mutate()
+            playIcon?.setBounds(0, 0, dp(20), dp(20))
+            setCompoundDrawablesRelative(playIcon, null, null, null)
+            compoundDrawablePadding = dp(8)
             contentDescription = "Find a team online"
             AppFocusRing.apply(this, cornerRadiusDp = 999f, strokeWidthDp = 3f)
             setOnClickListener { playSelectionPopAnimation { beginSearch() } }
@@ -412,18 +408,79 @@ class TeamUpActivity : Activity() {
         root.requestApplyInsets()
     }
 
+    /**
+     * Uses the same square, recessed-plywood character tiles as Online Match.
+     * The current player's chosen paw leads, followed by the other starter paws.
+     */
+    private fun teamCharacterTiles(): LinearLayout =
+        LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            clipChildren = false
+            clipToPadding = false
+
+            val catalogIds = LudoPawsCharacterCatalog
+                .charactersForPack(LudoPawsCharacterCatalog.STARTER_PACK_ID)
+                .map { it.id }
+            val firstCharacterId =
+                LudoPawsCharacterCatalog.canonicalCharacterId(selectedCharacterId)
+                    ?.takeIf { it in catalogIds }
+                    ?: LudoPawsCharacterCatalog.DEFAULT_CHARACTER_ID
+            val displayedCharacterIds = buildList {
+                add(firstCharacterId)
+                addAll(catalogIds.filterNot { it == firstCharacterId })
+            }.take(4)
+
+            val screenWidthDp =
+                resources.displayMetrics.widthPixels / resources.displayMetrics.density
+            val tileSizeDp = ((screenWidthDp - 102f) / 4f).toInt().coerceIn(52, 72)
+
+            displayedCharacterIds.forEachIndexed { index, characterId ->
+                val character =
+                    LudoPawsCharacterCatalog.character(characterId) ?: return@forEachIndexed
+                val characterTile = FrameLayout(this@TeamUpActivity).apply {
+                    background = recessedPlywoodBackground(
+                        context = this@TeamUpActivity,
+                        outerCornerRadiusDp = 14f,
+                    )
+                    setPadding(dp(3), dp(3), dp(3), dp(3))
+                    contentDescription = "${character.displayName} character"
+                    addView(
+                        LudoPawsCharacterAvatarView(this@TeamUpActivity).apply {
+                            bind(
+                                characterId = characterId,
+                                showCircularChrome = false,
+                            )
+                        },
+                        FrameLayout.LayoutParams(
+                            FrameLayout.LayoutParams.MATCH_PARENT,
+                            FrameLayout.LayoutParams.MATCH_PARENT,
+                        ),
+                    )
+                }
+                addView(
+                    characterTile,
+                    LinearLayout.LayoutParams(dp(tileSizeDp), dp(tileSizeDp)).apply {
+                        marginStart = dp(if (index == 2) 9 else 3)
+                        marginEnd = dp(3)
+                    },
+                )
+            }
+        }
+
     private fun teamSetupPanel(): LinearLayout =
         LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
             addView(
-                TeamFormationView(this@TeamUpActivity),
-                LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(116)),
+                teamCharacterTiles(),
+                LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(88)),
             )
             addView(
                 TextView(this@TeamUpActivity).apply {
                     text = "2 VS 2 ONLINE"
-                    LudoProofTheme.title(this, 26f, gold = true)
+                    LudoProofTheme.title(this, 26f, gold = false)
+                    setTextColor(Color.WHITE)
                     gravity = Gravity.CENTER
                     setPadding(0, dp(7), 0, 0)
                 },
@@ -756,128 +813,6 @@ class TeamUpActivity : Activity() {
         } else {
             showStatus("Searching • ${4 - safe} more player" + if (4 - safe == 1) "" else "s" + " needed.")
         }
-    }
-
-    private class TeamFormationView(context: android.content.Context) : View(context) {
-        private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-        private val outline =
-            Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                style = Paint.Style.STROKE
-                strokeWidth = dp(1.5f)
-            }
-
-        override fun onDraw(canvas: Canvas) {
-            super.onDraw(canvas)
-            val centerX = width / 2f
-            val centerY = height * 0.52f
-            val radius = minOf(width * 0.36f, height * 0.47f)
-
-            paint.shader =
-                android.graphics.RadialGradient(
-                    centerX,
-                    centerY,
-                    radius,
-                    intArrayOf(0xFF168AF4.toInt(), 0xFF06275F.toInt()),
-                    null,
-                    android.graphics.Shader.TileMode.CLAMP,
-                )
-            canvas.drawCircle(centerX, centerY, radius, paint)
-            paint.shader = null
-            outline.color = 0xFFFFD34A.toInt()
-            outline.strokeWidth = dp(3f)
-            canvas.drawCircle(centerX, centerY, radius, outline)
-            outline.color = 0xAAE7F8FF.toInt()
-            outline.strokeWidth = dp(1f)
-            canvas.drawCircle(centerX, centerY, radius - dp(5f), outline)
-
-            val people =
-                listOf(
-                    Person(centerX - radius * 0.52f, centerY + radius * 0.09f, 0xFFFF5D63.toInt(), 0.72f),
-                    Person(centerX + radius * 0.52f, centerY + radius * 0.09f, 0xFFFFD324.toInt(), 0.72f),
-                    Person(centerX - radius * 0.18f, centerY - radius * 0.34f, 0xFF35C83D.toInt(), 1f),
-                    Person(centerX + radius * 0.18f, centerY - radius * 0.34f, 0xFF2A8CFF.toInt(), 1f),
-                )
-            people.forEach { person ->
-                drawPerson(canvas, person.x, person.y, radius * 0.20f * person.scale, person.color)
-            }
-            outline.color = 0xFFFFD34A.toInt()
-            outline.strokeWidth = dp(3f)
-            canvas.drawLine(
-                centerX - radius * 1.05f,
-                centerY + radius * 0.42f,
-                centerX - radius * 0.79f,
-                centerY + radius * 0.42f,
-                outline,
-            )
-            canvas.drawLine(
-                centerX + radius * 0.79f,
-                centerY + radius * 0.42f,
-                centerX + radius * 1.05f,
-                centerY + radius * 0.42f,
-                outline,
-            )
-        }
-
-        private fun drawPerson(
-            canvas: Canvas,
-            x: Float,
-            y: Float,
-            headRadius: Float,
-            color: Int,
-        ) {
-            val light = blend(color, Color.WHITE, 0.34f)
-            val dark = blend(color, 0xFF06152F.toInt(), 0.24f)
-            val shoulder = headRadius * 1.18f
-            val bodyTop = y + headRadius * 0.78f
-            val bodyBottom = y + headRadius * 2.55f
-            val body =
-                Path().apply {
-                    moveTo(x - shoulder * 0.48f, bodyTop)
-                    cubicTo(x - shoulder, bodyTop, x - shoulder * 1.02f, bodyBottom, x - shoulder * 0.80f, bodyBottom)
-                    lineTo(x + shoulder * 0.80f, bodyBottom)
-                    cubicTo(x + shoulder * 1.02f, bodyBottom, x + shoulder, bodyTop, x + shoulder * 0.48f, bodyTop)
-                    close()
-                }
-            paint.shader =
-                android.graphics.LinearGradient(
-                    x - shoulder,
-                    bodyTop,
-                    x + shoulder,
-                    bodyBottom,
-                    intArrayOf(light, color, dark),
-                    null,
-                    android.graphics.Shader.TileMode.CLAMP,
-                )
-            canvas.drawPath(body, paint)
-            paint.shader = null
-            outline.color = blend(color, 0xFF06152F.toInt(), 0.30f)
-            outline.strokeWidth = dp(1.5f)
-            canvas.drawPath(body, outline)
-            paint.shader =
-                android.graphics.RadialGradient(
-                    x - headRadius * 0.36f,
-                    y - headRadius * 0.38f,
-                    headRadius * 1.55f,
-                    intArrayOf(light, color, dark),
-                    null,
-                    android.graphics.Shader.TileMode.CLAMP,
-                )
-            canvas.drawCircle(x, y, headRadius, paint)
-            paint.shader = null
-            outline.color = blend(color, 0xFF06152F.toInt(), 0.30f)
-            canvas.drawCircle(x, y, headRadius, outline)
-        }
-
-        private fun blend(first: Int, second: Int, amount: Float): Int =
-            android.graphics.Color.rgb(
-                (android.graphics.Color.red(first) * (1f - amount) + android.graphics.Color.red(second) * amount).toInt(),
-                (android.graphics.Color.green(first) * (1f - amount) + android.graphics.Color.green(second) * amount).toInt(),
-                (android.graphics.Color.blue(first) * (1f - amount) + android.graphics.Color.blue(second) * amount).toInt(),
-            )
-
-        private fun dp(value: Float): Float = value * resources.displayMetrics.density
-
-        private data class Person(val x: Float, val y: Float, val color: Int, val scale: Float)
     }
 
     private class TeamColorTokenView(
