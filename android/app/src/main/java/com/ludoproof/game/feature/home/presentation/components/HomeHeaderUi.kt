@@ -44,13 +44,15 @@ internal fun HomeActivity.profileHud(): LinearLayout =
                         hudInsetReductionDp * 2,
                 ),
             )
-        val reducedHudWidthPx =
-            (availableHudWidthPx * 0.75f).toInt()
+        // Keep the HUD aligned to the available Home content width.
+        // Only the inner controls were compacted; shrinking the row itself
+        // made Gems/Profile and the four shortcuts bunch up in the center.
+        val hudWidthPx = availableHudWidthPx
 
         addView(
             homeIdentityRow(),
             LinearLayout.LayoutParams(
-                reducedHudWidthPx,
+                hudWidthPx,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
             ),
         )
@@ -58,7 +60,7 @@ internal fun HomeActivity.profileHud(): LinearLayout =
         addView(
             homeShortcutRow(),
             LinearLayout.LayoutParams(
-                reducedHudWidthPx,
+                hudWidthPx,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
             ).apply {
                 topMargin = dp(if (isCompact()) 6 else 8)
