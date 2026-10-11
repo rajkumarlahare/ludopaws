@@ -2,16 +2,15 @@ package com.ludoproof.game.feature.friends.presentation
 
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.ColorFilter
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.PixelFormat
 import android.graphics.RectF
 import android.graphics.Typeface
+import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
-import android.text.Spannable
-import android.text.SpannableString
-import android.text.TextPaint
-import android.text.style.ReplacementSpan
 import android.view.Gravity
 import android.view.View
 import android.widget.EditText
@@ -192,19 +191,7 @@ internal object FriendsVisualKit {
                 it == FriendsIcon.COPY || it == FriendsIcon.SHARE || it == FriendsIcon.INVITE
             }
             text = if (drawnActionIcon != null) {
-                SpannableString("$label  \uFFFC").apply {
-                    val iconStart = label.length + 2
-                    setSpan(
-                        FriendsActionIconSpan(
-                            context = context,
-                            icon = drawnActionIcon,
-                            tint = if (enabled) Color.WHITE else 0xFF9EB4D1.toInt(),
-                        ),
-                        iconStart,
-                        iconStart + 1,
-                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
-                    )
-                }
+                label
             } else {
                 buildString {
                     if (icon != null) {
@@ -214,15 +201,31 @@ internal object FriendsVisualKit {
                     append(label)
                 }
             }
+            if (drawnActionIcon != null) {
+                isSingleLine = true
+                ellipsize = android.text.TextUtils.TruncateAt.END
+                compoundDrawablePadding = dp(context, 3)
+                setCompoundDrawablesRelativeWithIntrinsicBounds(
+                    null,
+                    null,
+                    FriendsActionIconDrawable(
+                        context = context,
+                        icon = drawnActionIcon,
+                        tint = if (enabled) Color.WHITE else 0xFF9EB4D1.toInt(),
+                    ),
+                    null,
+                )
+            }
             setTextColor(if (enabled) Color.WHITE else 0xFF9EB4D1.toInt())
             textSize = 14f
             typeface = Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
             includeFontPadding = false
+            val horizontalPadding = if (drawnActionIcon != null) 5 else 10
             setPadding(
-                dp(context, 10),
+                dp(context, horizontalPadding),
                 dp(context, 3),
-                dp(context, 10),
+                dp(context, horizontalPadding),
                 dp(context, 3),
             )
             background = buttonBackground(context, style, enabled)
@@ -368,12 +371,11 @@ internal object FriendsVisualKit {
         }
 }
 
-private class FriendsActionIconSpan(
-    private val context: Context,
+private class FriendsActionIconDrawable(
+    context: Context,
     private val icon: FriendsIcon,
-    private val tint: Int,
-) : ReplacementSpan() {
-    private val density = context.resources.displayMetrics.density
+    tint: Int,
+) : Drawable() {
     private val iconSize = FriendsVisualKit.dp(context, 18)
     private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = tint
@@ -399,66 +401,53 @@ private class FriendsActionIconSpan(
         null
     }
 
-    override fun getSize(
-        paint: Paint,
-        text: CharSequence,
-        start: Int,
-        end: Int,
-        fm: Paint.FontMetricsInt?,
-    ): Int {
-        val halfHeight = iconSize / 2 + FriendsVisualKit.dp(context, 1)
-        fm?.let {
-            it.ascent = minOf(it.ascent, -halfHeight)
-            it.top = minOf(it.top, -halfHeight)
-            it.descent = maxOf(it.descent, halfHeight)
-            it.bottom = maxOf(it.bottom, halfHeight)
-        }
-        return iconSize
-    }
+    override fun getIntrinsicWidth(): Int = iconSize
 
-    override fun draw(
-        canvas: Canvas,
-        text: CharSequence,
-        start: Int,
-        end: Int,
-        x: Float,
-        top: Int,
-        y: Int,
-        bottom: Int,
-        paint: Paint,
-    ) {
-        val centerY = y + (paint.descent() + paint.ascent()) / 2f
+    override fun getIntrinsicHeight(): Int = iconSize
+
+    override fun draw(canvas: Canvas) {
+        val saved = canvas.save()
+        canvas.translate(bounds.left.toFloat(), bounds.top.toFloat())
         homeShareIcon?.let { shareIcon ->
-            canvas.save()
-            canvas.translate(x, centerY - iconSize / 2f)
             shareIcon.draw(canvas)
-            canvas.restore()
+            canvas.restoreToCount(saved)
             return
         }
 
-        val scale = iconSize / 100f
-        canvas.save()
-        canvas.translate(x, centerY - iconSize / 2f)
-        canvas.scale(scale, scale)
+        canvas.scale(iconSize / 100f, iconSize / 100f)
         when (icon) {
             FriendsIcon.COPY -> drawCopy(canvas)
             FriendsIcon.INVITE -> drawSend(canvas)
             else -> Unit
         }
-        canvas.restore()
+        canvas.restoreToCount(saved)
     }
 
+    override fun setAlpha(alpha: Int) {
+        stroke.alpha = alpha
+        fill.alpha = alpha
+        homeShareIcon?.alpha = alpha / 255f
+        invalidateSelf()
+    }
+
+    override fun setColorFilter(colorFilter: ColorFilter?) {
+        stroke.colorFilter = colorFilter
+        fill.colorFilter = colorFilter
+        invalidateSelf()
+    }
+
+    @Deprecated("Deprecated in Android graphics API")
+    override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
+
     private fun drawCopy(canvas: Canvas) {
-        stroke.color = tint
+        stroke.color = strokeColor
         stroke.strokeWidth = 7f
-        // Two offset sheets with open-looking corners: a recognizable copy symbol.
         canvas.drawRoundRect(RectF(34f, 13f, 82f, 64f), 7f, 7f, stroke)
         canvas.drawRoundRect(RectF(18f, 35f, 66f, 86f), 7f, 7f, stroke)
     }
 
     private fun drawSend(canvas: Canvas) {
-        // Filled paper plane with a visible fold, instead of the previous plus sign.
-        fill.color = tint
+        fill.color = fillColor
         val plane = Path().apply {
             moveTo(9f, 45f)
             lineTo(92f, 10f)
@@ -468,12 +457,18 @@ private class FriendsActionIconSpan(
             close()
         }
         canvas.drawPath(plane, fill)
-        stroke.color = Color.argb(155, 7, 34, 65)
+        stroke.color = foldColor
         stroke.strokeWidth = 4.5f
         canvas.drawLine(30f, 55f, 92f, 10f, stroke)
         canvas.drawLine(47f, 62f, 66f, 90f, stroke)
     }
 
+    private val strokeColor: Int
+        get() = stroke.color
+    private val fillColor: Int
+        get() = fill.color
+    private val foldColor: Int
+        get() = Color.argb(155, 7, 34, 65)
 }
 
 internal class FriendsIconView(
