@@ -7,7 +7,7 @@ Address the in-match controls and UI surfaces that looked inconsistent in Pass &
 ## Applied changes
 
 - Offline gameplay top controls opt into a dedicated style; Online Lobby and Team Up continue using the existing shared glass style.
-- Back uses the semantic `BACK` icon and Settings uses the shared `SETTINGS` icon. Both use a matte dark circular surface with a thin cyan idle border, gold pressed/focus feedback, and a visible shared focus ring.
+- Back uses the new, distinct `BACK_ARROW` glyph (separate from a plain left chevron) and Settings uses the shared `SETTINGS` icon. Both use a matte dark circular surface with a thin cyan idle border, gold pressed/focus feedback, and a visible shared focus ring.
 - The offline turn/HUD panel uses an opaque-enough matte dark surface with a subtle mode-specific cyan/gold edge to improve text readability against the shared gameplay backdrop.
 - Result actions are now distinct, accessible controls: REMATCH uses `REFRESH` with a green positive treatment; EXIT uses `CLOSE` with a restrained danger treatment. Both preserve their existing callbacks and click sound and have at least a 48dp layout height.
 - The existing custom Quick Chat speech-bubble artwork is retained and receives a visible focus ring; the popup content and reaction behavior are unchanged.
