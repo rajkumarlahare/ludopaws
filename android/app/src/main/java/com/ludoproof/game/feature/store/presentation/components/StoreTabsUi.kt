@@ -6,6 +6,7 @@ import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.ludoproof.game.core.ui.components.AppFocusRing
 import com.ludoproof.game.feature.store.domain.model.StoreTab
 import com.ludoproof.game.feature.store.presentation.StoreActivity
 
@@ -48,8 +49,9 @@ internal fun StoreActivity.storeTabs():
                             true
                         isFocusable =
                             true
+                        isSelected = selected
                         contentDescription =
-                            tab.label
+                            if (selected) "${tab.label}, selected" else tab.label
                         background =
                             GradientDrawable(
                                 GradientDrawable.Orientation.TOP_BOTTOM,
@@ -90,6 +92,7 @@ internal fun StoreActivity.storeTabs():
                                 tab,
                             )
                         }
+                        AppFocusRing.apply(this, cornerRadiusDp = 10f)
                     },
                     LinearLayout.LayoutParams(
                         0,

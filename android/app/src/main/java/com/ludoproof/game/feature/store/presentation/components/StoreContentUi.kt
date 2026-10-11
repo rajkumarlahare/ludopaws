@@ -9,6 +9,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.LudoProofTheme
+import com.ludoproof.game.core.ui.components.AppFocusRing
 import com.ludoproof.game.feature.store.domain.StoreCatalog
 import com.ludoproof.game.feature.store.domain.model.StoreProduct
 import com.ludoproof.game.feature.store.domain.model.StoreTab
@@ -166,9 +167,11 @@ private fun StoreActivity.gemsContent():
                     setTextColor(0xFFB8D9FF.toInt())
                     gravity = Gravity.CENTER
                     setPadding(dp(8), dp(10), dp(8), dp(4))
+                    isFocusable = true
                     setOnClickListener {
                         showAdPrivacyOptions()
                     }
+                    AppFocusRing.apply(this, cornerRadiusDp = 8f)
                 },
                 LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
@@ -418,6 +421,7 @@ private fun StoreActivity.featuredRemoveAdsCard(
                         product.productId,
                     )
                 }
+                AppFocusRing.apply(this, cornerRadiusDp = 10f)
             },
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -501,6 +505,7 @@ private fun StoreActivity.rewardedAdCard():
                 setOnClickListener {
                     requestRewardedAd()
                 }
+                AppFocusRing.apply(this, cornerRadiusDp = 10f)
             },
             LinearLayout.LayoutParams(
                 dp(112),
@@ -643,6 +648,7 @@ private fun StoreActivity.gemProductCard(
                         product.productId,
                     )
                 }
+                AppFocusRing.apply(this, cornerRadiusDp = 10f)
             },
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,

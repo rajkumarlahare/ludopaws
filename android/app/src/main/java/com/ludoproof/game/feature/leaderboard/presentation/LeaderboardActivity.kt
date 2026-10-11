@@ -16,6 +16,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import com.ludoproof.game.LudoProofTheme
+import com.ludoproof.game.core.ui.components.AppFocusRing
 import com.ludoproof.game.feature.leaderboard.data.local.LeaderboardCacheStore
 import com.ludoproof.game.feature.leaderboard.data.local.LeaderboardCredential
 import com.ludoproof.game.feature.leaderboard.data.local.LeaderboardIdentityStore
@@ -423,6 +424,7 @@ class LeaderboardActivity :
                     setOnClickListener {
                         finish()
                     }
+                    AppFocusRing.apply(this, cornerRadiusDp = 999f)
                 },
                 LinearLayout.LayoutParams(
                     dp(48),
@@ -534,6 +536,7 @@ class LeaderboardActivity :
                     setOnClickListener {
                         refreshLeaderboard()
                     }
+                    AppFocusRing.apply(this, cornerRadiusDp = 999f)
                 },
                 LinearLayout.LayoutParams(
                     dp(48),
