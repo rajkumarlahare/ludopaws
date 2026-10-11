@@ -5,6 +5,14 @@ import android.graphics.drawable.GradientDrawable
 import com.ludoproof.game.LudoProofTheme
 
 /**
+ * App-wide surface palette and background factories.
+ *
+ * Game screens should reuse these helpers instead of recreating approved panel,
+ * icon, progress, plywood or recessed-pocket backgrounds inline. Keep the visual
+ * values here as the shared source of truth for the LudoProof UI design language.
+ */
+
+/**
  * Shared translucent navy surface for cards and sections across the app.
  * Defaults match the approved UI: #33104483 fill, #FF247FCB stroke, 18dp radius.
  */
