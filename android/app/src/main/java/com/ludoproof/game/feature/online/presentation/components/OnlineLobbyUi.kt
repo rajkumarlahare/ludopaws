@@ -6,12 +6,12 @@ import android.graphics.Paint
 import android.graphics.drawable.Drawable
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
-import android.graphics.drawable.LayerDrawable
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.LudoProofTheme
@@ -138,8 +138,9 @@ internal fun MainActivity.onlineLobbyPanel():
                                 } else {
                                     24f
                                 },
-                                gold = true,
+                                gold = false,
                             )
+                        setTextColor(Color.WHITE)
                         gravity =
                             Gravity.CENTER
                     },
@@ -246,35 +247,52 @@ internal fun MainActivity.onlineLobbyPanel():
                 )
 
                 findMatchButton =
-                    Button(
+                    LinearLayout(
                         this@onlineLobbyPanel,
                     ).apply {
-                        text = "PLAY"
-                        textSize =
-                            if (
-                                isCompactOnline()
-                            ) {
-                                16f
-                            } else {
-                                18f
-                            }
-                        setTypeface(Typeface.DEFAULT_BOLD)
-                        setTextColor(Color.WHITE)
-                        gravity = Gravity.CENTER_VERTICAL or Gravity.START
-                        minWidth = 0
-                        minHeight = 0
-                        setPadding(dp(22), 0, dp(20), 0)
-                        val playTriangle =
-                            context.getDrawable(com.ludoproof.game.R.drawable.ic_play_triangle_white)?.mutate()
-                        playTriangle?.setBounds(0, 0, dp(20), dp(20))
-                        setCompoundDrawablesRelative(null, null, playTriangle, null)
-                        compoundDrawablePadding = dp(8)
-                        // Reuse the exact Google Play sign-in fill, radius and stroke from Profile.
+                        orientation = LinearLayout.HORIZONTAL
+                        gravity = Gravity.CENTER
+                        isClickable = true
+                        isFocusable = true
+                        contentDescription = "Play"
+                        setPadding(dp(16), 0, dp(16), 0)
+                        // Reuse the exact Google Play sign-in fill and stroke from Profile.
                         background =
                             playGamesSignInBackground(
                                 this@onlineLobbyPanel,
                             )
-                        AppFocusRing.apply(this, cornerRadiusDp = 999f, strokeWidthDp = 3f)
+
+                        addView(
+                            TextView(this@onlineLobbyPanel).apply {
+                                text = "PLAY"
+                                textSize =
+                                    if (isCompactOnline()) 16f else 18f
+                                setTypeface(Typeface.DEFAULT_BOLD)
+                                setTextColor(Color.WHITE)
+                                gravity = Gravity.CENTER
+                                includeFontPadding = false
+                                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                            },
+                            LinearLayout.LayoutParams(
+                                LinearLayout.LayoutParams.WRAP_CONTENT,
+                                LinearLayout.LayoutParams.WRAP_CONTENT,
+                            ),
+                        )
+                        addView(
+                            ImageView(this@onlineLobbyPanel).apply {
+                                setImageDrawable(
+                                    context.getDrawable(com.ludoproof.game.R.drawable.ic_play_triangle_white)?.mutate(),
+                                )
+                                scaleType = ImageView.ScaleType.FIT_CENTER
+                                contentDescription = null
+                                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                            },
+                            LinearLayout.LayoutParams(dp(18), dp(18)).apply {
+                                marginStart = dp(6)
+                            },
+                        )
+
+                        AppFocusRing.apply(this, cornerRadiusDp = 13f, strokeWidthDp = 3f)
                         setOnClickListener {
                             beginPublicMatchmaking()
                         }
@@ -652,23 +670,11 @@ internal fun MainActivity.stylePublicPlayerCountButton(
         null,
         null,
     )
-    // Reuse Profile's recessed plywood pocket; keep a thin state outline above it.
+    // Use only the shared recessed plywood pocket; remove the extra yellow/blue outer stroke.
     button.background =
-        LayerDrawable(
-            arrayOf(
-                recessedPlywoodBackground(
-                    context = button.context,
-                    outerCornerRadiusDp = 20f,
-                ),
-                GradientDrawable().apply {
-                    setColor(Color.TRANSPARENT)
-                    cornerRadius = dp(20).toFloat()
-                    setStroke(
-                        dp(if (selected) 3 else 1),
-                        if (selected) 0xFFFFC52E.toInt() else 0xFF1689D0.toInt(),
-                    )
-                },
-            ),
+        recessedPlywoodBackground(
+            context = button.context,
+            outerCornerRadiusDp = 20f,
         )
 }
 
