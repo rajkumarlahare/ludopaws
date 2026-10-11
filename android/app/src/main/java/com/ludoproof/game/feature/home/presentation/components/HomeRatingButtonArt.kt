@@ -7,86 +7,33 @@ import android.graphics.Shader
 import android.graphics.Paint
 import android.graphics.Path
 import android.view.View
+import com.ludoproof.game.R
 import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.sin
 
-/** Crisp, high-contrast four-colour Google Play mark for the Home rating action. */
+/** Google Play mark rendered from a vector path asset for clean, exact colour joins. */
 internal class HomeGooglePlayIconView(
     context: Context,
 ) : View(context) {
-    private val paint =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.FILL
-        }
+    private val playMark =
+        context.getDrawable(R.drawable.ic_google_play_mark)
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
-        val size = min(width, height).toFloat()
-        if (size <= 0f) return
+        val drawable = playMark ?: return
+        val side = min(width, height).toFloat()
+        if (side <= 0f) return
 
-        val scale = size / 100f
-        canvas.save()
-        canvas.translate((width - size) / 2f, (height - size) / 2f)
-        canvas.scale(scale, scale)
-
-        // Flat, fully opaque brand colours keep the small mark sharp and readable.
-        // A broad rounded silhouette avoids a narrow, samosa-like triangle.
-        val blue =
-            Path().apply {
-                moveTo(22f, 11f)
-                quadTo(14f, 11f, 14f, 21f)
-                lineTo(14f, 79f)
-                quadTo(14f, 89f, 22f, 89f)
-                lineTo(52f, 50f)
-                close()
-            }
-        paint.color = 0xFF18A8F4.toInt()
-        canvas.drawPath(blue, paint)
-
-        val green =
-            Path().apply {
-                moveTo(22f, 11f)
-                quadTo(24f, 11f, 28f, 14f)
-                lineTo(57f, 38f)
-                lineTo(52f, 50f)
-                close()
-            }
-        paint.color = 0xFF00D66F.toInt()
-        canvas.drawPath(green, paint)
-
-        val red =
-            Path().apply {
-                moveTo(22f, 89f)
-                quadTo(24f, 89f, 28f, 86f)
-                lineTo(57f, 62f)
-                lineTo(52f, 50f)
-                close()
-            }
-        paint.color = 0xFFFF3B49.toInt()
-        canvas.drawPath(red, paint)
-
-        val yellow =
-            Path().apply {
-                // Keep the yellow segment tight around the Play mark's right-facing point.
-                // The previous wide diamond made the tip read like a yellow smudge.
-                moveTo(52f, 50f)
-                lineTo(57f, 38f)
-                lineTo(72f, 34f)
-                lineTo(88f, 50f)
-                lineTo(72f, 66f)
-                lineTo(57f, 62f)
-                close()
-            }
-        paint.color = 0xFFFFC928.toInt()
-        canvas.drawPath(yellow, paint)
-
-        // Tiny opaque centre join removes muddy overlapping gradients at this size.
-        paint.color = 0xFF20B8E8.toInt()
-        canvas.drawCircle(52f, 50f, 2.2f, paint)
-
-        canvas.restore()
+        // Preserve the original prism's portrait proportions instead of stretching it
+        // into a triangle; all four colour segments come from the same vector asset.
+        val markHeight = (side * 0.92f).toInt().coerceAtLeast(1)
+        val markWidth = (markHeight * 38.1f / 44.1f).toInt().coerceAtLeast(1)
+        val left = (width - markWidth) / 2
+        val top = (height - markHeight) / 2
+        drawable.setBounds(left, top, left + markWidth, top + markHeight)
+        drawable.draw(canvas)
     }
 }
 
