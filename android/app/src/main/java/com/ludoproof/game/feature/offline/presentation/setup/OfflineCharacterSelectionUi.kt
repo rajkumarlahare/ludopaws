@@ -197,10 +197,16 @@ private fun OfflineGameActivity.rebuildCharacterSlotButtons() {
         slotMap[slot] = button
         slotsRow.addView(
             button,
-            setupTileParams(
-                if (isCompactSetup()) 52 else 56,
-                marginDp = 4,
-            ),
+            if (isComputerMode) {
+                LinearLayout.LayoutParams(dp(126), dp(54)).apply {
+                    setMargins(dp(4), 0, dp(4), 0)
+                }
+            } else {
+                setupTileParams(
+                    if (isCompactSetup()) 52 else 56,
+                    marginDp = 4,
+                )
+            },
         )
     }
     characterSlotButtons = slotMap

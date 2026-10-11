@@ -1,9 +1,13 @@
 package com.ludoproof.game.feature.online
 
+import android.content.Context
+import android.util.Log
 import com.ludoproof.game.GameApiException
 import com.ludoproof.game.LudoProofTheme
 import com.ludoproof.game.MainActivity
+import com.ludoproof.game.PendingRemoteForfeit
 import com.ludoproof.game.RemoteForfeitApi
+import com.ludoproof.game.SecureSessionStore
 import com.ludoproof.game.feature.profile.data.local.ProfileStore
 import com.ludoproof.game.feature.profile.domain.model.ProfileGameMode
 import com.ludoproof.game.feature.profile.domain.model.ProfileMatchSource
@@ -25,35 +29,50 @@ private val inFlightForfeits =
     ConcurrentHashMap
         .newKeySet<String>()
 
-internal fun MainActivity.abandonRemoteSessionState() {
+internal fun MainActivity.abandonRemoteSessionState(): Boolean {
     val abandonedMatchId = matchId
     val abandonedPlayerToken = playerToken
-    val wasActive = currentState?.status == "ACTIVE"
+    val abandonedPlayerId = playerId
+    val needsForfeitResolution =
+        !abandonedMatchId.isNullOrBlank() &&
+            currentState?.status != "FINISHED"
 
     if (
-        wasActive &&
-        gameMode.ranked &&
+        needsForfeitResolution &&
         !abandonedMatchId.isNullOrBlank()
     ) {
-        ProfileStore(this)
-            .recordCompletedMatch(
-                matchId = abandonedMatchId,
-                mode = ProfileGameMode.CLASSIC,
-                source = ProfileMatchSource.ONLINE,
-                won = false,
+        if (
+            abandonedPlayerToken.isNullOrBlank() ||
+            abandonedPlayerId.isNullOrBlank()
+        ) {
+            showStatus(
+                "Could not securely prepare the match exit. Stay in the match and sync before trying again.",
             )
+            return false
+        }
+        try {
+            secureSessionStore.savePendingForfeit(
+                PendingRemoteForfeit(
+                    matchId = abandonedMatchId,
+                    playerId = abandonedPlayerId,
+                    playerToken = abandonedPlayerToken,
+                    ranked = gameMode.ranked,
+                ),
+            )
+        } catch (error: Exception) {
+            Log.e(
+                TAG,
+                "Could not persist the pending match forfeit",
+                error,
+            )
+            showStatus(
+                "Could not securely save the forfeit. Stay in the match and try again.",
+            )
+            return false
+        }
     }
 
-    if (
-        wasActive &&
-        !abandonedMatchId.isNullOrBlank() &&
-        !abandonedPlayerToken.isNullOrBlank()
-    ) {
-        enqueueAuthoritativeForfeit(
-            matchId = abandonedMatchId,
-            playerToken = abandonedPlayerToken,
-        )
-    }
+    retryPendingRemoteForfeits(this)
 
     publicMatchmakingStore.clear()
     secureSessionStore.clear()
@@ -72,52 +91,147 @@ internal fun MainActivity.abandonRemoteSessionState() {
 
     realtimeConnected = false
     realtimeClient.disconnect()
+    return true
 }
 
-private fun enqueueAuthoritativeForfeit(
-    matchId: String,
-    playerToken: String,
-) {
-    val key = matchId.trim().uppercase()
-    if (!inFlightForfeits.add(key)) return
-
+internal fun retryPendingRemoteForfeits(context: Context) {
+    val appContext = context.applicationContext
     remoteForfeitExecutor.execute {
-        try {
-            repeat(3) { attempt ->
-                try {
-                    RemoteForfeitApi.forfeit(
-                        matchId = matchId,
-                        playerToken = playerToken,
-                    )
-                    return@execute
-                } catch (error: GameApiException) {
-                    if (error.code in TERMINAL_FORFEIT_CODES) {
-                        return@execute
-                    }
-                } catch (_: Exception) {
-                    // Retry transient transport failures below.
-                }
-
-                if (attempt < 2) {
-                    try {
-                        Thread.sleep(700L * (attempt + 1))
-                    } catch (_: InterruptedException) {
-                        Thread.currentThread().interrupt()
-                        return@execute
-                    }
-                }
+        val store = SecureSessionStore(appContext)
+        val pending =
+            try {
+                store.pendingForfeits()
+            } catch (error: Exception) {
+                Log.e(
+                    TAG,
+                    "Could not load pending match forfeits",
+                    error,
+                )
+                return@execute
             }
-        } finally {
-            inFlightForfeits.remove(key)
+
+        pending.forEach { operation ->
+            val key = operation.matchId.trim().uppercase()
+            if (!inFlightForfeits.add(key)) return@forEach
+            try {
+                processPendingForfeit(appContext, store, operation)
+            } finally {
+                inFlightForfeits.remove(key)
+            }
         }
     }
+}
+
+private fun processPendingForfeit(
+    context: Context,
+    store: SecureSessionStore,
+    operation: PendingRemoteForfeit,
+) {
+    try {
+        var snapshot =
+            try {
+                RemoteForfeitApi.forfeit(
+                    operation.matchId,
+                    operation.playerToken,
+                )
+            } catch (error: GameApiException) {
+                when (error.code) {
+                    "INVALID_MATCH_STATUS",
+                    "PLAYER_FORFEITED",
+                    ->
+                        try {
+                            RemoteForfeitApi.state(
+                                operation.matchId,
+                                operation.playerToken,
+                            )
+                        } catch (stateError: GameApiException) {
+                            if (stateError.code in TERMINAL_FORFEIT_CODES) {
+                                store.clearPendingForfeit(operation.matchId)
+                                return
+                            }
+                            throw stateError
+                        }
+
+                    in TERMINAL_FORFEIT_CODES -> {
+                        store.clearPendingForfeit(operation.matchId)
+                        return
+                    }
+
+                    else -> throw error
+                }
+            }
+
+        repeat(FORFEIT_STATE_CHECKS) {
+            if (snapshot.status == FINISHED_STATUS) {
+                recordConfirmedResult(
+                    context,
+                    store,
+                    operation,
+                    snapshot.winnerPlayerId,
+                )
+                return
+            }
+            if (snapshot.status != ACTIVE_STATUS) {
+                store.clearPendingForfeit(operation.matchId)
+                return
+            }
+            Thread.sleep(FORFEIT_RECONCILE_DELAY_MS)
+            snapshot =
+                RemoteForfeitApi.state(
+                    operation.matchId,
+                    operation.playerToken,
+                )
+        }
+
+        if (snapshot.status == FINISHED_STATUS) {
+            recordConfirmedResult(
+                context,
+                store,
+                operation,
+                snapshot.winnerPlayerId,
+            )
+        }
+    } catch (error: InterruptedException) {
+        Thread.currentThread().interrupt()
+        Log.w(TAG, "Pending forfeit reconciliation was interrupted")
+    } catch (error: Exception) {
+        Log.e(
+            TAG,
+            "Pending forfeit remains queued for a later retry",
+            error,
+        )
+    }
+}
+
+private fun recordConfirmedResult(
+    context: Context,
+    store: SecureSessionStore,
+    operation: PendingRemoteForfeit,
+    winnerPlayerId: String?,
+) {
+    if (operation.ranked) {
+        ProfileStore(context)
+            .recordCompletedMatch(
+                matchId = operation.matchId,
+                mode = ProfileGameMode.CLASSIC,
+                source = ProfileMatchSource.ONLINE,
+                won = winnerPlayerId == operation.playerId,
+            )
+    }
+    store.clearPendingForfeit(operation.matchId)
 }
 
 private val TERMINAL_FORFEIT_CODES =
     setOf(
         "INVALID_MATCH_STATUS",
         "MATCH_NOT_FOUND",
-        "PLAYER_FORFEITED",
         "INVALID_PLAYER_TOKEN",
         "AUTH_REQUIRED",
+        "AUTH_INVALID",
     )
+
+private const val TAG = "LudoPawsForfeit"
+private const val ACTIVE_STATUS = "ACTIVE"
+private const val FINISHED_STATUS = "FINISHED"
+private const val FORFEIT_RECONCILE_DELAY_MS = 900L
+private const val FORFEIT_STATE_CHECKS = 3

@@ -27,6 +27,35 @@ class GemWalletStore(
         )
 
     @Synchronized
+    fun applyRewardedAdGems(
+        gemAmount: Int,
+    ): Int {
+        require(gemAmount > 0) {
+            "Rewarded-ad gem amount must be positive."
+        }
+        val nextBalance =
+            (
+                balance().toLong() +
+                    gemAmount
+                )
+                .coerceAtMost(
+                    Int.MAX_VALUE.toLong(),
+                )
+                .toInt()
+        check(
+            prefs.edit()
+                .putInt(
+                    StorePreferences.KEY_BALANCE,
+                    nextBalance,
+                )
+                .commit(),
+        ) {
+            "Could not safely save the rewarded-ad gem reward."
+        }
+        return nextBalance
+    }
+
+    @Synchronized
     fun applyVerifiedPurchase(
         productId: String,
         purchaseToken: String,
@@ -72,7 +101,8 @@ class GemWalletStore(
         applied +=
             purchaseToken
 
-        return prefs
+        val saved =
+            prefs
             .edit()
             .putInt(
                 StorePreferences.KEY_BALANCE,
@@ -88,6 +118,10 @@ class GemWalletStore(
                 applied,
             )
             .commit()
+        check(saved) {
+            "Could not safely save the verified Play purchase."
+        }
+        return true
     }
 
 }

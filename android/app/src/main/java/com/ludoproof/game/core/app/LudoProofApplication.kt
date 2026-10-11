@@ -3,6 +3,7 @@ package com.ludoproof.game
 import android.app.Activity
 import android.app.Application
 import android.os.Bundle
+import com.google.android.gms.games.PlayGamesSdk
 import com.ludoproof.game.feature.characters.data.local.CharacterSelectionStore
 import com.ludoproof.game.feature.friends.data.FriendPresenceController
 import com.ludoproof.game.feature.settings.data.local.GameMusicController
@@ -16,6 +17,7 @@ class LudoProofApplication :
 
     override fun onCreate() {
         super.onCreate()
+        PlayGamesSdk.initialize(this)
         // Prime the process-local cosmetic mirror before any remote create/join
         // request can be sent. Character selection remains presentation-only.
         CharacterSelectionStore(this).load()

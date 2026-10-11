@@ -92,6 +92,7 @@ internal fun MainActivity.applyResponse(
     }
 
     if (state.status == "FINISHED") {
+        stopFriendsVoice("Voice ended with the match.")
         realtimeClient.disconnect()
         realtimeConnected = false
         updateConnectionLabel()
@@ -172,7 +173,11 @@ internal fun MainActivity.applyResponse(
             current = state,
         )
 
-    if (transitionMessage != null) {
+    if (secureSessionPersistenceFailed) {
+        showStatus(
+            "Match is connected, but secure resume could not be saved. Keep this screen open until the match is finished.",
+        )
+    } else if (transitionMessage != null) {
         showStatus(transitionMessage)
     } else if (announce) {
         showStatus(
@@ -242,10 +247,13 @@ internal fun MainActivity.updateTurnBanner(
                 val winner = state.players.find { it.playerId == state.winnerPlayerId }
                 val winnerName = winner?.displayName ?: "Player"
                 resultTitleText.text =
-                    if (winner?.playerId == playerId) "YOU WON"
+                    if (state.players.size == 4) "MATCH COMPLETE"
+                    else if (winner?.playerId == playerId) "YOU WON"
                     else "WINNER • $winnerName"
                 resultSubtitleText.text =
-                    if (winner?.playerId == playerId) {
+                    if (state.players.size == 4 && state.finishOrderPlayerIds.isNotEmpty()) {
+                        "Final placements are shown on the board."
+                    } else if (winner?.playerId == playerId) {
                         "$winnerName • server-authoritative result • proof history available"
                     } else {
                         "Server-authoritative result • verified history available"

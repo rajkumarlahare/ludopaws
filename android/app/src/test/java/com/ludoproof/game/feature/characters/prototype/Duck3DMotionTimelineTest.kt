@@ -8,13 +8,16 @@ class Duck3DMotionTimelineTest {
     @Test
     fun hopStartsAndEndsOnGroundWithVisibleApex() {
         val start = Duck3DMotionTimeline.sample(Duck3DMotion.HOP, 0f)
+        val airborne = Duck3DMotionTimeline.sample(Duck3DMotion.HOP, 0.25f)
         val apex = Duck3DMotionTimeline.sample(Duck3DMotion.HOP, 0.5f)
         val end = Duck3DMotionTimeline.sample(Duck3DMotion.HOP, 1f)
 
         assertEquals(0f, start.liftY, 0.0001f)
         assertTrue(apex.liftY > 0.55f)
         assertTrue(apex.wingFlapDegrees > 25f)
+        assertTrue(kotlin.math.abs(airborne.legPaddleDegrees) > 10f)
         assertEquals(0f, end.liftY, 0.0001f)
+        assertEquals(0f, end.legPaddleDegrees, 0.0001f)
     }
 
     @Test

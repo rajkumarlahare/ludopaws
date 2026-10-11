@@ -16,6 +16,8 @@ data class Dog3DPose(
     val headTiltDegrees: Float = 0f,
     val earBounceDegrees: Float = 0f,
     val tailWagDegrees: Float = 0f,
+    val legSwingDegrees: Float = 0f,
+    val legTuckDegrees: Float = 0f,
 )
 
 /** Pure, testable motion timeline for the code-generated 3D dog pawn. */
@@ -58,6 +60,8 @@ object Dog3DMotionTimeline {
                     headTiltDegrees = -6f * arc,
                     earBounceDegrees = 18f * arc,
                     tailWagDegrees = 28f * tail,
+                    legSwingDegrees = 28f * sin(p * PI * 2.0).toFloat() * arc,
+                    legTuckDegrees = 34f * arc,
                 )
             }
 
@@ -71,6 +75,8 @@ object Dog3DMotionTimeline {
                     headTiltDegrees = 7f * sin(p * PI * 2.0).toFloat(),
                     earBounceDegrees = 12f * sin(p * PI).toFloat().coerceAtLeast(0f),
                     tailWagDegrees = 48f * sin(p * PI * 6.0).toFloat(),
+                    legSwingDegrees = 12f * sin(p * PI * 6.0).toFloat(),
+                    legTuckDegrees = 9f * sin(p * PI * 3.0).toFloat().coerceAtLeast(0f),
                 )
             }
         }

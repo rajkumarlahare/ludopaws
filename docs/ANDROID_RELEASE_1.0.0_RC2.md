@@ -8,7 +8,7 @@ This release candidate prepares the Android client for the Ruleset V2 rollout wi
 - `versionName`: `1.0.0-rc2`
 - production backend default: Ruleset V1
 - Android authoritative snapshot parser: V1 + V2 compatible
-- billing default: disabled unless explicitly enabled by build property
+- billing default: disabled unless explicitly enabled by build property and the Worker reports purchase verification ready
 
 ## Compatibility contract
 
@@ -38,6 +38,14 @@ The manual `LudoProof Android Signed Release` GitHub Actions workflow expects th
 - `LUDOPROOF_ANDROID_KEY_PASSWORD`
 
 The workflow decodes the keystore only into the ephemeral runner directory, builds the release APK/AAB, verifies their signatures, hashes release evidence, and uploads the signed artifacts. Missing signing secrets cause the workflow to fail instead of falling back to a debug key.
+
+## Google Play Billing
+
+Store checkout must remain disabled until the one-time Play Console products are active and the Worker has its Google Play Developer API service-account email/private-key configuration. The private key is a Cloudflare Worker secret and must never be compiled into the APK/AAB. The app queries `/api/store/status` before connecting Billing, verifies purchase tokens through `/api/store/purchases/verify`, and grants gems or remove-ads only after the backend confirms them. Follow the [Google Play Billing setup instructions](../README.md#google-play-billing) before enabling `-PLUDOPROOF_BILLING_ENABLED=true`.
+
+## Google AdMob rewarded ads
+
+Rewarded ads use the Google Mobile Ads SDK and UMP consent flow. Production ads remain disabled unless explicitly enabled with real AdMob IDs; Google's sample IDs are allowed only for debug testing. Complete the AdMob app/ad-unit and privacy-message setup in the [Google AdMob rewarded ads instructions](../README.md#google-admob-rewarded-ads) before enabling them. Reward grants are currently device-local and client-callback based, not server-side verified.
 
 ## Required gates before distribution
 

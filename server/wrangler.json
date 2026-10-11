@@ -41,6 +41,10 @@
       {
         "name": "LUDOPROOF_FRIEND_RECENT",
         "class_name": "FriendRecentRoom"
+      },
+      {
+        "name": "LUDOPROOF_STORE_PURCHASES",
+        "class_name": "StorePurchaseLedger"
       }
     ]
   },
@@ -92,6 +96,12 @@
       "new_sqlite_classes": [
         "FriendConversation",
         "FriendRecentRoom"
+      ]
+    },
+    {
+      "tag": "v9-store-purchases",
+      "new_sqlite_classes": [
+        "StorePurchaseLedger"
       ]
     }
   ],

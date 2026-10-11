@@ -31,6 +31,17 @@ class MatchRealtimeClient(
             displayName: String,
             emoji: String,
         ) -> Unit = { _, _, _ -> },
+    private val onVoicePeers:
+        (
+            playerIds: Set<String>,
+        ) -> Unit = {},
+    private val onVoiceSignal:
+        (
+            fromPlayerId: String,
+            signal: JSONObject,
+        ) -> Unit = { _, _ -> },
+    private val onVoiceEnded:
+        () -> Unit = {},
     private val client: OkHttpClient =
         OkHttpClient
             .Builder()
@@ -319,6 +330,32 @@ class MatchRealtimeClient(
                         .optString(
                             "type",
                         )
+                if (type == "VOICE_PEERS") {
+                    val peers = payload.optJSONArray("playerIds")
+                    val playerIds = buildSet {
+                        if (peers != null) {
+                            for (index in 0 until peers.length()) {
+                                peers.optString(index)
+                                    .takeIf(String::isNotBlank)
+                                    ?.let(::add)
+                            }
+                        }
+                    }
+                    onVoicePeers(playerIds)
+                    return
+                }
+                if (type == "VOICE_SIGNAL") {
+                    val sender = payload.optString("fromPlayerId").trim()
+                    val signal = payload.optJSONObject("signal")
+                    if (sender.isNotEmpty() && signal != null) {
+                        onVoiceSignal(sender, signal)
+                    }
+                    return
+                }
+                if (type == "VOICE_ENDED") {
+                    onVoiceEnded()
+                    return
+                }
                 if (type == "QUICK_CHAT") {
                     val senderId = payload.optString("playerId").trim()
                     val displayName = payload.optString("displayName").trim()
@@ -523,16 +560,42 @@ class MatchRealtimeClient(
 
     fun sendQuickChat(emoji: String): Boolean {
         if (emoji !in QuickChatEmojiCatalog.EMOJIS) return false
+        return sendRealtimeMessage(
+            JSONObject()
+                .put("type", "QUICK_CHAT_SEND")
+                .put("emoji", emoji),
+        )
+    }
+
+    fun sendVoiceJoin(): Boolean =
+        sendRealtimeMessage(
+            JSONObject().put("type", "VOICE_JOIN"),
+        )
+
+    fun sendVoiceLeave(): Boolean =
+        sendRealtimeMessage(
+            JSONObject().put("type", "VOICE_LEAVE"),
+        )
+
+    fun sendVoiceSignal(
+        playerId: String,
+        signal: JSONObject,
+    ): Boolean {
+        if (playerId.isBlank()) return false
+        return sendRealtimeMessage(
+            JSONObject()
+                .put("type", "VOICE_SIGNAL")
+                .put("toPlayerId", playerId)
+                .put("signal", signal),
+        )
+    }
+
+    private fun sendRealtimeMessage(payload: JSONObject): Boolean {
         val activeSocket =
             synchronized(stateLock) {
                 if (connected && desiredSession != null) socket else null
             } ?: return false
-        val payload =
-            JSONObject()
-                .put("type", "QUICK_CHAT_SEND")
-                .put("emoji", emoji)
-                .toString()
-        return runCatching { activeSocket.send(payload) }.getOrDefault(false)
+        return runCatching { activeSocket.send(payload.toString()) }.getOrDefault(false)
     }
 
     fun disconnect() {

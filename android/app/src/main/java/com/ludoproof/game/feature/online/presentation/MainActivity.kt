@@ -1,26 +1,31 @@
 package com.ludoproof.game
 
-import android.app.Activity
+import android.os.Build
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.text.InputType
 import android.view.Gravity
 import android.view.View
+import android.view.WindowInsets
 import android.widget.Button
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import org.json.JSONObject
 import java.util.concurrent.Executors
 import com.ludoproof.game.ui.game.addGameTopActions
 import com.ludoproof.game.ui.online.*
 import com.ludoproof.game.feature.online.*
+import com.ludoproof.game.feature.online.FriendsVoiceChatSession
 
-class MainActivity : Activity() {
+class MainActivity : ComponentActivity() {
     internal val gameMode:
         GameMode by lazy {
         GameMode
@@ -153,6 +158,21 @@ class MainActivity : Activity() {
     internal var realtimeConnected =
         false
 
+    internal var friendsVoiceEnabled =
+        false
+
+    internal var friendsMicEnabled =
+        true
+
+    internal var friendsVoiceStatus =
+        "Voice is off"
+
+    private var friendsVoiceSession: FriendsVoiceChatSession? = null
+
+    @Volatile
+    internal var screenStarted =
+        false
+
     internal var lastRealtimeRevision =
         -1
 
@@ -228,7 +248,11 @@ class MainActivity : Activity() {
                 }
                 mainHandler.postDelayed(
                     this,
-                    STATE_POLL_MS,
+                    if (realtimeConnected) {
+                        STATE_POLL_LIVE_MS
+                    } else {
+                        STATE_POLL_RECOVERY_MS
+                    },
                 )
             }
         }
@@ -236,6 +260,9 @@ class MainActivity : Activity() {
     internal val secureSessionStore by lazy {
         SecureSessionStore(this)
     }
+
+    internal var secureSessionPersistenceFailed =
+        false
 
     internal val pendingRollStore by lazy {
         PendingRollStore(this)
@@ -253,7 +280,7 @@ class MainActivity : Activity() {
         PublicMatchmakingStore(this)
     }
 
-    internal val realtimeClient by lazy {
+    internal val realtimeClient: MatchRealtimeClient by lazy {
         MatchRealtimeClient(
             onRevision = {
                     revision,
@@ -292,7 +319,27 @@ class MainActivity : Activity() {
                     }
                     realtimeConnected =
                         connected
+                    if (connected && friendsVoiceEnabled) {
+                        if (!realtimeClient.sendVoiceJoin()) {
+                            setFriendsVoiceStatus("Voice signaling is reconnecting…")
+                        }
+                    }
                     updateConnectionLabel()
+                    if (screenStarted && playerToken != null) {
+                        mainHandler.removeCallbacks(statePollRunnable)
+                        if (connected) {
+                            refreshState(silent = true)
+                            mainHandler.postDelayed(
+                                statePollRunnable,
+                                STATE_POLL_LIVE_MS,
+                            )
+                        } else {
+                            mainHandler.postDelayed(
+                                statePollRunnable,
+                                STATE_RECONCILE_DELAY_MS,
+                            )
+                        }
+                    }
                 }
             },
             onQuickChat = { senderPlayerId, displayName, emoji ->
@@ -304,6 +351,23 @@ class MainActivity : Activity() {
                         displayName = displayName,
                         emoji = emoji,
                     )
+                }
+            },
+            onVoicePeers = { playerIds ->
+                mainHandler.post {
+                    if (friendsVoiceEnabled) friendsVoiceSession?.updatePeers(playerIds)
+                }
+            },
+            onVoiceSignal = { senderPlayerId, signal ->
+                mainHandler.post {
+                    if (friendsVoiceEnabled) {
+                        friendsVoiceSession?.handleSignal(senderPlayerId, signal)
+                    }
+                }
+            },
+            onVoiceEnded = {
+                mainHandler.post {
+                    stopFriendsVoice("Voice ended with the match.")
                 }
             },
         )
@@ -363,6 +427,14 @@ class MainActivity : Activity() {
     ) {
         super.onCreate(
             savedInstanceState,
+        )
+        onBackPressedDispatcher.addCallback(
+            this,
+            object : OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    requestRemoteExit()
+                }
+            },
         )
         LudoProofTheme.configureWindow(
             this,
@@ -604,7 +676,8 @@ class MainActivity : Activity() {
             ),
         )
 
-        addGameTopActions(
+        val topActionsBar =
+            addGameTopActions(
             host = host,
             context = this,
             onBack = { requestRemoteExit() },
@@ -622,6 +695,31 @@ class MainActivity : Activity() {
         )
 
         setContentView(root)
+        root.setOnApplyWindowInsetsListener { _, insets ->
+            val cutoutTopInset =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    insets.displayCutout?.safeInsetTop ?: 0
+                } else {
+                    0
+                }
+            val statusBarTopInset =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    insets.getInsetsIgnoringVisibility(WindowInsets.Type.statusBars()).top
+                } else {
+                    @Suppress("DEPRECATION")
+                    insets.systemWindowInsetTop
+                }
+            val safeTopInset = maxOf(cutoutTopInset, statusBarTopInset)
+            content.setPadding(
+                content.paddingLeft,
+                dp(14) + safeTopInset,
+                content.paddingRight,
+                content.paddingBottom,
+            )
+            topActionsBar.translationY = safeTopInset.toFloat()
+            insets
+        }
+        root.requestApplyInsets()
         updateRollButton()
         restorePublicMatchmakingUi()
 
@@ -645,13 +743,14 @@ class MainActivity : Activity() {
 
     override fun onStart() {
         super.onStart()
+        screenStarted = true
         connectivityMonitor.start()
         mainHandler.removeCallbacks(
             statePollRunnable,
         )
         mainHandler.postDelayed(
             statePollRunnable,
-            STATE_POLL_MS,
+            STATE_POLL_RECOVERY_MS,
         )
         mainHandler.removeCallbacks(
             matchmakingPollRunnable,
@@ -669,6 +768,8 @@ class MainActivity : Activity() {
     }
 
     override fun onStop() {
+        stopFriendsVoice("Voice paused when you left the match.")
+        screenStarted = false
         uiStateHolder.update {
             it.copy(
                 currentStateSource = null,
@@ -697,12 +798,112 @@ class MainActivity : Activity() {
             !isDestroyed
 
     override fun onDestroy() {
+        stopFriendsVoice("Voice is off")
         mainHandler.removeCallbacksAndMessages(
             null,
         )
         realtimeClient.shutdown()
         executor.shutdownNow()
         super.onDestroy()
+    }
+
+    internal fun toggleFriendsVoice() {
+        val state = currentState
+        if (gameMode != GameMode.FRIENDS || state?.status != "ACTIVE") {
+            showStatus("Voice chat is available during an active Friends match.")
+            return
+        }
+        if (friendsVoiceEnabled) {
+            stopFriendsVoice("Voice is off")
+            return
+        }
+        if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(
+                arrayOf(android.Manifest.permission.RECORD_AUDIO),
+                FRIENDS_VOICE_PERMISSION_REQUEST,
+            )
+            setFriendsVoiceStatus("Allow microphone access to use voice.")
+            return
+        }
+        startFriendsVoice()
+    }
+
+    internal fun toggleFriendsMic() {
+        if (!friendsVoiceEnabled) return
+        friendsMicEnabled = !friendsMicEnabled
+        friendsVoiceSession?.setMicEnabled(friendsMicEnabled)
+        setFriendsVoiceStatus(if (friendsMicEnabled) "Microphone is on" else "Microphone muted")
+        currentState?.let { OnlineLudoPawsPresentation.refreshVoiceControls(this, it) }
+    }
+
+    private fun startFriendsVoice() {
+        if (friendsVoiceEnabled) return
+        val localPlayerId = playerId
+        if (localPlayerId.isNullOrBlank()) {
+            setFriendsVoiceStatus("Your player identity is not ready yet.")
+            return
+        }
+        try {
+            friendsVoiceSession =
+                FriendsVoiceChatSession(
+                    context = this,
+                    localPlayerId = localPlayerId,
+                    sendSignal = { peerId, signal ->
+                        realtimeClient.sendVoiceSignal(peerId, signal)
+                    },
+                    onStatusChanged = { status ->
+                        mainHandler.post {
+                            if (friendsVoiceEnabled && canRenderUi()) {
+                                setFriendsVoiceStatus(status)
+                            }
+                        }
+                    },
+                ).also { it.setMicEnabled(friendsMicEnabled) }
+            friendsVoiceEnabled = true
+            friendsVoiceStatus = "Connecting to Friends voice…"
+            if (realtimeConnected) {
+                if (!realtimeClient.sendVoiceJoin()) {
+                    friendsVoiceStatus = "Voice signaling is reconnecting…"
+                }
+            } else {
+                connectRealtimeIfPossible()
+                friendsVoiceStatus = "Waiting for a secure match connection…"
+            }
+        } catch (error: Exception) {
+            friendsVoiceSession?.close()
+            friendsVoiceSession = null
+            friendsVoiceEnabled = false
+            friendsVoiceStatus = "Could not start voice: ${error.message ?: "audio setup failed"}"
+        }
+        currentState?.let { OnlineLudoPawsPresentation.refreshVoiceControls(this, it) }
+    }
+
+    internal fun stopFriendsVoice(status: String = "Voice is off") {
+        if (friendsVoiceEnabled) realtimeClient.sendVoiceLeave()
+        friendsVoiceEnabled = false
+        friendsVoiceSession?.close()
+        friendsVoiceSession = null
+        setFriendsVoiceStatus(status)
+    }
+
+    private fun setFriendsVoiceStatus(status: String) {
+        friendsVoiceStatus = status
+        currentState?.let { OnlineLudoPawsPresentation.refreshVoiceControls(this, it) }
+    }
+
+    @Deprecated("Use the activity result API for new permission requests")
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray,
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode != FRIENDS_VOICE_PERMISSION_REQUEST) return
+        if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
+            startFriendsVoice()
+        } else {
+            setFriendsVoiceStatus("Microphone permission denied. Voice chat is off.")
+        }
     }
 
     internal fun isMatchmakingUiReady(): Boolean =
@@ -757,8 +958,13 @@ class MainActivity : Activity() {
     }
 
     private companion object {
-        const val STATE_POLL_MS =
+        const val FRIENDS_VOICE_PERMISSION_REQUEST = 731
+        const val STATE_POLL_RECOVERY_MS =
             3_000L
+        const val STATE_POLL_LIVE_MS =
+            30_000L
+        const val STATE_RECONCILE_DELAY_MS =
+            250L
         const val MATCHMAKING_POLL_MS =
             1_500L
         const val REALTIME_RECONNECT_MS =

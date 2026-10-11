@@ -31,7 +31,7 @@ object StoreCatalog {
                 kind =
                     StoreProductKind.NON_CONSUMABLE_REMOVE_ADS,
                 fallbackPrice =
-                    "₹149.00",
+                    "₹99.00",
                 featured =
                     true,
             ),
@@ -39,73 +39,73 @@ object StoreCatalog {
                 productId =
                     GEMS_300,
                 title =
-                    "300 Gems",
+                    "300 Gems · Starter",
                 gemAmount =
                     300,
                 kind =
                     StoreProductKind.CONSUMABLE_GEMS,
                 fallbackPrice =
-                    "₹80.00",
+                    "₹29.00",
             ),
             StoreProduct(
                 productId =
                     GEMS_1500,
                 title =
-                    "1,500 Gems",
+                    "1,200 Gems · Value",
                 gemAmount =
-                    1_500,
+                    1_200,
                 kind =
                     StoreProductKind.CONSUMABLE_GEMS,
                 fallbackPrice =
-                    "₹240.00",
+                    "₹79.00",
             ),
             StoreProduct(
                 productId =
                     GEMS_3500,
                 title =
-                    "3,500 Gems",
+                    "3,000 Gems · Popular",
                 gemAmount =
-                    3_500,
+                    3_000,
                 kind =
                     StoreProductKind.CONSUMABLE_GEMS,
                 fallbackPrice =
-                    "₹400.00",
+                    "₹179.00",
             ),
             StoreProduct(
                 productId =
                     GEMS_20000,
                 title =
-                    "20K Gems",
+                    "7,500 Gems",
                 gemAmount =
-                    20_000,
+                    7_500,
                 kind =
                     StoreProductKind.CONSUMABLE_GEMS,
                 fallbackPrice =
-                    "₹850.00",
+                    "₹399.00",
             ),
             StoreProduct(
                 productId =
                     GEMS_40000,
                 title =
-                    "40K Gems",
+                    "16,000 Gems",
                 gemAmount =
-                    40_000,
+                    16_000,
                 kind =
                     StoreProductKind.CONSUMABLE_GEMS,
                 fallbackPrice =
-                    "₹1,650.00",
+                    "₹799.00",
             ),
             StoreProduct(
                 productId =
                     GEMS_200000,
                 title =
-                    "200K Gems",
+                    "35,000 Gems · Best Value",
                 gemAmount =
-                    200_000,
+                    35_000,
                 kind =
                     StoreProductKind.CONSUMABLE_GEMS,
                 fallbackPrice =
-                    "₹4,200.00",
+                    "₹1,499.00",
             ),
         )
 

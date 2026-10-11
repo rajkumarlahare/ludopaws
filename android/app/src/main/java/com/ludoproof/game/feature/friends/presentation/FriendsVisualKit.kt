@@ -57,8 +57,8 @@ internal object FriendsVisualKit {
     fun card(
         context: Context,
         accent: Int = CYAN,
-        radiusDp: Int = 18,
-        paddingDp: Int = 14,
+        radiusDp: Int = 20,
+        paddingDp: Int = 13,
     ): LinearLayout =
         LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
@@ -70,13 +70,15 @@ internal object FriendsVisualKit {
             )
             background = gradient(
                 context = context,
-                top = 0xE91A66C6.toInt(),
-                bottom = 0xEE073C8A.toInt(),
+                top = 0xF12678D5.toInt(),
+                bottom = 0xF0062D70.toInt(),
                 stroke = accent,
                 strokeDp = 2,
                 radiusDp = radiusDp,
             )
-            elevation = dp(context, 4).toFloat()
+            clipChildren = false
+            clipToPadding = false
+            elevation = dp(context, 8).toFloat()
         }
 
     fun compactCard(
@@ -86,18 +88,18 @@ internal object FriendsVisualKit {
         card(
             context = context,
             accent = accent,
-            radiusDp = 16,
-            paddingDp = 11,
+            radiusDp = 18,
+            paddingDp = 12,
         )
 
     fun rowSurface(context: Context): GradientDrawable =
         gradient(
             context = context,
-            top = 0xF3144C99.toInt(),
-            bottom = 0xF30A3575.toInt(),
-            stroke = 0x882EC8FF.toInt(),
+            top = 0xF51A62B5.toInt(),
+            bottom = 0xF2083477.toInt(),
+            stroke = 0xAA69DFFF.toInt(),
             strokeDp = 1,
-            radiusDp = 14,
+            radiusDp = 15,
         )
 
     fun inputSurface(context: Context): GradientDrawable =

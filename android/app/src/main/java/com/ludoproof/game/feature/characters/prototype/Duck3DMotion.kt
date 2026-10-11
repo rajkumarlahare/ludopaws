@@ -15,6 +15,7 @@ data class Duck3DPose(
     val bodyYawDegrees: Float = 0f,
     val wingFlapDegrees: Float = 0f,
     val headTiltDegrees: Float = 0f,
+    val legPaddleDegrees: Float = 0f,
 )
 
 /**
@@ -59,6 +60,7 @@ object Duck3DMotionTimeline {
                     liftY = 0.62f * arc,
                     wingFlapDegrees = 34f * arc + 7f * flap,
                     headTiltDegrees = -7f * arc,
+                    legPaddleDegrees = 42f * sin(p * PI * 2.0).toFloat() * arc,
                 )
             }
 
@@ -71,6 +73,7 @@ object Duck3DMotionTimeline {
                     bodyYawDegrees = 360f * p,
                     wingFlapDegrees = 52f * sin((p * PI)).toFloat().coerceAtLeast(0f),
                     headTiltDegrees = 8f * sin((p * PI * 2.0)).toFloat(),
+                    legPaddleDegrees = 20f * sin(p * PI * 6.0).toFloat(),
                 )
             }
         }

@@ -4,6 +4,7 @@ import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import org.json.JSONObject
 import java.security.KeyStore
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -18,12 +19,24 @@ data class PlayerSession(
         GameMode.ONLINE.wireValue,
 )
 
+data class PendingRemoteForfeit(
+    val matchId: String,
+    val playerId: String,
+    val playerToken: String,
+    val ranked: Boolean,
+)
+
 class SecureSessionStore(
     private val context: Context,
 ) {
     private val prefs =
         context.getSharedPreferences(
             PREFS_NAME,
+            Context.MODE_PRIVATE,
+        )
+    private val pendingForfeitPrefs =
+        context.getSharedPreferences(
+            PENDING_FORFEIT_PREFS_NAME,
             Context.MODE_PRIVATE,
         )
 
@@ -103,6 +116,105 @@ class SecureSessionStore(
     fun clear() {
         prefs.edit().clear().apply()
         legacyPrefs().edit().clear().apply()
+    }
+
+    fun savePendingForfeit(value: PendingRemoteForfeit) {
+        require(MATCH_ID.matches(value.matchId))
+        require(value.playerId.isNotBlank())
+        require(PLAYER_TOKEN.matches(value.playerToken))
+
+        val cipher = Cipher.getInstance(TRANSFORMATION)
+        cipher.init(Cipher.ENCRYPT_MODE, secretKey())
+        cipher.updateAAD(
+            pendingForfeitAad(
+                value.matchId,
+                value.playerId,
+            ),
+        )
+        val ciphertext =
+            cipher.doFinal(
+                value.playerToken.toByteArray(Charsets.UTF_8),
+            )
+        val entry =
+            JSONObject()
+                .put(KEY_PLAYER_ID, value.playerId)
+                .put(KEY_RANKED, value.ranked)
+                .put(
+                    KEY_IV,
+                    Base64.encodeToString(cipher.iv, Base64.NO_WRAP),
+                )
+                .put(
+                    KEY_TOKEN_CIPHERTEXT,
+                    Base64.encodeToString(ciphertext, Base64.NO_WRAP),
+                )
+        check(
+            pendingForfeitPrefs.edit()
+                .putString(value.matchId, entry.toString())
+                .commit(),
+        ) {
+            "Pending forfeit could not be durably persisted"
+        }
+    }
+
+    fun pendingForfeits(): List<PendingRemoteForfeit> =
+        pendingForfeitPrefs.all.entries
+            .sortedBy { it.key }
+            .map { (matchId, raw) ->
+                require(MATCH_ID.matches(matchId)) {
+                    "Pending forfeit has an invalid match ID"
+                }
+                val entry =
+                    JSONObject(
+                        raw as? String
+                            ?: error("Pending forfeit entry is missing"),
+                    )
+                val playerId =
+                    entry.getString(KEY_PLAYER_ID)
+                require(playerId.isNotBlank()) {
+                    "Pending forfeit player ID is missing"
+                }
+                val cipher =
+                    Cipher.getInstance(TRANSFORMATION)
+                cipher.init(
+                    Cipher.DECRYPT_MODE,
+                    secretKey(),
+                    GCMParameterSpec(
+                        128,
+                        Base64.decode(
+                            entry.getString(KEY_IV),
+                            Base64.NO_WRAP,
+                        ),
+                    ),
+                )
+                cipher.updateAAD(
+                    pendingForfeitAad(matchId, playerId),
+                )
+                val token =
+                    cipher.doFinal(
+                        Base64.decode(
+                            entry.getString(KEY_TOKEN_CIPHERTEXT),
+                            Base64.NO_WRAP,
+                        ),
+                    ).toString(Charsets.UTF_8)
+                require(PLAYER_TOKEN.matches(token)) {
+                    "Pending forfeit player token is invalid"
+                }
+                PendingRemoteForfeit(
+                    matchId = matchId,
+                    playerId = playerId,
+                    playerToken = token,
+                    ranked = entry.getBoolean(KEY_RANKED),
+                )
+            }
+
+    fun clearPendingForfeit(matchId: String) {
+        check(
+            pendingForfeitPrefs.edit()
+                .remove(matchId)
+                .commit(),
+        ) {
+            "Pending forfeit could not be cleared"
+        }
     }
 
     private fun loadEncrypted(): PlayerSession? {
@@ -301,11 +413,20 @@ class SecureSessionStore(
         return generator.generateKey()
     }
 
+    private fun pendingForfeitAad(
+        matchId: String,
+        playerId: String,
+    ): ByteArray =
+        "ludoproof:pending-forfeit:v1:$matchId:$playerId"
+            .toByteArray(Charsets.UTF_8)
+
     private companion object {
         const val PREFS_NAME =
             "ludoproof_secure_session"
         const val LEGACY_PREFS_NAME =
             "ludoproof_session"
+        const val PENDING_FORFEIT_PREFS_NAME =
+            "ludoproof_pending_forfeits"
         const val ANDROID_KEYSTORE =
             "AndroidKeyStore"
         const val KEY_ALIAS =
@@ -323,6 +444,8 @@ class SecureSessionStore(
         const val KEY_IV = "iv"
         const val KEY_TOKEN_CIPHERTEXT =
             "playerTokenCiphertext"
+        const val KEY_RANKED =
+            "ranked"
 
         val MATCH_ID =
             Regex("^LP[A-Z2-9]{8}$")

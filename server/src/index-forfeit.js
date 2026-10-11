@@ -23,5 +23,9 @@ export {
 } from "./friend-social.js";
 
 export {
+  StorePurchaseLedger,
+} from "./store-purchase-ledger.js";
+
+export {
   MatchRoom,
 } from "./match-room-lifecycle.js";
