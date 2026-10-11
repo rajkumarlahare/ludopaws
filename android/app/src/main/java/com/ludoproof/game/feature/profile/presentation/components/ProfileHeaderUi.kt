@@ -9,6 +9,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.LudoProofTheme
+import com.ludoproof.game.core.ui.components.AppFocusRing
 import com.ludoproof.game.LudoPawsCharacterAvatarView
 import com.ludoproof.game.feature.characters.data.local.CharacterSelectionStore
 import com.ludoproof.game.feature.profile.domain.ProfileProgression
@@ -65,6 +66,8 @@ internal fun ProfileActivity.profileTopBar():
                 setOnClickListener {
                     finish()
                 }
+                contentDescription = "Back"
+                AppFocusRing.apply(this, cornerRadiusDp = 999f)
             },
             LinearLayout.LayoutParams(
                 dp(50),
@@ -148,6 +151,7 @@ internal fun ProfileActivity.profileTopBar():
                 setOnClickListener {
                     beginPlayGamesSignIn()
                 }
+                AppFocusRing.apply(this, cornerRadiusDp = 11f)
             },
             LinearLayout.LayoutParams(
                 dp(104),
@@ -244,9 +248,11 @@ internal fun ProfileActivity.profileIdentityPanel(
                                     0xFFFF9800.toInt(),
                                 )
                             }
+                        contentDescription = "Edit profile name"
                         setOnClickListener {
                             showNameEditor()
                         }
+                        AppFocusRing.apply(this, cornerRadiusDp = 999f)
                     },
                     FrameLayout.LayoutParams(
                         dp(30),
