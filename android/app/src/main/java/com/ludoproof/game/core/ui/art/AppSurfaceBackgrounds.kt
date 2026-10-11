@@ -149,9 +149,9 @@ private class PlayerCountSelectionOverlayDrawable(
         fillPaint.alpha = drawableAlpha
         canvas.drawCircle(badgeX, badgeY, badgeRadius, fillPaint)
 
-        // A white tick stays legible over the gold badge on the compact Friends controls.
+        // Match the compact Friends check tick to the green COPY button.
         strokePaint.color =
-            if (checkBadgeAtTopEnd) 0xFFFFFFFF.toInt() else 0xFF63451B.toInt()
+            if (checkBadgeAtTopEnd) 0xFF08A93B.toInt() else 0xFF63451B.toInt()
         strokePaint.alpha = drawableAlpha
         strokePaint.strokeWidth = dp(if (checkBadgeAtTopEnd) 1.5f else 1.8f)
         val check = android.graphics.Path().apply {
