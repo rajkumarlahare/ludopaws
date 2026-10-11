@@ -115,8 +115,36 @@ internal fun MainActivity.onlineLobbyPanel():
                         cornerRadiusDp = 24f,
                     )
 
+                // Show the selected Ludo Paws character here as well as during matchmaking.
+                val selectionOwnAvatar =
+                    FrameLayout(this@onlineLobbyPanel).apply {
+                        background =
+                            recessedPlywoodBackground(
+                                context = this@onlineLobbyPanel,
+                                outerCornerRadiusDp = 18f,
+                            )
+                        setPadding(dp(3), dp(3), dp(3), dp(3))
+                        contentDescription = "Your selected character"
+                        addView(
+                            LudoPawsCharacterAvatarView(
+                                this@onlineLobbyPanel,
+                            ).apply {
+                                bind(
+                                    characterId =
+                                        CharacterSelectionStore(
+                                            this@onlineLobbyPanel,
+                                        ).load().characterId,
+                                    showCircularChrome = false,
+                                )
+                            },
+                            FrameLayout.LayoutParams(
+                                FrameLayout.LayoutParams.MATCH_PARENT,
+                                FrameLayout.LayoutParams.MATCH_PARENT,
+                            ),
+                        )
+                    }
                 addView(
-                    MatchmakingMedallionView(this@onlineLobbyPanel),
+                    selectionOwnAvatar,
                     LinearLayout.LayoutParams(
                         dp(if (isCompactOnline()) 104 else 120),
                         dp(if (isCompactOnline()) 104 else 120),
