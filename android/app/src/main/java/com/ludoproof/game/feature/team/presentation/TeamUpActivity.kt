@@ -33,6 +33,7 @@ import android.widget.TextView
 import com.ludoproof.game.CachedMatchStore
 import com.ludoproof.game.LudoPawsCharacterAvatarView
 import com.ludoproof.game.core.ui.components.playSelectionPopAnimation
+import com.ludoproof.game.core.ui.components.LaserStatusDotView
 import com.ludoproof.game.GameMode
 import com.ludoproof.game.GameModeIntent
 import com.ludoproof.game.LudoProofTheme
@@ -40,7 +41,6 @@ import com.ludoproof.game.core.ui.components.AppFocusRing
 import com.ludoproof.game.core.ui.art.plywoodBackground
 import com.ludoproof.game.core.ui.art.playGamesSignInBackground
 import com.ludoproof.game.core.ui.art.recessedPlywoodBackground
-import com.ludoproof.game.core.ui.art.transparentDarkBlueStrokeBackground
 import com.ludoproof.game.MainActivity
 import com.ludoproof.game.PlayerSession
 import com.ludoproof.game.SecureSessionStore
@@ -170,22 +170,28 @@ class TeamUpActivity : Activity() {
                     },
                 )
                 addView(
-                    TextView(this@TeamUpActivity).apply {
-                        text = "● ONLINE"
-                        LudoProofTheme.body(this, 10f, centered = true, bright = true)
-                        setTextColor(0xFF62E9FF.toInt())
-                        setPadding(dp(12), dp(2), dp(12), dp(2))
-                        background =
-                            transparentDarkBlueStrokeBackground(
-                                context = this@TeamUpActivity,
-                                cornerRadiusDp = 999f,
-                            )
+                    LinearLayout(this@TeamUpActivity).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        gravity = Gravity.CENTER
+                        addView(
+                            LaserStatusDotView(this@TeamUpActivity),
+                            LinearLayout.LayoutParams(dp(10), dp(10)).apply { marginEnd = dp(5) },
+                        )
+                        addView(
+                            TextView(this@TeamUpActivity).apply {
+                                text = "ONLINE"
+                                LudoProofTheme.body(this, 10f, centered = true, bright = true)
+                                setTextColor(0xFF62E9FF.toInt())
+                                includeFontPadding = false
+                            },
+                        )
                     },
                     LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.WRAP_CONTENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT,
                     ).apply {
                         gravity = Gravity.CENTER_HORIZONTAL
+                        topMargin = dp(2)
                     },
                 )
             }

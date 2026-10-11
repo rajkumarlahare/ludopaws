@@ -24,6 +24,7 @@ import com.ludoproof.game.core.ui.art.playGamesSignInBackground
 import com.ludoproof.game.core.ui.art.recessedPlywoodBackground
 import com.ludoproof.game.core.ui.art.playerCountSelectionBackground
 import com.ludoproof.game.core.ui.components.AppFocusRing
+import com.ludoproof.game.core.ui.components.LaserStatusDotView
 import com.ludoproof.game.LudoPawsCharacterAvatarView
 import com.ludoproof.game.MainActivity
 import com.ludoproof.game.feature.profile.data.local.ProfileStore
@@ -34,32 +35,63 @@ import com.ludoproof.game.feature.online.selectPublicPlayerCount
 
 private fun MainActivity.onlineModePanelHeader(): LinearLayout =
     LinearLayout(this).apply {
-        orientation = LinearLayout.HORIZONTAL
+        orientation = LinearLayout.VERTICAL
         gravity = Gravity.CENTER
         val compact = isCompactOnline()
         addView(
-            ModeArtView(this@onlineModePanelHeader).apply {
-                mode = if (gameMode == GameMode.TEAM_UP) ModeArtView.Mode.TEAM_UP else ModeArtView.Mode.ONLINE
-                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            LinearLayout(this@onlineModePanelHeader).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER
+                addView(
+                    ModeArtView(this@onlineModePanelHeader).apply {
+                        mode = if (gameMode == GameMode.TEAM_UP) ModeArtView.Mode.TEAM_UP else ModeArtView.Mode.ONLINE
+                        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                    },
+                    LinearLayout.LayoutParams(
+                        dp(if (compact) 34 else 38),
+                        dp(if (compact) 34 else 38),
+                    ).apply { marginEnd = dp(8) },
+                )
+                addView(
+                    TextView(this@onlineModePanelHeader).apply {
+                        text = if (gameMode == GameMode.TEAM_UP) "TEAM UP" else "ONLINE"
+                        LudoProofTheme.title(this, if (compact) 20f else 23f)
+                        gravity = Gravity.CENTER_VERTICAL
+                        maxLines = 1
+                        includeFontPadding = false
+                    },
+                    LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                    ),
+                )
             },
-            LinearLayout.LayoutParams(
-                dp(if (compact) 34 else 38),
-                dp(if (compact) 34 else 38),
-            ).apply { marginEnd = dp(8) },
         )
-        addView(
-            TextView(this@onlineModePanelHeader).apply {
-                text = if (gameMode == GameMode.TEAM_UP) "TEAM UP" else "ONLINE"
-                LudoProofTheme.title(this, if (compact) 20f else 23f)
-                gravity = Gravity.CENTER_VERTICAL
-                maxLines = 1
+        val statusRow = LinearLayout(this@onlineModePanelHeader).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            addView(
+                LaserStatusDotView(this@onlineModePanelHeader),
+                LinearLayout.LayoutParams(dp(10), dp(10)).apply { marginEnd = dp(5) },
+            )
+            connectionText = TextView(this@onlineModePanelHeader).apply {
+                text = "ONLINE"
+                LudoProofTheme.body(this, if (compact) 10f else 11f, centered = true, bright = true)
+                setTextColor(0xFFD4FFB2.toInt())
                 includeFontPadding = false
-            },
+                accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+                setPadding(0, 0, 0, 0)
+            }
+            addView(connectionText)
+        }
+        addView(
+            statusRow,
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
-            ),
+            ).apply { topMargin = dp(2) },
         )
+        updateConnectionLabel()
     }
 
 internal fun MainActivity.onlineLobbyPanel():

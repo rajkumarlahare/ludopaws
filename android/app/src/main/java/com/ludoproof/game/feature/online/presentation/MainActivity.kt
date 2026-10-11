@@ -548,18 +548,7 @@ class MainActivity : ComponentActivity() {
             ),
         )
 
-        content.addView(
-            onlineTopBar(),
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            ).apply {
-                leftMargin =
-                    sectionSideMargin
-                rightMargin =
-                    sectionSideMargin
-            },
-        )
+        registerOnlineBackCallback()
 
         if (
             gameMode !=
@@ -943,7 +932,7 @@ class MainActivity : ComponentActivity() {
         when {
             !isOnline -> {
                 connectionText.text =
-                    "● OFFLINE"
+                    "OFFLINE"
                 connectionText.setTextColor(
                     LudoProofTheme.GOLD,
                 )
@@ -951,7 +940,7 @@ class MainActivity : ComponentActivity() {
 
             realtimeConnected -> {
                 connectionText.text =
-                    "● LIVE"
+                    "LIVE"
                 connectionText.setTextColor(
                     0xFF65EF55.toInt(),
                 )
@@ -959,7 +948,7 @@ class MainActivity : ComponentActivity() {
 
             else -> {
                 connectionText.text =
-                    "● ONLINE"
+                    "ONLINE"
                 // Soft, light parrot-green for the online status on the dark header.
                 connectionText.setTextColor(
                     0xFFD4FFB2.toInt(),
