@@ -30,18 +30,17 @@ internal fun OfflineGameActivity.centeredSetupTitle(label: String): View {
             dp(if (compact) 10 else 14),
             dp(4),
         )
-        // The Computer title is intentionally unboxed; keep the paw layout unchanged.
+        // The Computer title is intentionally unboxed, with a robot icon on its left.
         background = null
         elevation = 0f
         addView(
-            SetupPawMarkView(
-                this@centeredSetupTitle,
-                pawColor = 0xFFFFFFFF.toInt(),
-            ),
+            RobotTitleIconView(this@centeredSetupTitle),
             LinearLayout.LayoutParams(
-                dp(if (compact) 18 else 22),
-                dp(if (compact) 18 else 22),
-            ),
+                dp(if (compact) 22 else 26),
+                dp(if (compact) 22 else 26),
+            ).apply {
+                marginEnd = dp(4)
+            },
         )
         addView(
             TextView(this@centeredSetupTitle).apply {
@@ -51,16 +50,6 @@ internal fun OfflineGameActivity.centeredSetupTitle(label: String): View {
                 includeFontPadding = false
                 maxLines = 1
             },
-        )
-        addView(
-            SetupPawMarkView(
-                this@centeredSetupTitle,
-                pawColor = 0xFFFFFFFF.toInt(),
-            ),
-            LinearLayout.LayoutParams(
-                dp(if (compact) 18 else 22),
-                dp(if (compact) 18 else 22),
-            ),
         )
     }
     return FrameLayout(this).apply {
@@ -74,6 +63,44 @@ internal fun OfflineGameActivity.centeredSetupTitle(label: String): View {
                 Gravity.CENTER,
             ),
         )
+    }
+}
+
+private class RobotTitleIconView(context: Context) : View(context) {
+    private val outline = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFFFFFFFF.toInt()
+        style = Paint.Style.STROKE
+        strokeWidth = 5f
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
+    private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFFFFFFFF.toInt()
+        style = Paint.Style.FILL
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        val size = minOf(width, height).toFloat()
+        if (size <= 0f) return
+
+        canvas.save()
+        canvas.translate((width - size) / 2f, (height - size) / 2f)
+        canvas.scale(size / 100f, size / 100f)
+
+        // Antenna and side panels make the silhouette read as a small robot.
+        canvas.drawLine(50f, 14f, 50f, 23f, outline)
+        canvas.drawCircle(50f, 10f, 4f, fill)
+        canvas.drawRoundRect(RectF(9f, 38f, 20f, 59f), 4f, 4f, outline)
+        canvas.drawRoundRect(RectF(80f, 38f, 91f, 59f), 4f, 4f, outline)
+
+        // Rounded robot head with two bright eyes and a simple mouth.
+        canvas.drawRoundRect(RectF(20f, 23f, 80f, 77f), 12f, 12f, outline)
+        canvas.drawCircle(38f, 45f, 4.5f, fill)
+        canvas.drawCircle(62f, 45f, 4.5f, fill)
+        canvas.drawRoundRect(RectF(37f, 60f, 63f, 65f), 2.5f, 2.5f, fill)
+
+        canvas.restore()
     }
 }
 
