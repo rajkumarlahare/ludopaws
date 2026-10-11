@@ -20,7 +20,7 @@ internal fun addGameTopActions(
 ): FrameLayout {
     val buttonSize = LudoProofTheme.dp(context, 52)
     val sideMargin = LudoProofTheme.dp(context, 16)
-    val topMargin = LudoProofTheme.dp(context, 14)
+    val actionTopMargin = LudoProofTheme.dp(context, 14)
     val bar =
         FrameLayout(context).apply {
             clipChildren = false
@@ -42,7 +42,7 @@ internal fun addGameTopActions(
             Gravity.TOP or Gravity.START,
         ).apply {
             leftMargin = sideMargin
-            topMargin = topMargin
+            topMargin = actionTopMargin
         },
     )
 
@@ -60,7 +60,7 @@ internal fun addGameTopActions(
             Gravity.TOP or Gravity.END,
         ).apply {
             rightMargin = sideMargin
-            topMargin = topMargin
+            topMargin = actionTopMargin
         },
     )
 
