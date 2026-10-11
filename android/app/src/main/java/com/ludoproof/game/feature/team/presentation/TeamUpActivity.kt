@@ -1035,10 +1035,6 @@ class TeamUpActivity : Activity() {
             val targetIndex = queuedPlayers
             val sourceIndex = (queuedPlayers - 1).coerceIn(0, 3)
             val isSearching = queuedPlayers < 4 && isAttachedToWindow && visibility == View.VISIBLE
-            val elapsed = (now - approachStartedAt).coerceAtLeast(0L)
-            val approachFraction =
-                (elapsed / APPROACH_DURATION_MS.toFloat()).coerceIn(0f, 1f)
-
             paint.style = Paint.Style.STROKE
             paint.strokeCap = Paint.Cap.ROUND
             paint.strokeWidth = dp(3f)
