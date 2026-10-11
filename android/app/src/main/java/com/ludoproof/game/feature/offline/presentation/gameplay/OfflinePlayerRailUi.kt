@@ -7,6 +7,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import com.ludoproof.game.*
 import com.ludoproof.game.feature.offline.*
+import com.ludoproof.game.core.ui.components.AppFocusRing
 import com.ludoproof.game.feature.settings.data.local.GameSettingsStore
 import com.ludoproof.game.ui.quickchat.QuickChatButtonView
 import com.ludoproof.game.ui.quickchat.showQuickChatPopup
@@ -237,6 +238,11 @@ private fun OfflineGameActivity.addPlayerSlot(
                         )
                     }
                 }
+                AppFocusRing.apply(
+                    this,
+                    cornerRadiusDp = 999f,
+                    strokeWidthDp = 2f,
+                )
             }
         val profileColumn =
             LinearLayout(this).apply {

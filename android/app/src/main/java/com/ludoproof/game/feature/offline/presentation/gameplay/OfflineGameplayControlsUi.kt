@@ -3,20 +3,22 @@ package com.ludoproof.game.ui.offline.gameplay
 import android.graphics.Color
 import android.graphics.Typeface
 import android.os.SystemClock
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.StateListDrawable
 import android.view.Gravity
 import android.view.View
-import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.*
 import com.ludoproof.game.feature.offline.*
 import com.ludoproof.game.feature.offline.presentation.feedback.OfflineFeedbackAction
 import com.ludoproof.game.feature.offline.presentation.feedback.OfflineLudoPawsFeedbackDispatcher
+import com.ludoproof.game.core.ui.components.AppFocusRing
+import com.ludoproof.game.core.ui.icons.AppIconName
+import com.ludoproof.game.core.ui.icons.AppIconView
 import com.ludoproof.game.feature.settings.data.local.GameSettingsStore
 import com.ludoproof.game.feature.settings.data.local.GameSoundFeedback
-import com.ludoproof.game.ui.home.HomeGlassShape
-import com.ludoproof.game.ui.home.HomeGlassTone
-import com.ludoproof.game.ui.home.homeGlassBackground
 import com.ludoproof.game.ui.offline.common.*
 import com.ludoproof.game.ui.offline.setup.*
 import com.ludoproof.game.ui.offline.state.resolveOfflineCharacterIds
@@ -65,12 +67,14 @@ private fun OfflineGameActivity.ensureOfflineResultActions(
         offlineResultActionButton(
             label = "REMATCH",
             description = "Start a rematch",
+            iconName = AppIconName.REFRESH,
+            tone = OfflineResultActionTone.POSITIVE,
         ) {
             startOfflineRematch()
         },
         LinearLayout.LayoutParams(
             0,
-            dp(if (isCompactSetup()) 46 else 50),
+            dp(if (isCompactSetup()) 48 else 52),
             1f,
         ).apply {
             setMargins(dp(4), 0, dp(4), 0)
@@ -81,12 +85,14 @@ private fun OfflineGameActivity.ensureOfflineResultActions(
         offlineResultActionButton(
             label = "EXIT",
             description = "Exit the finished match",
+            iconName = AppIconName.CLOSE,
+            tone = OfflineResultActionTone.DANGER,
         ) {
             requestOfflineExit()
         },
         LinearLayout.LayoutParams(
             0,
-            dp(if (isCompactSetup()) 46 else 50),
+            dp(if (isCompactSetup()) 48 else 52),
             1f,
         ).apply {
             setMargins(dp(4), 0, dp(4), 0)
@@ -117,42 +123,117 @@ private fun OfflineGameActivity.ensureOfflineResultActions(
     )
 }
 
+private enum class OfflineResultActionTone {
+    POSITIVE,
+    DANGER,
+}
+
 private fun OfflineGameActivity.offlineResultActionButton(
     label: String,
     description: String,
+    iconName: AppIconName,
+    tone: OfflineResultActionTone,
     action: () -> Unit,
-): Button =
-    Button(this).apply {
-        text = label
-        textSize = if (isCompactSetup()) 11.5f else 13f
-        setTextColor(Color.WHITE)
-        setTypeface(Typeface.DEFAULT_BOLD)
-        includeFontPadding = false
-        gravity = Gravity.CENTER
-        minWidth = 0
-        minHeight = 0
-        stateListAnimator = null
-        elevation = dp(6).toFloat()
-        background =
-            homeGlassBackground(
-                context = this@offlineResultActionButton,
-                shape = HomeGlassShape.PILL,
-                tone = HomeGlassTone.GLASS,
-            )
-        setPadding(
-            dp(if (isCompactSetup()) 8 else 12),
-            0,
-            dp(if (isCompactSetup()) 8 else 12),
-            0,
-        )
+): FrameLayout =
+    FrameLayout(this).apply {
+        isClickable = true
+        isFocusable = true
+        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
         contentDescription = description
+        minimumHeight = dp(48)
+        stateListAnimator = null
+        elevation = dp(3).toFloat()
+        background = offlineResultActionBackground(tone)
         setOnClickListener {
-            GameSoundFeedback.click(
-                this@offlineResultActionButton,
-            )
+            GameSoundFeedback.click(this@offlineResultActionButton)
             action()
         }
+
+        val row = LinearLayout(this@offlineResultActionButton).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            isClickable = false
+            isFocusable = false
+            setPadding(
+                dp(if (isCompactSetup()) 8 else 12),
+                0,
+                dp(if (isCompactSetup()) 8 else 12),
+                0,
+            )
+            addView(
+                AppIconView(
+                    context = this@offlineResultActionButton,
+                    iconName = iconName,
+                    iconTint = Color.WHITE,
+                    strokeWidthDp = 2.5f,
+                ),
+                LinearLayout.LayoutParams(dp(20), dp(20)).apply {
+                    marginEnd = dp(7)
+                },
+            )
+            addView(
+                TextView(this@offlineResultActionButton).apply {
+                    text = label
+                    textSize = if (isCompactSetup()) 11.5f else 13f
+                    setTextColor(Color.WHITE)
+                    setTypeface(Typeface.DEFAULT_BOLD)
+                    includeFontPadding = false
+                    importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                },
+            )
+        }
+        addView(
+            row,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                Gravity.CENTER,
+            ),
+        )
+        AppFocusRing.apply(this, cornerRadiusDp = 14f, strokeWidthDp = 2.5f)
     }
+
+private fun OfflineGameActivity.offlineResultActionBackground(
+    tone: OfflineResultActionTone,
+): StateListDrawable {
+    fun surface(fill: Int, border: Int, strokeWidthDp: Int): GradientDrawable =
+        GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            setColor(fill)
+            cornerRadius = dp(14).toFloat()
+            setStroke(dp(strokeWidthDp), border)
+        }
+
+    val normalFill: Int
+    val normalBorder: Int
+    val pressedFill: Int
+    when (tone) {
+        OfflineResultActionTone.POSITIVE -> {
+            normalFill = 0xE31B3D35.toInt()
+            normalBorder = 0xFF67D7A6.toInt()
+            pressedFill = 0xFF294E43.toInt()
+        }
+        OfflineResultActionTone.DANGER -> {
+            normalFill = 0xE33B211F.toInt()
+            normalBorder = 0xFFFF806D.toInt()
+            pressedFill = 0xFF5B2B25.toInt()
+        }
+    }
+    return StateListDrawable().apply {
+        addState(
+            intArrayOf(android.R.attr.state_pressed),
+            surface(pressedFill, 0xFFFFD45E.toInt(), 2),
+        )
+        addState(
+            intArrayOf(android.R.attr.state_focused),
+            surface(normalFill, 0xFFFFD45E.toInt(), 3),
+        )
+        addState(
+            intArrayOf(),
+            surface(normalFill, normalBorder, 1),
+        )
+    }
+}
 
 private fun OfflineGameActivity.startOfflineRematch() {
     val finished =
