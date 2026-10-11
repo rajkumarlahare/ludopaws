@@ -3,6 +3,7 @@ package com.ludoproof.game.ui.home
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
+import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
@@ -27,7 +28,7 @@ internal fun HomeActivity.modeSection(): LinearLayout =
                         HomeModeCard(
                             mode = GameMode.ONLINE,
                             title = "Online",
-                            subtitle = "Matchmaking",
+                            subtitle = "Find match",
                             artMode = ModeArtView.Mode.ONLINE,
                             tone = HomeModeTone.ONLINE,
                         ),
@@ -50,7 +51,7 @@ internal fun HomeActivity.modeSection(): LinearLayout =
                         HomeModeCard(
                             mode = GameMode.FRIENDS,
                             title = "Friends",
-                            subtitle = "Private room",
+                            subtitle = "Private",
                             artMode = ModeArtView.Mode.FRIENDS,
                             tone = HomeModeTone.FRIENDS,
                         ),
@@ -276,6 +277,7 @@ private fun HomeActivity.modeLabel(
                 setTextColor(0xFFE3F6FF.toInt())
                 gravity = Gravity.CENTER
                 maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
                 includeFontPadding = false
                 letterSpacing = 0.015f
                 setShadowLayer(
