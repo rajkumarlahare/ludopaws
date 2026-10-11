@@ -358,10 +358,24 @@ class TeamUpActivity : Activity() {
                                         start: Int,
                                         end: Int,
                                         fm: Paint.FontMetricsInt?,
-                                    ): Int = maxOf(
-                                        (paint.textSize * 0.9f).toInt(),
-                                        (15f * density).toInt(),
-                                    )
+                                    ): Int {
+                                        // Reserve line height for the enlarged bolt and its glow.
+                                        // Without updating the font metrics the lower point can be clipped.
+                                        val iconHeight =
+                                            maxOf(paint.textSize * 1.35f, 20f * density) * 1.2f
+                                        val halfHeight =
+                                            (iconHeight * 1.16f / 2f + 6f * density).toInt() + 1
+                                        fm?.let {
+                                            it.ascent = minOf(it.ascent, -halfHeight)
+                                            it.top = minOf(it.top, -halfHeight)
+                                            it.descent = maxOf(it.descent, halfHeight)
+                                            it.bottom = maxOf(it.bottom, halfHeight)
+                                        }
+                                        return maxOf(
+                                            (paint.textSize * 1.08f).toInt(),
+                                            (18f * density).toInt(),
+                                        )
+                                    }
 
                                     override fun draw(
                                         canvas: Canvas,
@@ -375,7 +389,9 @@ class TeamUpActivity : Activity() {
                                         paint: Paint,
                                     ) {
                                         val width = getSize(paint, text, start, end, null).toFloat()
-                                        val height = maxOf(paint.textSize * 1.35f, 20f * density)
+                                        // Scale both width and height by 20%, with font metrics
+                                        // above reserving room for the complete lightning shape.
+                                        val height = maxOf(paint.textSize * 1.35f, 20f * density) * 1.2f
                                         val cx = x + width / 2f
                                         val cy = (top + bottom) / 2f
                                         val bolt = Path().apply {
