@@ -149,7 +149,7 @@ internal object LudoPawsCharacterPortraitBitmapCache {
                     eglSession =
                         OffscreenEglSession.create(PORTRAIT_SIZE)
                     LudoPaws3DSceneRenderer().also {
-                        it.onSurfaceCreated()
+                        it.onPortraitSurfaceCreated()
                         it.onPortraitSurfaceChanged(
                             PORTRAIT_SIZE,
                             PORTRAIT_SIZE,

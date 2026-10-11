@@ -85,6 +85,47 @@ internal class LudoPaws3DSceneRenderer {
             )
     }
 
+    /**
+     * Initializes a dedicated portrait renderer. The raw shader constants retain
+     * their historical formatting for the live gameplay renderer, so normalize
+     * them only for the off-screen portrait context where strict ES3 drivers
+     * require #version to be the first source line. The board render path remains
+     * unchanged.
+     */
+    fun onPortraitSurfaceCreated() {
+        GLES30.glClearColor(0f, 0f, 0f, 0f)
+        GLES30.glEnable(GLES30.GL_DEPTH_TEST)
+        GLES30.glEnable(GLES30.GL_BLEND)
+        GLES30.glBlendFunc(
+            GLES30.GL_SRC_ALPHA,
+            GLES30.GL_ONE_MINUS_SRC_ALPHA,
+        )
+        program =
+            createProgram(
+                VERTEX_SHADER.trimIndent(),
+                FRAGMENT_SHADER.trimIndent(),
+            )
+        uMvpLocation = GLES30.glGetUniformLocation(program, "uMvp")
+        uColorLocation = GLES30.glGetUniformLocation(program, "uColor")
+        uLightDirectionLocation = GLES30.glGetUniformLocation(program, "uLightDirection")
+        uNormalMatrixLocation = GLES30.glGetUniformLocation(program, "uNormalMatrix")
+        check(
+            uMvpLocation >= 0 &&
+                uColorLocation >= 0 &&
+                uLightDirectionLocation >= 0 &&
+                uNormalMatrixLocation >= 0,
+        ) { "3D portrait shader is missing a required uniform" }
+        sphere =
+            SphereMesh(
+                latitudeSegments = 16,
+                longitudeSegments = 24,
+                uMvpLocation = uMvpLocation,
+                uColorLocation = uColorLocation,
+                uLightDirectionLocation = uLightDirectionLocation,
+                uNormalMatrixLocation = uNormalMatrixLocation,
+            )
+    }
+
     fun onSurfaceChanged(
         width: Int,
         height: Int,
