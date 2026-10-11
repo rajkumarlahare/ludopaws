@@ -19,7 +19,8 @@ class AppIconViewRenderingInstrumentedTest {
     @Test
     fun everySharedIconAndVariantRendersAtSmallAndLargeSizes() {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        val sizes = listOf(24, 84)
+        val density = context.resources.displayMetrics.density
+        val sizes = listOf(16, 32).map { (it * density).toInt().coerceAtLeast(1) }
         val variants = AppIconVariant.entries
 
         for (size in sizes) {
