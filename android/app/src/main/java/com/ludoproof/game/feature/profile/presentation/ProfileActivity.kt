@@ -9,6 +9,7 @@ import android.view.View
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.Toast
 import com.ludoproof.game.LudoProofTheme
 import com.ludoproof.game.BuildConfig
 import com.ludoproof.game.R
@@ -215,6 +216,11 @@ class ProfileActivity : Activity() {
                             }
                             ?: getString(R.string.profile_play_games_sign_in_failed)
                     renderProfile()
+                    AlertDialog.Builder(this)
+                        .setTitle("Google Play Games")
+                        .setMessage(playGamesStatus)
+                        .setPositiveButton("OK", null)
+                        .show()
                     return@addOnCompleteListener
                 }
                 playGamesAuthenticated = task.result.isAuthenticated
@@ -224,6 +230,11 @@ class ProfileActivity : Activity() {
                     playGamesStatus =
                         getString(R.string.profile_play_games_sign_in_not_completed)
                     renderProfile()
+                    AlertDialog.Builder(this)
+                        .setTitle("Google Play Games")
+                        .setMessage(playGamesStatus)
+                        .setPositiveButton("OK", null)
+                        .show()
                 }
             }
     }
@@ -248,6 +259,7 @@ class ProfileActivity : Activity() {
                     playGamesStatus =
                         getString(R.string.profile_play_games_check_failed)
                     renderProfile()
+                    Toast.makeText(this, playGamesStatus, Toast.LENGTH_LONG).show()
                     return@addOnCompleteListener
                 }
                 playGamesAuthenticated = task.result.isAuthenticated
