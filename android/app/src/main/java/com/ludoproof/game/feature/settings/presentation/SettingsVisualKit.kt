@@ -14,6 +14,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import com.ludoproof.game.LudoProofTheme
+import com.ludoproof.game.core.ui.art.plywoodBackground
 import com.ludoproof.game.core.ui.components.AppFocusRing
 import com.ludoproof.game.core.ui.icons.AppIconName
 import com.ludoproof.game.core.ui.icons.AppIconView
@@ -30,7 +31,11 @@ internal fun settingsCompactPanel(
             settingsDp(context, 8),
             settingsDp(context, 8),
         )
-        background = SettingsSharedWebpDrawable(context)
+        background =
+            plywoodBackground(
+                context = context,
+                cornerRadiusDp = 20f,
+            )
 
         addView(
             settingsHeader(
@@ -485,7 +490,11 @@ internal fun showSettingsChoiceDialog(
                 settingsDp(context, 10),
                 settingsDp(context, 10),
             )
-            background = SettingsSharedWebpDrawable(context)
+            background =
+            plywoodBackground(
+                context = context,
+                cornerRadiusDp = 20f,
+            )
 
             addView(
                 TextView(context).apply {
