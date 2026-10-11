@@ -28,7 +28,7 @@ internal class HomeGooglePlayIconView(
 
         // Preserve the original prism's portrait proportions instead of stretching it
         // into a triangle; all four colour segments come from the same vector asset.
-        val markHeight = (side * 0.92f).toInt().coerceAtLeast(1)
+        val markHeight = (side * 0.92f * 0.8f).toInt().coerceAtLeast(1)
         val markWidth = (markHeight * 38.1f / 44.1f).toInt().coerceAtLeast(1)
         val left = (width - markWidth) / 2
         val top = (height - markHeight) / 2
