@@ -142,6 +142,13 @@ private class PlywoodTextureDrawable(
         strokeJoin = Paint.Join.ROUND
         colorFilter = plywoodShade
     }
+    // Separate un-tinted relief paint lets highlights stay warm while the wood is shaded.
+    private val reliefPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
+    private val lightSweepPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private var drawableAlpha = 255
 
     override fun draw(canvas: Canvas) {
@@ -174,6 +181,24 @@ private class PlywoodTextureDrawable(
         )
         canvas.drawRect(b, fill)
         fill.shader = null
+
+        // Soft diagonal light gives the veneer a shallow, satin-like 3D sheen
+        // without creating a hard stripe or a dark band through the center.
+        lightSweepPaint.shader = LinearGradient(
+            b.left,
+            b.top,
+            b.right,
+            b.bottom,
+            intArrayOf(
+                0x25FFFFFF,
+                0x00FFFFFF,
+                0x0D6B3B1D,
+            ),
+            floatArrayOf(0f, 0.56f, 1f),
+            Shader.TileMode.CLAMP,
+        )
+        canvas.drawRect(b, lightSweepPaint)
+        lightSweepPaint.shader = null
 
         // Fine, restrained plywood grain: lower opacity keeps it from reading as stripes.
         // Irregular paths vary from one another, like natural veneer texture.
@@ -251,7 +276,15 @@ private class PlywoodTextureDrawable(
                 1 -> 1.2f * density
                 else -> 0.85f * density
             }
+            // The dark fibre edge plus a tiny offset warm highlight gives each grain
+            // a tactile raised/recessed feel, rather than a flat painted line.
             canvas.drawPath(grain, line)
+            reliefPaint.color = Color.argb(34, 255, 239, 204)
+            reliefPaint.strokeWidth = (line.strokeWidth * 0.68f).coerceAtLeast(0.45f * density)
+            canvas.save()
+            canvas.translate(0.9f * density, 0f)
+            canvas.drawPath(grain, reliefPaint)
+            canvas.restore()
 
             // A faint companion line creates the fine fibre detail found in veneer.
             if (index % 3 == 0) {
@@ -321,6 +354,29 @@ private class PlywoodTextureDrawable(
         }
 
         canvas.restore()
+
+        // Inner bevel: a fine warm highlight on the top/left catches the light,
+        // while a soft umber edge on the right/bottom creates slight physical depth.
+        val bevelInset = 1.8f * density
+        val highlightPath = Path().apply {
+            moveTo(b.left + radius, b.top + bevelInset)
+            lineTo(b.right - radius, b.top + bevelInset)
+            moveTo(b.left + bevelInset, b.top + radius)
+            lineTo(b.left + bevelInset, b.bottom - radius)
+        }
+        reliefPaint.color = Color.argb(105, 255, 242, 213)
+        reliefPaint.strokeWidth = 1.25f * density
+        canvas.drawPath(highlightPath, reliefPaint)
+
+        val shadowPath = Path().apply {
+            moveTo(b.right - bevelInset, b.top + radius)
+            lineTo(b.right - bevelInset, b.bottom - radius)
+            moveTo(b.left + radius, b.bottom - bevelInset)
+            lineTo(b.right - radius, b.bottom - bevelInset)
+        }
+        reliefPaint.color = Color.argb(78, 102, 57, 27)
+        reliefPaint.strokeWidth = 1.7f * density
+        canvas.drawPath(shadowPath, reliefPaint)
 
         // Rounded warm timber edge and inset highlight; keeps the existing card shape.
         line.color = 0xFF9B622F.toInt()
