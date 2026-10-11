@@ -1,6 +1,7 @@
 package com.ludoproof.game.core.ui.art
 
 import android.graphics.Canvas
+import android.graphics.ColorFilter
 import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Paint
@@ -180,8 +181,8 @@ internal class RecessedPlywoodDrawable(
         invalidateSelf()
     }
 
-    override fun setColorFilter(colorFilter: android.graphics.ColorFilter?) {
-        plywood.colorFilter = colorFilter
+    override fun setColorFilter(colorFilter: ColorFilter?) {
+        plywood.setColorFilter(colorFilter)
         invalidateSelf()
     }
 
