@@ -10,6 +10,8 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.LudoProofTheme
 import com.ludoproof.game.core.ui.art.blueIconBackground
+import com.ludoproof.game.core.ui.art.classicStatsProgressTrackBackground
+import com.ludoproof.game.core.ui.art.classicStatsProgressFillBackground
 import com.ludoproof.game.core.ui.art.transparentDarkBlueStrokeBackground
 import com.ludoproof.game.feature.profile.domain.model.ProfileModeStats
 import com.ludoproof.game.feature.profile.domain.model.ProfileSnapshot
@@ -106,20 +108,11 @@ private fun ProfileActivity.classicRow(stats: ProfileModeStats): LinearLayout =
             0f
         }
         val track = FrameLayout(this@classicRow).apply {
-            background = LudoProofTheme.rounded(
-                0xFF062E70.toInt(),
-                999f,
-                0xFF1E73BE.toInt(),
-                1f,
-                this@classicRow,
-            )
+            background = classicStatsProgressTrackBackground(this@classicRow)
             clipToOutline = true
         }
         val fill = View(this@classicRow).apply {
-            background = GradientDrawable(
-                GradientDrawable.Orientation.LEFT_RIGHT,
-                intArrayOf(0xFFFFD93D.toInt(), 0xFFFFB91A.toInt()),
-            ).apply { cornerRadius = dp(999).toFloat() }
+            background = classicStatsProgressFillBackground(this@classicRow)
         }
         track.addView(
             fill,
