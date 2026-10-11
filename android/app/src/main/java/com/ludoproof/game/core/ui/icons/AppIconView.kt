@@ -15,6 +15,7 @@ import kotlin.math.sin
 /** Names describe the meaning of a reusable action glyph, not a screen or feature. */
 internal enum class AppIconName {
     BACK,
+    BACK_ARROW,
     CHEVRON_LEFT,
     CLOSE,
     ADD,
@@ -122,6 +123,8 @@ internal class AppIconView(
             AppIconName.BACK,
             AppIconName.CHEVRON_LEFT -> drawChevronLeft(canvas)
 
+            AppIconName.BACK_ARROW -> drawBackArrow(canvas)
+
             AppIconName.CLOSE -> drawClose(canvas)
             AppIconName.ADD -> drawAdd(canvas)
             AppIconName.SEARCH -> drawSearch(canvas)
@@ -139,6 +142,13 @@ internal class AppIconView(
         }
 
         canvas.restore()
+    }
+
+    private fun drawBackArrow(canvas: Canvas) {
+        // A true arrow with a shaft distinguishes navigation from a plain left chevron.
+        canvas.drawLine(35f, 50f, 76f, 50f, stroke)
+        canvas.drawLine(35f, 50f, 55f, 31f, stroke)
+        canvas.drawLine(35f, 50f, 55f, 69f, stroke)
     }
 
     private fun drawChevronLeft(canvas: Canvas) {
