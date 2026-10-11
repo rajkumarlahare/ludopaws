@@ -26,6 +26,8 @@ import com.ludoproof.game.GameMode
 import com.ludoproof.game.GameModeIntent
 import com.ludoproof.game.LudoProofTheme
 import com.ludoproof.game.core.ui.components.AppFocusRing
+import com.ludoproof.game.core.ui.icons.AppIconName
+import com.ludoproof.game.core.ui.icons.AppIconView
 import com.ludoproof.game.MainActivity
 import com.ludoproof.game.PlayerSession
 import com.ludoproof.game.SecureSessionStore
@@ -122,10 +124,26 @@ class TeamUpActivity : Activity() {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER
                 addView(
-                    TextView(this@TeamUpActivity).apply {
-                        text = "TEAM UP"
-                        LudoProofTheme.title(this, 19f)
+                    LinearLayout(this@TeamUpActivity).apply {
+                        orientation = LinearLayout.HORIZONTAL
                         gravity = Gravity.CENTER
+                        addView(
+                            AppIconView(
+                                context = this@TeamUpActivity,
+                                iconName = AppIconName.PEOPLE,
+                                iconTint = LudoProofTheme.GOLD,
+                            ),
+                            LinearLayout.LayoutParams(dp(26), dp(26)).apply {
+                                marginEnd = dp(8)
+                            },
+                        )
+                        addView(
+                            TextView(this@TeamUpActivity).apply {
+                                text = "TEAM UP"
+                                LudoProofTheme.title(this, 19f)
+                                gravity = Gravity.CENTER
+                            },
+                        )
                     },
                 )
                 addView(
@@ -190,6 +208,7 @@ class TeamUpActivity : Activity() {
                     cornerRadius = dp(999).toFloat()
                     setStroke(dp(2), 0xFFFFF0A0.toInt())
                 }
+            contentDescription = "Find a team online"
             AppFocusRing.apply(this, cornerRadiusDp = 999f, strokeWidthDp = 3f)
             setOnClickListener { beginSearch() }
         }
@@ -264,6 +283,7 @@ class TeamUpActivity : Activity() {
             cancelButton = Button(this@TeamUpActivity).apply {
                 text = "CANCEL SEARCH"
                 LudoProofTheme.danger(this)
+                contentDescription = "Cancel team search"
                 AppFocusRing.apply(this, cornerRadiusDp = 12f, strokeWidthDp = 2.5f)
                 setOnClickListener { cancelSearch() }
             }
