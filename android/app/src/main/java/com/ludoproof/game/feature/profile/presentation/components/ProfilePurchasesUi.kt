@@ -7,8 +7,6 @@ import android.view.Gravity
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
-import com.ludoproof.game.LudoProofTheme
-import com.ludoproof.game.core.ui.art.PlywoodTextureDrawable
 import com.ludoproof.game.feature.profile.domain.model.ProfileSnapshot
 import com.ludoproof.game.feature.profile.presentation.ProfileActivity
 
