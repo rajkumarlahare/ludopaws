@@ -31,6 +31,22 @@ class ModeArtView @JvmOverloads constructor(
             invalidate()
         }
 
+    /**
+     * Optional player-count glyph mode used by local game setup tiles.
+     * When null, the normal Home game-mode illustration is rendered unchanged.
+     */
+    var playerCount: Int? = null
+        set(value) {
+            field = value?.takeIf { it in 2..4 }
+            invalidate()
+        }
+
+    var playerCountSelected: Boolean = false
+        set(value) {
+            field = value
+            invalidate()
+        }
+
     private val density = resources.displayMetrics.density
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val stroke =
@@ -65,12 +81,53 @@ class ModeArtView @JvmOverloads constructor(
         val w = width.toFloat()
         val h = height.toFloat()
 
+        val count = playerCount
+        if (count != null) {
+            drawPlayerCount(canvas, w, h, count)
+            return
+        }
+
         when (mode) {
             Mode.ONLINE -> drawOnline(canvas, w, h)
             Mode.TEAM_UP -> drawTeamUp(canvas, w, h)
             Mode.FRIENDS -> drawFriends(canvas, w, h)
             Mode.COMPUTER -> drawComputer(canvas, w, h)
             Mode.PASS_AND_PLAY -> drawPassAndPlay(canvas, w, h)
+        }
+    }
+
+    private fun drawPlayerCount(
+        canvas: Canvas,
+        w: Float,
+        h: Float,
+        count: Int,
+    ) {
+        val size = min(w, h)
+        val positions = when (count) {
+            2 -> listOf(0.35f, 0.65f)
+            3 -> listOf(0.23f, 0.50f, 0.77f)
+            else -> listOf(0.16f, 0.39f, 0.61f, 0.84f)
+        }
+        val radius = size * when (count) {
+            2 -> 0.205f
+            3 -> 0.165f
+            else -> 0.135f
+        }
+        positions.forEachIndexed { index, position ->
+            val selectedTop = 0xFF0B3678.toInt()
+            val selectedBottom = 0xFF061F50.toInt()
+            val blueTop = 0xFFB4E8FF.toInt()
+            val blueBottom = 0xFF277BD8.toInt()
+            val centerFront = count == 3 && index == 1
+            drawPerson(
+                canvas = canvas,
+                cx = w * position,
+                cy = h * if (centerFront) 0.57f else 0.55f,
+                radius = radius * if (centerFront) 1.10f else 1f,
+                topColor = if (playerCountSelected) selectedTop else blueTop,
+                bottomColor = if (playerCountSelected) selectedBottom else blueBottom,
+                front = centerFront || count == 2,
+            )
         }
     }
 
