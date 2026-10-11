@@ -354,10 +354,11 @@ internal fun MainActivity.onlineLobbyPanel():
                     ),
                     dp(18),
                 )
+                // Matchmaking search uses the same carved/recessed plywood surface.
                 background =
-                    plywoodBackground(
+                    recessedPlywoodBackground(
                         context = this@onlineLobbyPanel,
-                        cornerRadiusDp = 24f,
+                        outerCornerRadiusDp = 24f,
                     )
 
                 val ownAvatar =
@@ -468,9 +469,7 @@ internal fun MainActivity.onlineLobbyPanel():
                         setTypeface(
                             Typeface.DEFAULT_BOLD,
                         )
-                        setTextColor(
-                            LudoProofTheme.GOLD,
-                        )
+                        setTextColor(Color.WHITE)
                         gravity =
                             Gravity.CENTER
                         setPadding(
@@ -518,8 +517,9 @@ internal fun MainActivity.onlineLobbyPanel():
                                 } else {
                                     17f
                                 },
-                                gold = true,
+                                gold = false,
                             )
+                        setTextColor(Color.WHITE)
                         gravity =
                             Gravity.CENTER
                         setPadding(
@@ -603,7 +603,10 @@ internal fun MainActivity.onlineLobbyPanel():
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
-            ),
+            ).apply {
+                // Keep the searching box aligned with the setup card's vertical position.
+                topMargin = dp(if (isCompactOnline()) 92 else 112)
+            },
         )
 
         matchmakingSlotsText =
