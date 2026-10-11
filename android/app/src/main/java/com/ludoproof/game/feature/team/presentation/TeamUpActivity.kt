@@ -292,7 +292,7 @@ class TeamUpActivity : Activity() {
             addView(
                 TextView(this@TeamUpActivity).apply {
                     text = "SEARCHING FOR TEAMMATES"
-                    LudoProofTheme.title(this, 18f, gold = true)
+                    LudoProofTheme.title(this, 18f)
                     gravity = Gravity.CENTER
                 },
             )
