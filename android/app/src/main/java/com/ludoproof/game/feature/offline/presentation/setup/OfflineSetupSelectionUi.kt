@@ -70,7 +70,7 @@ internal fun OfflineGameActivity.playersPanel():
                 contentDescription = "$playerCount players"
                 addView(
                     ModeArtView(this@playersPanel).apply {
-                        playerCount = playerCount
+                        this.playerCount = playerCount
                         importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
                     },
                     LinearLayout.LayoutParams(
@@ -339,7 +339,7 @@ internal fun OfflineGameActivity.selectionPanel(
                     setTextColor(Color.WHITE)
                     gravity = Gravity.CENTER_VERTICAL
                     includeFontPadding = false
-                    setShadowLayer(3f, 0f, dp(1), 0xB0000000.toInt())
+                    setShadowLayer(3f, 0f, dp(1).toFloat(), 0xB0000000.toInt())
                 },
             )
         }
