@@ -6,7 +6,7 @@ Extend the shared UI focus and selected-state treatment into Profile, Store and 
 
 ## Applied changes
 
-- Profile back, Play Games action and profile-name edit action display the shared gold focus ring without replacing their existing backgrounds.
+- Profile Back uses the shared circular semantic-icon action button and common glass surface. Play Games and profile-name edit actions retain their feature-specific surfaces with the shared focus ring.
 - Store back action, tab controls, purchase buttons, rewarded-ad action and ad-privacy action display the shared focus ring.
 - Store tabs expose their selected state through `isSelected` and an explicit selected accessibility description.
 - Leaderboard back and refresh actions display the shared focus ring. Existing refresh enable/disable state and loading feedback are unchanged.

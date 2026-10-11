@@ -7,16 +7,24 @@ import android.graphics.RectF
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
-import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.*
+import com.ludoproof.game.core.ui.components.appIconActionButton
+import com.ludoproof.game.core.ui.icons.AppIconName
 import com.ludoproof.game.ui.dialogs.showSettingsDialog
 import com.ludoproof.game.ui.offline.gameplay.showGame
 import com.ludoproof.game.ui.offline.setup.showSetup
 
 internal fun OfflineGameActivity.backHeader(label: String?): View {
+    fun openSettings() {
+        showSettingsDialog(this@backHeader) {
+            val current = engine.snapshot()
+            if (current != null) showGame(current) else showSetup()
+        }
+    }
+
     if (isComputerMode) {
         return FrameLayout(this).apply {
             minimumHeight = dp(54)
@@ -24,15 +32,19 @@ internal fun OfflineGameActivity.backHeader(label: String?): View {
             clipToPadding = false
 
             addView(
-                Button(this@backHeader).apply {
-                    LudoProofTheme.homeCircularAction(this, "←")
-                    includeFontPadding = false
-                    textSize = 27f
-                    contentDescription = "Back"
-                    setOnClickListener { requestOfflineExit() }
+                appIconActionButton(
+                    context = this@backHeader,
+                    contentDescription = "Back",
+                    iconName = AppIconName.CHEVRON_LEFT,
+                    sizeDp = 44,
+                ) {
+                    requestOfflineExit()
                 },
-                FrameLayout.LayoutParams(dp(44), dp(44), Gravity.START or Gravity.CENTER_VERTICAL)
-                    .apply { marginStart = dp(4) },
+                FrameLayout.LayoutParams(
+                    dp(44),
+                    dp(44),
+                    Gravity.START or Gravity.CENTER_VERTICAL,
+                ).apply { marginStart = dp(4) },
             )
 
             val badge =
@@ -75,19 +87,19 @@ internal fun OfflineGameActivity.backHeader(label: String?): View {
             )
 
             addView(
-                Button(this@backHeader).apply {
-                    LudoProofTheme.homeCircularAction(this, "⚙")
-                    textSize = 23f
-                    contentDescription = "Game settings"
-                    setOnClickListener {
-                        showSettingsDialog(this@backHeader) {
-                            val current = engine.snapshot()
-                            if (current != null) showGame(current) else showSetup()
-                        }
-                    }
+                appIconActionButton(
+                    context = this@backHeader,
+                    contentDescription = "Game settings",
+                    iconName = AppIconName.SETTINGS,
+                    sizeDp = 44,
+                ) {
+                    openSettings()
                 },
-                FrameLayout.LayoutParams(dp(44), dp(44), Gravity.END or Gravity.CENTER_VERTICAL)
-                    .apply { marginEnd = dp(4) },
+                FrameLayout.LayoutParams(
+                    dp(44),
+                    dp(44),
+                    Gravity.END or Gravity.CENTER_VERTICAL,
+                ).apply { marginEnd = dp(4) },
             )
         }
     }
@@ -96,23 +108,17 @@ internal fun OfflineGameActivity.backHeader(label: String?): View {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
         addView(
-            Button(this@backHeader).apply {
-                LudoProofTheme.homeCircularAction(this, "←")
-                includeFontPadding = false
-                textSize = 28f
-                gravity = Gravity.CENTER
-                setPadding(0, 0, 0, 0)
-                contentDescription = "Back"
-                setOnClickListener {
-                    requestOfflineExit()
-                }
+            appIconActionButton(
+                context = this@backHeader,
+                contentDescription = "Back",
+                iconName = AppIconName.CHEVRON_LEFT,
+                sizeDp = 52,
+            ) {
+                requestOfflineExit()
             },
             LinearLayout.LayoutParams(dp(52), dp(52)),
         )
-        if (
-            label !=
-            null
-        ) {
+        if (label != null) {
             addView(
                 TextView(this@backHeader).apply {
                     text = label
@@ -135,47 +141,27 @@ internal fun OfflineGameActivity.backHeader(label: String?): View {
             )
         } else {
             addView(
-                View(
-                    this@backHeader,
-                ),
+                View(this@backHeader),
                 LinearLayout.LayoutParams(
                     0,
                     1,
                     1f,
                 ).apply {
-                    marginStart =
-                        dp(12)
-                    marginEnd =
-                        dp(10)
+                    marginStart = dp(12)
+                    marginEnd = dp(10)
                 },
             )
         }
         addView(
-            Button(this@backHeader).apply {
-                LudoProofTheme.homeCircularAction(
-                    this,
-                    "⚙",
-                )
-                contentDescription =
-                    "Game settings"
-                setOnClickListener {
-                    showSettingsDialog(
-                        this@backHeader,
-                    ) {
-                        val current =
-                            engine.snapshot()
-                        if (current != null) {
-                            showGame(current)
-                        } else {
-                            showSetup()
-                        }
-                    }
-                }
+            appIconActionButton(
+                context = this@backHeader,
+                contentDescription = "Game settings",
+                iconName = AppIconName.SETTINGS,
+                sizeDp = 52,
+            ) {
+                openSettings()
             },
-            LinearLayout.LayoutParams(
-                dp(52),
-                dp(52),
-            ),
+            LinearLayout.LayoutParams(dp(52), dp(52)),
         )
     }
 }
