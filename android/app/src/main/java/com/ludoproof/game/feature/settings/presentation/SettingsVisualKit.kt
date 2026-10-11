@@ -14,6 +14,9 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import com.ludoproof.game.LudoProofTheme
+import com.ludoproof.game.core.ui.components.AppFocusRing
+import com.ludoproof.game.core.ui.icons.AppIconName
+import com.ludoproof.game.core.ui.icons.AppIconView
 
 internal fun settingsCompactPanel(
     context: Context,
@@ -92,8 +95,8 @@ private fun settingsHeader(
         addView(
             close,
             FrameLayout.LayoutParams(
-                settingsDp(context, 34),
-                settingsDp(context, 34),
+                settingsDp(context, 48),
+                settingsDp(context, 48),
                 Gravity.END or Gravity.CENTER_VERTICAL,
             ),
         )
@@ -102,20 +105,13 @@ private fun settingsHeader(
 private class SettingsCloseButton(
     context: Context,
     onClose: () -> Unit,
-) : View(context) {
-    private val density = resources.displayMetrics.density
-    private val iconPaint =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.WHITE
-            style = Paint.Style.STROKE
-            strokeWidth = 2.5f * density
-            strokeCap = Paint.Cap.ROUND
-        }
-
+) : FrameLayout(context) {
     init {
         contentDescription = "Close settings"
         isClickable = true
         isFocusable = true
+        minimumWidth = settingsDp(context, 48)
+        minimumHeight = settingsDp(context, 48)
         background =
             GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,
@@ -131,28 +127,21 @@ private class SettingsCloseButton(
                     0xFFFFDC65.toInt(),
                 )
             }
-        setOnClickListener { onClose() }
-    }
 
-    override fun onDraw(canvas: Canvas) {
-        super.onDraw(canvas)
-        val radius = 4f * density
-        val centerX = width / 2f
-        val centerY = height / 2f
-        canvas.drawLine(
-            centerX - radius,
-            centerY - radius,
-            centerX + radius,
-            centerY + radius,
-            iconPaint,
+        addView(
+            AppIconView(
+                context = context,
+                iconName = AppIconName.CLOSE,
+                iconTint = Color.WHITE,
+            ),
+            FrameLayout.LayoutParams(
+                settingsDp(context, 18),
+                settingsDp(context, 18),
+                Gravity.CENTER,
+            ),
         )
-        canvas.drawLine(
-            centerX + radius,
-            centerY - radius,
-            centerX - radius,
-            centerY + radius,
-            iconPaint,
-        )
+        AppFocusRing.apply(this, cornerRadiusDp = 999f, strokeWidthDp = 2.2f)
+        setOnClickListener { onClose() }
     }
 }
 
@@ -280,6 +269,7 @@ internal fun settingsDropdownField(
                 ),
                 settingsDp(context, 40),
             )
+        AppFocusRing.apply(this, cornerRadiusDp = 11f, strokeWidthDp = 2f)
     }
 
 internal fun settingsDropdownLabel(
@@ -365,6 +355,7 @@ internal class SettingsBooleanControl(
             gravity = Gravity.CENTER
             isClickable = true
             isFocusable = true
+            AppFocusRing.apply(this, cornerRadiusDp = 8f, strokeWidthDp = 2f)
         }
 
     private fun setValue(
@@ -559,6 +550,7 @@ internal fun showSettingsChoiceDialog(
                             settingsDp(context, 10)
                                 .toFloat()
                     }
+                AppFocusRing.apply(this, cornerRadiusDp = 10f, strokeWidthDp = 2f)
                 setOnClickListener {
                     onSelect(option)
                     dialog.dismiss()
