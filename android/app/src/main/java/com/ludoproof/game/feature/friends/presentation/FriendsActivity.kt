@@ -150,14 +150,14 @@ class FriendsActivity : Activity() {
                 cornerRadiusDp = 24f,
             )
         }
-        contentHost.addView(
-            content,
-            FrameLayout.LayoutParams(
-                width,
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                Gravity.TOP or Gravity.CENTER_HORIZONTAL,
-            ),
-        )
+        val contentLayoutParams = FrameLayout.LayoutParams(
+            width,
+            FrameLayout.LayoutParams.WRAP_CONTENT,
+            Gravity.TOP or Gravity.CENTER_HORIZONTAL,
+        ).apply {
+            topMargin = dp(12)
+        }
+        contentHost.addView(content, contentLayoutParams)
         host.addView(
             scroll,
             FrameLayout.LayoutParams(
@@ -221,7 +221,11 @@ class FriendsActivity : Activity() {
                     insets.systemWindowInsetTop
                 }
             val safeTopInset = maxOf(cutoutTop, statusTop)
-            content.setPadding(content.paddingLeft, dp(12) + safeTopInset, content.paddingRight, content.paddingBottom)
+            // Move the whole plywood panel below the system bars instead of
+            // pushing only its inner content down and leaving the panel clipped at the top.
+            contentLayoutParams.topMargin = dp(12) + safeTopInset
+            content.layoutParams = contentLayoutParams
+            content.setPadding(content.paddingLeft, dp(12), content.paddingRight, content.paddingBottom)
             topActionsBar.translationY = safeTopInset.toFloat()
             insets
         }
