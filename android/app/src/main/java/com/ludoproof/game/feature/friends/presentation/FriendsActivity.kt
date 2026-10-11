@@ -421,8 +421,9 @@ class FriendsActivity : Activity() {
                     context = this@FriendsActivity,
                     selected = selected,
                     outerCornerRadiusDp = 14f,
+                    checkBadgeAtTopEnd = true,
                     emphasizeSelected = true,
-                    showCheckBadge = false,
+                    showCheckBadge = true,
                 )
                 setTextColor(if (selected) 0xFFFFD45E.toInt() else Color.WHITE)
                 setShadowLayer(2f, 0f, dp(1).toFloat(), 0xA6000000.toInt())
