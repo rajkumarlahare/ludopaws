@@ -74,13 +74,14 @@ internal fun playerCountSelectionBackground(
     selected: Boolean,
     outerCornerRadiusDp: Float = 20f,
     checkBadgeAtTopEnd: Boolean = false,
+    emphasizeSelected: Boolean = false,
 ): android.graphics.drawable.Drawable {
     val baseBackground = recessedPlywoodBackground(context, outerCornerRadiusDp)
     if (!selected) return baseBackground
     return android.graphics.drawable.LayerDrawable(
         arrayOf(
             baseBackground,
-            PlayerCountSelectionOverlayDrawable(context, checkBadgeAtTopEnd),
+            PlayerCountSelectionOverlayDrawable(context, checkBadgeAtTopEnd, emphasizeSelected),
         ),
     )
 }
@@ -88,6 +89,7 @@ internal fun playerCountSelectionBackground(
 private class PlayerCountSelectionOverlayDrawable(
     context: Context,
     private val checkBadgeAtTopEnd: Boolean,
+    private val emphasizeSelected: Boolean,
 ) : android.graphics.drawable.Drawable() {
     private val density = context.resources.displayMetrics.density
     private val fillPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
@@ -113,7 +115,7 @@ private class PlayerCountSelectionOverlayDrawable(
         )
         fillPaint.style = android.graphics.Paint.Style.FILL
         fillPaint.color = 0xFFFFD45E.toInt()
-        fillPaint.alpha = 46 * drawableAlpha / 255
+        fillPaint.alpha = (if (emphasizeSelected) 92 else 46) * drawableAlpha / 255
         canvas.drawRoundRect(overlayRect, radius, radius, fillPaint)
 
         // Thin inset edge gives selection a clear boundary without an outside stroke.
@@ -121,8 +123,8 @@ private class PlayerCountSelectionOverlayDrawable(
             inset(dp(0.8f), dp(0.8f))
         }
         strokePaint.color = 0xFFFFD45E.toInt()
-        strokePaint.alpha = 220 * drawableAlpha / 255
-        strokePaint.strokeWidth = dp(1.35f)
+        strokePaint.alpha = (if (emphasizeSelected) 255 else 220) * drawableAlpha / 255
+        strokePaint.strokeWidth = dp(if (emphasizeSelected) 2f else 1.35f)
         val strokeRadius = (radius - dp(0.8f)).coerceAtLeast(1f)
         canvas.drawRoundRect(strokeRect, strokeRadius, strokeRadius, strokePaint)
 

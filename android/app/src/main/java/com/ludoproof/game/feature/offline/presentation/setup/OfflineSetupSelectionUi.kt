@@ -67,6 +67,16 @@ internal fun OfflineGameActivity.playersPanel():
                 clipChildren = false
                 clipToPadding = false
                 setPadding(dp(4), dp(5), dp(4), dp(6))
+                // Apply the recessed plywood as soon as each 2/3/4 tile is created,
+                // rather than waiting for the later selection refresh.
+                background = playerCountSelectionBackground(
+                    context = this@playersPanel,
+                    selected = playerCount == selectedPlayers,
+                    outerCornerRadiusDp = 14f,
+                    checkBadgeAtTopEnd = true,
+                    emphasizeSelected = true,
+                )
+                elevation = dp(if (playerCount == selectedPlayers) 5 else 4).toFloat()
                 isClickable = true
                 isFocusable = true
                 contentDescription = "$playerCount players"
@@ -518,6 +528,7 @@ internal fun OfflineGameActivity.refreshSetupSelections() {
             selected = selected,
             outerCornerRadiusDp = 14f,
             checkBadgeAtTopEnd = true,
+            emphasizeSelected = true,
         )
         tile.elevation = dp(if (selected) 5 else 4).toFloat()
         tile.isSelected = selected
