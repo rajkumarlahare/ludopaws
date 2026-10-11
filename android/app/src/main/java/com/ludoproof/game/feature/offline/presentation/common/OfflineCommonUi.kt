@@ -124,27 +124,15 @@ internal fun OfflineGameActivity.backHeader(label: String?): View {
                         dp(if (LudoProofTheme.isCompactWidth(this@backHeader)) 10 else 14),
                         dp(4),
                     )
-                    background = if (isComputerMode) {
-                        transparentDarkBlueStrokeBackground(
-                            context = this@backHeader,
-                            cornerRadiusDp = 999f,
-                        )
-                    } else {
-                        GradientDrawable(
-                            GradientDrawable.Orientation.TOP_BOTTOM,
-                            intArrayOf(
-                                0xFF1476D9.toInt(),
-                                0xFF0750AB.toInt(),
-                                0xFF04295F.toInt(),
-                            ),
-                        ).apply {
-                            cornerRadius = dp(999).toFloat()
-                            setStroke(dp(2), LudoProofTheme.GOLD)
-                        }
-                    }
-                    elevation = dp(7).toFloat()
+                    // Match the unboxed ROBOT title style on Computer while retaining
+                    // the existing PASS & PLAY title position and surrounding actions.
+                    background = null
+                    elevation = 0f
                     addView(
-                        SetupPawMarkView(this@backHeader),
+                        SetupPawMarkView(
+                            this@backHeader,
+                            pawColor = 0xFFFFFFFF.toInt(),
+                        ),
                         LinearLayout.LayoutParams(
                             dp(if (LudoProofTheme.isCompactWidth(this@backHeader)) 18 else 22),
                             dp(if (LudoProofTheme.isCompactWidth(this@backHeader)) 18 else 22),
@@ -156,7 +144,7 @@ internal fun OfflineGameActivity.backHeader(label: String?): View {
                             LudoProofTheme.title(
                                 this,
                                 if (LudoProofTheme.isCompactWidth(this@backHeader)) 15f else 19f,
-                                gold = true,
+                                gold = false,
                             )
                             setPadding(dp(7), 0, dp(7), 0)
                             includeFontPadding = false
@@ -164,7 +152,10 @@ internal fun OfflineGameActivity.backHeader(label: String?): View {
                         },
                     )
                     addView(
-                        SetupPawMarkView(this@backHeader),
+                        SetupPawMarkView(
+                            this@backHeader,
+                            pawColor = 0xFFFFFFFF.toInt(),
+                        ),
                         LinearLayout.LayoutParams(
                             dp(if (LudoProofTheme.isCompactWidth(this@backHeader)) 18 else 22),
                             dp(if (LudoProofTheme.isCompactWidth(this@backHeader)) 18 else 22),
