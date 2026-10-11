@@ -69,7 +69,10 @@ internal fun OfflineGameActivity.playersPanel():
                 isFocusable = true
                 contentDescription = "$playerCount players"
                 addView(
-                    SetupPlayerCountIconView(this@playersPanel, playerCount),
+                    ModeArtView(this@playersPanel).apply {
+                        playerCount = playerCount
+                        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                    },
                     LinearLayout.LayoutParams(
                         dp(if (isCompactSetup()) 42 else 46),
                         dp(30),
@@ -507,7 +510,7 @@ internal fun OfflineGameActivity.refreshSetupSelections() {
             LudoProofTheme.normalTile(tile)
         }
         (tile as? LinearLayout)?.let { content ->
-            (content.getChildAt(0) as? SetupPlayerCountIconView)?.isSelectedIcon = selected
+            (content.getChildAt(0) as? ModeArtView)?.playerCountSelected = selected
             (content.getChildAt(1) as? TextView)?.setTextColor(
                 if (selected) 0xFF062B68.toInt() else Color.WHITE,
             )
@@ -627,89 +630,6 @@ private class SetupPaletteIconView(context: android.content.Context) : View(cont
         fill.color = 0xFF72E9FF.toInt()
         canvas.drawCircle(55f, 45f, 5.5f, fill)
         canvas.restore()
-    }
-}
-
-private class SetupPlayerCountIconView(
-    context: android.content.Context,
-    private val personCount: Int,
-) : View(context) {
-    private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val outline = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeWidth = 2f
-    }
-
-    var isSelectedIcon: Boolean = false
-        set(value) {
-            field = value
-            invalidate()
-        }
-
-    override fun onDraw(canvas: Canvas) {
-        super.onDraw(canvas)
-        val w = width.toFloat()
-        val h = height.toFloat()
-        if (w <= 0f || h <= 0f) return
-        val positions = when (personCount) {
-            2 -> listOf(0.34f, 0.66f)
-            3 -> listOf(0.23f, 0.50f, 0.77f)
-            else -> listOf(0.17f, 0.39f, 0.61f, 0.83f)
-        }
-        val radius = minOf(h * 0.25f, w / (positions.size * 2.8f))
-        positions.forEachIndexed { index, fraction ->
-            val cx = w * fraction
-            val headY = h * (if (personCount >= 3 && index % 2 == 1) 0.30f else 0.34f)
-            val bodyTop = headY + radius * 0.75f
-            val bodyWidth = radius * 1.85f
-            val bodyBottom = h * 0.97f
-
-            fill.shader = null
-            fill.color = 0x55001A46
-            canvas.drawOval(
-                RectF(cx - bodyWidth * 0.62f, bodyTop + 1f, cx + bodyWidth * 0.62f, bodyBottom + 1f),
-                fill,
-            )
-
-            if (isSelectedIcon) {
-                fill.color = 0xFF07316F.toInt()
-            } else {
-                fill.shader = RadialGradient(
-                    cx - radius * 0.35f, headY - radius * 0.38f, radius * 2.3f,
-                    intArrayOf(0xFFE6FBFF.toInt(), 0xFF83C7FF.toInt(), 0xFF2878D9.toInt()),
-                    null,
-                    Shader.TileMode.CLAMP,
-                )
-            }
-            canvas.drawCircle(cx, headY, radius, fill)
-            fill.shader = null
-
-            val body = RectF(
-                cx - bodyWidth / 2f,
-                bodyTop,
-                cx + bodyWidth / 2f,
-                bodyBottom,
-            )
-            if (isSelectedIcon) {
-                fill.color = 0xFF07316F.toInt()
-            } else {
-                fill.shader = android.graphics.LinearGradient(
-                    body.left, body.top, body.right, body.bottom,
-                    intArrayOf(0xFFB3E3FF.toInt(), 0xFF64ABF8.toInt(), 0xFF145CC4.toInt()),
-                    null,
-                    Shader.TileMode.CLAMP,
-                )
-            }
-            canvas.drawRoundRect(body, radius * 0.6f, radius * 0.6f, fill)
-            fill.shader = null
-
-            if (!isSelectedIcon) {
-                outline.color = 0xDFFFFFFF.toInt()
-                outline.strokeWidth = 0.7f
-                canvas.drawCircle(cx, headY, radius, outline)
-                canvas.drawRoundRect(body, radius * 0.6f, radius * 0.6f, outline)
-            }
-        }
     }
 }
 
