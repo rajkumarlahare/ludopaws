@@ -20,6 +20,7 @@ import com.ludoproof.game.LudoProofTheme
 import com.ludoproof.game.ModeArtView
 import com.ludoproof.game.core.ui.art.plywoodBackground
 import com.ludoproof.game.core.ui.art.playGamesSignInBackground
+import com.ludoproof.game.core.ui.art.recessedPlywoodBackground
 import com.ludoproof.game.core.ui.art.playerCountSelectionBackground
 import com.ludoproof.game.core.ui.components.AppFocusRing
 import com.ludoproof.game.LudoPawsCharacterAvatarView
