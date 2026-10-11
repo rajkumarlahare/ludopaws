@@ -11,7 +11,6 @@ import android.widget.TextView
 import com.ludoproof.game.LudoPawsCharacterAvatarView
 import com.ludoproof.game.core.ui.art.playerCountSelectionBackground
 import com.ludoproof.game.core.ui.components.playSelectionPopAnimation
-import com.ludoproof.game.core.ui.art.transparentDarkBlueStrokeBackground
 import com.ludoproof.game.LudoProofTheme
 import com.ludoproof.game.OfflineGameActivity
 import com.ludoproof.game.feature.characters.domain.catalog.LudoPawsCharacterCatalog
@@ -273,10 +272,8 @@ private fun OfflineGameActivity.characterChoiceCard(
                 setPadding(dp(5), dp(4), dp(5), dp(4))
                 maxLines = 1
                 ellipsize = android.text.TextUtils.TruncateAt.END
-                background = transparentDarkBlueStrokeBackground(
-                    context = this@characterChoiceCard,
-                    cornerRadiusDp = 999f,
-                )
+                // Keep the personality subtitle text unboxed over the card surface.
+                background = null
                 tag = CHARACTER_PERSONALITY_TAG
             },
             LinearLayout.LayoutParams(
@@ -373,10 +370,7 @@ internal fun OfflineGameActivity.refreshCharacterSelectionUi() {
             ?.setTextColor(if (selected) 0xFFFFD45E.toInt() else Color.WHITE)
         card.findViewWithTag<TextView>(CHARACTER_PERSONALITY_TAG)?.apply {
             setTextColor(0xFFBCD5FF.toInt())
-            background = transparentDarkBlueStrokeBackground(
-                context = this@refreshCharacterSelectionUi,
-                cornerRadiusDp = 999f,
-            )
+            background = null
         }
     }
 
