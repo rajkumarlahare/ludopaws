@@ -12,6 +12,8 @@ import android.os.Build
 import android.view.WindowInsets
 import com.ludoproof.game.*
 import com.ludoproof.game.core.ui.art.plywoodBackground
+import com.ludoproof.game.ui.game.addGameTopActions
+import com.ludoproof.game.ui.dialogs.showSettingsDialog
 import com.ludoproof.game.feature.offline.*
 import com.ludoproof.game.ui.offline.common.*
 import com.ludoproof.game.ui.offline.gameplay.*
@@ -90,15 +92,51 @@ internal fun OfflineGameActivity.showSetup() {
         ),
     )
 
-    content.addView(
-        backHeader(
-            if (isComputerMode) {
-                "VS COMPUTER"
-            } else {
-                "PASS & PLAY"
+    var fixedTopActionsBar: FrameLayout? = null
+    var fixedTitleBar: FrameLayout? = null
+    if (isComputerMode) {
+        // Match Online: Back/Settings are fixed to the screen, not the centered
+        // scrolling setup. Keep the title centered on the full device width.
+        fixedTitleBar = FrameLayout(this).apply {
+            clipChildren = false
+            clipToPadding = false
+            addView(
+                centeredSetupTitle("VS COMPUTER"),
+                FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    Gravity.CENTER,
+                ),
+            )
+        }
+        host.addView(
+            fixedTitleBar,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                dp(52),
+                Gravity.TOP,
+            ).apply { topMargin = dp(14) },
+        )
+        fixedTopActionsBar = addGameTopActions(
+            host = host,
+            context = this,
+            onBack = { requestOfflineExit() },
+            onSettings = {
+                showSettingsDialog(this) {
+                    val current = engine.snapshot()
+                    if (current != null) showGame(current) else showSetup()
+                }
             },
-        ),
-    )
+        ).apply {
+            // Use the same plywood action surfaces as the Online page.
+            for (index in 0 until childCount) {
+                getChildAt(index).background =
+                    plywoodBackground(context = this@showSetup, cornerRadiusDp = 999f)
+            }
+        }
+    } else {
+        content.addView(backHeader("PASS & PLAY"))
+    }
 
     // Paw selection and player count share one recessed panel on the computer page.
     // Pass & Play keeps its existing individual setup panels and color selection.
@@ -205,12 +243,15 @@ internal fun OfflineGameActivity.showSetup() {
                 @Suppress("DEPRECATION")
                 insets.systemWindowInsetTop
             }
+        val safeTopInset = maxOf(cutoutTop, statusTop)
         content.setPadding(
             content.paddingLeft,
-            dp(if (isCompactSetup()) 10 else 12) + maxOf(cutoutTop, statusTop),
+            dp(if (isCompactSetup()) 10 else 12) + safeTopInset,
             content.paddingRight,
             content.paddingBottom,
         )
+        fixedTopActionsBar?.translationY = safeTopInset.toFloat()
+        fixedTitleBar?.translationY = safeTopInset.toFloat()
         insets
     }
     root.requestApplyInsets()

@@ -19,6 +19,60 @@ import com.ludoproof.game.ui.dialogs.showSettingsDialog
 import com.ludoproof.game.ui.offline.gameplay.showGame
 import com.ludoproof.game.ui.offline.setup.showSetup
 
+internal fun OfflineGameActivity.centeredSetupTitle(label: String): View {
+    val compact = LudoProofTheme.isCompactWidth(this)
+    val badge = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER
+        setPadding(
+            dp(if (compact) 10 else 14),
+            dp(4),
+            dp(if (compact) 10 else 14),
+            dp(4),
+        )
+        background = transparentDarkBlueStrokeBackground(
+            context = this@centeredSetupTitle,
+            cornerRadiusDp = 999f,
+        )
+        elevation = dp(7).toFloat()
+        addView(
+            SetupPawMarkView(this@centeredSetupTitle),
+            LinearLayout.LayoutParams(
+                dp(if (compact) 18 else 22),
+                dp(if (compact) 18 else 22),
+            ),
+        )
+        addView(
+            TextView(this@centeredSetupTitle).apply {
+                text = label
+                LudoProofTheme.title(this, if (compact) 15f else 19f, gold = true)
+                setPadding(dp(7), 0, dp(7), 0)
+                includeFontPadding = false
+                maxLines = 1
+            },
+        )
+        addView(
+            SetupPawMarkView(this@centeredSetupTitle),
+            LinearLayout.LayoutParams(
+                dp(if (compact) 18 else 22),
+                dp(if (compact) 18 else 22),
+            ),
+        )
+    }
+    return FrameLayout(this).apply {
+        clipChildren = false
+        clipToPadding = false
+        addView(
+            badge,
+            FrameLayout.LayoutParams(
+                dp(if (compact) 222 else 254),
+                dp(if (compact) 42 else 48),
+                Gravity.CENTER,
+            ),
+        )
+    }
+}
+
 internal fun OfflineGameActivity.backHeader(label: String?): View {
     fun openSettings() {
         showSettingsDialog(this@backHeader) {
