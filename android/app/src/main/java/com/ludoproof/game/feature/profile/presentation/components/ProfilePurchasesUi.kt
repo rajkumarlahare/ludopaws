@@ -355,46 +355,68 @@ private class PlywoodTextureDrawable(
 
         canvas.restore()
 
-        // Inner bevel: a fine warm highlight on the top/left catches the light,
-        // while a soft umber edge on the right/bottom creates slight physical depth.
-        val bevelInset = 1.8f * density
-        val highlightPath = Path().apply {
-            moveTo(b.left + radius, b.top + bevelInset)
-            lineTo(b.right - radius, b.top + bevelInset)
-            moveTo(b.left + bevelInset, b.top + radius)
-            lineTo(b.left + bevelInset, b.bottom - radius)
-        }
-        reliefPaint.color = Color.argb(105, 255, 242, 213)
-        reliefPaint.strokeWidth = 1.25f * density
-        canvas.drawPath(highlightPath, reliefPaint)
+        // Layered timber rim: shadow, warm edge, bevel gradient, and inner lip.
+        // Multiple contours create visible thickness instead of a single outlined stroke.
+        val outerRim = RectF(b).apply { inset(1.2f * density, 1.2f * density) }
+        val outerRadius = (radius - 1.2f * density).coerceAtLeast(1f)
 
-        val shadowPath = Path().apply {
-            moveTo(b.right - bevelInset, b.top + radius)
-            lineTo(b.right - bevelInset, b.bottom - radius)
-            moveTo(b.left + radius, b.bottom - bevelInset)
-            lineTo(b.right - radius, b.bottom - bevelInset)
-        }
-        reliefPaint.color = Color.argb(78, 102, 57, 27)
-        reliefPaint.strokeWidth = 1.7f * density
-        canvas.drawPath(shadowPath, reliefPaint)
+        reliefPaint.shader = null
+        reliefPaint.color = Color.argb(145, 76, 39, 18)
+        reliefPaint.strokeWidth = 4.8f * density
+        canvas.drawRoundRect(outerRim, outerRadius, outerRadius, reliefPaint)
 
-        // Rounded warm timber edge and inset highlight; keeps the existing card shape.
-        line.color = 0xFF9B622F.toInt()
-        line.strokeWidth = 2f * density
-        canvas.drawRoundRect(
-            RectF(b).apply { inset(1f * density, 1f * density) },
-            radius,
-            radius,
-            line,
+        val bronzeRim = RectF(b).apply { inset(3.2f * density, 3.2f * density) }
+        val bronzeRadius = (radius - 3.2f * density).coerceAtLeast(1f)
+        reliefPaint.shader = LinearGradient(
+            bronzeRim.left,
+            bronzeRim.top,
+            bronzeRim.right,
+            bronzeRim.bottom,
+            intArrayOf(
+                0xFFFFE2A6.toInt(),
+                0xFFD69A55.toInt(),
+                0xFF9A572B.toInt(),
+                0xFFEBC184.toInt(),
+            ),
+            floatArrayOf(0f, 0.36f, 0.72f, 1f),
+            Shader.TileMode.CLAMP,
         )
-        line.color = 0x99FFF0C8.toInt()
-        line.strokeWidth = 0.8f * density
-        canvas.drawRoundRect(
-            RectF(b).apply { inset(3f * density, 3f * density) },
-            (radius - 2f * density).coerceAtLeast(0f),
-            (radius - 2f * density).coerceAtLeast(0f),
-            line,
-        )
+        reliefPaint.strokeWidth = 3.8f * density
+        canvas.drawRoundRect(bronzeRim, bronzeRadius, bronzeRadius, reliefPaint)
+        reliefPaint.shader = null
+
+        // Upper/left raised bevel catches the light; lower/right bevel falls into shadow.
+        val lip = RectF(b).apply { inset(5.0f * density, 5.0f * density) }
+        val lipRadius = (radius - 5.0f * density).coerceAtLeast(1f)
+
+        val raisedHighlight = Path().apply {
+            moveTo(lip.left + lipRadius, lip.top)
+            lineTo(lip.right - lipRadius * 1.1f, lip.top)
+            quadTo(lip.right, lip.top, lip.right, lip.top + lipRadius * 0.65f)
+            moveTo(lip.left, lip.top + lipRadius)
+            lineTo(lip.left, lip.bottom - lipRadius * 0.8f)
+        }
+        reliefPaint.color = Color.argb(190, 255, 242, 209)
+        reliefPaint.strokeWidth = 2.0f * density
+        reliefPaint.strokeCap = Paint.Cap.ROUND
+        canvas.drawPath(raisedHighlight, reliefPaint)
+
+        val recessedShadow = Path().apply {
+            moveTo(lip.right, lip.top + lipRadius * 0.8f)
+            lineTo(lip.right, lip.bottom - lipRadius)
+            quadTo(lip.right, lip.bottom, lip.right - lipRadius, lip.bottom)
+            lineTo(lip.left + lipRadius, lip.bottom)
+        }
+        reliefPaint.color = Color.argb(150, 91, 46, 20)
+        reliefPaint.strokeWidth = 2.4f * density
+        canvas.drawPath(recessedShadow, reliefPaint)
+
+        // Fine inner glint makes the lip read as lacquered wood, not a flat border.
+        val innerEdge = RectF(b).apply { inset(7.0f * density, 7.0f * density) }
+        val innerRadius = (radius - 7.0f * density).coerceAtLeast(1f)
+        reliefPaint.color = Color.argb(88, 255, 238, 194)
+        reliefPaint.strokeWidth = 0.9f * density
+        canvas.drawRoundRect(innerEdge, innerRadius, innerRadius, reliefPaint)
 
         canvas.restoreToCount(layer)
     }
