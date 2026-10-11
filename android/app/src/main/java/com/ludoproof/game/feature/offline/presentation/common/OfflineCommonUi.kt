@@ -101,7 +101,7 @@ internal fun OfflineGameActivity.backHeader(label: String?): View {
             addView(
                 badge,
                 FrameLayout.LayoutParams(
-                    dp(if (LudoProofTheme.isCompactWidth(this@backHeader)) 222 else 274),
+                    dp(if (LudoProofTheme.isCompactWidth(this@backHeader)) 222 else 254),
                     dp(if (LudoProofTheme.isCompactWidth(this@backHeader)) 42 else 48),
                     Gravity.CENTER,
                 ),
@@ -187,7 +187,7 @@ internal fun OfflineGameActivity.backHeader(label: String?): View {
     }
 }
 
-internal fun OfflineGameActivity.LudoProofTheme.isCompactWidth(this@backHeader):
+internal fun OfflineGameActivity.isCompactSetup():
     Boolean =
     LudoProofTheme
         .isCompactWidth(this)
