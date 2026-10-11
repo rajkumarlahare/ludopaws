@@ -3,7 +3,6 @@ package com.ludoproof.game.feature.profile.presentation.components
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
@@ -12,9 +11,12 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.LudoProofTheme
-import com.ludoproof.game.core.ui.art.PlywoodTextureDrawable
-import com.ludoproof.game.core.ui.art.RecessedPlywoodDrawable
+import com.ludoproof.game.core.ui.art.plywoodBackground
+import com.ludoproof.game.core.ui.art.recessedPlywoodBackground
 import com.ludoproof.game.core.ui.art.transparentDarkBlueStrokeBackground
+import com.ludoproof.game.core.ui.art.playGamesSignInBackground
+import com.ludoproof.game.core.ui.art.experienceProgressTrackBackground
+import com.ludoproof.game.core.ui.art.experienceProgressFillBackground
 import com.ludoproof.game.LudoPawsCharacterAvatarView
 import com.ludoproof.game.core.ui.components.AppFocusRing
 import com.ludoproof.game.core.ui.components.appIconActionButton
@@ -54,10 +56,7 @@ internal fun ProfileActivity.profileTopBar(): FrameLayout =
                 sizeDp = 50,
             ) { finish() }.apply {
                 // Keep the Back button circular while using the shared plywood texture.
-                background = PlywoodTextureDrawable(
-                    resources.displayMetrics.density,
-                    cornerRadiusDp = 25f,
-                )
+                background = plywoodBackground(this@profileTopBar, cornerRadiusDp = 25f)
             },
             FrameLayout.LayoutParams(dp(50), dp(50), Gravity.START or Gravity.CENTER_VERTICAL),
         )
@@ -69,7 +68,7 @@ internal fun ProfileActivity.profileIdentityPanel(profile: ProfileSnapshot): Lin
         orientation = LinearLayout.VERTICAL
         setPadding(dp(10), dp(10), dp(10), dp(10))
         // Match the Purchased Products plywood treatment across the Profile hero card.
-        background = PlywoodTextureDrawable(resources.displayMetrics.density)
+        background = plywoodBackground(this@profileIdentityPanel)
         elevation = dp(6).toFloat()
 
         val selection = CharacterSelectionStore(this@profileIdentityPanel).load()
@@ -88,10 +87,7 @@ internal fun ProfileActivity.profileIdentityPanel(profile: ProfileSnapshot): Lin
         }
         val pawFrame = FrameLayout(this@profileIdentityPanel).apply {
             // Carved plywood pocket makes the existing 3D Paw feel seated into the panel.
-            background = RecessedPlywoodDrawable(
-                resources.displayMetrics.density,
-                outerCornerRadiusDp = 18f,
-            )
+            background = recessedPlywoodBackground(this@profileIdentityPanel, outerCornerRadiusDp = 18f)
             clipChildren = false
             clipToPadding = false
         }
@@ -121,7 +117,7 @@ internal fun ProfileActivity.profileIdentityPanel(profile: ProfileSnapshot): Lin
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER
                 setPadding(0, 0, 0, 0)
-                background = PlywoodTextureDrawable(resources.displayMetrics.density)
+                background = plywoodBackground(this@profileIdentityPanel)
                 contentDescription = "Change selected Paw"
                 isClickable = true
                 isFocusable = true
@@ -214,13 +210,7 @@ internal fun ProfileActivity.profileIdentityPanel(profile: ProfileSnapshot): Lin
                 minWidth = 0
                 minHeight = 0
                 setPadding(dp(8), 0, dp(8), 0)
-                background = LudoProofTheme.rounded(
-                    0xFF058A69.toInt(),
-                    13f,
-                    0xFF20E1C0.toInt(),
-                    1.5f,
-                    this@profileIdentityPanel,
-                )
+                background = playGamesSignInBackground(this@profileIdentityPanel)
                 contentDescription = "Sign in to Google Play Games"
                 isEnabled = !playGamesAuthenticated && !playGamesSignInInProgress
                 alpha = if (isEnabled || playGamesAuthenticated) 1f else 0.78f
@@ -298,20 +288,11 @@ internal fun ProfileActivity.profileIdentityPanel(profile: ProfileSnapshot): Lin
         )
 
         val track = FrameLayout(this@profileIdentityPanel).apply {
-            background = LudoProofTheme.rounded(
-                0xFF052E78.toInt(),
-                999f,
-                0xFF3185D5.toInt(),
-                1f,
-                this@profileIdentityPanel,
-            )
+            background = experienceProgressTrackBackground(this@profileIdentityPanel)
             clipToOutline = true
         }
         val fill = View(this@profileIdentityPanel).apply {
-            background = GradientDrawable(
-                GradientDrawable.Orientation.LEFT_RIGHT,
-                intArrayOf(0xFFFFD83D.toInt(), 0xFFFFB812.toInt()),
-            ).apply { cornerRadius = dp(999).toFloat() }
+            background = experienceProgressFillBackground(this@profileIdentityPanel)
         }
         track.addView(
             fill,
