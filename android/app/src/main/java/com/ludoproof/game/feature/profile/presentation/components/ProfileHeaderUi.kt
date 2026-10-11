@@ -99,13 +99,8 @@ internal fun ProfileActivity.profileIdentityPanel(profile: ProfileSnapshot): Lin
     LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         setPadding(dp(10), dp(10), dp(10), dp(10))
-        background = GradientDrawable(
-            GradientDrawable.Orientation.TOP_BOTTOM,
-            intArrayOf(0xFF0876E0.toInt(), 0xFF0649A8.toInt()),
-        ).apply {
-            cornerRadius = dp(20).toFloat()
-            setStroke(dp(2), 0xFF21C8FF.toInt())
-        }
+        // Match the Purchased Products plywood treatment across the Profile hero card.
+        background = PlywoodTextureDrawable(resources.displayMetrics.density)
         elevation = dp(6).toFloat()
 
         val selection = CharacterSelectionStore(this@profileIdentityPanel).load()
