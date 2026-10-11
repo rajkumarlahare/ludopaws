@@ -12,20 +12,13 @@ import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.sin
 
-/** Reference-style Google Play mark used only by the Home rating action. */
+/** Smooth, four-colour Google Play mark used by the Home rating action. */
 internal class HomeGooglePlayIconView(
     context: Context,
 ) : View(context) {
     private val paint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.FILL
-        }
-    private val separator =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            color = 0xCCFFFFFF.toInt()
-            strokeWidth = 1.7f
-            strokeJoin = Paint.Join.ROUND
         }
 
     override fun onDraw(canvas: Canvas) {
@@ -39,88 +32,118 @@ internal class HomeGooglePlayIconView(
         canvas.translate((width - size) / 2f, (height - size) / 2f)
         canvas.scale(scale, scale)
 
-        // Soft depth behind the Play mark so it reads like the large reference icon.
-        val shadow =
+        // Keep the Play mark broad and give the two left corners a soft radius,
+        // instead of rendering it as one hard, samosa-like triangle.
+        val outer =
             Path().apply {
-                moveTo(20f, 18f)
-                lineTo(20f, 86f)
-                lineTo(84f, 52f)
+                moveTo(22f, 11f)
+                quadTo(14f, 11f, 14f, 21f)
+                lineTo(14f, 79f)
+                quadTo(14f, 89f, 22f, 89f)
+                lineTo(83f, 56f)
+                quadTo(93f, 50f, 83f, 44f)
                 close()
             }
+
+        paint.shader = null
         paint.color = 0x66000000
         canvas.save()
-        canvas.translate(0f, 4f)
-        canvas.drawPath(shadow, paint)
+        canvas.translate(0f, 3f)
+        canvas.drawPath(outer, paint)
         canvas.restore()
 
-        val leftBlue =
+        // Blue forms the rounded back of the mark.
+        val blue =
             Path().apply {
-                moveTo(18f, 15f)
-                lineTo(49f, 47f)
-                lineTo(18f, 85f)
-                close()
-            }
-        paint.color = 0xFF22B7F2.toInt()
-        canvas.drawPath(leftBlue, paint)
-
-        val topGreen =
-            Path().apply {
-                moveTo(18f, 15f)
-                lineTo(56f, 38f)
-                lineTo(49f, 47f)
-                close()
-            }
-        paint.color = 0xFF34D27B.toInt()
-        canvas.drawPath(topGreen, paint)
-
-        val bottomRed =
-            Path().apply {
-                moveTo(18f, 85f)
-                lineTo(49f, 47f)
-                lineTo(57f, 62f)
-                close()
-            }
-        paint.color = 0xFFF64B4B.toInt()
-        canvas.drawPath(bottomRed, paint)
-
-        val rightYellow =
-            Path().apply {
-                moveTo(49f, 47f)
-                lineTo(56f, 38f)
-                lineTo(84f, 50f)
-                lineTo(57f, 62f)
-                close()
-            }
-        paint.color = 0xFFFFD24A.toInt()
-        canvas.drawPath(rightYellow, paint)
-
-        // Fine bright separators give the multicolor mark a polished, beveled edge.
-        canvas.drawLine(18f, 15f, 49f, 47f, separator)
-        canvas.drawLine(18f, 85f, 49f, 47f, separator)
-        canvas.drawLine(49f, 47f, 56f, 38f, separator)
-        canvas.drawLine(49f, 47f, 57f, 62f, separator)
-
-        // Small glass reflection rather than a hard white stripe.
-        val gloss =
-            Path().apply {
-                moveTo(22f, 20f)
-                lineTo(48f, 40f)
-                lineTo(43f, 44f)
-                lineTo(23f, 31f)
+                moveTo(22f, 11f)
+                quadTo(14f, 11f, 14f, 21f)
+                lineTo(14f, 79f)
+                quadTo(14f, 89f, 22f, 89f)
+                lineTo(51f, 50f)
                 close()
             }
         paint.shader =
             LinearGradient(
-                20f,
-                18f,
-                48f,
-                46f,
-                intArrayOf(
-                    0xC8FFFFFF.toInt(),
-                    0x30FFFFFF,
-                    Color.TRANSPARENT,
-                ),
-                floatArrayOf(0f, 0.58f, 1f),
+                16f, 15f, 52f, 86f,
+                intArrayOf(0xFF39C9F5.toInt(), 0xFF1687E4.toInt()),
+                null,
+                Shader.TileMode.CLAMP,
+            )
+        canvas.drawPath(blue, paint)
+
+        // Green and red split the upper and lower arms of the Play symbol.
+        val green =
+            Path().apply {
+                moveTo(22f, 11f)
+                quadTo(24f, 11f, 28f, 14f)
+                lineTo(56f, 39f)
+                lineTo(51f, 50f)
+                lineTo(22f, 11f)
+                close()
+            }
+        paint.shader =
+            LinearGradient(
+                22f, 12f, 63f, 44f,
+                intArrayOf(0xFF42E477.toInt(), 0xFF08B96A.toInt()),
+                null,
+                Shader.TileMode.CLAMP,
+            )
+        canvas.drawPath(green, paint)
+
+        val red =
+            Path().apply {
+                moveTo(22f, 89f)
+                quadTo(24f, 89f, 28f, 86f)
+                lineTo(56f, 61f)
+                lineTo(51f, 50f)
+                lineTo(22f, 89f)
+                close()
+            }
+        paint.shader =
+            LinearGradient(
+                22f, 88f, 63f, 56f,
+                intArrayOf(0xFFFF7467.toInt(), 0xFFEA3348.toInt()),
+                null,
+                Shader.TileMode.CLAMP,
+            )
+        canvas.drawPath(red, paint)
+
+        // Yellow makes the recognisable forward-facing tip; curved joins keep
+        // the four colours reading as one continuous Play Store symbol.
+        val yellow =
+            Path().apply {
+                moveTo(51f, 50f)
+                lineTo(56f, 39f)
+                lineTo(70f, 31f)
+                lineTo(83f, 44f)
+                quadTo(93f, 50f, 83f, 56f)
+                lineTo(70f, 69f)
+                lineTo(56f, 61f)
+                close()
+            }
+        paint.shader =
+            LinearGradient(
+                56f, 34f, 85f, 66f,
+                intArrayOf(0xFFFFE36A.toInt(), 0xFFFFB82F.toInt()),
+                null,
+                Shader.TileMode.CLAMP,
+            )
+        canvas.drawPath(yellow, paint)
+
+        // A restrained gloss softens the finish without a harsh white divider.
+        val gloss =
+            Path().apply {
+                moveTo(21f, 20f)
+                quadTo(20f, 17f, 24f, 19f)
+                lineTo(45f, 40f)
+                lineTo(40f, 43f)
+                close()
+            }
+        paint.shader =
+            LinearGradient(
+                20f, 18f, 47f, 44f,
+                intArrayOf(0x9EFFFFFF.toInt(), 0x18FFFFFF, Color.TRANSPARENT),
+                floatArrayOf(0f, 0.62f, 1f),
                 Shader.TileMode.CLAMP,
             )
         canvas.drawPath(gloss, paint)
@@ -185,9 +208,9 @@ internal class HomeRatingStarsView(
                     0f,
                     centerY + radius,
                     intArrayOf(
-                        0xFFFFF08A.toInt(),
-                        0xFFFFC51E.toInt(),
-                        0xFFF28B00.toInt(),
+                        0xFFFFF7B5.toInt(),
+                        0xFFFFD957.toInt(),
+                        0xFFFFB83D.toInt(),
                     ),
                     floatArrayOf(0f, 0.54f, 1f),
                     Shader.TileMode.CLAMP,
@@ -195,7 +218,7 @@ internal class HomeRatingStarsView(
             canvas.drawPath(star, paint)
             paint.shader = null
 
-            outline.color = 0xFFD97700.toInt()
+            outline.color = 0xFFE6AD3E.toInt()
             outline.strokeWidth = (radius * 0.11f).coerceAtLeast(1f)
             canvas.drawPath(star, outline)
 
