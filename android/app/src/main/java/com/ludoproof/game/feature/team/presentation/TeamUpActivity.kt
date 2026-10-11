@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.graphics.Paint
 import android.graphics.RadialGradient
 import android.graphics.RectF
@@ -329,18 +330,43 @@ class TeamUpActivity : Activity() {
             addView(timerText)
 
             cancelButton = Button(this@TeamUpActivity).apply {
-                text = "CANCEL SEARCH"
-                LudoProofTheme.danger(this)
+                text = "CANCEL"
+                textSize = 14f
+                setTypeface(Typeface.DEFAULT_BOLD)
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
                 contentDescription = "Cancel team search"
-                AppFocusRing.apply(this, cornerRadiusDp = 12f, strokeWidthDp = 2.5f)
+
+                // Keep this secondary/destructive action compact and consistently red.
+                // Clear the theme tint/ripple so it cannot flash a blue state color.
+                backgroundTintList = null
+                foreground = null
+                stateListAnimator = null
+                background = GradientDrawable(
+                    GradientDrawable.Orientation.TOP_BOTTOM,
+                    intArrayOf(
+                        0xFFD7434B.toInt(),
+                        0xFFB62D36.toInt(),
+                    ),
+                ).apply {
+                    cornerRadius = dp(10f).toFloat()
+                    setStroke(dp(1), 0xFFE56A70.toInt())
+                }
+                minWidth = dp(108)
+                minHeight = dp(40)
+                setPadding(dp(22), dp(3), dp(22), dp(3))
+                AppFocusRing.apply(this, cornerRadiusDp = 10f, strokeWidthDp = 2f)
                 setOnClickListener { playSelectionPopAnimation { cancelSearch() } }
             }
             addView(
                 cancelButton,
                 LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    dp(52),
-                ).apply { topMargin = dp(12) },
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    dp(40),
+                ).apply {
+                    gravity = Gravity.CENTER_HORIZONTAL
+                    topMargin = dp(12)
+                },
             )
         }
         teamPanel.addView(
