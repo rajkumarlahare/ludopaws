@@ -415,8 +415,8 @@ class FriendsActivity : Activity() {
             }.apply {
                 // These are the compact PRIVATE ROOM size controls (not the
                 // separate Offline setup tiles). Reuse Online's recessed timber
-                // and gold selected treatment, without a check badge that would
-                // overlap the number at this 42dp size.
+                // and gold selected treatment, with a small top-end check badge
+                // so the selected option is recognizable at this compact size.
                 background = playerCountSelectionBackground(
                     context = this@FriendsActivity,
                     selected = selected,
