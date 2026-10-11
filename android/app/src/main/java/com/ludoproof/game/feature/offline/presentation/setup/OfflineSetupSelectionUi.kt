@@ -19,6 +19,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.*
 import com.ludoproof.game.core.ui.art.playerCountSelectionBackground
+import com.ludoproof.game.core.ui.art.plywoodBackground
 import com.ludoproof.game.core.ui.art.recessedPlywoodBackground
 import com.ludoproof.game.core.ui.icons.AppIconName
 import com.ludoproof.game.core.ui.icons.AppIconVariant
@@ -307,7 +308,10 @@ internal fun OfflineGameActivity.selectionPanel(
                 context = this@selectionPanel,
                 outerCornerRadiusDp = 20f,
             )
-            else -> LudoProofTheme.darkPanelDrawable(this@selectionPanel)
+            else -> plywoodBackground(
+                context = this@selectionPanel,
+                cornerRadiusDp = 20f,
+            )
         }
         if (embeddedInComputerPanel) elevation = 0f
 
@@ -535,10 +539,14 @@ internal fun OfflineGameActivity.refreshSetupSelections() {
                 checkMarkScale = 3f,
             )
             tile.elevation = dp(if (selected) 6 else 4).toFloat()
-        } else if (selected) {
-            LudoProofTheme.selectedTile(tile)
         } else {
-            LudoProofTheme.normalTile(tile)
+            tile.background = playerCountSelectionBackground(
+                context = this@refreshSetupSelections,
+                selected = selected,
+                outerCornerRadiusDp = 12f,
+                showCheckBadge = false,
+            )
+            tile.elevation = dp(if (selected) 3 else 1).toFloat()
         }
         (tile as? LinearLayout)?.let { content ->
             (content.getChildAt(0) as? ModeArtView)?.playerCountSelected = selected
@@ -554,13 +562,15 @@ internal fun OfflineGameActivity.refreshSetupSelections() {
 
     colorButtons.forEach { (colorName, tile) ->
         val selected = colorName == selectedColor
-        if (selected) {
-            LudoProofTheme.selectedTile(tile)
-        } else {
-            LudoProofTheme.normalTile(tile)
-        }
+        tile.background = playerCountSelectionBackground(
+            context = this@refreshSetupSelections,
+            selected = selected,
+            outerCornerRadiusDp = 12f,
+            showCheckBadge = false,
+        )
+        tile.elevation = dp(if (selected) 3 else 1).toFloat()
         ((tile as? LinearLayout)?.getChildAt(1) as? TextView)?.setTextColor(
-            if (selected) 0xFF052A68.toInt() else Color.WHITE,
+            if (selected) 0xFFFFD45E.toInt() else Color.WHITE,
         )
     }
 
