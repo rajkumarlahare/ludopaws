@@ -480,7 +480,7 @@ class FriendsActivity : Activity() {
                 summary = if (inviteCount == 0) "No invites" else "$inviteCount waiting",
                 icon = FriendsIcon.INVITES,
                 count = inviteCount,
-                accent = 0xFFB36DFF.toInt(),
+                accent = 0xFF39E73B.toInt(),
             ) { showInvitesDialog() },
             LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
                 marginStart = dp(5)
