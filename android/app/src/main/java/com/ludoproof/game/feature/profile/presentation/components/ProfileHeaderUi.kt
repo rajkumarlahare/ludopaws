@@ -174,13 +174,7 @@ internal fun ProfileActivity.profileIdentityPanel(profile: ProfileSnapshot): Lin
                 setCompoundDrawablesRelative(pencil, null, null, null)
                 compoundDrawablePadding = dp(2)
                 setPadding(dp(6), 0, dp(6), 0)
-                background = LudoProofTheme.rounded(
-                    0xFF064EAE.toInt(),
-                    999f,
-                    0xFF2ED3FF.toInt(),
-                    1.5f,
-                    this@profileIdentityPanel,
-                )
+                background = PlywoodTextureDrawable(resources.displayMetrics.density)
                 contentDescription = "Change selected Paw"
                 setOnClickListener {
                     startActivity(
