@@ -2,6 +2,7 @@ package com.ludoproof.game.feature.profile.presentation.components
 
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
@@ -12,198 +13,141 @@ import com.ludoproof.game.feature.profile.domain.model.ProfileModeStats
 import com.ludoproof.game.feature.profile.domain.model.ProfileSnapshot
 import com.ludoproof.game.feature.profile.presentation.ProfileActivity
 
-internal fun ProfileActivity.profileModeStatsPanel(
-    profile: ProfileSnapshot,
-):
-    LinearLayout =
+internal fun ProfileActivity.profileModeStatsPanel(profile: ProfileSnapshot): LinearLayout =
     profilePanel().apply {
+        val heading = LinearLayout(this@profileModeStatsPanel).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        heading.addView(
+            profileTitle("Game Stats"),
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f),
+        )
+        heading.addView(
+            TextView(this@profileModeStatsPanel).apply {
+                text = "›"
+                textSize = 34f
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
+                contentDescription = "Classic game statistics"
+            },
+            LinearLayout.LayoutParams(dp(28), dp(34)),
+        )
+        addView(heading)
+
         addView(
-            modeRow(
-                symbol = "▦",
-                label = "Classic",
-                stats =
-                    profile.classic,
-            ),
-        )
-    }
-
-private fun ProfileActivity.modeRow(
-    symbol: String,
-    label: String,
-    stats: ProfileModeStats,
-):
-    LinearLayout =
-    LinearLayout(this).apply {
-        orientation =
-            LinearLayout.VERTICAL
-
-        val top =
-            LinearLayout(
-                this@modeRow,
-            ).apply {
-                orientation =
-                    LinearLayout.HORIZONTAL
-                gravity =
-                    Gravity.CENTER_VERTICAL
-            }
-
-        top.addView(
-            TextView(
-                this@modeRow,
-            ).apply {
-                text =
-                    symbol
-                textSize =
-                    20f
-                setTypeface(
-                    Typeface.DEFAULT_BOLD,
-                )
-                setTextColor(
-                    Color.WHITE,
-                )
-                gravity =
-                    Gravity.CENTER
-                background =
-                    LudoProofTheme
-                        .rounded(
-                            0xE20A2F72.toInt(),
-                            999f,
-                            0x665ED8FF,
-                            1f,
-                            this@modeRow,
-                        )
-            },
-            LinearLayout.LayoutParams(
-                dp(44),
-                dp(44),
-            ),
-        )
-
-        top.addView(
-            TextView(
-                this@modeRow,
-            ).apply {
-                text =
-                    label
-                textSize =
-                    17f
-                setTypeface(
-                    Typeface.DEFAULT_BOLD,
-                )
-                setTextColor(
-                    Color.WHITE,
-                )
-                setPadding(
-                    dp(12),
-                    0,
-                    0,
-                    0,
-                )
-            },
-            LinearLayout.LayoutParams(
-                0,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                1f,
-            ),
-        )
-
-        top.addView(
-            TextView(
-                this@modeRow,
-            ).apply {
-                text =
-                    stats.wins
-                        .toString() +
-                        " wins · " +
-                        stats.games +
-                        " games  ›"
-                textSize =
-                    13f
-                setTypeface(
-                    Typeface.DEFAULT_BOLD,
-                )
-                setTextColor(
-                    Color.WHITE,
-                )
-            },
-        )
-        addView(
-            top,
-        )
-
-        val ratio =
-            if (
-                stats.games >
-                    0
-            ) {
-                stats.wins
-                    .toFloat() /
-                    stats.games
-                        .toFloat()
-            } else {
-                0f
-            }
-
-        val progress =
-            FrameLayout(
-                this@modeRow,
-            ).apply {
-                background =
-                    LudoProofTheme
-                        .rounded(
-                            0xCC092A63.toInt(),
-                            999f,
-                            0x5537C9FF,
-                            1f,
-                            this@modeRow,
-                        )
-            }
-        progress.addView(
-            View(
-                this@modeRow,
-            ).apply {
-                background =
-                    LudoProofTheme
-                        .rounded(
-                            LudoProofTheme.GOLD,
-                            999f,
-                            LudoProofTheme.GOLD,
-                            0f,
-                            this@modeRow,
-                        )
-            },
-            FrameLayout.LayoutParams(
-                dp(
-                    (
-                        260 *
-                            ratio
-                        )
-                        .toInt()
-                        .coerceAtLeast(
-                            if (
-                                stats.games >
-                                    0
-                            ) {
-                                6
-                            } else {
-                                0
-                            },
-                        ),
-                ),
-                FrameLayout.LayoutParams.MATCH_PARENT,
-            ),
-        )
-        addView(
-            progress,
+            classicRow(profile.classic),
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(9),
-            ).apply {
-                topMargin =
-                    dp(8)
-                marginStart =
-                    dp(56)
-            },
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply { topMargin = dp(10) },
         )
     }
 
+private fun ProfileActivity.classicRow(stats: ProfileModeStats): LinearLayout =
+    LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding(dp(10), dp(10), dp(10), dp(10))
+        background = LudoProofTheme.rounded(
+            0x33104483,
+            18f,
+            0xFF247FCB.toInt(),
+            1f,
+            this@classicRow,
+        )
+
+        addView(
+            TextView(this@classicRow).apply {
+                text = "▦"
+                textSize = 28f
+                setTypeface(Typeface.DEFAULT_BOLD)
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
+                background = LudoProofTheme.rounded(
+                    0xE20A347A.toInt(),
+                    999f,
+                    0xFF217BD0.toInt(),
+                    1f,
+                    this@classicRow,
+                )
+                contentDescription = "Classic"
+            },
+            LinearLayout.LayoutParams(dp(48), dp(48)),
+        )
+
+        val details = LinearLayout(this@classicRow).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(12), 0, 0, 0)
+        }
+        val top = LinearLayout(this@classicRow).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        top.addView(
+            TextView(this@classicRow).apply {
+                text = "Classic"
+                textSize = 17f
+                setTypeface(Typeface.DEFAULT_BOLD)
+                setTextColor(Color.WHITE)
+                maxLines = 1
+            },
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f),
+        )
+        top.addView(
+            TextView(this@classicRow).apply {
+                text = "${stats.wins} wins · ${stats.games} games ›"
+                textSize = 12.5f
+                setTypeface(Typeface.DEFAULT_BOLD)
+                setTextColor(Color.WHITE)
+                gravity = Gravity.END or Gravity.CENTER_VERTICAL
+                maxLines = 1
+            },
+        )
+        details.addView(top)
+
+        val ratio = if (stats.games > 0) {
+            (stats.wins.toFloat() / stats.games.toFloat()).coerceIn(0f, 1f)
+        } else {
+            0f
+        }
+        val track = FrameLayout(this@classicRow).apply {
+            background = LudoProofTheme.rounded(
+                0xFF062E70.toInt(),
+                999f,
+                0xFF1E73BE.toInt(),
+                1f,
+                this@classicRow,
+            )
+            clipToOutline = true
+        }
+        val fill = View(this@classicRow).apply {
+            background = GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                intArrayOf(0xFFFFD93D.toInt(), 0xFFFFB91A.toInt()),
+            ).apply { cornerRadius = dp(999).toFloat() }
+        }
+        track.addView(
+            fill,
+            FrameLayout.LayoutParams(0, FrameLayout.LayoutParams.MATCH_PARENT, Gravity.START),
+        )
+        track.post {
+            if (track.width > 0) {
+                val params = fill.layoutParams as FrameLayout.LayoutParams
+                params.width = (track.width * ratio).toInt().coerceIn(0, track.width)
+                fill.layoutParams = params
+            }
+        }
+        details.addView(
+            track,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(10),
+            ).apply { topMargin = dp(8) },
+        )
+
+        addView(
+            details,
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f),
+        )
+    }
