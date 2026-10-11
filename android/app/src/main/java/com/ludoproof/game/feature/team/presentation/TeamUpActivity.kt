@@ -41,11 +41,11 @@ import com.ludoproof.game.core.ui.art.plywoodBackground
 import com.ludoproof.game.core.ui.art.playGamesSignInBackground
 import com.ludoproof.game.core.ui.art.recessedPlywoodBackground
 import com.ludoproof.game.core.ui.art.transparentDarkBlueStrokeBackground
-import com.ludoproof.game.core.ui.icons.AppIconName
-import com.ludoproof.game.core.ui.icons.AppIconView
 import com.ludoproof.game.MainActivity
 import com.ludoproof.game.PlayerSession
 import com.ludoproof.game.SecureSessionStore
+import com.ludoproof.game.feature.friends.presentation.FriendsIcon
+import com.ludoproof.game.feature.friends.presentation.FriendsVisualKit
 import com.ludoproof.game.feature.leaderboard.data.local.LeaderboardCredential
 import com.ludoproof.game.feature.leaderboard.data.local.LeaderboardIdentityStore
 import com.ludoproof.game.feature.leaderboard.data.remote.LeaderboardApi
@@ -151,12 +151,12 @@ class TeamUpActivity : Activity() {
                         orientation = LinearLayout.HORIZONTAL
                         gravity = Gravity.CENTER
                         addView(
-                            AppIconView(
-                                context = this@TeamUpActivity,
-                                iconName = AppIconName.PEOPLE,
-                                iconTint = Color.WHITE,
+                            FriendsVisualKit.iconView(
+                                this@TeamUpActivity,
+                                FriendsIcon.PEOPLE,
+                                FriendsVisualKit.TEXT,
                             ),
-                            LinearLayout.LayoutParams(dp(34), dp(34)).apply {
+                            LinearLayout.LayoutParams(dp(36), dp(36)).apply {
                                 marginEnd = dp(8)
                             },
                         )
