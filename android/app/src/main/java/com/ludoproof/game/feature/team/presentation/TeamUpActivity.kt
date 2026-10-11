@@ -15,6 +15,10 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.text.Spannable
+import android.text.SpannableString
+import android.text.TextPaint
+import android.text.style.CharacterStyle
 import android.view.Gravity
 import android.view.View
 import android.view.WindowInsets
@@ -297,9 +301,41 @@ class TeamUpActivity : Activity() {
             )
             addView(
                 TextView(this@TeamUpActivity).apply {
-                    text = "RED + YELLOW   VS   GREEN + BLUE"
+                    text = SpannableString("RED + YELLOW   VS   GREEN + BLUE").apply {
+                        fun styleColorWord(
+                            word: String,
+                            textColor: Int,
+                            glowColor: Int,
+                        ) {
+                            val start = indexOf(word)
+                            if (start < 0) return
+                            setSpan(
+                                object : CharacterStyle() {
+                                    override fun updateDrawState(textPaint: TextPaint) {
+                                        textPaint.color = textColor
+                                        textPaint.setShadowLayer(
+                                            this@TeamUpActivity.dp(5).toFloat(),
+                                            0f,
+                                            0f,
+                                            glowColor,
+                                        )
+                                    }
+                                },
+                                start,
+                                start + word.length,
+                                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
+                            )
+                        }
+
+                        // Match Pass & Play's color-label colors and soft glow.
+                        styleColorWord("RED", 0xFFFF6670.toInt(), 0xFFFF263D.toInt())
+                        styleColorWord("YELLOW", 0xFFFFEB70.toInt(), 0xFFFFD324.toInt())
+                        styleColorWord("GREEN", 0xFF5BF58A.toInt(), 0xFF23E968.toInt())
+                        styleColorWord("BLUE", 0xFF64C4FF.toInt(), 0xFF35AFFF.toInt())
+                    }
                     LudoProofTheme.body(this, 9.5f, centered = true, bright = true)
                     setTextColor(0xFFBDEBFF.toInt())
+                    setTypeface(Typeface.DEFAULT_BOLD)
                     setPadding(0, dp(7), 0, 0)
                 },
             )
