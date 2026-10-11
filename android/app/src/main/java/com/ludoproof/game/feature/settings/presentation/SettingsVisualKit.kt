@@ -122,7 +122,7 @@ private class SettingsCloseButton(
 ) : View(context) {
     private val crossPaint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = 0xFFFF3030.toInt()
+            color = 0xFFD95757.toInt()
             style = Paint.Style.STROKE
             strokeWidth = settingsDp(context, 6f).toFloat()
             strokeCap = Paint.Cap.ROUND
