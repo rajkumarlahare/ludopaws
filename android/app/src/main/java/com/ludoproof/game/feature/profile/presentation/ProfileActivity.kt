@@ -1,6 +1,7 @@
 package com.ludoproof.game.feature.profile.presentation
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
@@ -175,7 +176,11 @@ class ProfileActivity : Activity() {
     internal fun beginPlayGamesSignIn() {
         if (!isPlayGamesConfigured) {
             playGamesStatus = getString(R.string.profile_play_games_setup_button_message)
-            renderProfile()
+            AlertDialog.Builder(this)
+                .setTitle("Google Play Games")
+                .setMessage(playGamesStatus)
+                .setPositiveButton("OK", null)
+                .show()
             return
         }
         if (playGamesSignInInProgress) return
