@@ -159,9 +159,15 @@ internal fun OfflineGameActivity.colorPanel(
                         text = entry.key
                         textSize = if (isCompactSetup()) 10f else 11.5f
                         setTypeface(Typeface.DEFAULT_BOLD)
-                        setTextColor(Color.WHITE)
+                        setTextColor(setupColorLabelColor(entry.key))
                         gravity = Gravity.CENTER
                         includeFontPadding = false
+                        setShadowLayer(
+                            dp(5).toFloat(),
+                            0f,
+                            0f,
+                            setupColorGlowColor(entry.key),
+                        )
                         setPadding(0, dp(4), 0, 0)
                     },
                     LinearLayout.LayoutParams(
@@ -525,6 +531,22 @@ private fun setupColor(name: String): Int =
         else -> 0xFFFFD324.toInt()
     }
 
+private fun setupColorLabelColor(name: String): Int =
+    when (name) {
+        "BLUE" -> 0xFF64C4FF.toInt()
+        "RED" -> 0xFFFF6670.toInt()
+        "GREEN" -> 0xFF5BF58A.toInt()
+        else -> 0xFFFFEB70.toInt()
+    }
+
+private fun setupColorGlowColor(name: String): Int =
+    when (name) {
+        "BLUE" -> 0xFF35AFFF.toInt()
+        "RED" -> 0xFFFF263D.toInt()
+        "GREEN" -> 0xFF23E968.toInt()
+        else -> 0xFFFFD324.toInt()
+    }
+
 internal fun OfflineGameActivity.refreshSetupSelections() {
     playerButtons.forEach { (playerCount, tile) ->
         val selected = playerCount == selectedPlayers
@@ -569,9 +591,15 @@ internal fun OfflineGameActivity.refreshSetupSelections() {
             showCheckBadge = true,
         )
         tile.elevation = dp(if (selected) 3 else 1).toFloat()
-        ((tile as? LinearLayout)?.getChildAt(1) as? TextView)?.setTextColor(
-            if (selected) 0xFFFFD45E.toInt() else Color.WHITE,
-        )
+        ((tile as? LinearLayout)?.getChildAt(1) as? TextView)?.apply {
+            setTextColor(setupColorLabelColor(colorName))
+            setShadowLayer(
+                dp(if (selected) 8 else 5).toFloat(),
+                0f,
+                0f,
+                setupColorGlowColor(colorName),
+            )
+        }
     }
 
     refreshCharacterSelectionUi()
