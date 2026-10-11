@@ -5,6 +5,9 @@ import android.content.Intent
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.RadialGradient
+import android.graphics.RectF
+import android.graphics.Shader
 import android.graphics.Typeface
 import android.os.Build
 import android.os.Bundle
@@ -823,33 +826,86 @@ class TeamUpActivity : Activity() {
         private val firstColor: Int,
         private val secondColor: Int,
     ) : View(context) {
-        private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+        }
+        private val shine = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = 0xA8FFFFFF.toInt()
+        }
 
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
-            val radius = minOf(width * 0.30f, height * 0.42f)
-            val firstX = width * 0.34f
-            val secondX = width * 0.68f
-            val cy = height * 0.48f
+            if (width <= 0 || height <= 0) return
+
+            // Two glossy color orbs, using the same light-to-dark shading,
+            // bright rim, soft shadow and specular shine as Pass & Play colors.
+            val radius = minOf(width * 0.25f, height * 0.42f)
+            val cy = height * 0.49f
+            val firstX = width * 0.27f
+            val secondX = width * 0.73f
             drawToken(canvas, firstX, cy, radius, firstColor)
             drawToken(canvas, secondX, cy, radius, secondColor)
         }
 
-        private fun drawToken(canvas: Canvas, x: Float, y: Float, radius: Float, color: Int) {
-            paint.color = 0x88020A18.toInt()
-            canvas.drawCircle(x + dp(1f), y + dp(2f), radius * 1.18f, paint)
-            paint.shader =
-                android.graphics.RadialGradient(
-                    x - radius * 0.35f,
-                    y - radius * 0.38f,
-                    radius * 1.6f,
-                    intArrayOf(0xFFFFFFFF.toInt(), color, 0xFF06152F.toInt()),
-                    null,
-                    android.graphics.Shader.TileMode.CLAMP,
-                )
-            canvas.drawCircle(x, y, radius, paint)
-            paint.shader = null
+        private fun drawToken(canvas: Canvas, cx: Float, cy: Float, radius: Float, baseColor: Int) {
+            fill.shader = null
+            fill.color = 0x7000183B
+            fill.setShadowLayer(dp(3f), 0f, dp(2f), 0x9900102D.toInt())
+            canvas.drawCircle(cx, cy + dp(1f), radius * 1.03f, fill)
+            fill.clearShadowLayer()
+
+            fill.shader = RadialGradient(
+                cx - radius * 0.38f,
+                cy - radius * 0.43f,
+                radius * 1.55f,
+                intArrayOf(
+                    blendWithWhite(baseColor, 0.68f),
+                    baseColor,
+                    blendWithBlack(baseColor, 0.48f),
+                ),
+                floatArrayOf(0f, 0.46f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+            canvas.drawCircle(cx, cy, radius, fill)
+            fill.shader = null
+
+            stroke.color = 0xDFFFFFFF.toInt()
+            stroke.strokeWidth = dp(1.2f)
+            canvas.drawCircle(cx, cy, radius, stroke)
+
+            shine.alpha = 200
+            canvas.drawOval(
+                RectF(
+                    cx - radius * 0.62f,
+                    cy - radius * 0.67f,
+                    cx - radius * 0.02f,
+                    cy - radius * 0.30f,
+                ),
+                shine,
+            )
+            shine.alpha = 95
+            canvas.drawCircle(
+                cx - radius * 0.48f,
+                cy - radius * 0.43f,
+                radius * 0.09f,
+                shine,
+            )
         }
+
+        private fun blendWithWhite(color: Int, amount: Float): Int =
+            Color.rgb(
+                (Color.red(color) + (255 - Color.red(color)) * amount).toInt(),
+                (Color.green(color) + (255 - Color.green(color)) * amount).toInt(),
+                (Color.blue(color) + (255 - Color.blue(color)) * amount).toInt(),
+            )
+
+        private fun blendWithBlack(color: Int, amount: Float): Int =
+            Color.rgb(
+                (Color.red(color) * (1f - amount)).toInt(),
+                (Color.green(color) * (1f - amount)).toInt(),
+                (Color.blue(color) * (1f - amount)).toInt(),
+            )
 
         private fun dp(value: Float): Float = value * resources.displayMetrics.density
     }
