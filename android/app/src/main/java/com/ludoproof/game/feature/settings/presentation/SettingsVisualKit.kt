@@ -23,6 +23,9 @@ internal fun settingsCompactPanel(
 ): LinearLayout =
     LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
+        // Let the close mark draw over the popup's own top-right border.
+        clipChildren = false
+        clipToPadding = false
         setPadding(
             settingsDp(context, 8),
             settingsDp(context, 8),
@@ -54,6 +57,8 @@ private fun settingsHeader(
     dialog: Dialog,
 ): FrameLayout =
     FrameLayout(context).apply {
+        clipChildren = false
+        clipToPadding = false
         val title =
             TextView(context).apply {
                 text = "SETTINGS"
@@ -101,41 +106,49 @@ private fun settingsHeader(
                 settingsDp(context, 40),
                 settingsDp(context, 40),
                 Gravity.END or Gravity.TOP,
-            ),
+            ).apply {
+                // settingsCompactPanel has 8dp inset; offset the 40dp touch
+                // target so the red mark's center lands on the rounded rim.
+                rightMargin = -settingsDp(context, 20)
+                topMargin = -settingsDp(context, 20)
+            },
         )
     }
 
 private class SettingsCloseButton(
     context: Context,
     onClose: () -> Unit,
-) : FrameLayout(context) {
+) : View(context) {
+    private val crossPaint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = 0xFFFF3030.toInt()
+            style = Paint.Style.STROKE
+            strokeWidth = settingsDp(context, 3f)
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+        }
+
     init {
         contentDescription = "Close settings"
         isClickable = true
         isFocusable = true
         minimumWidth = settingsDp(context, 40)
         minimumHeight = settingsDp(context, 40)
-        // Keep the close mark directly on the popup surface with no button chrome.
+        // Transparent view: only the red cross is drawn.
         background = null
         elevation = 0f
-
-        addView(
-            TextView(context).apply {
-                text = "×"
-                textSize = 30f
-                setTypeface(Typeface.DEFAULT_BOLD)
-                setTextColor(0xFFFF3030.toInt())
-                gravity = Gravity.CENTER
-                includeFontPadding = false
-                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-            },
-            FrameLayout.LayoutParams(
-                settingsDp(context, 40),
-                settingsDp(context, 40),
-                Gravity.CENTER,
-            ),
-        )
         setOnClickListener { onClose() }
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        // The view's touch area is 40dp, but the mark itself is kept close
+        // to its center so it sits on the popup's curved outer rim.
+        val cx = width / 2f
+        val cy = height / 2f
+        val arm = settingsDp(context, 6f)
+        canvas.drawLine(cx - arm, cy - arm, cx + arm, cy + arm, crossPaint)
+        canvas.drawLine(cx + arm, cy - arm, cx - arm, cy + arm, crossPaint)
     }
 }
 
