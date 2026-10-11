@@ -151,7 +151,7 @@ private class SettingsCloseButton(
         // to its center so it sits on the popup's curved outer rim.
         val cx = width / 2f
         val cy = height / 2f
-        val arm = settingsDp(context, 12f)
+        val arm = settingsDp(context, 8.4f)
         canvas.drawLine(cx - arm, cy - arm, cx + arm, cy + arm, crossPaint)
         canvas.drawLine(cx + arm, cy - arm, cx - arm, cy + arm, crossPaint)
     }
