@@ -8,6 +8,7 @@ import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.HomeActivity
+import com.ludoproof.game.LudoProofTheme
 import com.ludoproof.game.LudoPawsCharacterAvatarView
 import com.ludoproof.game.feature.characters.data.local.CharacterSelectionStore
 import com.ludoproof.game.feature.leaderboard.presentation.LeaderboardActivity
@@ -19,17 +20,37 @@ import com.ludoproof.game.feature.store.presentation.StoreActivity
 internal fun HomeActivity.profileHud(): LinearLayout =
     LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
+        gravity = Gravity.CENTER_HORIZONTAL
         setPadding(
-            dp(if (isCompact()) 2 else 4),
+            dp(if (isCompact()) 2 else 3),
             dp(2),
-            dp(if (isCompact()) 2 else 4),
-            dp(4),
+            dp(if (isCompact()) 2 else 3),
+            dp(3),
         )
+
+        val hudInsetReductionDp =
+            if (isCompact()) 6 else 8
+        val hudHorizontalPaddingDp =
+            (
+                LudoProofTheme.pageHorizontalPaddingDp(this@profileHud) -
+                    hudInsetReductionDp
+                ).coerceAtLeast(6)
+        val availableHudWidthPx =
+            minOf(
+                resources.displayMetrics.widthPixels -
+                    dp(hudHorizontalPaddingDp * 2),
+                dp(
+                    LudoProofTheme.pageMaxContentWidthDp(this@profileHud) +
+                        hudInsetReductionDp * 2,
+                ),
+            )
+        val reducedHudWidthPx =
+            (availableHudWidthPx * 0.75f).toInt()
 
         addView(
             homeIdentityRow(),
             LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
+                reducedHudWidthPx,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
             ),
         )
@@ -37,10 +58,10 @@ internal fun HomeActivity.profileHud(): LinearLayout =
         addView(
             homeShortcutRow(),
             LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
+                reducedHudWidthPx,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
             ).apply {
-                topMargin = dp(if (isCompact()) 8 else 10)
+                topMargin = dp(if (isCompact()) 6 else 8)
             },
         )
 
@@ -58,13 +79,13 @@ private fun HomeActivity.homeIdentityRow(): LinearLayout =
     LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
-        minimumHeight = dp(if (isCompact()) 48 else 52)
+        minimumHeight = dp(if (isCompact()) 36 else 39)
 
         addView(
             homeCurrencyPill(),
             LinearLayout.LayoutParams(
-                dp(if (isCompact()) 128 else 142),
-                dp(if (isCompact()) 46 else 50),
+                dp(if (isCompact()) 96 else 107),
+                dp(if (isCompact()) 35 else 38),
             ),
         )
 
@@ -98,12 +119,12 @@ private fun HomeActivity.homeCurrencyPill(): LinearLayout =
                 context = this@homeCurrencyPill,
                 shape = HomeGlassShape.PILL,
             )
-        elevation = dp(7).toFloat()
+        elevation = dp(5).toFloat()
         setPadding(
-            dp(5),
             dp(4),
-            dp(4),
-            dp(4),
+            dp(3),
+            dp(3),
+            dp(3),
         )
         setOnClickListener {
             startActivity(
@@ -121,7 +142,7 @@ private fun HomeActivity.homeCurrencyPill(): LinearLayout =
                     View.IMPORTANT_FOR_ACCESSIBILITY_NO
             },
             LinearLayout.LayoutParams(
-                dp(if (isCompact()) 34 else 38),
+                dp(if (isCompact()) 26 else 29),
                 LinearLayout.LayoutParams.MATCH_PARENT,
             ),
         )
@@ -133,7 +154,7 @@ private fun HomeActivity.homeCurrencyPill(): LinearLayout =
                     GemWalletStore(this@homeCurrencyPill)
                         .balance()
                         .toString()
-                textSize = if (isCompact()) 18f else 20f
+                textSize = if (isCompact()) 14f else 15f
                 setTypeface(Typeface.DEFAULT_BOLD)
                 setTextColor(Color.WHITE)
                 gravity = Gravity.CENTER
@@ -159,10 +180,10 @@ private fun HomeActivity.homeCurrencyPill(): LinearLayout =
                 isFocusable = true
                 contentDescription = "Add currency"
                 setPadding(
-                    dp(8),
-                    dp(8),
-                    dp(8),
-                    dp(8),
+                    dp(4),
+                    dp(4),
+                    dp(4),
+                    dp(4),
                 )
                 background =
                     homeGlassBackground(
@@ -180,8 +201,8 @@ private fun HomeActivity.homeCurrencyPill(): LinearLayout =
                 }
             },
             LinearLayout.LayoutParams(
-                dp(if (isCompact()) 34 else 38),
-                dp(if (isCompact()) 34 else 38),
+                dp(if (isCompact()) 26 else 29),
+                dp(if (isCompact()) 26 else 29),
             ),
         )
     }
@@ -201,10 +222,10 @@ private fun HomeActivity.homeProfilePill(): LinearLayout =
         elevation = dp(7).toFloat()
 
         setPadding(
-            dp(10),
-            dp(4),
-            dp(4),
-            dp(4),
+            dp(8),
+            dp(3),
+            dp(3),
+            dp(3),
         )
 
         setOnClickListener {
@@ -220,7 +241,7 @@ private fun HomeActivity.homeProfilePill(): LinearLayout =
             TextView(this@homeProfilePill).apply {
                 homeProfileNameText = this
                 text = homeDisplayName()
-                textSize = if (isCompact()) 14f else 16f
+                textSize = if (isCompact()) 11f else 12f
                 setTypeface(Typeface.DEFAULT_BOLD)
                 setTextColor(Color.WHITE)
                 gravity = Gravity.CENTER_VERTICAL
@@ -234,7 +255,7 @@ private fun HomeActivity.homeProfilePill(): LinearLayout =
                 setPadding(
                     0,
                     0,
-                    dp(7),
+                    dp(5),
                     0,
                 )
             },
@@ -271,8 +292,8 @@ private fun HomeActivity.homeProfilePill(): LinearLayout =
                     View.IMPORTANT_FOR_ACCESSIBILITY_NO
             },
             LinearLayout.LayoutParams(
-                dp(if (isCompact()) 38 else 42),
-                dp(if (isCompact()) 38 else 42),
+                dp(if (isCompact()) 29 else 32),
+                dp(if (isCompact()) 29 else 32),
             ),
         )
     }
@@ -309,11 +330,11 @@ private fun HomeActivity.homeShortcutRow(): LinearLayout =
                 homeShortcut(item),
                 LinearLayout.LayoutParams(
                     0,
-                    dp(if (isCompact()) 84 else 92),
+                    dp(if (isCompact()) 63 else 69),
                     1f,
                 ).apply {
-                    leftMargin = dp(2)
-                    rightMargin = dp(2)
+                    leftMargin = dp(1)
+                    rightMargin = dp(1)
                 },
             )
         }
@@ -336,12 +357,12 @@ private fun HomeActivity.homeShortcut(
                 context = this@homeShortcut,
                 shape = HomeGlassShape.TILE,
             )
-        elevation = dp(7).toFloat()
+        elevation = dp(5).toFloat()
         setPadding(
-            dp(3),
-            dp(if (isCompact()) 5 else 6),
-            dp(3),
-            dp(5),
+            dp(2),
+            dp(if (isCompact()) 4 else 5),
+            dp(2),
+            dp(4),
         )
         if (item.enabled) {
             setOnClickListener {
@@ -375,8 +396,8 @@ private fun HomeActivity.homeShortcut(
                     View.IMPORTANT_FOR_ACCESSIBILITY_NO
             },
             LinearLayout.LayoutParams(
-                dp(if (isCompact()) 48 else 54),
-                dp(if (isCompact()) 48 else 54),
+                dp(if (isCompact()) 36 else 41),
+                dp(if (isCompact()) 36 else 41),
             ),
         )
 
@@ -385,10 +406,10 @@ private fun HomeActivity.homeShortcut(
                 text = item.label
                 textSize =
                     when {
-                        isCompact() && item.label.length > 10 -> 8.5f
-                        isCompact() -> 10f
-                        item.label.length > 10 -> 9.5f
-                        else -> 11f
+                        isCompact() && item.label.length > 10 -> 8f
+                        isCompact() -> 8.5f
+                        item.label.length > 10 -> 8f
+                        else -> 9f
                     }
                 setTypeface(Typeface.DEFAULT_BOLD)
                 setTextColor(Color.WHITE)
