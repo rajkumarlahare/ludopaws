@@ -8,7 +8,6 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.drawable.Drawable
 import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
@@ -365,22 +364,13 @@ internal fun MainActivity.onlineLobbyPanel():
                     FrameLayout(
                         this@onlineLobbyPanel,
                     ).apply {
+                        // Reuse the carved plywood pocket instead of the old blue avatar plate.
                         background =
-                            GradientDrawable(
-                                GradientDrawable.Orientation.TOP_BOTTOM,
-                                intArrayOf(
-                                    0xFF168EEA.toInt(),
-                                    0xFF083D91.toInt(),
-                                ),
-                            ).apply {
-                                cornerRadius =
-                                    dp(12)
-                                        .toFloat()
-                                setStroke(
-                                    dp(2),
-                                    0xFF5BE0FF.toInt(),
-                                )
-                            }
+                            recessedPlywoodBackground(
+                                context = this@onlineLobbyPanel,
+                                outerCornerRadiusDp = 14f,
+                            )
+                        setPadding(dp(3), dp(3), dp(3), dp(3))
                         addView(
                             LudoPawsCharacterAvatarView(
                                 this@onlineLobbyPanel,
@@ -390,8 +380,7 @@ internal fun MainActivity.onlineLobbyPanel():
                                         CharacterSelectionStore(
                                             this@onlineLobbyPanel,
                                         ).load().characterId,
-                                    ringColor = 0xFFFFD34A.toInt(),
-                                    highlighted = true,
+                                    showCircularChrome = false,
                                 )
                             },
                             FrameLayout.LayoutParams(
