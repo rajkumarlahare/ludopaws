@@ -11,7 +11,7 @@ import android.widget.TextView
 import android.os.Build
 import android.view.WindowInsets
 import com.ludoproof.game.*
-import com.ludoproof.game.core.ui.art.recessedPlywoodBackground
+import com.ludoproof.game.core.ui.art.plywoodBackground
 import com.ludoproof.game.feature.offline.*
 import com.ludoproof.game.ui.offline.common.*
 import com.ludoproof.game.ui.offline.gameplay.*
@@ -113,9 +113,9 @@ internal fun OfflineGameActivity.showSetup() {
                 dp(8),
                 dp(if (isCompactSetup()) 8 else 10),
             )
-            background = recessedPlywoodBackground(
+            background = plywoodBackground(
                 context = this@showSetup,
-                outerCornerRadiusDp = 24f,
+                cornerRadiusDp = 24f,
             )
         }
         combinedSelectionPanel.addView(
