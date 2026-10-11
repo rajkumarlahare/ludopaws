@@ -25,24 +25,6 @@ internal fun ProfileActivity.profileModeStatsPanel(
                     profile.classic,
             ),
         )
-        addView(
-            modeRow(
-                symbol = "⚡",
-                label = "Rush",
-                stats =
-                    profile.rush,
-            ),
-            rowSpacing(),
-        )
-        addView(
-            modeRow(
-                symbol = "↟",
-                label = "Snake & Ladder",
-                stats =
-                    profile.snakeLadder,
-            ),
-            rowSpacing(),
-        )
     }
 
 private fun ProfileActivity.modeRow(
@@ -225,12 +207,3 @@ private fun ProfileActivity.modeRow(
         )
     }
 
-private fun ProfileActivity.rowSpacing():
-    LinearLayout.LayoutParams =
-    LinearLayout.LayoutParams(
-        LinearLayout.LayoutParams.MATCH_PARENT,
-        LinearLayout.LayoutParams.WRAP_CONTENT,
-    ).apply {
-        topMargin =
-            dp(14)
-    }
