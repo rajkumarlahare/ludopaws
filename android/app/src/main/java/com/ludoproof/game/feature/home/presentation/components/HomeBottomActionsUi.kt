@@ -116,7 +116,12 @@ private fun HomeActivity.bottomActionButton(
                 dp(if (isCompact()) 31 else 36),
                 dp(if (isCompact()) 31 else 36),
             ).apply {
-                marginEnd = dp(if (isCompact()) 3 else 5)
+                marginEnd =
+                    when (iconKind) {
+                        HomeIconKind.SHARE -> dp(0)
+                        HomeIconKind.RATING -> dp(if (isCompact()) 3 else 5)
+                        else -> dp(if (isCompact()) 3 else 5)
+                    }
             },
         )
 
@@ -195,8 +200,12 @@ private fun HomeActivity.bottomActionButton(
                     }
                 }
             }.apply {
-                if (iconKind == HomeIconKind.RATING) {
-                    translationX = -dp(if (isCompact()) 2 else 3).toFloat()
+                when (iconKind) {
+                    HomeIconKind.RATING ->
+                        translationX = -dp(if (isCompact()) 2 else 3).toFloat()
+                    HomeIconKind.SHARE ->
+                        translationX = -dp(if (isCompact()) 4 else 5).toFloat()
+                    else -> Unit
                 }
             },
             LinearLayout.LayoutParams(
