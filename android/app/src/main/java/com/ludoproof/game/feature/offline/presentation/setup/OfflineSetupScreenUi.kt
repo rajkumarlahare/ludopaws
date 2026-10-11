@@ -64,9 +64,9 @@ internal fun OfflineGameActivity.showSetup() {
             // setup gets one shared recessed surface around Paw + player selection.
             setPadding(
                 0,
-                dp(if (isCompactSetup()) 10 else 12),
+                if (isComputerMode) 0 else dp(if (isCompactSetup()) 10 else 12),
                 0,
-                dp(24),
+                if (isComputerMode) 0 else dp(24),
             )
         }
     contentHost.addView(
@@ -97,7 +97,7 @@ internal fun OfflineGameActivity.showSetup() {
     if (isComputerMode) {
         // Match Online: Back/Settings are fixed to the screen, not the centered
         // scrolling setup. Keep the title centered on the full device width.
-        fixedTitleBar = FrameLayout(this).apply {
+        val titleBar = FrameLayout(this).apply {
             clipChildren = false
             clipToPadding = false
             addView(
@@ -109,8 +109,9 @@ internal fun OfflineGameActivity.showSetup() {
                 ),
             )
         }
+        fixedTitleBar = titleBar
         host.addView(
-            fixedTitleBar,
+            titleBar,
             FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 dp(52),
@@ -246,9 +247,9 @@ internal fun OfflineGameActivity.showSetup() {
         val safeTopInset = maxOf(cutoutTop, statusTop)
         content.setPadding(
             content.paddingLeft,
-            dp(if (isCompactSetup()) 10 else 12) + safeTopInset,
+            if (isComputerMode) 0 else dp(if (isCompactSetup()) 10 else 12) + safeTopInset,
             content.paddingRight,
-            content.paddingBottom,
+            if (isComputerMode) 0 else content.paddingBottom,
         )
         fixedTopActionsBar?.translationY = safeTopInset.toFloat()
         fixedTitleBar?.translationY = safeTopInset.toFloat()
