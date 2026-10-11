@@ -76,6 +76,12 @@ private class HomeGlassChromeDrawable(
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = 0x26000000
         }
+    private val focusedPaint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = dp(2.8f)
+            color = 0xFFFFD45E.toInt()
+        }
 
     private val outerRect = RectF()
     private val innerRect = RectF()
@@ -83,6 +89,7 @@ private class HomeGlassChromeDrawable(
 
     private var radius = 0f
     private var pressed = false
+    private var focused = false
     private var drawableAlpha = 255
 
     override fun onBoundsChange(bounds: android.graphics.Rect) {
@@ -177,6 +184,7 @@ private class HomeGlassChromeDrawable(
         glossPaint.alpha = (0xA8 * alphaScale).toInt()
         bottomShadePaint.alpha = drawableAlpha
         pressedPaint.alpha = if (pressed) (0x26 * alphaScale).toInt() else 0
+        focusedPaint.alpha = if (focused) drawableAlpha else 0
 
         canvas.drawRoundRect(
             outerRect,
@@ -229,16 +237,25 @@ private class HomeGlassChromeDrawable(
             (radius - dp(2f)).coerceAtLeast(0f),
             innerRimPaint,
         )
+        if (focused) {
+            canvas.drawRoundRect(
+                outerRect,
+                radius,
+                radius,
+                focusedPaint,
+            )
+        }
     }
 
     override fun isStateful(): Boolean = true
 
     override fun onStateChange(stateSet: IntArray): Boolean {
-        val nextPressed =
-            stateSet.contains(android.R.attr.state_pressed)
-        if (nextPressed == pressed) return false
+        val nextPressed = stateSet.contains(android.R.attr.state_pressed)
+        val nextFocused = stateSet.contains(android.R.attr.state_focused)
+        if (nextPressed == pressed && nextFocused == focused) return false
 
         pressed = nextPressed
+        focused = nextFocused
         invalidateSelf()
         return true
     }
@@ -253,6 +270,7 @@ private class HomeGlassChromeDrawable(
         glowPaint.colorFilter = colorFilter
         borderPaint.colorFilter = colorFilter
         innerRimPaint.colorFilter = colorFilter
+        focusedPaint.colorFilter = colorFilter
         glossPaint.colorFilter = colorFilter
         bottomShadePaint.colorFilter = colorFilter
         invalidateSelf()
