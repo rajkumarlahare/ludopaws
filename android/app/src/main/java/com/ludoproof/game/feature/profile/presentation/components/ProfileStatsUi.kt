@@ -9,6 +9,8 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.LudoProofTheme
+import com.ludoproof.game.core.ui.art.blueIconBackground
+import com.ludoproof.game.core.ui.art.transparentDarkBlueStrokeBackground
 import com.ludoproof.game.feature.profile.domain.model.ProfileModeStats
 import com.ludoproof.game.feature.profile.domain.model.ProfileSnapshot
 import com.ludoproof.game.feature.profile.presentation.ProfileActivity
@@ -49,13 +51,7 @@ private fun ProfileActivity.classicRow(stats: ProfileModeStats): LinearLayout =
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
         setPadding(dp(10), dp(10), dp(10), dp(10))
-        background = LudoProofTheme.rounded(
-            0x33104483,
-            18f,
-            0xFF247FCB.toInt(),
-            1f,
-            this@classicRow,
-        )
+        background = transparentDarkBlueStrokeBackground(this@classicRow)
 
         addView(
             TextView(this@classicRow).apply {
@@ -64,12 +60,10 @@ private fun ProfileActivity.classicRow(stats: ProfileModeStats): LinearLayout =
                 setTypeface(Typeface.DEFAULT_BOLD)
                 setTextColor(Color.WHITE)
                 gravity = Gravity.CENTER
-                background = LudoProofTheme.rounded(
-                    0xE20A347A.toInt(),
-                    999f,
-                    0xFF217BD0.toInt(),
-                    1f,
-                    this@classicRow,
+                background = blueIconBackground(
+                    context = this@classicRow,
+                    fillColor = 0xE20A347A.toInt(),
+                    strokeColor = 0xFF217BD0.toInt(),
                 )
                 contentDescription = "Classic"
             },
