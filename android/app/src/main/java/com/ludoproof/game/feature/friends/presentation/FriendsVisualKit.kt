@@ -13,6 +13,9 @@ import android.view.View
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.ludoproof.game.core.ui.art.plywoodBackground
+import com.ludoproof.game.core.ui.art.recessedPlywoodBackground
+import com.ludoproof.game.core.ui.art.transparentDarkBlueStrokeBackground
 import com.ludoproof.game.core.ui.components.AppFocusRing
 import com.ludoproof.game.core.ui.icons.AppIconName
 import com.ludoproof.game.core.ui.icons.AppIconVariant
@@ -58,6 +61,7 @@ internal object FriendsVisualKit {
     fun dp(context: Context, value: Int): Int =
         (value * context.resources.displayMetrics.density).toInt()
 
+    @Suppress("UNUSED_PARAMETER")
     fun card(
         context: Context,
         accent: Int = CYAN,
@@ -72,59 +76,37 @@ internal object FriendsVisualKit {
                 dp(context, paddingDp),
                 dp(context, paddingDp),
             )
-            background = gradient(
+            background = plywoodBackground(
                 context = context,
-                top = 0xF12678D5.toInt(),
-                bottom = 0xF0062D70.toInt(),
-                stroke = accent,
-                strokeDp = 2,
-                radiusDp = radiusDp,
+                cornerRadiusDp = radiusDp.toFloat(),
             )
             clipChildren = false
             clipToPadding = false
             elevation = dp(context, 8).toFloat()
         }
 
+    @Suppress("UNUSED_PARAMETER")
     fun compactCard(
         context: Context,
         accent: Int = CYAN,
     ): LinearLayout =
-        card(
-            context = context,
-            accent = accent,
-            radiusDp = 18,
-            paddingDp = 12,
-        )
+        LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(context, 12), dp(context, 12), dp(context, 12), dp(context, 12))
+            background = recessedPlywoodBackground(context, outerCornerRadiusDp = 18f)
+            clipChildren = false
+            clipToPadding = false
+            elevation = dp(context, 8).toFloat()
+        }
 
-    fun rowSurface(context: Context): GradientDrawable =
-        gradient(
-            context = context,
-            top = 0xF51A62B5.toInt(),
-            bottom = 0xF2083477.toInt(),
-            stroke = 0xAA69DFFF.toInt(),
-            strokeDp = 1,
-            radiusDp = 15,
-        )
+    fun rowSurface(context: Context): android.graphics.drawable.Drawable =
+        transparentDarkBlueStrokeBackground(context, cornerRadiusDp = 15f)
 
     fun inputSurface(context: Context): GradientDrawable =
-        gradient(
-            context = context,
-            top = 0xFF0A2C66.toInt(),
-            bottom = 0xFF061F4E.toInt(),
-            stroke = 0xFF3C9CFF.toInt(),
-            strokeDp = 2,
-            radiusDp = 15,
-        )
+        transparentDarkBlueStrokeBackground(context, cornerRadiusDp = 15f)
 
     fun friendIdSurface(context: Context): GradientDrawable =
-        gradient(
-            context = context,
-            top = 0xFF182B7E.toInt(),
-            bottom = 0xFF101F68.toInt(),
-            stroke = 0xFF6A63FF.toInt(),
-            strokeDp = 2,
-            radiusDp = 14,
-        )
+        transparentDarkBlueStrokeBackground(context, cornerRadiusDp = 14f)
 
     fun title(
         context: Context,

@@ -28,6 +28,7 @@ import com.ludoproof.game.GameApiException
 import com.ludoproof.game.GameMode
 import com.ludoproof.game.GameModeIntent
 import com.ludoproof.game.LudoProofTheme
+import com.ludoproof.game.core.ui.art.plywoodBackground
 import com.ludoproof.game.core.ui.components.AppFocusRing
 import com.ludoproof.game.MainActivity
 import com.ludoproof.game.PendingOperationStore
@@ -143,7 +144,11 @@ class FriendsActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             clipChildren = false
             clipToPadding = false
-            setPadding(0, dp(12), 0, dp(42))
+            setPadding(dp(8), dp(12), dp(8), dp(42))
+            background = plywoodBackground(
+                context = this@FriendsActivity,
+                cornerRadiusDp = 24f,
+            )
         }
         contentHost.addView(
             content,
@@ -194,7 +199,12 @@ class FriendsActivity : Activity() {
                 context = this,
                 onBack = { finish() },
                 onSettings = { ArcadeDialogs.showSettings(this) },
-            )
+            ).apply {
+                for (index in 0 until childCount) {
+                    getChildAt(index).background =
+                        plywoodBackground(context = this@FriendsActivity, cornerRadiusDp = 999f)
+                }
+            }
         setContentView(root)
         root.setOnApplyWindowInsetsListener { _, insets ->
             val cutoutTop =
