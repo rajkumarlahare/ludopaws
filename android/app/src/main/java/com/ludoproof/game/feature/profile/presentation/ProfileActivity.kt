@@ -1,6 +1,8 @@
 package com.ludoproof.game.feature.profile.presentation
 
 import android.app.Activity
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.Gravity
@@ -35,6 +37,38 @@ class ProfileActivity : Activity() {
 
     internal val profileStore by lazy {
         ProfileStore(this)
+    }
+
+    internal val profilePhotoUri: String?
+        get() = getSharedPreferences(PHOTO_PREFS, MODE_PRIVATE)
+            .getString(KEY_PROFILE_PHOTO_URI, null)
+
+    internal fun chooseProfilePhoto() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "image/*"
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+        }
+        startActivityForResult(intent, REQUEST_PROFILE_PHOTO)
+    }
+
+    @Deprecated("Uses the platform activity result contract for compatibility with the existing Activity.")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != REQUEST_PROFILE_PHOTO || resultCode != RESULT_OK) return
+        val uri = data?.data ?: return
+        runCatching {
+            contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION,
+            )
+        }
+        getSharedPreferences(PHOTO_PREFS, MODE_PRIVATE)
+            .edit()
+            .putString(KEY_PROFILE_PHOTO_URI, uri.toString())
+            .apply()
+        renderProfile()
     }
 
     override fun onCreate(
@@ -297,6 +331,12 @@ class ProfileActivity : Activity() {
                     playGamesDisplayName =
                         task.result.displayName
                             ?.takeIf(String::isNotBlank)
+                    playGamesDisplayName?.let { googleName ->
+                        val savedName = profileStore.snapshot().displayName
+                        if (savedName.isBlank() || savedName == "Guest User") {
+                            profileStore.updateDisplayName(googleName)
+                        }
+                    }
                     playGamesStatus =
                         playGamesDisplayName?.let {
                             getString(R.string.profile_play_games_signed_in_as, it)
@@ -331,5 +371,8 @@ class ProfileActivity : Activity() {
 
     private companion object {
         const val TAG = "ProfilePlayGames"
+        const val REQUEST_PROFILE_PHOTO = 7412
+        const val PHOTO_PREFS = "ludoproof_profile_photo"
+        const val KEY_PROFILE_PHOTO_URI = "profile_photo_uri"
     }
 }
