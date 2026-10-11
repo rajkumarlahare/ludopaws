@@ -3,6 +3,7 @@ package com.ludoproof.game
 import android.content.Context
 import android.text.InputType
 import android.view.View
+import androidx.test.annotation.UiThreadTest
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.ludoproof.game.core.ui.components.AppActionIconButton
@@ -31,6 +32,7 @@ class AppUiComponentsInstrumentedTest {
         get() = LudoProofTheme.dp(context, AppUiTokens.Icon.MIN_TOUCH_TARGET_DP)
 
     @Test
+    @UiThreadTest
     fun buttonUsesThemeAndHonorsEnabledAndClickContracts() {
         var clickCount = 0
         val button = AppButton.create(
