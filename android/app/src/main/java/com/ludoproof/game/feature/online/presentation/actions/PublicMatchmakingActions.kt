@@ -30,6 +30,29 @@ internal fun MainActivity.selectPublicPlayerCount(
     selectedPublicPlayerCount =
         playerCount
     updatePublicPlayerCountButtons()
+
+    // A short press-and-return animation gives immediate feedback on selection.
+    val tappedButton =
+        if (playerCount == 2) {
+            twoPlayerButton
+        } else {
+            fourPlayerButton
+        }
+    tappedButton.animate().cancel()
+    tappedButton.scaleX = 1f
+    tappedButton.scaleY = 1f
+    tappedButton.animate()
+        .scaleX(0.965f)
+        .scaleY(0.965f)
+        .setDuration(75L)
+        .withEndAction {
+            tappedButton.animate()
+                .scaleX(1f)
+                .scaleY(1f)
+                .setDuration(135L)
+                .start()
+        }
+        .start()
 }
 
 internal fun MainActivity.beginPublicMatchmaking() {
