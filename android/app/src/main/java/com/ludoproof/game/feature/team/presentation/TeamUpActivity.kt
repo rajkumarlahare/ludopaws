@@ -6,6 +6,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RadialGradient
 import android.graphics.RectF
 import android.graphics.Shader
@@ -19,6 +20,7 @@ import android.text.Spannable
 import android.text.SpannableString
 import android.text.TextPaint
 import android.text.style.CharacterStyle
+import android.text.style.ReplacementSpan
 import android.view.Gravity
 import android.view.View
 import android.view.WindowInsets
@@ -305,7 +307,7 @@ class TeamUpActivity : Activity() {
             )
             addView(
                 TextView(this@TeamUpActivity).apply {
-                    text = SpannableString("RED + YELLOW   VS   GREEN + BLUE").apply {
+                    text = SpannableString("RED + YELLOW   ⚡   GREEN + BLUE").apply {
                         fun styleColorWord(
                             word: String,
                             textColor: Int,
@@ -327,6 +329,70 @@ class TeamUpActivity : Activity() {
                                 },
                                 start,
                                 start + word.length,
+                                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
+                            )
+                        }
+
+                        val boltStart = indexOf("⚡")
+                        if (boltStart >= 0) {
+                            setSpan(
+                                object : ReplacementSpan() {
+                                    private val density = this@TeamUpActivity.resources.displayMetrics.density
+                                    private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                                        color = Color.WHITE
+                                        style = Paint.Style.STROKE
+                                        strokeCap = Paint.Cap.ROUND
+                                        strokeJoin = Paint.Join.ROUND
+                                        strokeWidth = 3.2f * density
+                                        alpha = 115
+                                        setShadowLayer(5f * density, 0f, 0f, Color.WHITE)
+                                    }
+                                    private val boltPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                                        color = Color.WHITE
+                                        style = Paint.Style.FILL
+                                    }
+
+                                    override fun getSize(
+                                        paint: Paint,
+                                        text: CharSequence,
+                                        start: Int,
+                                        end: Int,
+                                        fm: Paint.FontMetricsInt?,
+                                    ): Int = maxOf(
+                                        (paint.textSize * 0.9f).toInt(),
+                                        (15f * density).toInt(),
+                                    )
+
+                                    override fun draw(
+                                        canvas: Canvas,
+                                        text: CharSequence,
+                                        start: Int,
+                                        end: Int,
+                                        x: Float,
+                                        top: Int,
+                                        y: Int,
+                                        bottom: Int,
+                                        paint: Paint,
+                                    ) {
+                                        val width = getSize(paint, text, start, end, null).toFloat()
+                                        val height = maxOf(paint.textSize * 1.35f, 20f * density)
+                                        val cx = x + width / 2f
+                                        val cy = (top + bottom) / 2f
+                                        val bolt = Path().apply {
+                                            moveTo(cx + width * 0.10f, cy - height * 0.58f)
+                                            lineTo(cx - width * 0.35f, cy + height * 0.02f)
+                                            lineTo(cx - width * 0.02f, cy + height * 0.02f)
+                                            lineTo(cx - width * 0.16f, cy + height * 0.58f)
+                                            lineTo(cx + width * 0.36f, cy - height * 0.14f)
+                                            lineTo(cx + width * 0.05f, cy - height * 0.14f)
+                                            close()
+                                        }
+                                        canvas.drawPath(bolt, glowPaint)
+                                        canvas.drawPath(bolt, boltPaint)
+                                    }
+                                },
+                                boltStart,
+                                boltStart + 1,
                                 Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
                             )
                         }
