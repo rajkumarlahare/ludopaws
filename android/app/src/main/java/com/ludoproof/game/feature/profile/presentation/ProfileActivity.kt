@@ -2,7 +2,6 @@ package com.ludoproof.game.feature.profile.presentation
 
 import android.app.Activity
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.Gravity
