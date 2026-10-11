@@ -22,10 +22,6 @@ import com.ludoproof.game.feature.profile.presentation.ProfileActivity
 
 internal fun ProfileActivity.profilePurchasesPanel(profile: ProfileSnapshot): LinearLayout =
     profilePanel().apply {
-        // Test the reference's realistic plywood look on this section only.
-        // Other Profile panels continue using the standard blue profilePanel background.
-        background = PlywoodTextureDrawable(resources.displayMetrics.density)
-
         val heading = LinearLayout(this@profilePurchasesPanel).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -120,11 +116,11 @@ internal fun ProfileActivity.profilePurchasesPanel(profile: ProfileSnapshot): Li
     }
 
 /**
- * Code-drawn plywood texture for the Purchased Products panel test.
- * Vertical boards, subtle grain, seams and knots are painted at runtime:
+ * Reusable code-drawn plywood texture for Profile panels.
+ * Grain, knots, shading and the continuous 3D timber rim are painted at runtime;
  * no bitmap/image asset is used.
  */
-private class PlywoodTextureDrawable(
+internal class PlywoodTextureDrawable(
     private val density: Float,
 ) : Drawable() {
     // Multiplying RGB by ~0.7 keeps the wood finish about 10 percentage points
