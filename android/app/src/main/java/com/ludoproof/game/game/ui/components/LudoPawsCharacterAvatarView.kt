@@ -45,6 +45,7 @@ class LudoPawsCharacterAvatarView @JvmOverloads constructor(
     private var ringColor: Int =
         0xFF5BE0FF.toInt()
     private var highlighted: Boolean = false
+    private var showCircularChrome: Boolean = true
     private var modelTeamColor: String = LudoPawsTeamColor.BLUE.wireName
     private var requestedPortraitKey: String? = null
     private var portraitBitmap: Bitmap? = null
@@ -54,6 +55,7 @@ class LudoPawsCharacterAvatarView @JvmOverloads constructor(
         ringColor: Int = 0xFF5BE0FF.toInt(),
         highlighted: Boolean = false,
         modelTeamColor: String? = null,
+        showCircularChrome: Boolean = true,
     ) {
         this.characterId =
             LudoPawsCharacterCatalog
@@ -61,6 +63,7 @@ class LudoPawsCharacterAvatarView @JvmOverloads constructor(
                 ?: LudoPawsCharacterCatalog.DEFAULT_CHARACTER_ID
         this.ringColor = ringColor
         this.highlighted = highlighted
+        this.showCircularChrome = showCircularChrome
         this.modelTeamColor =
             LudoPawsTeamIdentityPolicy
                 .resolve(modelTeamColor)
@@ -125,15 +128,17 @@ class LudoPawsCharacterAvatarView @JvmOverloads constructor(
         )
         canvas.scale(scale, scale)
 
-        fill.color = 0x22000000
-        canvas.drawCircle(50f, 53f, 44f, fill)
+        if (showCircularChrome) {
+            fill.color = 0x22000000
+            canvas.drawCircle(50f, 53f, 44f, fill)
 
-        fill.color = 0xFFF8FBFF.toInt()
-        canvas.drawCircle(50f, 49f, 43f, fill)
+            fill.color = 0xFFF8FBFF.toInt()
+            canvas.drawCircle(50f, 49f, 43f, fill)
 
-        stroke.color = ringColor
-        stroke.strokeWidth = if (highlighted) 6f else 4f
-        canvas.drawCircle(50f, 49f, 43f, stroke)
+            stroke.color = ringColor
+            stroke.strokeWidth = if (highlighted) 6f else 4f
+            canvas.drawCircle(50f, 49f, 43f, stroke)
+        }
 
         val portrait = portraitBitmap
         if (portrait != null && !portrait.isRecycled) {
