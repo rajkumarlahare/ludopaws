@@ -1,5 +1,6 @@
 package com.ludoproof.game.ui.offline.gameplay
 
+import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
@@ -9,6 +10,7 @@ import com.ludoproof.game.*
 import com.ludoproof.game.feature.offline.*
 import com.ludoproof.game.feature.offline.presentation.feedback.OfflineFeedbackAction
 import com.ludoproof.game.feature.offline.presentation.feedback.OfflineLudoPawsFeedbackDispatcher
+import com.ludoproof.game.ui.game.GameTopActionsStyle
 import com.ludoproof.game.ui.game.addGameTopActions
 import com.ludoproof.game.ui.dialogs.showSettingsDialog
 import com.ludoproof.game.ui.offline.common.*
@@ -187,6 +189,7 @@ internal fun OfflineGameActivity.showGame(snapshot: MatchSnapshot?) {
     addGameTopActions(
         host = host,
         context = this,
+        style = GameTopActionsStyle.OFFLINE_GAMEPLAY,
         onBack = { requestOfflineExit() },
         onSettings = {
             showSettingsDialog(
@@ -256,12 +259,7 @@ internal fun OfflineGameActivity.gameplayHud(): LinearLayout =
             dp(if (isCompactSetup()) 10 else 14),
             dp(if (isCompactSetup()) 5 else 7),
         )
-        background =
-            LudoProofTheme
-                .hudPanelDrawable(
-                    this@gameplayHud,
-                    goldBorder = false,
-                )
+        background = offlineGameplayHudBackground()
         elevation = dp(3).toFloat()
 
         turnText =
@@ -354,5 +352,18 @@ internal fun OfflineGameActivity.offlineResultPanel(): FrameLayout =
                 leftMargin = dp(18)
                 rightMargin = dp(18)
             },
+        )
+    }
+
+
+/** Low-gloss HUD surface tuned for the Pass & Play and Computer game viewport. */
+private fun OfflineGameActivity.offlineGameplayHudBackground(): GradientDrawable =
+    GradientDrawable().apply {
+        shape = GradientDrawable.RECTANGLE
+        setColor(0xE50C1A28.toInt())
+        cornerRadius = dp(if (isCompactSetup()) 14 else 16).toFloat()
+        setStroke(
+            dp(1),
+            if (isComputerMode) 0xCCFFD45E.toInt() else 0xAA58DFF0.toInt(),
         )
     }
