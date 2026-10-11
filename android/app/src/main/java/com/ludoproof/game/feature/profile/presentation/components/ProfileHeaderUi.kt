@@ -12,6 +12,8 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.LudoProofTheme
+import com.ludoproof.game.core.ui.art.PlywoodTextureDrawable
+import com.ludoproof.game.core.ui.art.transparentDarkBlueStrokeBackground
 import com.ludoproof.game.LudoPawsCharacterAvatarView
 import com.ludoproof.game.core.ui.components.AppFocusRing
 import com.ludoproof.game.core.ui.components.appIconActionButton
@@ -354,13 +356,7 @@ internal fun ProfileActivity.profileIdentityPanel(profile: ProfileSnapshot): Lin
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
             setPadding(dp(2), dp(7), dp(2), dp(7))
-            background = LudoProofTheme.rounded(
-                0x33104483,
-                18f,
-                0xFF247FCB.toInt(),
-                1f,
-                this@profileIdentityPanel,
-            )
+            background = transparentDarkBlueStrokeBackground(this@profileIdentityPanel)
         }
         statsStrip.addView(
             statCell("🎮", profile.totalGames.toString(), "Games"),
