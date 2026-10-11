@@ -1,12 +1,13 @@
 package com.ludoproof.game.ui.game
 
-import android.graphics.Canvas
-import android.graphics.Paint
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
 import android.widget.FrameLayout
 import com.ludoproof.game.LudoProofTheme
+import com.ludoproof.game.core.ui.icons.AppIconName
+import com.ludoproof.game.core.ui.icons.AppIconView
+import com.ludoproof.game.core.ui.theme.AppUiTokens
 import com.ludoproof.game.ui.home.HomeGlassShape
 import com.ludoproof.game.ui.home.homeGlassBackground
 import com.ludoproof.game.ui.home.HomeIconKind
@@ -36,7 +37,13 @@ internal fun addGameTopActions(
         gameTopButton(
             context = context,
             contentDescription = "Back",
-            icon = GameChevronIconView(context),
+            icon =
+                AppIconView(
+                    context = context,
+                    iconName = AppIconName.CHEVRON_LEFT,
+                    iconTint = android.graphics.Color.WHITE,
+                    strokeWidthDp = AppUiTokens.Icon.EMPHASIS_STROKE_DP,
+                ),
             onClick = onBack,
         ),
         FrameLayout.LayoutParams(
@@ -103,33 +110,10 @@ private fun gameTopButton(
         addView(
             icon,
             FrameLayout.LayoutParams(
-                LudoProofTheme.dp(context, 34),
-                LudoProofTheme.dp(context, 34),
+                LudoProofTheme.dp(context, AppUiTokens.Icon.ACTION_CONTENT_DP),
+                LudoProofTheme.dp(context, AppUiTokens.Icon.ACTION_CONTENT_DP),
                 Gravity.CENTER,
             ),
         )
     }
 
-private class GameChevronIconView(
-    context: android.content.Context,
-) : View(context) {
-    private val paint =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            color = android.graphics.Color.WHITE
-            strokeWidth = LudoProofTheme.dp(context, 4f).toFloat()
-            strokeCap = Paint.Cap.ROUND
-            strokeJoin = Paint.Join.ROUND
-        }
-
-    override fun onDraw(canvas: Canvas) {
-        super.onDraw(canvas)
-        val size = minOf(width, height).toFloat()
-        if (size <= 0f) return
-        val cx = width / 2f
-        val cy = height / 2f
-        val span = size * 0.24f
-        canvas.drawLine(cx + span * 0.55f, cy - span, cx - span * 0.55f, cy, paint)
-        canvas.drawLine(cx - span * 0.55f, cy, cx + span * 0.55f, cy + span, paint)
-    }
-}
