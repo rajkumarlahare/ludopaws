@@ -354,11 +354,11 @@ internal fun MainActivity.onlineLobbyPanel():
                     ),
                     dp(18),
                 )
-                // Matchmaking search uses the same carved/recessed plywood surface.
+                // The complete searching board keeps the same regular plywood skin as setup.
                 background =
-                    recessedPlywoodBackground(
+                    plywoodBackground(
                         context = this@onlineLobbyPanel,
-                        outerCornerRadiusDp = 24f,
+                        cornerRadiusDp = 24f,
                     )
 
                 val ownAvatar =
@@ -481,12 +481,31 @@ internal fun MainActivity.onlineLobbyPanel():
                     },
                 )
 
+                // Only the inner opponent/searching lane uses the recessed plywood pocket.
+                val matchmakingOpponentArea =
+                    FrameLayout(this@onlineLobbyPanel).apply {
+                        background =
+                            recessedPlywoodBackground(
+                                context = this@onlineLobbyPanel,
+                                outerCornerRadiusDp = 16f,
+                            )
+                        setPadding(dp(7), dp(6), dp(7), dp(6))
+                        clipToPadding = true
+                        clipChildren = true
+                    }
                 matchmakingOpponentRail =
                     MatchmakingOpponentRailView(
                         this@onlineLobbyPanel,
                     )
-                addView(
+                matchmakingOpponentArea.addView(
                     matchmakingOpponentRail,
+                    FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                    ),
+                )
+                addView(
+                    matchmakingOpponentArea,
                     LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
                         dp(
