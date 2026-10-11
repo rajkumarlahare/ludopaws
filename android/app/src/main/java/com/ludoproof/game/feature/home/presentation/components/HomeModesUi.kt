@@ -3,6 +3,7 @@ package com.ludoproof.game.ui.home
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
+import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
@@ -27,7 +28,7 @@ internal fun HomeActivity.modeSection(): LinearLayout =
                         HomeModeCard(
                             mode = GameMode.ONLINE,
                             title = "Online",
-                            subtitle = "Matchmaking",
+                            subtitle = "Find match",
                             artMode = ModeArtView.Mode.ONLINE,
                             tone = HomeModeTone.ONLINE,
                         ),
@@ -50,7 +51,7 @@ internal fun HomeActivity.modeSection(): LinearLayout =
                         HomeModeCard(
                             mode = GameMode.FRIENDS,
                             title = "Friends",
-                            subtitle = "Private room",
+                            subtitle = "Private",
                             artMode = ModeArtView.Mode.FRIENDS,
                             tone = HomeModeTone.FRIENDS,
                         ),
@@ -165,7 +166,10 @@ private fun HomeActivity.homeGameCard(
                 )
 
                 addView(
-                    modeTitle(card.title),
+                    modeLabel(
+                        title = card.title,
+                        subtitle = card.subtitle,
+                    ),
                     LinearLayout.LayoutParams(
                         0,
                         LinearLayout.LayoutParams.MATCH_PARENT,
@@ -222,8 +226,9 @@ private fun HomeActivity.homeWideModeCard(
                 )
 
                 addView(
-                    modeTitle(
-                        text = card.title,
+                    modeLabel(
+                        title = card.title,
+                        subtitle = card.subtitle,
                         wide = true,
                     ),
                     LinearLayout.LayoutParams(
@@ -238,6 +243,56 @@ private fun HomeActivity.homeWideModeCard(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT,
             ),
+        )
+    }
+
+private fun HomeActivity.modeLabel(
+    title: String,
+    subtitle: String,
+    wide: Boolean = false,
+): LinearLayout =
+    LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        gravity = Gravity.CENTER
+
+        addView(
+            modeTitle(title, wide),
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ),
+        )
+
+        addView(
+            TextView(this@modeLabel).apply {
+                text = subtitle
+                textSize =
+                    when {
+                        wide && isCompact() -> 10f
+                        wide -> 12f
+                        isCompact() -> 9.5f
+                        else -> 11f
+                    }
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+                setTextColor(0xFFE3F6FF.toInt())
+                gravity = Gravity.CENTER
+                maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
+                includeFontPadding = false
+                letterSpacing = 0.015f
+                setShadowLayer(
+                    dp(1).toFloat(),
+                    0f,
+                    dp(1).toFloat(),
+                    0x90001A38.toInt(),
+                )
+            },
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                topMargin = dp(2)
+            },
         )
     }
 
