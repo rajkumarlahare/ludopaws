@@ -1,6 +1,7 @@
 package com.ludoproof.game.feature.profile.presentation
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.os.Bundle
 import android.util.Log
 import android.view.Gravity
@@ -8,6 +9,7 @@ import android.view.View
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.Toast
 import com.ludoproof.game.LudoProofTheme
 import com.ludoproof.game.BuildConfig
 import com.ludoproof.game.R
@@ -16,8 +18,6 @@ import com.ludoproof.game.feature.profile.data.local.ProfileStore
 import com.ludoproof.game.feature.profile.presentation.components.profileBadgesPanel
 import com.ludoproof.game.feature.profile.presentation.components.profileIdentityPanel
 import com.ludoproof.game.feature.profile.presentation.components.profileModeStatsPanel
-import com.ludoproof.game.feature.profile.presentation.components.profilePawIdentityPanel
-import com.ludoproof.game.feature.profile.presentation.components.profilePlayGamesPanel
 import com.ludoproof.game.feature.profile.presentation.components.profilePurchasesPanel
 import com.ludoproof.game.feature.profile.presentation.components.profileTopBar
 
@@ -127,7 +127,7 @@ class ProfileActivity : Activity() {
                     0,
                     dp(12),
                     0,
-                    dp(34),
+                    dp(24),
                 )
             }
         contentHost.addView(
@@ -152,46 +152,20 @@ class ProfileActivity : Activity() {
             profileTopBar(),
         )
         content.addView(
-            profileIdentityPanel(
-                profile,
-            ),
-            sectionParams(
-                14,
-            ),
+            profileIdentityPanel(profile),
+            sectionParams(10),
         )
         content.addView(
-            profilePlayGamesPanel(),
+            profileModeStatsPanel(profile),
             sectionParams(12),
         )
         content.addView(
-            profilePawIdentityPanel(),
-            sectionParams(
-                12,
-            ),
+            profileBadgesPanel(profile),
+            sectionParams(12),
         )
         content.addView(
-            profileModeStatsPanel(
-                profile,
-            ),
-            sectionParams(
-                16,
-            ),
-        )
-        content.addView(
-            profileBadgesPanel(
-                profile,
-            ),
-            sectionParams(
-                16,
-            ),
-        )
-        content.addView(
-            profilePurchasesPanel(
-                profile,
-            ),
-            sectionParams(
-                16,
-            ),
+            profilePurchasesPanel(profile),
+            sectionParams(12),
         )
 
         setContentView(
@@ -202,7 +176,11 @@ class ProfileActivity : Activity() {
     internal fun beginPlayGamesSignIn() {
         if (!isPlayGamesConfigured) {
             playGamesStatus = getString(R.string.profile_play_games_setup_button_message)
-            renderProfile()
+            AlertDialog.Builder(this)
+                .setTitle("Google Play Games")
+                .setMessage(playGamesStatus)
+                .setPositiveButton("OK", null)
+                .show()
             return
         }
         if (playGamesSignInInProgress) return
@@ -238,6 +216,11 @@ class ProfileActivity : Activity() {
                             }
                             ?: getString(R.string.profile_play_games_sign_in_failed)
                     renderProfile()
+                    AlertDialog.Builder(this)
+                        .setTitle("Google Play Games")
+                        .setMessage(playGamesStatus)
+                        .setPositiveButton("OK", null)
+                        .show()
                     return@addOnCompleteListener
                 }
                 playGamesAuthenticated = task.result.isAuthenticated
@@ -247,6 +230,11 @@ class ProfileActivity : Activity() {
                     playGamesStatus =
                         getString(R.string.profile_play_games_sign_in_not_completed)
                     renderProfile()
+                    AlertDialog.Builder(this)
+                        .setTitle("Google Play Games")
+                        .setMessage(playGamesStatus)
+                        .setPositiveButton("OK", null)
+                        .show()
                 }
             }
     }
@@ -271,6 +259,7 @@ class ProfileActivity : Activity() {
                     playGamesStatus =
                         getString(R.string.profile_play_games_check_failed)
                     renderProfile()
+                    Toast.makeText(this, playGamesStatus, Toast.LENGTH_LONG).show()
                     return@addOnCompleteListener
                 }
                 playGamesAuthenticated = task.result.isAuthenticated
@@ -297,6 +286,12 @@ class ProfileActivity : Activity() {
                     playGamesDisplayName =
                         task.result.displayName
                             ?.takeIf(String::isNotBlank)
+                    playGamesDisplayName?.let { googleName ->
+                        val savedName = profileStore.snapshot().displayName
+                        if (savedName.isBlank() || savedName == "Guest User") {
+                            profileStore.updateDisplayName(googleName)
+                        }
+                    }
                     playGamesStatus =
                         playGamesDisplayName?.let {
                             getString(R.string.profile_play_games_signed_in_as, it)

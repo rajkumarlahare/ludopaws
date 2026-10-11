@@ -85,6 +85,47 @@ internal class LudoPaws3DSceneRenderer {
             )
     }
 
+    /**
+     * Initializes a dedicated portrait renderer. The raw shader constants retain
+     * their historical formatting for the live gameplay renderer, so normalize
+     * them only for the off-screen portrait context where strict ES3 drivers
+     * require #version to be the first source line. The board render path remains
+     * unchanged.
+     */
+    fun onPortraitSurfaceCreated() {
+        GLES30.glClearColor(0f, 0f, 0f, 0f)
+        GLES30.glEnable(GLES30.GL_DEPTH_TEST)
+        GLES30.glEnable(GLES30.GL_BLEND)
+        GLES30.glBlendFunc(
+            GLES30.GL_SRC_ALPHA,
+            GLES30.GL_ONE_MINUS_SRC_ALPHA,
+        )
+        program =
+            createProgram(
+                VERTEX_SHADER.trimIndent(),
+                FRAGMENT_SHADER.trimIndent(),
+            )
+        uMvpLocation = GLES30.glGetUniformLocation(program, "uMvp")
+        uColorLocation = GLES30.glGetUniformLocation(program, "uColor")
+        uLightDirectionLocation = GLES30.glGetUniformLocation(program, "uLightDirection")
+        uNormalMatrixLocation = GLES30.glGetUniformLocation(program, "uNormalMatrix")
+        check(
+            uMvpLocation >= 0 &&
+                uColorLocation >= 0 &&
+                uLightDirectionLocation >= 0 &&
+                uNormalMatrixLocation >= 0,
+        ) { "3D portrait shader is missing a required uniform" }
+        sphere =
+            SphereMesh(
+                latitudeSegments = 16,
+                longitudeSegments = 24,
+                uMvpLocation = uMvpLocation,
+                uColorLocation = uColorLocation,
+                uLightDirectionLocation = uLightDirectionLocation,
+                uNormalMatrixLocation = uNormalMatrixLocation,
+            )
+    }
+
     fun onSurfaceChanged(
         width: Int,
         height: Int,
@@ -120,6 +161,74 @@ internal class LudoPaws3DSceneRenderer {
             -100f,
             100f,
         )
+    }
+
+    /**
+     * Configures the same production geometry renderer for a square, transparent
+     * character portrait. This is used only by the off-screen portrait cache;
+     * the existing gameplay surface continues to use onSurfaceChanged/drawFrame.
+     */
+    fun onPortraitSurfaceChanged(
+        width: Int,
+        height: Int,
+    ) {
+        this.width = width.coerceAtLeast(1)
+        this.height = height.coerceAtLeast(1)
+        GLES30.glViewport(0, 0, this.width, this.height)
+        Matrix.orthoM(
+            projection,
+            0,
+            0f,
+            this.width.toFloat(),
+            this.height.toFloat(),
+            0f,
+            -100f,
+            100f,
+        )
+    }
+
+    /**
+     * Draws one static portrait using the exact same 3D body-part methods,
+     * sphere mesh, shader, and lighting as a live board pawn. No match state,
+     * pawn position, movement, or animation state is read or modified.
+     */
+    fun drawPortrait(
+        characterId: String,
+        teamColorName: String,
+    ) {
+        if (program == 0) return
+
+        GLES30.glViewport(0, 0, width, height)
+        GLES30.glClear(
+            GLES30.GL_COLOR_BUFFER_BIT or
+                GLES30.GL_DEPTH_BUFFER_BIT,
+        )
+        GLES30.glUseProgram(program)
+
+        val species =
+            LudoPaws3DCharacterPolicy
+                .speciesForCharacterId(characterId)
+                ?: LudoPaws3DSpecies.DOG
+        val teamColor =
+            LudoPawsTeamIdentityPolicy.resolve(teamColorName)
+                ?: LudoPawsTeamColor.BLUE
+        val size = min(width, height).toFloat()
+        val modelScale = size * 0.30f
+        prepareRoot(
+            x = width * 0.5f,
+            y = height * 0.62f,
+            scale = modelScale,
+            liftY = 0f,
+            bodyYawDegrees = 0f,
+        )
+
+        when (species) {
+            LudoPaws3DSpecies.DOG -> drawDog(root, Dog3DPose(), teamColor)
+            LudoPaws3DSpecies.GOAT -> drawGoat(root, Goat3DPose(), teamColor)
+            LudoPaws3DSpecies.DUCK -> drawDuck(root, Duck3DPose(), teamColor)
+            LudoPaws3DSpecies.CAT -> drawCat(root, Cat3DPose(), teamColor)
+        }
+        GLES30.glFinish()
     }
 
     fun drawFrame(

@@ -124,6 +124,7 @@ class LudoPawsPlayerCardView(
             characterId = character?.id,
             ringColor = playerColor(player.color),
             highlighted = active,
+            modelTeamColor = player.color,
         )
 
         nameText.text = displayPlayerName(player.displayName, computer)

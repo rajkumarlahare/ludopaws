@@ -46,14 +46,14 @@ internal fun ProfileActivity.profileBadgesPanel(
                 this@profileBadgesPanel,
             ).apply {
                 text =
-                    "View All"
+                    "VIEW ALL  ›"
                 textSize =
-                    12f
+                    11f
                 setTypeface(
                     Typeface.DEFAULT_BOLD,
                 )
                 setTextColor(
-                    LudoProofTheme.GOLD,
+                    0xFFFFD43B.toInt(),
                 )
                 minWidth =
                     0
@@ -98,7 +98,7 @@ internal fun ProfileActivity.profileBadgesPanel(
                     Gravity.CENTER
                 setPadding(
                     0,
-                    dp(12),
+                    dp(8),
                     0,
                     0,
                 )
@@ -130,17 +130,22 @@ internal fun ProfileActivity.profileBadgesPanel(
                             text =
                                 badge.symbol
                             textSize =
-                                21f
+                                24f
                             setTypeface(
                                 Typeface.DEFAULT_BOLD,
                             )
                             setTextColor(
-                                if (
-                                    badge.unlocked
-                                ) {
-                                    LudoProofTheme.GOLD
+                                if (!badge.unlocked) {
+                                    0xFF8FA8C9.toInt()
                                 } else {
-                                    0xFF9CB3D0.toInt()
+                                    when (badge.id) {
+                                        "first-win" -> 0xFFFFD13A.toInt()
+                                        "strategist" -> 0xFF20F06A.toInt()
+                                        "unstoppable" -> 0xFFDA64FF.toInt()
+                                        "friendship" -> 0xFF21D8F8.toInt()
+                                        "social-gamer" -> 0xFFFF5664.toInt()
+                                        else -> 0xFFFFD13A.toInt()
+                                    }
                                 },
                             )
                             gravity =
@@ -148,9 +153,9 @@ internal fun ProfileActivity.profileBadgesPanel(
                             background =
                                 LudoProofTheme
                                     .rounded(
-                                        0xD70B3478.toInt(),
+                                        0xFF073F8C.toInt(),
                                         999f,
-                                        0x665ED8FF,
+                                        0xFF1C8BDA.toInt(),
                                         1f,
                                         this@profileBadgesPanel,
                                     )
@@ -168,7 +173,7 @@ internal fun ProfileActivity.profileBadgesPanel(
                             text =
                                 badge.title
                             textSize =
-                                7.5f
+                                9f
                             setTextColor(
                                 Color.WHITE,
                             )
