@@ -3,6 +3,10 @@ package com.ludoproof.game.ui.offline.setup
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.ValueAnimator
+import android.view.animation.DecelerateInterpolator
 import android.view.Gravity
 import android.widget.Button
 import android.widget.HorizontalScrollView
@@ -166,10 +170,51 @@ internal fun OfflineGameActivity.characterPanel(
         scroll.addView(cardsRow)
         addView(scroll)
 
+        // On Pass & Play entry, briefly reveal the far-right character and
+        // smoothly return to the starting position. Computer setup is unchanged.
+        if (!isComputerMode) {
+            scroll.post {
+                val maxScrollX = (cardsRow.width - scroll.width).coerceAtLeast(0)
+                if (maxScrollX > 0 && scroll.isAttachedToWindow) {
+                    scroll.animateCharacterRowTo(maxScrollX) {
+                        scroll.postDelayed({
+                            if (scroll.isAttachedToWindow) {
+                                scroll.animateCharacterRowTo(0)
+                            }
+                        }, 180L)
+                    }
+                }
+            }
+        }
+
+
+
 
 
         refreshCharacterSelectionUi()
     }
+
+private fun HorizontalScrollView.animateCharacterRowTo(
+    targetX: Int,
+    onEnd: (() -> Unit)? = null,
+) {
+    ValueAnimator.ofInt(scrollX, targetX).apply {
+        duration = 420L
+        interpolator = DecelerateInterpolator()
+        addUpdateListener { animator ->
+            scrollTo(animator.animatedValue as Int, 0)
+        }
+        if (onEnd != null) {
+            addListener(
+                object : AnimatorListenerAdapter() {
+                    override fun onAnimationEnd(animation: Animator) {
+                        onEnd()
+                    }
+                },
+            )
+        }
+    }.start()
+}
 
 private fun OfflineGameActivity.rebuildCharacterSlotButtons() {
     val slotsRow = characterSlotsRow ?: return
