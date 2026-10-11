@@ -123,7 +123,7 @@ private class SettingsCloseButton(
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = 0xFFFF3030.toInt()
             style = Paint.Style.STROKE
-            strokeWidth = settingsDp(context, 3f).toFloat()
+            strokeWidth = settingsDp(context, 6f).toFloat()
             strokeCap = Paint.Cap.ROUND
             strokeJoin = Paint.Join.ROUND
         }
@@ -146,7 +146,7 @@ private class SettingsCloseButton(
         // to its center so it sits on the popup's curved outer rim.
         val cx = width / 2f
         val cy = height / 2f
-        val arm = settingsDp(context, 6f)
+        val arm = settingsDp(context, 12f)
         canvas.drawLine(cx - arm, cy - arm, cx + arm, cy + arm, crossPaint)
         canvas.drawLine(cx + arm, cy - arm, cx - arm, cy + arm, crossPaint)
     }
