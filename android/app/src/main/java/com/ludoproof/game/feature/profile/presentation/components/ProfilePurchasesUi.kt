@@ -147,19 +147,20 @@ private class PlywoodTextureDrawable(
         canvas.save()
         canvas.clipPath(outerPath)
 
-        // Warm plywood base with gentle top-to-bottom light falloff.
+        // Even, lightly warm plywood tone. Keep the center and lower area
+        // close in brightness so it reads as one naturally lit sheet, not a dark patch.
         fill.shader = LinearGradient(
             b.left,
             b.top,
             b.left,
             b.bottom,
             intArrayOf(
-                0xFFF1D4A0.toInt(),
-                0xFFDDB077.toInt(),
-                0xFFC58A53.toInt(),
-                0xFFE5BD82.toInt(),
+                0xFFF0D4A4.toInt(),
+                0xFFECCB98.toInt(),
+                0xFFE9C590.toInt(),
+                0xFFEED0A0.toInt(),
             ),
-            null,
+            floatArrayOf(0f, 0.32f, 0.68f, 1f),
             Shader.TileMode.CLAMP,
         )
         canvas.drawRect(b, fill)
@@ -231,8 +232,8 @@ private class PlywoodTextureDrawable(
                 (b.left + b.width() * 0.73f) to (b.top + b.height() * 0.72f),
             )
             knots.forEachIndexed { index, (knotX, knotY) ->
-                line.color = Color.argb(24, 119, 65, 32)
-                line.strokeWidth = 0.7f * density
+                line.color = Color.argb(15, 119, 65, 32)
+                line.strokeWidth = 0.6f * density
                 canvas.drawOval(
                     RectF(
                         knotX - 2.4f * density,
@@ -242,8 +243,8 @@ private class PlywoodTextureDrawable(
                     ),
                     line,
                 )
-                line.color = Color.argb(18, 255, 232, 181)
-                line.strokeWidth = 0.55f * density
+                line.color = Color.argb(14, 255, 232, 181)
+                line.strokeWidth = 0.5f * density
                 canvas.drawOval(
                     RectF(
                         knotX - 1.1f * density,
