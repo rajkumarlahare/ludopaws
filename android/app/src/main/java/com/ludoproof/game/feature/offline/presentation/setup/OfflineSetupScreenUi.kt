@@ -61,13 +61,20 @@ internal fun OfflineGameActivity.showSetup() {
     val content =
         LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            // The old outer plywood shell is intentionally removed. The computer
-            // setup gets one shared recessed surface around Paw + player selection.
+            clipChildren = false
+            clipToPadding = false
+            // Pass & Play follows the Friends/Online surface hierarchy: one
+            // plywood shell contains recessed setup sections. Computer keeps its
+            // dedicated compact selection panel.
             setPadding(
-                0,
+                if (isComputerMode) 0 else dp(8),
                 if (isComputerMode) 0 else dp(if (isCompactSetup()) 10 else 12),
-                0,
+                if (isComputerMode) 0 else dp(8),
                 if (isComputerMode) 0 else dp(24),
+            )
+            background = if (isComputerMode) null else plywoodBackground(
+                context = this@showSetup,
+                cornerRadiusDp = 24f,
             )
         }
     contentHost.addView(
@@ -201,11 +208,10 @@ internal fun OfflineGameActivity.showSetup() {
             textSize = if (isCompactSetup()) 21f else 24f
             isAllCaps = false
             LudoProofTheme.primary(this)
-            if (isComputerMode) {
-                // Match the Online lobby PLAY action's green fill and cyan stroke.
-                background = playGamesSignInBackground(this@showSetup)
-                setTextColor(Color.WHITE)
-            }
+            // Reuse Online/Team Up's approved green fill and cyan stroke for
+            // the Pass & Play action as well as Computer's existing PLAY action.
+            background = playGamesSignInBackground(this@showSetup)
+            setTextColor(Color.WHITE)
             contentDescription = if (isComputerMode) {
                 "Start game against computer"
             } else {

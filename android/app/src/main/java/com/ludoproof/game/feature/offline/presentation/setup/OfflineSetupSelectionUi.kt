@@ -308,9 +308,9 @@ internal fun OfflineGameActivity.selectionPanel(
                 context = this@selectionPanel,
                 outerCornerRadiusDp = 20f,
             )
-            else -> plywoodBackground(
+            else -> recessedPlywoodBackground(
                 context = this@selectionPanel,
-                cornerRadiusDp = 20f,
+                outerCornerRadiusDp = 20f,
             )
         }
         if (embeddedInComputerPanel) elevation = 0f
@@ -550,11 +550,7 @@ internal fun OfflineGameActivity.refreshSetupSelections() {
         }
         (tile as? LinearLayout)?.let { content ->
             (content.getChildAt(0) as? ModeArtView)?.playerCountSelected = selected
-            val countTextColor = when {
-                isComputerMode && selected -> 0xFFFFD45E.toInt()
-                !isComputerMode && selected -> 0xFF062B68.toInt()
-                else -> Color.WHITE
-            }
+            val countTextColor = if (selected) 0xFFFFD45E.toInt() else Color.WHITE
             (content.getChildAt(1) as? TextView)?.setTextColor(countTextColor)
             (content.getChildAt(2) as? TextView)?.setTextColor(countTextColor)
         }

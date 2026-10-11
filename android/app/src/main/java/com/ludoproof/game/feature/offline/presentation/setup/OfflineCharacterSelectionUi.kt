@@ -184,12 +184,9 @@ internal fun OfflineGameActivity.characterPanel(
                     )
                     setTypeface(Typeface.DEFAULT_BOLD)
                     setPadding(dp(12), dp(8), dp(12), dp(8))
-                    background = LudoProofTheme.rounded(
-                        0xC8062861.toInt(),
-                        999f,
-                        0xFF267ACF.toInt(),
-                        1f,
-                        this@characterPanel,
+                    background = transparentDarkBlueStrokeBackground(
+                        context = this@characterPanel,
+                        cornerRadiusDp = 999f,
                     )
                 }.also(::addView)
         }
@@ -293,31 +290,13 @@ private fun OfflineGameActivity.characterChoiceCard(
                 setTextColor(0xFFBCD5FF.toInt())
                 gravity = Gravity.CENTER
                 includeFontPadding = false
-                setPadding(
-                    dp(if (isComputerMode) 5 else 8),
-                    dp(4),
-                    dp(if (isComputerMode) 5 else 8),
-                    dp(4),
+                setPadding(dp(5), dp(4), dp(5), dp(4))
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+                background = transparentDarkBlueStrokeBackground(
+                    context = this@characterChoiceCard,
+                    cornerRadiusDp = 999f,
                 )
-                if (isComputerMode) {
-                    maxLines = 1
-                    ellipsize = android.text.TextUtils.TruncateAt.END
-                }
-                background =
-                    if (isComputerMode) {
-                        transparentDarkBlueStrokeBackground(
-                            context = this@characterChoiceCard,
-                            cornerRadiusDp = 999f,
-                        )
-                    } else {
-                        LudoProofTheme.rounded(
-                            0xB803225C.toInt(),
-                            999f,
-                            0xFF178CD6.toInt(),
-                            1f,
-                            this@characterChoiceCard,
-                        )
-                    }
                 tag = CHARACTER_PERSONALITY_TAG
             },
             LinearLayout.LayoutParams(
@@ -325,11 +304,9 @@ private fun OfflineGameActivity.characterChoiceCard(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
             ).apply {
                 topMargin = dp(3)
-                // Keep the subtitle stroke tucked inside the character card's side edges.
-                if (isComputerMode) {
-                    marginStart = dp(4)
-                    marginEnd = dp(4)
-                }
+                // Keep the shared subtitle stroke tucked inside the card edges.
+                marginStart = dp(4)
+                marginEnd = dp(4)
             },
         )
 
@@ -364,11 +341,15 @@ internal fun OfflineGameActivity.refreshCharacterSelectionUi() {
     }
 
     characterSlotButtons.forEach { (slot, button) ->
-        if (slot == selectedCharacterSlot) {
-            LudoProofTheme.selectedTile(button)
-        } else {
-            LudoProofTheme.normalTile(button)
-        }
+        val selected = slot == selectedCharacterSlot
+        button.background = playerCountSelectionBackground(
+            context = this@refreshCharacterSelectionUi,
+            selected = selected,
+            outerCornerRadiusDp = 12f,
+            showCheckBadge = false,
+        )
+        button.elevation = dp(if (selected) 3 else 1).toFloat()
+        button.isSelected = selected
         val characterName =
             selectedCharacterIds
                 .getOrNull(slot)
@@ -380,76 +361,38 @@ internal fun OfflineGameActivity.refreshCharacterSelectionUi() {
                 isComputerMode -> "YOU\n$characterName"
                 else -> "P${slot + 1}\n$characterName"
             }
-        button.setTextColor(
-            if (slot == selectedCharacterSlot) {
-                0xFF052A68.toInt()
-            } else {
-                Color.WHITE
-            },
-        )
+        button.setTextColor(if (selected) 0xFFFFD45E.toInt() else Color.WHITE)
     }
 
     val activeCharacterId = selectedCharacterIds.getOrNull(selectedCharacterSlot)
     characterCards.forEach { (characterId, card) ->
         val selected = characterId == activeCharacterId
-        if (isComputerMode) {
-            // Match the Friends page's recessed plywood + gold edge/check treatment.
-            // The shared background communicates selection without the old yellow tile flash.
-            card.background = playerCountSelectionBackground(
-                context = this@refreshCharacterSelectionUi,
-                selected = selected,
-                outerCornerRadiusDp = 12f,
-                checkBadgeAtTopEnd = true,
-                emphasizeSelected = true,
-                showCheckBadge = true,
-                checkMarkScale = 3f,
-            )
-            card.elevation = dp(if (selected) 6 else 4).toFloat()
-        } else if (selected) {
-            LudoProofTheme.selectedTile(card)
-        } else {
-            LudoProofTheme.normalTile(card)
-        }
+        // Share the Friends/Computer recessed plywood card and gold check treatment.
+        card.background = playerCountSelectionBackground(
+            context = this@refreshCharacterSelectionUi,
+            selected = selected,
+            outerCornerRadiusDp = 12f,
+            checkBadgeAtTopEnd = true,
+            emphasizeSelected = true,
+            showCheckBadge = true,
+            checkMarkScale = 3f,
+        )
+        card.elevation = dp(if (selected) 6 else 4).toFloat()
         card.findViewWithTag<LudoPawsCharacterAvatarView>(CHARACTER_AVATAR_TAG)
             ?.bind(
                 characterId = characterId,
-                ringColor =
-                    if (selected && !isComputerMode) {
-                        0xFFFFC72C.toInt()
-                    } else {
-                        0xFF5BE0FF.toInt()
-                    },
-                highlighted = selected && !isComputerMode,
+                ringColor = 0xFF5BE0FF.toInt(),
+                highlighted = false,
                 showCircularChrome = false,
             )
         card.findViewWithTag<TextView>(CHARACTER_NAME_TAG)
-            ?.setTextColor(
-                when {
-                    isComputerMode && selected -> 0xFFFFD45E.toInt()
-                    !isComputerMode && selected -> 0xFF052A68.toInt()
-                    else -> Color.WHITE
-                },
-            )
+            ?.setTextColor(if (selected) 0xFFFFD45E.toInt() else Color.WHITE)
         card.findViewWithTag<TextView>(CHARACTER_PERSONALITY_TAG)?.apply {
-            val legacySelectedStyle = selected && !isComputerMode
-            setTextColor(
-                if (legacySelectedStyle) 0xFF174A78.toInt() else 0xFFBCD5FF.toInt(),
+            setTextColor(0xFFBCD5FF.toInt())
+            background = transparentDarkBlueStrokeBackground(
+                context = this@refreshCharacterSelectionUi,
+                cornerRadiusDp = 999f,
             )
-            background =
-                if (isComputerMode) {
-                    transparentDarkBlueStrokeBackground(
-                        context = this@refreshCharacterSelectionUi,
-                        cornerRadiusDp = 999f,
-                    )
-                } else {
-                    LudoProofTheme.rounded(
-                        if (legacySelectedStyle) 0xB5FFE59A.toInt() else 0xB803225C.toInt(),
-                        999f,
-                        if (legacySelectedStyle) 0xCCFFB51D.toInt() else 0xFF178CD6.toInt(),
-                        1f,
-                        this@refreshCharacterSelectionUi,
-                    )
-                }
         }
     }
 

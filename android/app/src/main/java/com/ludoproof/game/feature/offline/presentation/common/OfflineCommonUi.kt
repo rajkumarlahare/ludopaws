@@ -100,7 +100,7 @@ internal fun OfflineGameActivity.backHeader(label: String?): View {
                 ) {
                     requestOfflineExit()
                 }.apply {
-                    if (isComputerMode) {
+                    if (isComputerMode || label == "PASS & PLAY") {
                         background = plywoodBackground(
                             context = this@backHeader,
                             cornerRadiusDp = 999f,
