@@ -166,26 +166,7 @@ internal fun OfflineGameActivity.characterPanel(
         scroll.addView(cardsRow)
         addView(scroll)
 
-        if (isComputerMode) {
-            // The YOU/CPU assignment summary is redundant on the Computer page.
-            characterSummaryText = null
-        } else {
-            characterSummaryText =
-                TextView(this@characterPanel).apply {
-                    LudoProofTheme.body(
-                        this,
-                        if (isCompactSetup()) 10.5f else 11.5f,
-                        centered = true,
-                        bright = true,
-                    )
-                    setTypeface(Typeface.DEFAULT_BOLD)
-                    setPadding(dp(12), dp(8), dp(12), dp(8))
-                    background = transparentDarkBlueStrokeBackground(
-                        context = this@characterPanel,
-                        cornerRadiusDp = 999f,
-                    )
-                }.also(::addView)
-        }
+
 
         refreshCharacterSelectionUi()
     }
@@ -392,27 +373,7 @@ internal fun OfflineGameActivity.refreshCharacterSelectionUi() {
         }
     }
 
-    characterSummaryText?.text =
-        selectedCharacterIds
-            .mapIndexed { index, characterId ->
-                val characterName =
-                    LudoPawsCharacterCatalog
-                        .character(characterId)
-                        ?.displayName
-                        ?: characterId
-                val owner =
-                    if (isComputerMode) {
-                        if (index == 0) {
-                            "YOU"
-                        } else {
-                            "CPU $index"
-                        }
-                    } else {
-                        "P${index + 1}"
-                    }
-                "$owner $characterName"
-            }
-            .joinToString("  •  ")
+
 }
 
 private const val CHARACTER_AVATAR_TAG =
