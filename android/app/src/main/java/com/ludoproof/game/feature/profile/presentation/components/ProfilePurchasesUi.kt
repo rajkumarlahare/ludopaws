@@ -122,6 +122,7 @@ internal fun ProfileActivity.profilePurchasesPanel(profile: ProfileSnapshot): Li
  */
 internal class PlywoodTextureDrawable(
     private val density: Float,
+    private val cornerRadiusDp: Float = 15f,
 ) : Drawable() {
     // Multiplying RGB by ~0.7 keeps the wood finish about 10 percentage points
     // lighter than the previous 40%-darkened test, while preserving its warm tone.
@@ -151,7 +152,7 @@ internal class PlywoodTextureDrawable(
         val b = RectF(bounds)
         if (b.width() <= 0f || b.height() <= 0f) return
 
-        val radius = 15f * density
+        val radius = cornerRadiusDp * density
         val outerPath = Path().apply {
             addRoundRect(b, radius, radius, Path.Direction.CW)
         }
