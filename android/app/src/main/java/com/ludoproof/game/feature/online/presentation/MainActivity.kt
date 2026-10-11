@@ -960,8 +960,9 @@ class MainActivity : ComponentActivity() {
             else -> {
                 connectionText.text =
                     "● ONLINE"
+                // Soft, light parrot-green for the online status on the dark header.
                 connectionText.setTextColor(
-                    0xFF6EE7FF.toInt(),
+                    0xFFD4FFB2.toInt(),
                 )
             }
         }
