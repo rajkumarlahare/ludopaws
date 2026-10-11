@@ -30,13 +30,14 @@ internal fun OfflineGameActivity.centeredSetupTitle(label: String): View {
             dp(if (compact) 10 else 14),
             dp(4),
         )
-        background = transparentDarkBlueStrokeBackground(
-            context = this@centeredSetupTitle,
-            cornerRadiusDp = 999f,
-        )
-        elevation = dp(7).toFloat()
+        // The Computer title is intentionally unboxed; keep the paw layout unchanged.
+        background = null
+        elevation = 0f
         addView(
-            SetupPawMarkView(this@centeredSetupTitle),
+            SetupPawMarkView(
+                this@centeredSetupTitle,
+                pawColor = 0xFFFFFFFF.toInt(),
+            ),
             LinearLayout.LayoutParams(
                 dp(if (compact) 18 else 22),
                 dp(if (compact) 18 else 22),
@@ -45,14 +46,17 @@ internal fun OfflineGameActivity.centeredSetupTitle(label: String): View {
         addView(
             TextView(this@centeredSetupTitle).apply {
                 text = label
-                LudoProofTheme.title(this, if (compact) 15f else 19f, gold = true)
+                LudoProofTheme.title(this, if (compact) 15f else 19f, gold = false)
                 setPadding(dp(7), 0, dp(7), 0)
                 includeFontPadding = false
                 maxLines = 1
             },
         )
         addView(
-            SetupPawMarkView(this@centeredSetupTitle),
+            SetupPawMarkView(
+                this@centeredSetupTitle,
+                pawColor = 0xFFFFFFFF.toInt(),
+            ),
             LinearLayout.LayoutParams(
                 dp(if (compact) 18 else 22),
                 dp(if (compact) 18 else 22),
@@ -271,10 +275,13 @@ internal fun OfflineGameActivity.isCompactSetup():
 internal fun OfflineGameActivity.dp(value: Int): Int =
     LudoProofTheme.dp(this, value)
 
-private class SetupPawMarkView(context: Context) : View(context) {
+private class SetupPawMarkView(
+    context: Context,
+    pawColor: Int = 0xFF55C9FF.toInt(),
+) : View(context) {
     private val pawPaint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = 0xFF55C9FF.toInt()
+            color = pawColor
             style = Paint.Style.FILL
         }
 

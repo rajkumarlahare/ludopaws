@@ -102,7 +102,7 @@ internal fun OfflineGameActivity.showSetup() {
             clipChildren = false
             clipToPadding = false
             addView(
-                centeredSetupTitle("VS COMPUTER"),
+                centeredSetupTitle("ROBOT"),
                 FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.MATCH_PARENT,
                     FrameLayout.LayoutParams.MATCH_PARENT,
