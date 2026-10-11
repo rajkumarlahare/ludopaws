@@ -213,8 +213,8 @@ internal fun ProfileActivity.profileIdentityPanel(
 
                 addView(
                     Button(this@profileIdentityPanel).apply {
-                        text = "📷"
-                        textSize = 12f
+                        text = "✎"
+                        textSize = 14f
                         setTextColor(Color.WHITE)
                         minWidth = 0
                         minHeight = 0
