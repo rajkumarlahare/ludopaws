@@ -16,7 +16,7 @@ import com.ludoproof.game.core.ui.components.AppFocusRing
 import com.ludoproof.game.core.ui.components.appIconActionButton
 import com.ludoproof.game.core.ui.icons.AppIconName
 import com.ludoproof.game.feature.characters.data.local.CharacterSelectionStore
-import com.ludoproof.game.feature.characters.domain.ProfileProgression
+import com.ludoproof.game.feature.profile.domain.ProfileProgression
 import com.ludoproof.game.feature.characters.domain.catalog.LudoPawsCharacterCatalog
 import com.ludoproof.game.feature.profile.domain.model.ProfileSnapshot
 import com.ludoproof.game.feature.profile.presentation.ProfileActivity
