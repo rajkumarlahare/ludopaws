@@ -15,6 +15,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.LudoProofTheme
 import com.ludoproof.game.core.ui.art.plywoodBackground
+import com.ludoproof.game.core.ui.art.playGamesSignInBackground
 import com.ludoproof.game.core.ui.components.AppFocusRing
 import com.ludoproof.game.LudoPawsCharacterAvatarView
 import com.ludoproof.game.MainActivity
@@ -257,17 +258,11 @@ internal fun MainActivity.onlineLobbyPanel():
                             }
                         setTypeface(Typeface.DEFAULT_BOLD)
                         setTextColor(0xFF342000.toInt())
+                        // Reuse the exact Google Play sign-in fill, radius and stroke from Profile.
                         background =
-                            GradientDrawable(
-                                GradientDrawable.Orientation.TOP_BOTTOM,
-                                intArrayOf(
-                                    0xFFFFD642.toInt(),
-                                    0xFFFF9D00.toInt(),
-                                ),
-                            ).apply {
-                                cornerRadius = dp(999).toFloat()
-                                setStroke(dp(2), 0xFFFFF0A0.toInt())
-                            }
+                            playGamesSignInBackground(
+                                this@onlineLobbyPanel,
+                            )
                         AppFocusRing.apply(this, cornerRadiusDp = 999f, strokeWidthDp = 3f)
                         setOnClickListener {
                             beginPublicMatchmaking()
