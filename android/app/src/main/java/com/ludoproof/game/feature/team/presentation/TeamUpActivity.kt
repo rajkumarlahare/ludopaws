@@ -25,6 +25,7 @@ import com.ludoproof.game.CachedMatchStore
 import com.ludoproof.game.GameMode
 import com.ludoproof.game.GameModeIntent
 import com.ludoproof.game.LudoProofTheme
+import com.ludoproof.game.core.ui.components.AppFocusRing
 import com.ludoproof.game.MainActivity
 import com.ludoproof.game.PlayerSession
 import com.ludoproof.game.SecureSessionStore
@@ -189,6 +190,7 @@ class TeamUpActivity : Activity() {
                     cornerRadius = dp(999).toFloat()
                     setStroke(dp(2), 0xFFFFF0A0.toInt())
                 }
+            AppFocusRing.apply(this, cornerRadiusDp = 999f, strokeWidthDp = 3f)
             setOnClickListener { beginSearch() }
         }
         setupContent.addView(
@@ -262,6 +264,7 @@ class TeamUpActivity : Activity() {
             cancelButton = Button(this@TeamUpActivity).apply {
                 text = "CANCEL SEARCH"
                 LudoProofTheme.danger(this)
+                AppFocusRing.apply(this, cornerRadiusDp = 12f, strokeWidthDp = 2.5f)
                 setOnClickListener { cancelSearch() }
             }
             addView(

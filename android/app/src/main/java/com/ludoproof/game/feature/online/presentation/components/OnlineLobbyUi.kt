@@ -14,6 +14,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.LudoProofTheme
+import com.ludoproof.game.core.ui.components.AppFocusRing
 import com.ludoproof.game.LudoPawsCharacterAvatarView
 import com.ludoproof.game.MainActivity
 import com.ludoproof.game.feature.profile.data.local.ProfileStore
@@ -182,6 +183,7 @@ internal fun MainActivity.onlineLobbyPanel():
                             dp(14),
                             0,
                         )
+                        AppFocusRing.apply(this, cornerRadiusDp = 20f, strokeWidthDp = 3f)
                         setOnClickListener {
                             selectPublicPlayerCount(
                                 2,
@@ -203,6 +205,7 @@ internal fun MainActivity.onlineLobbyPanel():
                             dp(14),
                             0,
                         )
+                        AppFocusRing.apply(this, cornerRadiusDp = 20f, strokeWidthDp = 3f)
                         setOnClickListener {
                             selectPublicPlayerCount(
                                 4,
@@ -270,6 +273,7 @@ internal fun MainActivity.onlineLobbyPanel():
                                 cornerRadius = dp(999).toFloat()
                                 setStroke(dp(2), 0xFFFFF0A0.toInt())
                             }
+                        AppFocusRing.apply(this, cornerRadiusDp = 999f, strokeWidthDp = 3f)
                         setOnClickListener {
                             beginPublicMatchmaking()
                         }

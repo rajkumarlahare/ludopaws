@@ -28,6 +28,7 @@ import com.ludoproof.game.GameApiException
 import com.ludoproof.game.GameMode
 import com.ludoproof.game.GameModeIntent
 import com.ludoproof.game.LudoProofTheme
+import com.ludoproof.game.core.ui.components.AppFocusRing
 import com.ludoproof.game.MainActivity
 import com.ludoproof.game.PendingOperationStore
 import com.ludoproof.game.PlayerSession
@@ -462,6 +463,7 @@ class FriendsActivity : Activity() {
         setPadding(dp(7), dp(6), dp(7), dp(6))
         isClickable = true
         isFocusable = true
+        AppFocusRing.apply(this, cornerRadiusDp = 18f, strokeWidthDp = 2f)
         setOnClickListener { onClick() }
         val row = LinearLayout(this@FriendsActivity).apply {
             orientation = LinearLayout.HORIZONTAL
