@@ -11,7 +11,7 @@ Address the in-match controls and UI surfaces that looked inconsistent in Pass &
 - The offline turn/HUD panel uses a matte dark surface with a subtle mode-specific cyan/gold edge to improve text readability against the shared gameplay backdrop.
 - Result actions are now distinct, accessible controls: REMATCH uses `REFRESH` with a green positive treatment; EXIT uses `CLOSE` with a restrained danger treatment. Both preserve their existing callbacks and click sound and have at least a 48dp layout height.
 - The existing custom Quick Chat speech-bubble artwork is retained and receives a visible focus ring; the popup content and reaction behavior are unchanged.
-- Adds `GameTopActionsUiInstrumentedTest` covering semantic icon selection, focusability, matte state-list backgrounds, foreground focus overlays, accessibility names and click callbacks.
+- Adds `GameTopActionsUiInstrumentedTest` covering semantic icon selection, focusability, shared circular backgrounds, foreground focus overlays, accessibility names and click callbacks.
 
 ## Background and artwork boundaries
 
