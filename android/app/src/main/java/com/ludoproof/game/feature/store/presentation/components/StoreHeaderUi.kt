@@ -8,6 +8,7 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.LudoProofTheme
+import com.ludoproof.game.core.ui.components.AppFocusRing
 import com.ludoproof.game.feature.store.presentation.StoreActivity
 import com.ludoproof.game.feature.store.presentation.art.GemClusterView
 import com.ludoproof.game.feature.store.presentation.art.StoreAwningView
@@ -64,6 +65,7 @@ internal fun StoreActivity.storeHeader():
                 setOnClickListener {
                     finish()
                 }
+                AppFocusRing.apply(this, cornerRadiusDp = 999f)
             },
             LinearLayout.LayoutParams(
                 dp(50),
