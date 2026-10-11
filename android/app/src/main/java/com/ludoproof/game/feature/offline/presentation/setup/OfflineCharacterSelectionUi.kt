@@ -111,7 +111,9 @@ internal fun OfflineGameActivity.persistActiveCharacterSetup() {
     )
 }
 
-internal fun OfflineGameActivity.characterPanel(): LinearLayout =
+internal fun OfflineGameActivity.characterPanel(
+    embeddedInComputerPanel: Boolean = false,
+): LinearLayout =
     selectionPanel(
         "CHOOSE YOUR PAW",
         if (isComputerMode) {
@@ -119,6 +121,7 @@ internal fun OfflineGameActivity.characterPanel(): LinearLayout =
         } else {
             "Give every player a different animal."
         },
+        embeddedInComputerPanel = embeddedInComputerPanel,
     ).apply {
         characterSlotsRow =
             LinearLayout(this@characterPanel).apply {

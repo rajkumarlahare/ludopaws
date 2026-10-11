@@ -11,7 +11,7 @@ import android.widget.TextView
 import android.os.Build
 import android.view.WindowInsets
 import com.ludoproof.game.*
-import com.ludoproof.game.core.ui.art.plywoodBackground
+import com.ludoproof.game.core.ui.art.recessedPlywoodBackground
 import com.ludoproof.game.feature.offline.*
 import com.ludoproof.game.ui.offline.common.*
 import com.ludoproof.game.ui.offline.gameplay.*
@@ -58,25 +58,14 @@ internal fun OfflineGameActivity.showSetup() {
     val content =
         LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            if (isComputerMode) {
-                setPadding(
-                    dp(8),
-                    dp(if (isCompactSetup()) 10 else 12),
-                    dp(8),
-                    dp(24),
-                )
-                background = plywoodBackground(
-                    context = this@showSetup,
-                    cornerRadiusDp = 24f,
-                )
-            } else {
-                setPadding(
-                    0,
-                    dp(if (isCompactSetup()) 10 else 12),
-                    0,
-                    dp(24),
-                )
-            }
+            // The old outer plywood shell is intentionally removed. The computer
+            // setup gets one shared recessed surface around Paw + player selection.
+            setPadding(
+                0,
+                dp(if (isCompactSetup()) 10 else 12),
+                0,
+                dp(24),
+            )
         }
     contentHost.addView(
         content,
@@ -111,32 +100,56 @@ internal fun OfflineGameActivity.showSetup() {
         ),
     )
 
-    // Character identity is the main Ludo Paws choice, so it leads the setup.
-    // Classic rules are the only local ruleset and no longer need a form panel.
-    content.addView(
-        characterPanel(),
-        setupSectionParams(
-            if (isComputerMode) {
-                if (isCompactSetup()) 10 else 12
-            } else if (isCompactSetup()) 12 else 14,
-        ),
-    )
-
-    content.addView(
-        playersPanel(),
-        setupSectionParams(
-            if (isComputerMode) {
-                if (isCompactSetup()) 8 else 10
-            } else if (isCompactSetup()) 10 else 12,
-        ),
-    )
-
-    if (!isComputerMode) {
+    // Paw selection and player count share one recessed panel on the computer page.
+    // Pass & Play keeps its existing individual setup panels and color selection.
+    if (isComputerMode) {
+        val combinedSelectionPanel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            clipChildren = false
+            clipToPadding = false
+            setPadding(
+                dp(8),
+                dp(if (isCompactSetup()) 6 else 8),
+                dp(8),
+                dp(if (isCompactSetup()) 8 else 10),
+            )
+            background = recessedPlywoodBackground(
+                context = this@showSetup,
+                outerCornerRadiusDp = 24f,
+            )
+        }
+        combinedSelectionPanel.addView(
+            characterPanel(embeddedInComputerPanel = true),
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ),
+        )
+        combinedSelectionPanel.addView(
+            playersPanel(embeddedInComputerPanel = true),
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                topMargin = dp(if (isCompactSetup()) 2 else 4)
+            },
+        )
+        content.addView(
+            combinedSelectionPanel,
+            setupSectionParams(if (isCompactSetup()) 10 else 12),
+        )
+    } else {
+        content.addView(
+            characterPanel(),
+            setupSectionParams(if (isCompactSetup()) 12 else 14),
+        )
+        content.addView(
+            playersPanel(),
+            setupSectionParams(if (isCompactSetup()) 10 else 12),
+        )
         content.addView(
             colorPanel(),
-            setupSectionParams(
-                if (isCompactSetup()) 10 else 12,
-            ),
+            setupSectionParams(if (isCompactSetup()) 10 else 12),
         )
     }
 

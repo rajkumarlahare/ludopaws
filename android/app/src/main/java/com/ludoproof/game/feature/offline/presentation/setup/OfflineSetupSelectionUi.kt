@@ -4,6 +4,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.drawable.ColorDrawable
 import android.graphics.RectF
 import android.graphics.RadialGradient
 import android.graphics.Shader
@@ -18,14 +19,15 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.*
 import com.ludoproof.game.core.ui.art.recessedPlywoodBackground
-import com.ludoproof.game.core.ui.art.playerCountSelectionBackground
 import com.ludoproof.game.core.ui.icons.AppIconName
 import com.ludoproof.game.core.ui.icons.AppIconVariant
 import com.ludoproof.game.core.ui.icons.AppIconView
 import com.ludoproof.game.feature.offline.*
 import com.ludoproof.game.ui.offline.common.*
 
-internal fun OfflineGameActivity.playersPanel():
+internal fun OfflineGameActivity.playersPanel(
+    embeddedInComputerPanel: Boolean = false,
+):
     LinearLayout =
     selectionPanel(
         "SELECT PLAYERS",
@@ -34,6 +36,7 @@ internal fun OfflineGameActivity.playersPanel():
         } else {
             "Choose 2–4 players on this device."
         },
+        embeddedInComputerPanel = embeddedInComputerPanel,
     ).apply {
         val playersRow = LinearLayout(this@playersPanel).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -280,25 +283,32 @@ internal fun OfflineGameActivity.localTrustStrip():
 internal fun OfflineGameActivity.selectionPanel(
     title: String,
     subtitle: String,
+    embeddedInComputerPanel: Boolean = false,
 ):
     LinearLayout =
     LudoProofTheme.panel(this).apply {
-        setPadding(
-            dp(if (isCompactSetup()) 10 else 14),
-            dp(if (isCompactSetup()) 10 else 14),
-            dp(if (isCompactSetup()) 10 else 14),
-            dp(if (isCompactSetup()) 10 else 14),
-        )
-        // The setup reference uses one deep navy/cyan visual language for
-        // Pass & Play and Computer, while their actual setup rules stay separate.
-        background = if (isComputerMode) {
-            recessedPlywoodBackground(
+        val horizontalPadding = if (embeddedInComputerPanel) {
+            dp(if (isCompactSetup()) 4 else 6)
+        } else {
+            dp(if (isCompactSetup()) 10 else 14)
+        }
+        val verticalPadding = if (embeddedInComputerPanel) {
+            dp(if (isCompactSetup()) 3 else 5)
+        } else {
+            dp(if (isCompactSetup()) 10 else 14)
+        }
+        setPadding(horizontalPadding, verticalPadding, horizontalPadding, verticalPadding)
+        // Embedded subsections are transparent: the shared Computer parent is
+        // the sole recessed plywood surface. Other modes retain their own panels.
+        background = when {
+            embeddedInComputerPanel -> ColorDrawable(Color.TRANSPARENT)
+            isComputerMode -> recessedPlywoodBackground(
                 context = this@selectionPanel,
                 outerCornerRadiusDp = 20f,
             )
-        } else {
-            LudoProofTheme.darkPanelDrawable(this@selectionPanel)
+            else -> LudoProofTheme.darkPanelDrawable(this@selectionPanel)
         }
+        if (embeddedInComputerPanel) elevation = 0f
 
         val heading = LinearLayout(this@selectionPanel).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -513,23 +523,18 @@ private fun setupColor(name: String): Int =
 internal fun OfflineGameActivity.refreshSetupSelections() {
     playerButtons.forEach { (playerCount, tile) ->
         val selected = playerCount == selectedPlayers
-        tile.background = playerCountSelectionBackground(
-            context = this,
-            selected = selected,
-            outerCornerRadiusDp = 14f,
-            checkBadgeAtTopEnd = true,
-        )
-        tile.elevation = dp(if (selected) 5 else 4).toFloat()
-        tile.isSelected = selected
-        tile.contentDescription =
-            if (selected) "$playerCount players, selected" else "$playerCount players"
+        if (selected) {
+            LudoProofTheme.selectedTile(tile)
+        } else {
+            LudoProofTheme.normalTile(tile)
+        }
         (tile as? LinearLayout)?.let { content ->
             (content.getChildAt(0) as? ModeArtView)?.playerCountSelected = selected
             (content.getChildAt(1) as? TextView)?.setTextColor(
-                if (selected) 0xFFFFD45E.toInt() else Color.WHITE,
+                if (selected) 0xFF062B68.toInt() else Color.WHITE,
             )
             (content.getChildAt(2) as? TextView)?.setTextColor(
-                if (selected) 0xFFFFD45E.toInt() else Color.WHITE,
+                if (selected) 0xFF062B68.toInt() else Color.WHITE,
             )
         }
     }
