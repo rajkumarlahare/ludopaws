@@ -323,7 +323,9 @@ internal fun OfflineGameActivity.refreshCharacterSelectionUi() {
             context = this@refreshCharacterSelectionUi,
             selected = selected,
             outerCornerRadiusDp = 12f,
-            showCheckBadge = false,
+            checkBadgeAtTopEnd = true,
+            emphasizeSelected = true,
+            showCheckBadge = true,
         )
         button.elevation = dp(if (selected) 3 else 1).toFloat()
         button.isSelected = selected

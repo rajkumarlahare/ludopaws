@@ -544,7 +544,9 @@ internal fun OfflineGameActivity.refreshSetupSelections() {
                 context = this@refreshSetupSelections,
                 selected = selected,
                 outerCornerRadiusDp = 12f,
-                showCheckBadge = false,
+                checkBadgeAtTopEnd = true,
+                emphasizeSelected = true,
+                showCheckBadge = true,
             )
             tile.elevation = dp(if (selected) 3 else 1).toFloat()
         }
@@ -562,7 +564,9 @@ internal fun OfflineGameActivity.refreshSetupSelections() {
             context = this@refreshSetupSelections,
             selected = selected,
             outerCornerRadiusDp = 12f,
-            showCheckBadge = false,
+            checkBadgeAtTopEnd = true,
+            emphasizeSelected = true,
+            showCheckBadge = true,
         )
         tile.elevation = dp(if (selected) 3 else 1).toFloat()
         ((tile as? LinearLayout)?.getChildAt(1) as? TextView)?.setTextColor(
