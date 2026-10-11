@@ -27,7 +27,7 @@ internal fun OfflineGameActivity.backHeader(label: String?): View {
 
     if (isComputerMode || label == "PASS & PLAY") {
         return FrameLayout(this).apply {
-            minimumHeight = dp(if (isCompactSetup()) 50 else 56)
+            minimumHeight = dp(if (LudoProofTheme.isCompactWidth(this@backHeader)) 50 else 56)
             clipChildren = false
             clipToPadding = false
 
@@ -52,9 +52,9 @@ internal fun OfflineGameActivity.backHeader(label: String?): View {
                     orientation = LinearLayout.HORIZONTAL
                     gravity = Gravity.CENTER
                     setPadding(
-                        dp(if (isCompactSetup()) 10 else 14),
+                        dp(if (LudoProofTheme.isCompactWidth(this@backHeader)) 10 else 14),
                         dp(4),
-                        dp(if (isCompactSetup()) 10 else 14),
+                        dp(if (LudoProofTheme.isCompactWidth(this@backHeader)) 10 else 14),
                         dp(4),
                     )
                     background =
@@ -73,8 +73,8 @@ internal fun OfflineGameActivity.backHeader(label: String?): View {
                     addView(
                         SetupPawMarkView(this@backHeader),
                         LinearLayout.LayoutParams(
-                            dp(if (isCompactSetup()) 18 else 22),
-                            dp(if (isCompactSetup()) 18 else 22),
+                            dp(if (LudoProofTheme.isCompactWidth(this@backHeader)) 18 else 22),
+                            dp(if (LudoProofTheme.isCompactWidth(this@backHeader)) 18 else 22),
                         ),
                     )
                     addView(
@@ -82,7 +82,7 @@ internal fun OfflineGameActivity.backHeader(label: String?): View {
                             text = label.orEmpty()
                             LudoProofTheme.title(
                                 this,
-                                if (isCompactSetup()) 15f else 19f,
+                                if (LudoProofTheme.isCompactWidth(this@backHeader)) 15f else 19f,
                                 gold = true,
                             )
                             setPadding(dp(7), 0, dp(7), 0)
@@ -93,16 +93,16 @@ internal fun OfflineGameActivity.backHeader(label: String?): View {
                     addView(
                         SetupPawMarkView(this@backHeader),
                         LinearLayout.LayoutParams(
-                            dp(if (isCompactSetup()) 18 else 22),
-                            dp(if (isCompactSetup()) 18 else 22),
+                            dp(if (LudoProofTheme.isCompactWidth(this@backHeader)) 18 else 22),
+                            dp(if (LudoProofTheme.isCompactWidth(this@backHeader)) 18 else 22),
                         ),
                     )
                 }
             addView(
                 badge,
                 FrameLayout.LayoutParams(
-                    dp(if (isCompactSetup()) 222 else 274),
-                    dp(if (isCompactSetup()) 42 else 48),
+                    dp(if (LudoProofTheme.isCompactWidth(this@backHeader)) 222 else 274),
+                    dp(if (LudoProofTheme.isCompactWidth(this@backHeader)) 42 else 48),
                     Gravity.CENTER,
                 ),
             )
@@ -187,7 +187,7 @@ internal fun OfflineGameActivity.backHeader(label: String?): View {
     }
 }
 
-internal fun OfflineGameActivity.isCompactSetup():
+internal fun OfflineGameActivity.LudoProofTheme.isCompactWidth(this@backHeader):
     Boolean =
     LudoProofTheme
         .isCompactWidth(this)
