@@ -326,6 +326,7 @@ internal fun OfflineGameActivity.refreshCharacterSelectionUi() {
             checkBadgeAtTopEnd = true,
             emphasizeSelected = true,
             showCheckBadge = true,
+            checkMarkScale = 2f,
         )
         button.elevation = dp(if (selected) 3 else 1).toFloat()
         button.isSelected = selected
