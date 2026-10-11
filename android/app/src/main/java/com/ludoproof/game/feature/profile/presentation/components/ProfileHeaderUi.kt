@@ -3,7 +3,6 @@ package com.ludoproof.game.feature.profile.presentation.components
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
-import android.net.Uri
 import android.view.Gravity
 import android.widget.Button
 import android.widget.FrameLayout
@@ -190,25 +189,27 @@ internal fun ProfileActivity.profileIdentityPanel(
                 )
 
                 profilePhotoUri?.let { savedUri ->
-                    addView(
-                        ImageView(this@profileIdentityPanel).apply {
-                            setImageURI(Uri.parse(savedUri))
-                            scaleType = ImageView.ScaleType.CENTER_CROP
-                            background = LudoProofTheme.rounded(
-                                0xFF0B397A.toInt(),
-                                14f,
-                                0xFF5BE0FF.toInt(),
-                                1f,
-                                this@profileIdentityPanel,
-                            )
-                            clipToOutline = true
-                            contentDescription = "Profile picture"
-                        },
-                        FrameLayout.LayoutParams(
-                            FrameLayout.LayoutParams.MATCH_PARENT,
-                            FrameLayout.LayoutParams.MATCH_PARENT,
-                        ),
-                    )
+                    loadProfilePhoto(savedUri)?.let { bitmap ->
+                        addView(
+                            ImageView(this@profileIdentityPanel).apply {
+                                setImageBitmap(bitmap)
+                                scaleType = ImageView.ScaleType.CENTER_CROP
+                                background = LudoProofTheme.rounded(
+                                    0xFF0B397A.toInt(),
+                                    14f,
+                                    0xFF5BE0FF.toInt(),
+                                    1f,
+                                    this@profileIdentityPanel,
+                                )
+                                clipToOutline = true
+                                contentDescription = "Profile picture"
+                            },
+                            FrameLayout.LayoutParams(
+                                FrameLayout.LayoutParams.MATCH_PARENT,
+                                FrameLayout.LayoutParams.MATCH_PARENT,
+                            ),
+                        )
+                    }
                 }
 
                 addView(
