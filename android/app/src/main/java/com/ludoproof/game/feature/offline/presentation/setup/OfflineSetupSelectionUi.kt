@@ -532,6 +532,7 @@ internal fun OfflineGameActivity.refreshSetupSelections() {
                 checkBadgeAtTopEnd = true,
                 emphasizeSelected = true,
                 showCheckBadge = true,
+                checkMarkScale = 3f,
             )
             tile.elevation = dp(if (selected) 6 else 4).toFloat()
         } else if (selected) {

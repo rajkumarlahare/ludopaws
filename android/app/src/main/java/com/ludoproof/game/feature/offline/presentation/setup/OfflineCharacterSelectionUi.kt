@@ -10,6 +10,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.LudoPawsCharacterAvatarView
 import com.ludoproof.game.core.ui.art.playerCountSelectionBackground
+import com.ludoproof.game.core.ui.art.transparentDarkBlueStrokeBackground
 import com.ludoproof.game.LudoProofTheme
 import com.ludoproof.game.OfflineGameActivity
 import com.ludoproof.game.feature.characters.domain.catalog.LudoPawsCharacterCatalog
@@ -292,20 +293,44 @@ private fun OfflineGameActivity.characterChoiceCard(
                 setTextColor(0xFFBCD5FF.toInt())
                 gravity = Gravity.CENTER
                 includeFontPadding = false
-                setPadding(dp(8), dp(4), dp(8), dp(4))
-                background = LudoProofTheme.rounded(
-                    0xB803225C.toInt(),
-                    999f,
-                    0xFF178CD6.toInt(),
-                    1f,
-                    this@characterChoiceCard,
+                setPadding(
+                    dp(if (isComputerMode) 5 else 8),
+                    dp(4),
+                    dp(if (isComputerMode) 5 else 8),
+                    dp(4),
                 )
+                if (isComputerMode) {
+                    maxLines = 1
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                }
+                background =
+                    if (isComputerMode) {
+                        transparentDarkBlueStrokeBackground(
+                            context = this@characterChoiceCard,
+                            cornerRadiusDp = 999f,
+                        )
+                    } else {
+                        LudoProofTheme.rounded(
+                            0xB803225C.toInt(),
+                            999f,
+                            0xFF178CD6.toInt(),
+                            1f,
+                            this@characterChoiceCard,
+                        )
+                    }
                 tag = CHARACTER_PERSONALITY_TAG
             },
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(3) },
+            ).apply {
+                topMargin = dp(3)
+                // Keep the subtitle stroke tucked inside the character card's side edges.
+                if (isComputerMode) {
+                    marginStart = dp(4)
+                    marginEnd = dp(4)
+                }
+            },
         )
 
         contentDescription = "Choose ${character.displayName}"
@@ -377,6 +402,7 @@ internal fun OfflineGameActivity.refreshCharacterSelectionUi() {
                 checkBadgeAtTopEnd = true,
                 emphasizeSelected = true,
                 showCheckBadge = true,
+                checkMarkScale = 3f,
             )
             card.elevation = dp(if (selected) 6 else 4).toFloat()
         } else if (selected) {
@@ -409,13 +435,21 @@ internal fun OfflineGameActivity.refreshCharacterSelectionUi() {
             setTextColor(
                 if (legacySelectedStyle) 0xFF174A78.toInt() else 0xFFBCD5FF.toInt(),
             )
-            background = LudoProofTheme.rounded(
-                if (legacySelectedStyle) 0xB5FFE59A.toInt() else 0xB803225C.toInt(),
-                999f,
-                if (legacySelectedStyle) 0xCCFFB51D.toInt() else 0xFF178CD6.toInt(),
-                1f,
-                this@refreshCharacterSelectionUi,
-            )
+            background =
+                if (isComputerMode) {
+                    transparentDarkBlueStrokeBackground(
+                        context = this@refreshCharacterSelectionUi,
+                        cornerRadiusDp = 999f,
+                    )
+                } else {
+                    LudoProofTheme.rounded(
+                        if (legacySelectedStyle) 0xB5FFE59A.toInt() else 0xB803225C.toInt(),
+                        999f,
+                        if (legacySelectedStyle) 0xCCFFB51D.toInt() else 0xFF178CD6.toInt(),
+                        1f,
+                        this@refreshCharacterSelectionUi,
+                    )
+                }
         }
     }
 

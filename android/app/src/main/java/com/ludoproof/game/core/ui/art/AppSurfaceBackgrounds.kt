@@ -76,6 +76,7 @@ internal fun playerCountSelectionBackground(
     checkBadgeAtTopEnd: Boolean = false,
     emphasizeSelected: Boolean = false,
     showCheckBadge: Boolean = true,
+    checkMarkScale: Float = 1f,
 ): android.graphics.drawable.Drawable {
     val baseBackground = recessedPlywoodBackground(context, outerCornerRadiusDp)
     if (!selected) return baseBackground
@@ -87,6 +88,7 @@ internal fun playerCountSelectionBackground(
                 checkBadgeAtTopEnd,
                 emphasizeSelected,
                 showCheckBadge,
+                checkMarkScale,
             ),
         ),
     )
@@ -97,6 +99,7 @@ private class PlayerCountSelectionOverlayDrawable(
     private val checkBadgeAtTopEnd: Boolean,
     private val emphasizeSelected: Boolean,
     private val showCheckBadge: Boolean,
+    private val checkMarkScale: Float,
 ) : android.graphics.drawable.Drawable() {
     private val density = context.resources.displayMetrics.density
     private val fillPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
@@ -139,25 +142,34 @@ private class PlayerCountSelectionOverlayDrawable(
         // the selected numeral remains unobstructed.
         if (!showCheckBadge) return
 
-        // The Friends page uses a compact 42dp control: pin its marker to the
-        // actual top-right corner. Larger online cards keep their bottom-right badge.
-        val badgeRadius = dp(if (checkBadgeAtTopEnd) 5.2f else 7.2f)
-        val badgeX = boundsRect.right - dp(if (checkBadgeAtTopEnd) 8f else 18f)
+        // Friends keeps its compact marker by default. Computer opts into a
+        // 3x checkmark; its badge grows enough to contain the enlarged tick.
+        val topEndScale = if (checkBadgeAtTopEnd) checkMarkScale.coerceAtLeast(1f) else 1f
+        val baseTickRadius = dp(if (checkBadgeAtTopEnd) 5.2f else 7.2f)
+        val badgeRadius =
+            if (checkBadgeAtTopEnd) dp(5.2f + (topEndScale - 1f) * 3.4f)
+            else baseTickRadius
+        val badgeInset =
+            if (checkBadgeAtTopEnd) 8f + (topEndScale - 1f) * 3f
+            else 18f
+        val badgeX = boundsRect.right - dp(badgeInset)
         val badgeY =
-            if (checkBadgeAtTopEnd) boundsRect.top + dp(8f)
+            if (checkBadgeAtTopEnd) boundsRect.top + dp(badgeInset)
             else boundsRect.bottom - dp(19f)
         fillPaint.alpha = drawableAlpha
         canvas.drawCircle(badgeX, badgeY, badgeRadius, fillPaint)
 
-        // Match the compact Friends check tick to the green COPY button.
+        // Match the Friends check tick to the green COPY button.
         strokePaint.color =
             if (checkBadgeAtTopEnd) 0xFF08A93B.toInt() else 0xFF63451B.toInt()
         strokePaint.alpha = drawableAlpha
-        strokePaint.strokeWidth = dp(if (checkBadgeAtTopEnd) 1.5f else 1.8f)
+        strokePaint.strokeWidth =
+            dp(if (checkBadgeAtTopEnd) 1.5f * topEndScale else 1.8f)
+        val tickRadius = if (checkBadgeAtTopEnd) baseTickRadius * topEndScale else badgeRadius
         val check = android.graphics.Path().apply {
-            moveTo(badgeX - badgeRadius * 0.43f, badgeY + badgeRadius * 0.02f)
-            lineTo(badgeX - badgeRadius * 0.10f, badgeY + badgeRadius * 0.34f)
-            lineTo(badgeX + badgeRadius * 0.44f, badgeY - badgeRadius * 0.36f)
+            moveTo(badgeX - tickRadius * 0.43f, badgeY + tickRadius * 0.02f)
+            lineTo(badgeX - tickRadius * 0.10f, badgeY + tickRadius * 0.34f)
+            lineTo(badgeX + tickRadius * 0.44f, badgeY - tickRadius * 0.36f)
         }
         canvas.drawPath(check, strokePaint)
     }

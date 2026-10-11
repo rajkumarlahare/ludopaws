@@ -12,6 +12,7 @@ import android.os.Build
 import android.view.WindowInsets
 import com.ludoproof.game.*
 import com.ludoproof.game.core.ui.art.plywoodBackground
+import com.ludoproof.game.core.ui.art.playGamesSignInBackground
 import com.ludoproof.game.ui.game.addGameTopActions
 import com.ludoproof.game.ui.dialogs.showSettingsDialog
 import com.ludoproof.game.feature.offline.*
@@ -200,6 +201,11 @@ internal fun OfflineGameActivity.showSetup() {
             textSize = if (isCompactSetup()) 21f else 24f
             isAllCaps = false
             LudoProofTheme.primary(this)
+            if (isComputerMode) {
+                // Match the Online lobby PLAY action's green fill and cyan stroke.
+                background = playGamesSignInBackground(this@showSetup)
+                setTextColor(Color.WHITE)
+            }
             contentDescription = if (isComputerMode) {
                 "Start game against computer"
             } else {
