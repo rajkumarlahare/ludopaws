@@ -171,20 +171,8 @@ internal fun ProfileActivity.profileIdentityPanel(profile: ProfileSnapshot): Lin
                     )
                 }
 
-                // Use two explicit views rather than Button compound-drawable spacing,
-                // so the pen sits immediately beside the word with a predictable ~1dp gap.
-                addView(
-                    ImageView(this@profileIdentityPanel).apply {
-                        setImageDrawable(
-                            context.getDrawable(com.ludoproof.game.R.drawable.ic_profile_edit_pen)
-                                ?.mutate()
-                                ?.apply { setTint(Color.WHITE) },
-                        )
-                        scaleType = ImageView.ScaleType.FIT_CENTER
-                        contentDescription = null
-                    },
-                    LinearLayout.LayoutParams(dp(14), dp(14)),
-                )
+                // Keep the label first, with the pen immediately to its right.
+                // The parent row centers the combined label + icon as one group.
                 addView(
                     TextView(this@profileIdentityPanel).apply {
                         text = "Change"
@@ -197,7 +185,21 @@ internal fun ProfileActivity.profileIdentityPanel(profile: ProfileSnapshot): Lin
                     LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.WRAP_CONTENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT,
-                    ).apply { marginStart = -dp(1) },
+                    ),
+                )
+                addView(
+                    ImageView(this@profileIdentityPanel).apply {
+                        setImageDrawable(
+                            context.getDrawable(com.ludoproof.game.R.drawable.ic_profile_edit_pen)
+                                ?.mutate()
+                                ?.apply { setTint(Color.WHITE) },
+                        )
+                        scaleType = ImageView.ScaleType.FIT_CENTER
+                        contentDescription = null
+                    },
+                    LinearLayout.LayoutParams(dp(14), dp(14)).apply {
+                        marginStart = dp(3)
+                    },
                 )
                 AppFocusRing.apply(this, cornerRadiusDp = 999f)
             },
