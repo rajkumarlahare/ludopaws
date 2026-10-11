@@ -169,11 +169,12 @@ internal fun ProfileActivity.profileIdentityPanel(profile: ProfileSnapshot): Lin
                     ?.mutate()
                     ?.apply {
                         setTint(Color.WHITE)
-                        setBounds(0, 0, dp(16), dp(16))
+                        setBounds(0, 0, dp(15), dp(15))
                     }
                 setCompoundDrawablesRelative(pencil, null, null, null)
-                compoundDrawablePadding = dp(2)
-                setPadding(dp(6), 0, dp(6), 0)
+                // Keep the pen snug to the label; the vector itself already has inner whitespace.
+                compoundDrawablePadding = 0
+                setPadding(dp(4), 0, dp(4), 0)
                 background = PlywoodTextureDrawable(resources.displayMetrics.density)
                 contentDescription = "Change selected Paw"
                 setOnClickListener {
