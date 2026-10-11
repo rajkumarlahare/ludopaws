@@ -27,11 +27,7 @@ internal fun settingsCompactPanel(
             settingsDp(context, 8),
             settingsDp(context, 8),
         )
-        background =
-            LudoProofTheme.darkPanelDrawable(
-                context,
-                goldBorder = true,
-            )
+        background = SettingsSharedWebpDrawable(context)
 
         addView(
             settingsHeader(
@@ -498,11 +494,7 @@ internal fun showSettingsChoiceDialog(
                 settingsDp(context, 10),
                 settingsDp(context, 10),
             )
-            background =
-                LudoProofTheme.darkPanelDrawable(
-                    context,
-                    goldBorder = true,
-                )
+            background = SettingsSharedWebpDrawable(context)
 
             addView(
                 TextView(context).apply {
