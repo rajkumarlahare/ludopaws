@@ -36,17 +36,17 @@ internal fun OfflineGameActivity.centeredSetupTitle(label: String): View {
         addView(
             RobotTitleIconView(this@centeredSetupTitle),
             LinearLayout.LayoutParams(
-                dp(if (compact) 22 else 26),
-                dp(if (compact) 22 else 26),
+                dp(36),
+                dp(36),
             ).apply {
-                marginEnd = dp(4)
+                marginEnd = dp(8)
             },
         )
         addView(
             TextView(this@centeredSetupTitle).apply {
                 text = label
-                LudoProofTheme.title(this, if (compact) 15f else 19f, gold = false)
-                setPadding(dp(7), 0, dp(7), 0)
+                LudoProofTheme.title(this, if (compact) 22f else 26f, gold = false)
+                setPadding(0, 0, 0, 0)
                 includeFontPadding = false
                 maxLines = 1
             },
@@ -59,7 +59,7 @@ internal fun OfflineGameActivity.centeredSetupTitle(label: String): View {
             badge,
             FrameLayout.LayoutParams(
                 dp(if (compact) 222 else 254),
-                dp(if (compact) 42 else 48),
+                dp(54),
                 Gravity.CENTER,
             ),
         )

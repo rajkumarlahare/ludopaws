@@ -38,24 +38,27 @@ private fun MainActivity.onlineModePanelHeader(): LinearLayout =
         orientation = LinearLayout.VERTICAL
         gravity = Gravity.CENTER
         val compact = isCompactOnline()
+        val isTeamUp = gameMode == GameMode.TEAM_UP
+        val iconSize = if (isTeamUp) { if (compact) 34 else 38 } else 36
+        val titleSize = if (isTeamUp) { if (compact) 20f else 23f } else { if (compact) 22f else 26f }
         addView(
             LinearLayout(this@onlineModePanelHeader).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER
                 addView(
                     ModeArtView(this@onlineModePanelHeader).apply {
-                        mode = if (gameMode == GameMode.TEAM_UP) ModeArtView.Mode.TEAM_UP else ModeArtView.Mode.ONLINE
+                        mode = if (isTeamUp) ModeArtView.Mode.TEAM_UP else ModeArtView.Mode.ONLINE
                         importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
                     },
                     LinearLayout.LayoutParams(
-                        dp(if (compact) 34 else 38),
-                        dp(if (compact) 34 else 38),
+                        dp(iconSize),
+                        dp(iconSize),
                     ).apply { marginEnd = dp(8) },
                 )
                 addView(
                     TextView(this@onlineModePanelHeader).apply {
-                        text = if (gameMode == GameMode.TEAM_UP) "TEAM UP" else "ONLINE"
-                        LudoProofTheme.title(this, if (compact) 20f else 23f)
+                        text = if (isTeamUp) "TEAM UP" else "ONLINE"
+                        LudoProofTheme.title(this, titleSize)
                         gravity = Gravity.CENTER_VERTICAL
                         maxLines = 1
                         includeFontPadding = false
