@@ -113,6 +113,22 @@ internal fun ProfileActivity.profileIdentityPanel(profile: ProfileSnapshot): Lin
                 setStroke(dp(1), 0xFF63DFFF.toInt())
             }
         }
+        // A subtle neon paw stage echoes the reference artwork without adding a second character.
+        pawFrame.addView(
+            View(this@profileIdentityPanel).apply {
+                background = GradientDrawable(
+                    GradientDrawable.Orientation.LEFT_RIGHT,
+                    intArrayOf(0xFF35C9FF.toInt(), 0xFF75F4FF.toInt(), 0xFF167FFF.toInt()),
+                ).apply {
+                    shape = GradientDrawable.OVAL
+                    setStroke(dp(1), 0xFFB0FFFF.toInt())
+                }
+                elevation = dp(2).toFloat()
+            },
+            FrameLayout.LayoutParams(dp(104), dp(16), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply {
+                bottomMargin = dp(7)
+            },
+        )
         pawFrame.addView(
             LudoPawsCharacterAvatarView(this@profileIdentityPanel).apply {
                 setPadding(dp(3), dp(3), dp(3), dp(3))
