@@ -91,7 +91,7 @@ class MainActivity : ComponentActivity() {
     internal lateinit var connectionText: TextView
     internal lateinit var boardView: LudoBoardView
     internal lateinit var diceView: DiceView
-    internal lateinit var findMatchButton: Button
+    internal lateinit var findMatchButton: LinearLayout
     internal lateinit var cancelMatchmakingButton: Button
     internal lateinit var twoPlayerButton: Button
     internal lateinit var fourPlayerButton: Button
