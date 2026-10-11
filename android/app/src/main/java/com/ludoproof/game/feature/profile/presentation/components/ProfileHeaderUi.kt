@@ -156,33 +156,49 @@ internal fun ProfileActivity.profileIdentityPanel(profile: ProfileSnapshot): Lin
             ),
         )
         pawFrame.addView(
-            Button(this@profileIdentityPanel).apply {
-                text = "Change"
-                textSize = 12f
-                isAllCaps = false
-                setTypeface(Typeface.DEFAULT_BOLD)
-                setTextColor(Color.WHITE)
-                minWidth = 0
-                minHeight = 0
-                val pencil = context
-                    .getDrawable(com.ludoproof.game.R.drawable.ic_profile_edit_pen)
-                    ?.mutate()
-                    ?.apply {
-                        setTint(Color.WHITE)
-                        setBounds(0, 0, dp(15), dp(15))
-                    }
-                setCompoundDrawablesRelative(pencil, null, null, null)
-                // Keep the pen snug to the label; the vector itself already has inner whitespace.
-                compoundDrawablePadding = 0
-                setPadding(dp(4), 0, dp(4), 0)
+            LinearLayout(this@profileIdentityPanel).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER
+                setPadding(0, 0, 0, 0)
                 background = PlywoodTextureDrawable(resources.displayMetrics.density)
                 contentDescription = "Change selected Paw"
+                isClickable = true
+                isFocusable = true
                 setOnClickListener {
                     startActivity(
                         Intent(this@profileIdentityPanel, StoreActivity::class.java)
                             .putExtra(StoreActivity.EXTRA_INITIAL_TAB, StoreTab.PAWS.name),
                     )
                 }
+
+                // Use two explicit views rather than Button compound-drawable spacing,
+                // so the pen sits immediately beside the word with a predictable ~1dp gap.
+                addView(
+                    ImageView(this@profileIdentityPanel).apply {
+                        setImageDrawable(
+                            context.getDrawable(com.ludoproof.game.R.drawable.ic_profile_edit_pen)
+                                ?.mutate()
+                                ?.apply { setTint(Color.WHITE) },
+                        )
+                        scaleType = ImageView.ScaleType.FIT_CENTER
+                        contentDescription = null
+                    },
+                    LinearLayout.LayoutParams(dp(14), dp(14)),
+                )
+                addView(
+                    TextView(this@profileIdentityPanel).apply {
+                        text = "Change"
+                        textSize = 12f
+                        setTypeface(Typeface.DEFAULT_BOLD)
+                        setTextColor(Color.WHITE)
+                        gravity = Gravity.CENTER_VERTICAL
+                        includeFontPadding = false
+                    },
+                    LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                    ).apply { marginStart = -dp(1) },
+                )
                 AppFocusRing.apply(this, cornerRadiusDp = 999f)
             },
             FrameLayout.LayoutParams(
