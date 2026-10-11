@@ -56,6 +56,11 @@ class ProfileActivity : Activity() {
         refreshPlayGamesSignIn()
     }
 
+    override fun onRestart() {
+        super.onRestart()
+        renderProfile()
+    }
+
     internal fun renderProfile() {
         val profile =
             profileStore
