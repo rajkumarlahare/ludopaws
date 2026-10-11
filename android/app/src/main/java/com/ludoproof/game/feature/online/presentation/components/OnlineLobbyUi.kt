@@ -14,6 +14,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.LudoProofTheme
+import com.ludoproof.game.core.ui.art.plywoodBackground
 import com.ludoproof.game.core.ui.components.AppFocusRing
 import com.ludoproof.game.LudoPawsCharacterAvatarView
 import com.ludoproof.game.MainActivity
@@ -103,16 +104,10 @@ internal fun MainActivity.onlineLobbyPanel():
                 clipChildren = false
                 clipToPadding = false
                 background =
-                    GradientDrawable(
-                        GradientDrawable.Orientation.TOP_BOTTOM,
-                        intArrayOf(
-                            0xF20A2856.toInt(),
-                            0xF2081B3D.toInt(),
-                        ),
-                    ).apply {
-                        cornerRadius = dp(24).toFloat()
-                        setStroke(dp(2), 0xFF40CFFF.toInt())
-                    }
+                    plywoodBackground(
+                        context = this@onlineLobbyPanel,
+                        cornerRadiusDp = 24f,
+                    )
 
                 addView(
                     MatchmakingMedallionView(this@onlineLobbyPanel),
@@ -332,11 +327,10 @@ internal fun MainActivity.onlineLobbyPanel():
                     dp(18),
                 )
                 background =
-                    LudoProofTheme
-                        .darkPanelDrawable(
-                            this@onlineLobbyPanel,
-                            goldBorder = true,
-                        )
+                    plywoodBackground(
+                        context = this@onlineLobbyPanel,
+                        cornerRadiusDp = 24f,
+                    )
 
                 val ownAvatar =
                     FrameLayout(
