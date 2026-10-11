@@ -4,7 +4,6 @@ import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.StateListDrawable
 import android.view.Gravity
 import android.view.View
-import android.widget.Button
 import android.widget.FrameLayout
 import com.ludoproof.game.LudoProofTheme
 import com.ludoproof.game.core.ui.components.AppFocusRing
@@ -48,7 +47,7 @@ internal fun addGameTopActions(
                 AppIconView(
                     context = context,
                     iconName = if (style == GameTopActionsStyle.OFFLINE_GAMEPLAY) {
-                        AppIconName.BACK
+                        AppIconName.BACK_ARROW
                     } else {
                         AppIconName.CHEVRON_LEFT
                     },
@@ -122,25 +121,24 @@ private fun gameTopButton(
         isClickable = true
         isFocusable = true
         this.contentDescription = contentDescription
-        background = if (style == GameTopActionsStyle.OFFLINE_GAMEPLAY) {
-            offlineGameplayActionBackground(context)
-        } else {
-            com.ludoproof.game.ui.home.homeGlassBackground(
-                context = context,
-                shape = com.ludoproof.game.ui.home.HomeGlassShape.CIRCLE,
-            )
-        }
-        elevation = LudoProofTheme.dp(context, if (style == GameTopActionsStyle.OFFLINE_GAMEPLAY) 3 else 7).toFloat()
-        stateListAnimator = null
-        setOnClickListener { onClick() }
         if (style == GameTopActionsStyle.OFFLINE_GAMEPLAY) {
+            background = offlineGameplayActionBackground(context)
+            elevation = LudoProofTheme.dp(context, 3).toFloat()
+            stateListAnimator = null
             AppFocusRing.apply(
                 this,
                 cornerRadiusDp = AppUiTokens.Shape.PILL_RADIUS_DP,
                 strokeWidthDp = AppUiTokens.Icon.NORMAL_STROKE_DP,
                 color = LudoProofTheme.GOLD,
             )
+        } else {
+            background = com.ludoproof.game.ui.home.homeGlassBackground(
+                context = context,
+                shape = com.ludoproof.game.ui.home.HomeGlassShape.CIRCLE,
+            )
+            elevation = LudoProofTheme.dp(context, 7).toFloat()
         }
+        setOnClickListener { onClick() }
 
         addView(
             icon,
