@@ -1,7 +1,6 @@
 package com.ludoproof.game.core.ui.components
 
 import android.content.Context
-import android.graphics.Color
 import android.graphics.Typeface
 import android.view.Gravity
 import android.widget.TextView
