@@ -22,6 +22,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import com.ludoproof.game.CachedMatchStore
+import com.ludoproof.game.LudoPawsCharacterAvatarView
 import com.ludoproof.game.GameMode
 import com.ludoproof.game.GameModeIntent
 import com.ludoproof.game.LudoProofTheme
@@ -37,6 +38,8 @@ import com.ludoproof.game.SecureSessionStore
 import com.ludoproof.game.feature.leaderboard.data.local.LeaderboardCredential
 import com.ludoproof.game.feature.leaderboard.data.local.LeaderboardIdentityStore
 import com.ludoproof.game.feature.leaderboard.data.remote.LeaderboardApi
+import com.ludoproof.game.feature.characters.data.local.CharacterSelectionStore
+import com.ludoproof.game.feature.characters.domain.catalog.LudoPawsCharacterCatalog
 import com.ludoproof.game.feature.profile.data.local.ProfileStore
 import com.ludoproof.game.feature.team.data.local.TeamMatchmakingStore
 import com.ludoproof.game.feature.team.data.local.TeamMatchmakingTicket
@@ -52,6 +55,7 @@ class TeamUpActivity : Activity() {
     private val ticketStore by lazy { TeamMatchmakingStore(this) }
     private val identityStore by lazy { LeaderboardIdentityStore(this) }
     private val profileStore by lazy { ProfileStore(this) }
+    private var selectedCharacterId = LudoPawsCharacterCatalog.DEFAULT_CHARACTER_ID
     private val sessionStore by lazy { SecureSessionStore(this) }
     private val cachedMatchStore by lazy { CachedMatchStore(this) }
     private val executor = Executors.newSingleThreadExecutor()
@@ -86,6 +90,7 @@ class TeamUpActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         LudoProofTheme.configureWindow(this)
+        selectedCharacterId = CharacterSelectionStore(this).load().characterId
         buildUi()
         renderSearchState()
     }
@@ -267,7 +272,9 @@ class TeamUpActivity : Activity() {
                 },
             )
 
-            teamSlotProgressView = TeamSlotProgressView(this@TeamUpActivity)
+            teamSlotProgressView = TeamSlotProgressView(this@TeamUpActivity).apply {
+                setQueuedPlayers(1, listOf(selectedCharacterId))
+            }
             addView(
                 teamSlotProgressView,
                 LinearLayout.LayoutParams(
@@ -508,6 +515,9 @@ class TeamUpActivity : Activity() {
             return
         }
 
+        // Refresh the persisted selection so the YOU portrait and matchmaking request agree.
+        selectedCharacterId = CharacterSelectionStore(this).load().characterId
+
         val displayName =
             profileStore.snapshot().displayName
                 .trim()
@@ -539,6 +549,7 @@ class TeamUpActivity : Activity() {
                     profileToken = credential.profileToken,
                     displayName = ticket.displayName,
                     clientRequestId = ticket.requestId,
+                    characterId = selectedCharacterId,
                 )
             },
             onSuccess = ::applyMatchmakingResponse,
@@ -592,7 +603,7 @@ class TeamUpActivity : Activity() {
             "MATCHED" -> openMatchedGame(response)
             "SEARCHING" -> {
                 val queued = response.optInt("queuedPlayers", 1).coerceIn(1, 4)
-                renderQueuedPlayers(queued)
+                renderQueuedPlayers(queued, queuedCharacterIds(response))
             }
             "IDLE" -> {
                 ticketStore.clear()
@@ -600,6 +611,24 @@ class TeamUpActivity : Activity() {
                 showStatus("Search expired. Tap QUICK TEAM to search again.")
             }
             else -> showStatus("Unexpected Team Up matchmaking response.")
+        }
+    }
+
+    private fun queuedCharacterIds(response: JSONObject): List<String> {
+        val array = response.optJSONArray("queuedCharacterIds")
+            ?: return listOf(selectedCharacterId)
+        val received = buildList {
+            for (index in 0 until minOf(array.length(), 4)) {
+                val id = LudoPawsCharacterCatalog.canonicalCharacterId(array.optString(index))
+                    ?: continue
+                if (LudoPawsCharacterCatalog.character(id) != null) add(id)
+            }
+        }
+        // The server orders the current request first; use the local profile value
+        // for slot zero so YOU always matches the character used by this device.
+        return buildList {
+            add(selectedCharacterId)
+            addAll(received.drop(1).take(3))
         }
     }
 
@@ -714,10 +743,13 @@ class TeamUpActivity : Activity() {
         updateButtons()
     }
 
-    private fun renderQueuedPlayers(queued: Int) {
+    private fun renderQueuedPlayers(
+        queued: Int,
+        characterIds: List<String> = listOf(selectedCharacterId),
+    ) {
         val safe = queued.coerceIn(1, 4)
         slotsText.text = "$safe / 4 PLAYERS"
-        teamSlotProgressView.setQueuedPlayers(safe)
+        teamSlotProgressView.setQueuedPlayers(safe, characterIds)
         if (safe >= 4) {
             showStatus("Match found • assigning opposite-color teams…")
         } else {
@@ -889,7 +921,7 @@ class TeamUpActivity : Activity() {
      * server confirms another queued player, that slot locks in and the scan
      * extends from it toward the following slot.
      */
-    private class TeamSlotProgressView(context: android.content.Context) : View(context) {
+    private class TeamSlotProgressView(context: android.content.Context) : FrameLayout(context) {
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         private val playerColors =
             intArrayOf(
@@ -899,14 +931,56 @@ class TeamUpActivity : Activity() {
                 0xFF2A8CFF.toInt(),
             )
         private var queuedPlayers = 1
+        private var queuedCharacterIds: List<String> = emptyList()
         private var approachStartedAt = 0L
+        private val characterViews = Array(4) {
+            LudoPawsCharacterAvatarView(context).apply {
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                bind(
+                    characterId = LudoPawsCharacterCatalog.DEFAULT_CHARACTER_ID,
+                    showCircularChrome = false,
+                )
+                visibility = View.INVISIBLE
+            }
+        }
 
-        fun setQueuedPlayers(value: Int) {
+        init {
+            setWillNotDraw(false)
+            characterViews.forEach { avatar ->
+                addView(
+                    avatar,
+                    FrameLayout.LayoutParams(dp(29f).toInt(), dp(29f).toInt()),
+                )
+            }
+        }
+
+        fun setQueuedPlayers(value: Int, characterIds: List<String>) {
             val next = value.coerceIn(1, 4)
-            if (approachStartedAt == 0L || next != queuedPlayers) {
+            val safeCharacterIds = characterIds.take(4)
+            if (
+                approachStartedAt == 0L ||
+                next != queuedPlayers ||
+                safeCharacterIds != queuedCharacterIds
+            ) {
                 approachStartedAt = SystemClock.uptimeMillis()
             }
             queuedPlayers = next
+            queuedCharacterIds = safeCharacterIds
+
+            characterViews.forEachIndexed { index, avatar ->
+                val characterId = safeCharacterIds.getOrNull(index)
+                if (index < next && characterId != null) {
+                    avatar.visibility = View.VISIBLE
+                    avatar.bind(
+                        characterId = characterId,
+                        ringColor = 0xFF62E8FF.toInt(),
+                        showCircularChrome = false,
+                    )
+                } else {
+                    avatar.visibility = View.INVISIBLE
+                }
+            }
+            requestLayout()
             invalidate()
         }
 
@@ -927,6 +1001,25 @@ class TeamUpActivity : Activity() {
                     approachStartedAt = SystemClock.uptimeMillis()
                 }
                 postInvalidateOnAnimation()
+            }
+        }
+
+        override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+            val inset = dp(5f)
+            val contentRight = width - inset
+            val spacing = (contentRight - inset) / 4f
+            val centerY = height * 0.39f
+            val avatarSize = dp(29f).toInt()
+            for (index in characterViews.indices) {
+                val centerX = inset + spacing * (index + 0.5f)
+                val childLeft = (centerX - avatarSize / 2f).toInt()
+                val childTop = (centerY - avatarSize / 2f).toInt()
+                characterViews[index].layout(
+                    childLeft,
+                    childTop,
+                    childLeft + avatarSize,
+                    childTop + avatarSize,
+                )
             }
         }
 
@@ -952,7 +1045,6 @@ class TeamUpActivity : Activity() {
             val approachFraction =
                 (elapsed / APPROACH_DURATION_MS.toFloat()).coerceIn(0f, 1f)
 
-            // Previously found connections stay lit; the current connection has a dim track.
             paint.style = Paint.Style.STROKE
             paint.strokeCap = Paint.Cap.ROUND
             paint.strokeWidth = dp(3f)
@@ -965,18 +1057,14 @@ class TeamUpActivity : Activity() {
                 canvas.drawLine(centers[index], cy, centers[index + 1], cy, paint)
             }
 
-            // The cyan line extends from the last confirmed player's center toward
-            // the next open ring. Slot circles are drawn afterwards to mask its interior.
             if (isSearching) {
                 val sourceX = centers[sourceIndex]
                 val targetX = centers[targetIndex]
                 val targetEdgeX = targetX - radius - dp(5f)
                 val reachedX = sourceX + (targetEdgeX - sourceX) * approachFraction
-
                 paint.color = 0xFF59DEFF.toInt()
                 paint.strokeWidth = dp(2.8f)
                 canvas.drawLine(sourceX, cy, reachedX, cy, paint)
-
                 paint.style = Paint.Style.FILL
                 paint.color = 0x8859DEFF.toInt()
                 canvas.drawCircle(reachedX, cy, dp(5f), paint)
@@ -984,12 +1072,12 @@ class TeamUpActivity : Activity() {
                 canvas.drawCircle(reachedX, cy, dp(2.3f), paint)
             }
 
-            // Draw the four slots. Only the number reported by the server counts as joined.
+            // Confirmed players get their production character portraits as child views.
+            // Empty slots retain a neutral placeholder silhouette only.
             for (index in 0..3) {
                 val x = centers[index]
                 val isQueued = index < queuedPlayers
                 val isTarget = isSearching && index == targetIndex
-
                 paint.style = Paint.Style.FILL
                 paint.color = if (isQueued) playerColors[index] else 0xFF132A4A.toInt()
                 canvas.drawCircle(x, cy, radius, paint)
@@ -1002,10 +1090,12 @@ class TeamUpActivity : Activity() {
                     else -> 0xFF8CA9C7.toInt()
                 }
                 canvas.drawCircle(x, cy, radius, paint)
+
+                if (!isQueued || queuedCharacterIds.getOrNull(index) == null) {
+                    drawPlayerPlaceholder(canvas, x, cy, radius, isQueued)
+                }
             }
 
-            // Once the line reaches the open slot, a bright arc travels around its
-            // stroke until the server confirms another player.
             if (isSearching && approachFraction >= 1f) {
                 val orbitRadius = radius + dp(4.5f)
                 val arcBounds = android.graphics.RectF(
@@ -1021,7 +1111,6 @@ class TeamUpActivity : Activity() {
                 paint.strokeWidth = dp(3.2f)
                 paint.color = 0xFF62E8FF.toInt()
                 canvas.drawArc(arcBounds, angle, sweep, false, paint)
-
                 val tipAngle = Math.toRadians((angle + sweep).toDouble())
                 val tipX = centers[targetIndex] + (kotlin.math.cos(tipAngle) * orbitRadius).toFloat()
                 val tipY = cy + (kotlin.math.sin(tipAngle) * orbitRadius).toFloat()
@@ -1030,19 +1119,14 @@ class TeamUpActivity : Activity() {
                 canvas.drawCircle(tipX, tipY, dp(2.6f), paint)
             }
 
-            // Player glyphs and labels sit above the animated connectors.
             for (index in 0..3) {
-                val x = centers[index]
-                val isQueued = index < queuedPlayers
-                drawPlayerIcon(canvas, x, cy, radius, isQueued)
-
-                paint.color = if (isQueued) 0xFFDDF4FF.toInt() else 0xFF8CA9C7.toInt()
+                paint.color = if (index < queuedPlayers) 0xFFDDF4FF.toInt() else 0xFF8CA9C7.toInt()
                 paint.textAlign = Paint.Align.CENTER
                 paint.textSize = dp(8.5f)
                 paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
                 canvas.drawText(
-                    if (index == 0) "YOU" else if (isQueued) "PLAYER ${index + 1}" else "OPEN",
-                    x,
+                    if (index == 0) "YOU" else if (index < queuedPlayers) "PLAYER ${index + 1}" else "OPEN",
+                    centers[index],
                     height - dp(13f),
                     paint,
                 )
@@ -1051,7 +1135,7 @@ class TeamUpActivity : Activity() {
             if (isSearching) postInvalidateOnAnimation()
         }
 
-        private fun drawPlayerIcon(
+        private fun drawPlayerPlaceholder(
             canvas: Canvas,
             x: Float,
             y: Float,

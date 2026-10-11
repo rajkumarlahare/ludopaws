@@ -92,7 +92,7 @@ export class TeamMatchmakerQueue {
         lastSeenAt: now,
       };
       await this.#persist(state);
-      return json(200, searchingPayload(state, now));
+      return json(200, searchingPayload(state, now, participant.clientRequestId));
     }
 
     if (
@@ -155,7 +155,7 @@ export class TeamMatchmakerQueue {
     }
 
     await this.#persist(state);
-    return json(202, searchingPayload(state, now));
+    return json(202, searchingPayload(state, now, participant.clientRequestId));
   }
 
   async #status(request, body) {
@@ -201,7 +201,7 @@ export class TeamMatchmakerQueue {
     }
     queued.lastSeenAt = now;
     await this.#persist(state);
-    return json(200, searchingPayload(state, now));
+    return json(200, searchingPayload(state, now, clientRequestId));
   }
 
   async #cancel(request, body) {
@@ -473,14 +473,29 @@ function normalizeParticipant(body, profileId) {
   };
 }
 
-function searchingPayload(state, now) {
+function searchingPayload(state, now, requesterRequestId) {
   const queued = [...state.queue].sort((a, b) => a.joinedAt - b.joinedAt);
+  const requester = queued.find(
+    (candidate) => candidate.clientRequestId === requesterRequestId,
+  );
+  const orderedForRequester = requester
+    ? [
+        requester,
+        ...queued.filter(
+          (candidate) => candidate.clientRequestId !== requesterRequestId,
+        ),
+      ]
+    : queued;
+  const visibleParticipants = orderedForRequester.slice(0, TARGET_PLAYER_COUNT);
   return {
     status: "SEARCHING",
     matchMode: "TEAM_UP",
     playerCount: TARGET_PLAYER_COUNT,
     queuedPlayers: Math.min(queued.length, TARGET_PLAYER_COUNT),
     targetPlayerCount: TARGET_PLAYER_COUNT,
+    queuedCharacterIds: visibleParticipants.map((participant) =>
+      normalizeCharacterId(participant.characterId),
+    ),
     searchStartedAt: queued[0]?.joinedAt ?? now,
   };
 }
