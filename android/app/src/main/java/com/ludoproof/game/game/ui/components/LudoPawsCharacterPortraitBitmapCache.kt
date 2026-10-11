@@ -166,6 +166,10 @@ internal object LudoPawsCharacterPortraitBitmapCache {
             characterId = characterId,
             teamColorName = teamColor,
         )
+        val drawError = GLES30.glGetError()
+        check(drawError == GLES30.GL_NO_ERROR) {
+            "3D portrait draw failed for $characterId (0x" + drawError.toString(16) + ")"
+        }
 
         val rgba =
             ByteBuffer
