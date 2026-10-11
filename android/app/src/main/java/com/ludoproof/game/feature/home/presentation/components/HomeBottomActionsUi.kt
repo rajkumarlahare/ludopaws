@@ -194,6 +194,10 @@ private fun HomeActivity.bottomActionButton(
                         )
                     }
                 }
+            }.apply {
+                if (iconKind == HomeIconKind.RATING) {
+                    translationX = -dp(if (isCompact()) 2 else 3).toFloat()
+                }
             },
             LinearLayout.LayoutParams(
                 0,
