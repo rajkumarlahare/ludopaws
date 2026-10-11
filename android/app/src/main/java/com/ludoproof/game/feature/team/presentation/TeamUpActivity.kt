@@ -504,48 +504,67 @@ class TeamUpActivity : Activity() {
                     setPadding(0, dp(3), 0, dp(15))
                 },
             )
-            addView(teamLabelRow("TEAM A", "RED  +  YELLOW", 0xFFFF5D63.toInt(), 0xFFFFD324.toInt()))
+            val teamCards = LinearLayout(this@TeamUpActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER
+                clipChildren = false
+                clipToPadding = false
+                addView(
+                    teamSelectionCard("TEAM A", 0xFFFF5D63.toInt(), 0xFFFFD324.toInt()),
+                    LinearLayout.LayoutParams(0, dp(106), 1f).apply {
+                        marginEnd = dp(5)
+                    },
+                )
+                addView(
+                    teamSelectionCard("TEAM B", 0xFF35C83D.toInt(), 0xFF2A8CFF.toInt()),
+                    LinearLayout.LayoutParams(0, dp(106), 1f).apply {
+                        marginStart = dp(5)
+                    },
+                )
+            }
             addView(
-                teamLabelRow("TEAM B", "GREEN  +  BLUE", 0xFF35C83D.toInt(), 0xFF2A8CFF.toInt()),
-                LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(46)).apply {
-                    topMargin = dp(8)
+                teamCards,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    dp(106),
+                ).apply {
+                    topMargin = dp(2)
                 },
             )
         }
 
-    private fun teamLabelRow(
+    private fun teamSelectionCard(
         title: String,
-        members: String,
         firstColor: Int,
         secondColor: Int,
     ): LinearLayout =
         LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(12), dp(6), dp(12), dp(6))
-            background =
-                recessedPlywoodBackground(
-                    context = this@TeamUpActivity,
-                    outerCornerRadiusDp = 13f,
-                )
-            addView(TeamColorTokenView(this@TeamUpActivity, firstColor, secondColor), LinearLayout.LayoutParams(dp(38), dp(30)))
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            clipChildren = false
+            clipToPadding = false
+            setPadding(dp(5), dp(7), dp(5), dp(7))
+            background = recessedPlywoodBackground(
+                context = this@TeamUpActivity,
+                outerCornerRadiusDp = 16f,
+            )
             addView(
-                TextView(this@TeamUpActivity).apply {
-                    text = title
-                    LudoProofTheme.title(this, 11f, gold = true)
-                    gravity = Gravity.CENTER_VERTICAL
-                    setPadding(dp(8), 0, dp(8), 0)
-                },
-                LinearLayout.LayoutParams(dp(74), LinearLayout.LayoutParams.WRAP_CONTENT),
+                TeamColorTokenView(this@TeamUpActivity, firstColor, secondColor),
+                LinearLayout.LayoutParams(dp(88), dp(42)),
             )
             addView(
                 TextView(this@TeamUpActivity).apply {
-                    text = members
-                    LudoProofTheme.body(this, 13f, centered = true, bright = true)
-                    setTypeface(Typeface.DEFAULT_BOLD)
-                    gravity = Gravity.CENTER_VERTICAL
+                    text = title
+                    LudoProofTheme.title(this, 13f, gold = true)
+                    setTextColor(0xFFFFD45E.toInt())
+                    gravity = Gravity.CENTER
+                    includeFontPadding = false
+                    setPadding(0, dp(4), 0, 0)
                 },
-                LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f),
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ),
             )
         }
 
