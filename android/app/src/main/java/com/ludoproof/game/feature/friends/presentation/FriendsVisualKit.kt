@@ -192,15 +192,16 @@ internal object FriendsVisualKit {
                 it == FriendsIcon.COPY || it == FriendsIcon.SHARE || it == FriendsIcon.INVITE
             }
             text = if (drawnActionIcon != null) {
-                SpannableString("\uFFFC  $label").apply {
+                SpannableString("$label  \uFFFC").apply {
+                    val iconStart = label.length + 2
                     setSpan(
                         FriendsActionIconSpan(
                             context = context,
                             icon = drawnActionIcon,
                             tint = if (enabled) Color.WHITE else 0xFF9EB4D1.toInt(),
                         ),
-                        0,
-                        1,
+                        iconStart,
+                        iconStart + 1,
                         Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
                     )
                 }
