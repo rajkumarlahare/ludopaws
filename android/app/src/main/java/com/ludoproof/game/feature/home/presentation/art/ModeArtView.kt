@@ -122,8 +122,8 @@ class ModeArtView @JvmOverloads constructor(
             drawPerson(
                 canvas = canvas,
                 cx = w * position,
-                cy = h * if (centerFront) 0.57f else 0.55f,
-                radius = radius * if (centerFront) 1.10f else 1f,
+                cy = h * (if (centerFront) 0.57f else 0.55f),
+                radius = radius * (if (centerFront) 1.10f else 1f),
                 topColor = if (playerCountSelected) selectedTop else blueTop,
                 bottomColor = if (playerCountSelected) selectedBottom else blueBottom,
                 front = centerFront || count == 2,
