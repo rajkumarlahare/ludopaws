@@ -127,11 +127,20 @@ internal fun ProfileActivity.profilePurchasesPanel(profile: ProfileSnapshot): Li
 private class PlywoodTextureDrawable(
     private val density: Float,
 ) : Drawable() {
-    private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
+    // Multiplying RGB by ~0.6 darkens the entire plywood finish by about 40%
+    // while retaining the natural tone differences between the grain and highlights.
+    private val plywoodShade = android.graphics.LightingColorFilter(
+        0xFF999999.toInt(),
+        Color.TRANSPARENT,
+    )
+    private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        colorFilter = plywoodShade
+    }
     private val line = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
         strokeJoin = Paint.Join.ROUND
+        colorFilter = plywoodShade
     }
     private var drawableAlpha = 255
 
@@ -286,8 +295,9 @@ private class PlywoodTextureDrawable(
     }
 
     override fun setColorFilter(colorFilter: ColorFilter?) {
-        fill.colorFilter = colorFilter
-        line.colorFilter = colorFilter
+        // Keep the requested plywood darkening and optionally compose a caller tint.
+        fill.colorFilter = colorFilter ?: plywoodShade
+        line.colorFilter = colorFilter ?: plywoodShade
         invalidateSelf()
     }
 
