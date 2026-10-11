@@ -11,6 +11,7 @@ import android.widget.TextView
 import android.os.Build
 import android.view.WindowInsets
 import com.ludoproof.game.*
+import com.ludoproof.game.core.ui.art.plywoodBackground
 import com.ludoproof.game.feature.offline.*
 import com.ludoproof.game.ui.offline.common.*
 import com.ludoproof.game.ui.offline.gameplay.*
@@ -57,12 +58,25 @@ internal fun OfflineGameActivity.showSetup() {
     val content =
         LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(
-                0,
-                dp(if (isCompactSetup()) 10 else 12),
-                0,
-                dp(24),
-            )
+            if (isComputerMode) {
+                setPadding(
+                    dp(8),
+                    dp(if (isCompactSetup()) 10 else 12),
+                    dp(8),
+                    dp(24),
+                )
+                background = plywoodBackground(
+                    context = this@showSetup,
+                    cornerRadiusDp = 24f,
+                )
+            } else {
+                setPadding(
+                    0,
+                    dp(if (isCompactSetup()) 10 else 12),
+                    0,
+                    dp(24),
+                )
+            }
         }
     contentHost.addView(
         content,

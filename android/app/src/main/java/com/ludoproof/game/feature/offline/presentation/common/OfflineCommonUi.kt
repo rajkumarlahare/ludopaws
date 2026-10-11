@@ -11,6 +11,8 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.*
+import com.ludoproof.game.core.ui.art.plywoodBackground
+import com.ludoproof.game.core.ui.art.transparentDarkBlueStrokeBackground
 import com.ludoproof.game.core.ui.components.appIconActionButton
 import com.ludoproof.game.core.ui.icons.AppIconName
 import com.ludoproof.game.ui.dialogs.showSettingsDialog
@@ -39,6 +41,13 @@ internal fun OfflineGameActivity.backHeader(label: String?): View {
                     sizeDp = 44,
                 ) {
                     requestOfflineExit()
+                }.apply {
+                    if (isComputerMode) {
+                        background = plywoodBackground(
+                            context = this@backHeader,
+                            cornerRadiusDp = 999f,
+                        )
+                    }
                 },
                 FrameLayout.LayoutParams(
                     dp(44),
@@ -57,7 +66,12 @@ internal fun OfflineGameActivity.backHeader(label: String?): View {
                         dp(if (LudoProofTheme.isCompactWidth(this@backHeader)) 10 else 14),
                         dp(4),
                     )
-                    background =
+                    background = if (isComputerMode) {
+                        transparentDarkBlueStrokeBackground(
+                            context = this@backHeader,
+                            cornerRadiusDp = 999f,
+                        )
+                    } else {
                         GradientDrawable(
                             GradientDrawable.Orientation.TOP_BOTTOM,
                             intArrayOf(
@@ -69,6 +83,7 @@ internal fun OfflineGameActivity.backHeader(label: String?): View {
                             cornerRadius = dp(999).toFloat()
                             setStroke(dp(2), LudoProofTheme.GOLD)
                         }
+                    }
                     elevation = dp(7).toFloat()
                     addView(
                         SetupPawMarkView(this@backHeader),
@@ -115,6 +130,13 @@ internal fun OfflineGameActivity.backHeader(label: String?): View {
                     sizeDp = 44,
                 ) {
                     openSettings()
+                }.apply {
+                    if (isComputerMode) {
+                        background = plywoodBackground(
+                            context = this@backHeader,
+                            cornerRadiusDp = 999f,
+                        )
+                    }
                 },
                 FrameLayout.LayoutParams(
                     dp(44),

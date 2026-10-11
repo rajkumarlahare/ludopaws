@@ -17,6 +17,7 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.*
+import com.ludoproof.game.core.ui.art.recessedPlywoodBackground
 import com.ludoproof.game.core.ui.icons.AppIconName
 import com.ludoproof.game.core.ui.icons.AppIconVariant
 import com.ludoproof.game.core.ui.icons.AppIconView
@@ -289,7 +290,14 @@ internal fun OfflineGameActivity.selectionPanel(
         )
         // The setup reference uses one deep navy/cyan visual language for
         // Pass & Play and Computer, while their actual setup rules stay separate.
-        background = LudoProofTheme.darkPanelDrawable(this@selectionPanel)
+        background = if (isComputerMode) {
+            recessedPlywoodBackground(
+                context = this@selectionPanel,
+                outerCornerRadiusDp = 20f,
+            )
+        } else {
+            LudoProofTheme.darkPanelDrawable(this@selectionPanel)
+        }
 
         val heading = LinearLayout(this@selectionPanel).apply {
             orientation = LinearLayout.HORIZONTAL

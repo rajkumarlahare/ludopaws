@@ -9,6 +9,7 @@ import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.LudoPawsCharacterAvatarView
+import com.ludoproof.game.core.ui.art.recessedPlywoodBackground
 import com.ludoproof.game.LudoProofTheme
 import com.ludoproof.game.OfflineGameActivity
 import com.ludoproof.game.feature.characters.domain.catalog.LudoPawsCharacterCatalog
@@ -356,6 +357,12 @@ internal fun OfflineGameActivity.refreshCharacterSelectionUi() {
             LudoProofTheme.selectedTile(card)
         } else {
             LudoProofTheme.normalTile(card)
+            if (isComputerMode) {
+                card.background = recessedPlywoodBackground(
+                    context = this@refreshCharacterSelectionUi,
+                    outerCornerRadiusDp = 12f,
+                )
+            }
         }
         card.findViewWithTag<LudoPawsCharacterAvatarView>(CHARACTER_AVATAR_TAG)
             ?.bind(
