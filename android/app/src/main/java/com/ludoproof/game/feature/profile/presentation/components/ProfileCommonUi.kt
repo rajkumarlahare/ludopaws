@@ -6,6 +6,7 @@ import android.graphics.Typeface
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.ludoproof.game.core.ui.art.PlywoodTextureDrawable
 import com.ludoproof.game.feature.profile.presentation.ProfileActivity
 
 internal fun ProfileActivity.profilePanel():
