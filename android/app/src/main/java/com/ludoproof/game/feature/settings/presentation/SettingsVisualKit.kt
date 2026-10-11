@@ -16,8 +16,6 @@ import android.widget.TextView
 import com.ludoproof.game.LudoProofTheme
 import com.ludoproof.game.core.ui.art.plywoodBackground
 import com.ludoproof.game.core.ui.components.AppFocusRing
-import com.ludoproof.game.core.ui.icons.AppIconName
-import com.ludoproof.game.core.ui.icons.AppIconView
 
 internal fun settingsCompactPanel(
     context: Context,
@@ -100,9 +98,9 @@ private fun settingsHeader(
         addView(
             close,
             FrameLayout.LayoutParams(
-                settingsDp(context, 48),
-                settingsDp(context, 48),
-                Gravity.END or Gravity.CENTER_VERTICAL,
+                settingsDp(context, 40),
+                settingsDp(context, 40),
+                Gravity.END or Gravity.TOP,
             ),
         )
     }
@@ -115,37 +113,28 @@ private class SettingsCloseButton(
         contentDescription = "Close settings"
         isClickable = true
         isFocusable = true
-        minimumWidth = settingsDp(context, 48)
-        minimumHeight = settingsDp(context, 48)
-        background =
-            GradientDrawable(
-                GradientDrawable.Orientation.TOP_BOTTOM,
-                intArrayOf(
-                    0xFFFFB62C.toInt(),
-                    0xFFF37D00.toInt(),
-                    0xFFD95500.toInt(),
-                ),
-            ).apply {
-                shape = GradientDrawable.OVAL
-                setStroke(
-                    settingsDp(context, 2),
-                    0xFFFFDC65.toInt(),
-                )
-            }
+        minimumWidth = settingsDp(context, 40)
+        minimumHeight = settingsDp(context, 40)
+        // Keep the close mark directly on the popup surface with no button chrome.
+        background = null
+        elevation = 0f
 
         addView(
-            AppIconView(
-                context = context,
-                iconName = AppIconName.CLOSE,
-                iconTint = Color.WHITE,
-            ),
+            TextView(context).apply {
+                text = "×"
+                textSize = 30f
+                setTypeface(Typeface.DEFAULT_BOLD)
+                setTextColor(0xFFFF3030.toInt())
+                gravity = Gravity.CENTER
+                includeFontPadding = false
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            },
             FrameLayout.LayoutParams(
-                settingsDp(context, 18),
-                settingsDp(context, 18),
+                settingsDp(context, 40),
+                settingsDp(context, 40),
                 Gravity.CENTER,
             ),
         )
-        AppFocusRing.apply(this, cornerRadiusDp = 999f, strokeWidthDp = 2.2f)
         setOnClickListener { onClose() }
     }
 }
