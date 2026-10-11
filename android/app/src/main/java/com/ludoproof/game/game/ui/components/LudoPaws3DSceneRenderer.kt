@@ -122,6 +122,74 @@ internal class LudoPaws3DSceneRenderer {
         )
     }
 
+    /**
+     * Configures the same production geometry renderer for a square, transparent
+     * character portrait. This is used only by the off-screen portrait cache;
+     * the existing gameplay surface continues to use onSurfaceChanged/drawFrame.
+     */
+    fun onPortraitSurfaceChanged(
+        width: Int,
+        height: Int,
+    ) {
+        this.width = width.coerceAtLeast(1)
+        this.height = height.coerceAtLeast(1)
+        GLES30.glViewport(0, 0, this.width, this.height)
+        Matrix.orthoM(
+            projection,
+            0,
+            0f,
+            this.width.toFloat(),
+            this.height.toFloat(),
+            0f,
+            -100f,
+            100f,
+        )
+    }
+
+    /**
+     * Draws one static portrait using the exact same 3D body-part methods,
+     * sphere mesh, shader, and lighting as a live board pawn. No match state,
+     * pawn position, movement, or animation state is read or modified.
+     */
+    fun drawPortrait(
+        characterId: String,
+        teamColorName: String,
+    ) {
+        if (program == 0) return
+
+        GLES30.glViewport(0, 0, width, height)
+        GLES30.glClear(
+            GLES30.GL_COLOR_BUFFER_BIT or
+                GLES30.GL_DEPTH_BUFFER_BIT,
+        )
+        GLES30.glUseProgram(program)
+
+        val species =
+            LudoPaws3DCharacterPolicy
+                .speciesForCharacterId(characterId)
+                ?: LudoPaws3DSpecies.DOG
+        val teamColor =
+            LudoPawsTeamIdentityPolicy.resolve(teamColorName)
+                ?: LudoPawsTeamColor.BLUE
+        val size = min(width, height).toFloat()
+        val modelScale = size * 0.30f
+        prepareRoot(
+            x = width * 0.5f,
+            y = height * 0.62f,
+            scale = modelScale,
+            liftY = 0f,
+            bodyYawDegrees = 0f,
+        )
+
+        when (species) {
+            LudoPaws3DSpecies.DOG -> drawDog(root, Dog3DPose(), teamColor)
+            LudoPaws3DSpecies.GOAT -> drawGoat(root, Goat3DPose(), teamColor)
+            LudoPaws3DSpecies.DUCK -> drawDuck(root, Duck3DPose(), teamColor)
+            LudoPaws3DSpecies.CAT -> drawCat(root, Cat3DPose(), teamColor)
+        }
+        GLES30.glFinish()
+    }
+
     fun drawFrame(
         state: LudoPaws3DSceneState,
         nowMillis: Long,
