@@ -18,6 +18,7 @@ import com.ludoproof.game.feature.profile.presentation.ProfileActivity
 import com.ludoproof.game.feature.store.domain.model.StoreTab
 import com.ludoproof.game.feature.store.presentation.StoreActivity
 
+// Character personality is presentation-only and never changes dice or legal moves.
 internal fun ProfileActivity.profilePawIdentityPanel(): LinearLayout =
     LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
