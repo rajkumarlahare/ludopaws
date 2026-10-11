@@ -1,6 +1,8 @@
 package com.ludoproof.game.ui.offline.setup
 
 import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.widget.Button
 import android.widget.HorizontalScrollView
@@ -147,7 +149,7 @@ internal fun OfflineGameActivity.characterPanel(): LinearLayout =
                     card,
                     LinearLayout.LayoutParams(
                         dp(if (isCompactSetup()) 100 else 112),
-                        dp(if (isCompactSetup()) 132 else 144),
+                        dp(if (isCompactSetup()) 140 else 152),
                     ).apply {
                         setMargins(dp(4), 0, dp(4), 0)
                     },
@@ -165,7 +167,15 @@ internal fun OfflineGameActivity.characterPanel(): LinearLayout =
                     centered = true,
                     bright = true,
                 )
-                setPadding(dp(6), dp(8), dp(6), 0)
+                setTypeface(Typeface.DEFAULT_BOLD)
+                setPadding(dp(12), dp(8), dp(12), dp(8))
+                background = LudoProofTheme.rounded(
+                    0xC8062861.toInt(),
+                    999f,
+                    0xFF267ACF.toInt(),
+                    1f,
+                    this@characterPanel,
+                )
             }.also(::addView)
 
         refreshCharacterSelectionUi()
@@ -218,21 +228,24 @@ private fun OfflineGameActivity.characterChoiceCard(
     LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         gravity = Gravity.CENTER
-        setPadding(dp(6), dp(7), dp(6), dp(7))
+        clipChildren = false
+        clipToPadding = false
+        setPadding(dp(5), dp(7), dp(5), dp(7))
 
-        // fallbackDrawableName remains the catalog contract for future authored
-        // portrait assets; this vector avatar guarantees a non-blank current UI.
+        // Keep the existing production 3D portrait, but show it as a clean
+        // cut-out inside the selection card rather than a white circular badge.
         LudoPawsCharacterAvatarView(this@characterChoiceCard).also { avatar ->
             avatar.tag = CHARACTER_AVATAR_TAG
             avatar.bind(
                 characterId = character.id,
                 ringColor = 0xFF5BE0FF.toInt(),
+                showCircularChrome = false,
             )
             addView(
                 avatar,
                 LinearLayout.LayoutParams(
-                    dp(if (isCompactSetup()) 66 else 74),
-                    dp(if (isCompactSetup()) 66 else 74),
+                    dp(if (isCompactSetup()) 70 else 80),
+                    dp(if (isCompactSetup()) 70 else 80),
                 ),
             )
         }
@@ -240,14 +253,18 @@ private fun OfflineGameActivity.characterChoiceCard(
         addView(
             TextView(this@characterChoiceCard).apply {
                 text = character.displayName
-                LudoProofTheme.body(
-                    this,
-                    if (isCompactSetup()) 12f else 13f,
-                    centered = true,
-                    bright = true,
-                )
+                textSize = if (isCompactSetup()) 14f else 15f
+                setTypeface(Typeface.DEFAULT_BOLD)
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
+                includeFontPadding = false
+                setShadowLayer(2f, 0f, dp(1), 0xAA00112D.toInt())
                 tag = CHARACTER_NAME_TAG
             },
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply { topMargin = dp(1) },
         )
 
         addView(
@@ -256,11 +273,24 @@ private fun OfflineGameActivity.characterChoiceCard(
                     character.personality.name
                         .lowercase()
                         .replaceFirstChar(Char::uppercase)
-                textSize = if (isCompactSetup()) 9.5f else 10f
+                textSize = if (isCompactSetup()) 9.5f else 10.5f
                 setTextColor(0xFFBCD5FF.toInt())
                 gravity = Gravity.CENTER
+                includeFontPadding = false
+                setPadding(dp(8), dp(4), dp(8), dp(4))
+                background = LudoProofTheme.rounded(
+                    0xB803225C.toInt(),
+                    999f,
+                    0xFF178CD6.toInt(),
+                    1f,
+                    this@characterChoiceCard,
+                )
                 tag = CHARACTER_PERSONALITY_TAG
             },
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply { topMargin = dp(3) },
         )
 
         contentDescription = "Choose ${character.displayName}"
@@ -337,6 +367,7 @@ internal fun OfflineGameActivity.refreshCharacterSelectionUi() {
                         0xFF5BE0FF.toInt()
                     },
                 highlighted = selected,
+                showCircularChrome = false,
             )
         card.findViewWithTag<TextView>(CHARACTER_NAME_TAG)
             ?.setTextColor(
@@ -346,14 +377,18 @@ internal fun OfflineGameActivity.refreshCharacterSelectionUi() {
                     Color.WHITE
                 },
             )
-        card.findViewWithTag<TextView>(CHARACTER_PERSONALITY_TAG)
-            ?.setTextColor(
-                if (selected) {
-                    0xFF174A78.toInt()
-                } else {
-                    0xFFBCD5FF.toInt()
-                },
+        card.findViewWithTag<TextView>(CHARACTER_PERSONALITY_TAG)?.apply {
+            setTextColor(
+                if (selected) 0xFF174A78.toInt() else 0xFFBCD5FF.toInt(),
             )
+            background = LudoProofTheme.rounded(
+                if (selected) 0xB5FFE59A.toInt() else 0xB803225C.toInt(),
+                999f,
+                if (selected) 0xCCFFB51D.toInt() else 0xFF178CD6.toInt(),
+                1f,
+                this@refreshCharacterSelectionUi,
+            )
+        }
     }
 
     characterSummaryText?.text =
