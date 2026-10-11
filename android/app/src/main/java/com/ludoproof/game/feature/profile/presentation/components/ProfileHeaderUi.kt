@@ -13,6 +13,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.LudoProofTheme
 import com.ludoproof.game.core.ui.art.PlywoodTextureDrawable
+import com.ludoproof.game.core.ui.art.RecessedPlywoodDrawable
 import com.ludoproof.game.core.ui.art.transparentDarkBlueStrokeBackground
 import com.ludoproof.game.LudoPawsCharacterAvatarView
 import com.ludoproof.game.core.ui.components.AppFocusRing
@@ -86,19 +87,11 @@ internal fun ProfileActivity.profileIdentityPanel(profile: ProfileSnapshot): Lin
             gravity = Gravity.CENTER_HORIZONTAL
         }
         val pawFrame = FrameLayout(this@profileIdentityPanel).apply {
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.RECTANGLE
-                setGradientType(GradientDrawable.RADIAL_GRADIENT)
-                gradientRadius = dp(125).toFloat()
-                setColors(
-                    intArrayOf(
-                        0xFF168FF5.toInt(),
-                        0xFF0755B8.toInt(),
-                        0xFF031B45.toInt(),
-                    ),
-                )
-                cornerRadius = dp(18).toFloat()
-            }
+            // Carved plywood pocket makes the existing 3D Paw feel seated into the panel.
+            background = RecessedPlywoodDrawable(
+                resources.displayMetrics.density,
+                outerCornerRadiusDp = 18f,
+            )
             clipChildren = false
             clipToPadding = false
         }
