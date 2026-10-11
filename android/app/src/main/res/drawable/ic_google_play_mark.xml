@@ -23,7 +23,7 @@
 
         <path
             android:fillColor="#34A853"
-            android:pathData="m36.7,35.4 9.8,-9.7 -21.2,-12.3 a5.1,5.1 0,0 0,-7.6,3 l19,19 z" />
+            android:pathData="m36.7,35.4 9.8,-9.7 -21.2,-12.3 a5.1,5.1 0,0 0,-7.6,3 s19,19 19,19 z" />
 
     </group>
 </vector>
