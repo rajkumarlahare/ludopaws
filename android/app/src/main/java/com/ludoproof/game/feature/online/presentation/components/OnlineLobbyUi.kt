@@ -548,6 +548,8 @@ internal fun MainActivity.onlineLobbyPanel():
                             .danger(
                                 this,
                             )
+                        contentDescription = "Cancel online matchmaking"
+                        AppFocusRing.apply(this, cornerRadiusDp = 12f)
                         setOnClickListener {
                             cancelPublicMatchmaking()
                         }
@@ -614,7 +616,10 @@ internal fun MainActivity.stylePublicPlayerCountButton(
     selected: Boolean,
 ) {
     val isTwoPlayer = button === twoPlayerButton
-    button.text = (if (isTwoPlayer) "2" else "4") + " PLAYERS"
+    val playerLabel = (if (isTwoPlayer) "2" else "4") + " PLAYERS"
+    button.text = playerLabel
+    button.isSelected = selected
+    button.contentDescription = if (selected) "$playerLabel, selected" else playerLabel
 
     button.textSize =
         if (isCompactOnline()) 14f else 16f
