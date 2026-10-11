@@ -9,6 +9,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.HomeActivity
 import com.ludoproof.game.LudoProofTheme
+import com.ludoproof.game.core.ui.art.plywoodBackground
 import com.ludoproof.game.LudoPawsCharacterAvatarView
 import com.ludoproof.game.feature.characters.data.local.CharacterSelectionStore
 import com.ludoproof.game.feature.leaderboard.presentation.LeaderboardActivity
@@ -117,9 +118,9 @@ private fun HomeActivity.homeCurrencyPill(): LinearLayout =
         isFocusable = true
         contentDescription = "Open gem store"
         background =
-            homeGlassBackground(
+            plywoodBackground(
                 context = this@homeCurrencyPill,
-                shape = HomeGlassShape.PILL,
+                cornerRadiusDp = if (isCompact()) 17.5f else 19f,
             )
         elevation = dp(5).toFloat()
         setPadding(
@@ -188,10 +189,9 @@ private fun HomeActivity.homeCurrencyPill(): LinearLayout =
                     dp(6),
                 )
                 background =
-                    homeGlassBackground(
+                    plywoodBackground(
                         context = this@homeCurrencyPill,
-                        shape = HomeGlassShape.CIRCLE,
-                        tone = HomeGlassTone.BLUE,
+                        cornerRadiusDp = if (isCompact()) 13f else 14.5f,
                     )
                 setOnClickListener {
                     startActivity(
@@ -217,9 +217,9 @@ private fun HomeActivity.homeProfilePill(): LinearLayout =
         isFocusable = true
         contentDescription = "Guest user profile"
         background =
-            homeGlassBackground(
+            plywoodBackground(
                 context = this@homeProfilePill,
-                shape = HomeGlassShape.PILL,
+                cornerRadiusDp = if (isCompact()) 17.5f else 19f,
             )
         elevation = dp(5).toFloat()
 
@@ -285,10 +285,9 @@ private fun HomeActivity.homeProfilePill(): LinearLayout =
                     dp(4),
                 )
                 background =
-                    homeGlassBackground(
+                    plywoodBackground(
                         context = this@homeProfilePill,
-                        shape = HomeGlassShape.CIRCLE,
-                        tone = HomeGlassTone.PURPLE,
+                        cornerRadiusDp = if (isCompact()) 14.5f else 16f,
                     )
                 importantForAccessibility =
                     View.IMPORTANT_FOR_ACCESSIBILITY_NO
@@ -355,9 +354,9 @@ private fun HomeActivity.homeShortcut(
             if (item.enabled) item.label else "${item.label} unavailable"
         alpha = if (item.enabled) 1f else 0.56f
         background =
-            homeGlassBackground(
+            plywoodBackground(
                 context = this@homeShortcut,
-                shape = HomeGlassShape.TILE,
+                cornerRadiusDp = 18f,
             )
         elevation = dp(5).toFloat()
         setPadding(
