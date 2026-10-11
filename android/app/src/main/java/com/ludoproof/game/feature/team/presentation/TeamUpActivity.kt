@@ -883,6 +883,12 @@ class TeamUpActivity : Activity() {
         private fun dp(value: Float): Float = value * resources.displayMetrics.density
     }
 
+    /**
+     * Shows the server-confirmed queue as a sequential connection animation:
+     * YOU -> next open slot. The next slot's ring orbits while we wait. When the
+     * server confirms another queued player, that slot locks in and the scan
+     * extends from it toward the following slot.
+     */
     private class TeamSlotProgressView(context: android.content.Context) : View(context) {
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         private val playerColors =
@@ -893,15 +899,23 @@ class TeamUpActivity : Activity() {
                 0xFF2A8CFF.toInt(),
             )
         private var queuedPlayers = 1
+        private var approachStartedAt = 0L
 
         fun setQueuedPlayers(value: Int) {
-            queuedPlayers = value.coerceIn(1, 4)
+            val next = value.coerceIn(1, 4)
+            if (approachStartedAt == 0L || next != queuedPlayers) {
+                approachStartedAt = SystemClock.uptimeMillis()
+            }
+            queuedPlayers = next
             invalidate()
         }
 
         override fun onAttachedToWindow() {
             super.onAttachedToWindow()
-            if (visibility == View.VISIBLE && queuedPlayers < 4) {
+            if (queuedPlayers < 4 && visibility == View.VISIBLE) {
+                if (approachStartedAt == 0L) {
+                    approachStartedAt = SystemClock.uptimeMillis()
+                }
                 postInvalidateOnAnimation()
             }
         }
@@ -909,59 +923,117 @@ class TeamUpActivity : Activity() {
         override fun onVisibilityChanged(changedView: View, visibility: Int) {
             super.onVisibilityChanged(changedView, visibility)
             if (visibility == View.VISIBLE && queuedPlayers < 4 && isAttachedToWindow) {
+                if (approachStartedAt == 0L) {
+                    approachStartedAt = SystemClock.uptimeMillis()
+                }
                 postInvalidateOnAnimation()
             }
         }
 
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
+            if (width <= 0 || height <= 0) return
+
+            val now = SystemClock.uptimeMillis()
+            if (approachStartedAt == 0L) approachStartedAt = now
+
             val inset = dp(5f)
             val left = inset
             val right = width - inset
             val spacing = (right - left) / 4f
             val radius = minOf(dp(19f), height * 0.25f)
             val cy = height * 0.39f
+            val centers = FloatArray(4) { index -> left + spacing * (index + 0.5f) }
 
+            val targetIndex = queuedPlayers
+            val sourceIndex = (queuedPlayers - 1).coerceIn(0, 3)
+            val isSearching = queuedPlayers < 4 && isAttachedToWindow && visibility == View.VISIBLE
+            val elapsed = (now - approachStartedAt).coerceAtLeast(0L)
+            val approachFraction =
+                (elapsed / APPROACH_DURATION_MS.toFloat()).coerceIn(0f, 1f)
+
+            // Previously found connections stay lit; the current connection has a dim track.
+            paint.style = Paint.Style.STROKE
             paint.strokeCap = Paint.Cap.ROUND
             paint.strokeWidth = dp(3f)
             for (index in 0..2) {
-                paint.color = if (index + 1 < queuedPlayers) 0xFFFFD34A.toInt() else 0x665D87B4
-                canvas.drawLine(
-                    left + spacing * (index + 1) + radius * 0.72f,
-                    cy,
-                    left + spacing * (index + 2) - radius * 0.72f,
-                    cy,
-                    paint,
-                )
-            }
-
-            if (queuedPlayers < 4 && isAttachedToWindow && visibility == View.VISIBLE) {
-                val phase = (SystemClock.uptimeMillis() % 1_500L) / 1_500f
-                val scanX = left + phase * (right - left)
-                paint.color = 0x5539DFFF.toInt()
-                canvas.drawCircle(scanX, cy, dp(12f), paint)
-                paint.color = 0xFFBDF7FF.toInt()
-                canvas.drawCircle(scanX, cy, dp(3.5f), paint)
-            }
-
-            for (index in 0..3) {
-                val x = left + spacing * (index + 0.5f)
-                val isQueued = index < queuedPlayers
-                val pulse = (SystemClock.uptimeMillis() % 1_200L) / 1_200f
-                if (!isQueued && index == queuedPlayers && isAttachedToWindow && visibility == View.VISIBLE) {
-                    paint.style = Paint.Style.STROKE
-                    paint.strokeWidth = dp(2f)
-                    paint.color = 0xAA57DFFF.toInt()
-                    canvas.drawCircle(x, cy, radius + dp(4f + pulse * 7f), paint)
-                    paint.style = Paint.Style.FILL
+                paint.color = when {
+                    index < queuedPlayers - 1 -> 0xFFFFD34A.toInt()
+                    index == queuedPlayers - 1 && queuedPlayers < 4 -> 0x6657DFFF
+                    else -> 0x665D87B4
                 }
+                canvas.drawLine(centers[index], cy, centers[index + 1], cy, paint)
+            }
+
+            // The cyan line extends from the last confirmed player's center toward
+            // the next open ring. Slot circles are drawn afterwards to mask its interior.
+            if (isSearching) {
+                val sourceX = centers[sourceIndex]
+                val targetX = centers[targetIndex]
+                val targetEdgeX = targetX - radius - dp(5f)
+                val reachedX = sourceX + (targetEdgeX - sourceX) * approachFraction
+
+                paint.color = 0xFF59DEFF.toInt()
+                paint.strokeWidth = dp(2.8f)
+                canvas.drawLine(sourceX, cy, reachedX, cy, paint)
+
+                paint.style = Paint.Style.FILL
+                paint.color = 0x8859DEFF.toInt()
+                canvas.drawCircle(reachedX, cy, dp(5f), paint)
+                paint.color = 0xFFE5FCFF.toInt()
+                canvas.drawCircle(reachedX, cy, dp(2.3f), paint)
+            }
+
+            // Draw the four slots. Only the number reported by the server counts as joined.
+            for (index in 0..3) {
+                val x = centers[index]
+                val isQueued = index < queuedPlayers
+                val isTarget = isSearching && index == targetIndex
+
+                paint.style = Paint.Style.FILL
                 paint.color = if (isQueued) playerColors[index] else 0xFF132A4A.toInt()
                 canvas.drawCircle(x, cy, radius, paint)
-                paint.color = if (isQueued) 0xFFFFF4D1.toInt() else 0xFF8CA9C7.toInt()
+
                 paint.style = Paint.Style.STROKE
-                paint.strokeWidth = dp(2f)
+                paint.strokeWidth = dp(if (isTarget) 2.6f else 2f)
+                paint.color = when {
+                    isQueued -> 0xFFFFF4D1.toInt()
+                    isTarget -> 0xFF57DFFF.toInt()
+                    else -> 0xFF8CA9C7.toInt()
+                }
                 canvas.drawCircle(x, cy, radius, paint)
+            }
+
+            // Once the line reaches the open slot, a bright arc travels around its
+            // stroke until the server confirms another player.
+            if (isSearching && approachFraction >= 1f) {
+                val orbitRadius = radius + dp(4.5f)
+                val arcBounds = android.graphics.RectF(
+                    centers[targetIndex] - orbitRadius,
+                    cy - orbitRadius,
+                    centers[targetIndex] + orbitRadius,
+                    cy + orbitRadius,
+                )
+                val angle = (now % ORBIT_DURATION_MS).toFloat() / ORBIT_DURATION_MS.toFloat() * 360f - 90f
+                val sweep = 96f
+                paint.style = Paint.Style.STROKE
+                paint.strokeCap = Paint.Cap.ROUND
+                paint.strokeWidth = dp(3.2f)
+                paint.color = 0xFF62E8FF.toInt()
+                canvas.drawArc(arcBounds, angle, sweep, false, paint)
+
+                val tipAngle = Math.toRadians((angle + sweep).toDouble())
+                val tipX = centers[targetIndex] + (kotlin.math.cos(tipAngle) * orbitRadius).toFloat()
+                val tipY = cy + (kotlin.math.sin(tipAngle) * orbitRadius).toFloat()
                 paint.style = Paint.Style.FILL
+                paint.color = 0xFFE4FCFF.toInt()
+                canvas.drawCircle(tipX, tipY, dp(2.6f), paint)
+            }
+
+            // Player glyphs and labels sit above the animated connectors.
+            for (index in 0..3) {
+                val x = centers[index]
+                val isQueued = index < queuedPlayers
                 drawPlayerIcon(canvas, x, cy, radius, isQueued)
 
                 paint.color = if (isQueued) 0xFFDDF4FF.toInt() else 0xFF8CA9C7.toInt()
@@ -976,9 +1048,7 @@ class TeamUpActivity : Activity() {
                 )
             }
 
-            if (queuedPlayers < 4 && isAttachedToWindow && visibility == View.VISIBLE) {
-                postInvalidateOnAnimation()
-            }
+            if (isSearching) postInvalidateOnAnimation()
         }
 
         private fun drawPlayerIcon(
@@ -989,6 +1059,7 @@ class TeamUpActivity : Activity() {
             isQueued: Boolean,
         ) {
             paint.color = if (isQueued) 0xFFFFF4D1.toInt() else 0xFF8CA9C7.toInt()
+            paint.style = Paint.Style.FILL
             canvas.drawCircle(x, y - radius * 0.22f, radius * 0.22f, paint)
             paint.style = Paint.Style.STROKE
             paint.strokeWidth = dp(2.5f)
@@ -1006,6 +1077,11 @@ class TeamUpActivity : Activity() {
         }
 
         private fun dp(value: Float): Float = value * resources.displayMetrics.density
+
+        private companion object {
+            const val APPROACH_DURATION_MS = 850L
+            const val ORBIT_DURATION_MS = 1_250L
+        }
     }
 
     private fun updateTimer() {
