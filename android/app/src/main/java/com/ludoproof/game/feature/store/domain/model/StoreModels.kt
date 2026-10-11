@@ -7,7 +7,6 @@ enum class StoreTab(
     PAWS("PAWS"),
     BOARD("BOARD"),
     DICE("DICE"),
-    AVATAR("AVATAR"),
 }
 
 enum class StoreProductKind {

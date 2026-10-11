@@ -31,8 +31,6 @@ internal fun StoreActivity.storeContent():
         StoreTab.DICE ->
             diceCatalogContent()
 
-        StoreTab.AVATAR ->
-            avatarCatalogContent()
     }
 
 private fun StoreActivity.gemsContent():

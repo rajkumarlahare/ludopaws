@@ -448,6 +448,7 @@ class StoreActivity :
             LudoProofTheme
                 .arcadeRoot(
                     this,
+                    gameplayBackground = true,
                 )
 
         val scroll =
