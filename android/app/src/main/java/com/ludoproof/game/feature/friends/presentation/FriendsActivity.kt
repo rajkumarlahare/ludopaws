@@ -29,6 +29,7 @@ import com.ludoproof.game.GameMode
 import com.ludoproof.game.GameModeIntent
 import com.ludoproof.game.LudoProofTheme
 import com.ludoproof.game.core.ui.art.plywoodBackground
+import com.ludoproof.game.core.ui.art.playerCountSelectionBackground
 import com.ludoproof.game.core.ui.components.AppFocusRing
 import com.ludoproof.game.MainActivity
 import com.ludoproof.game.PendingOperationStore
@@ -402,15 +403,35 @@ class FriendsActivity : Activity() {
 
         val countRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         listOf(2, 3, 4).forEachIndexed { index, count ->
+            val selected = selectedPlayerCount == count
+            val playerCountButton = FriendsVisualKit.button(
+                this,
+                count.toString(),
+                if (selected) FriendsButtonStyle.GREEN else FriendsButtonStyle.BLUE,
+            ) {
+                selectedPlayerCount = count
+                renderRoom()
+            }.apply {
+                // These are the compact PRIVATE ROOM size controls (not the
+                // separate Offline setup tiles). Reuse Online's recessed timber
+                // and gold selected treatment, without a check badge that would
+                // overlap the number at this 42dp size.
+                background = playerCountSelectionBackground(
+                    context = this@FriendsActivity,
+                    selected = selected,
+                    outerCornerRadiusDp = 14f,
+                    emphasizeSelected = true,
+                    showCheckBadge = false,
+                )
+                setTextColor(if (selected) 0xFFFFD45E.toInt() else Color.WHITE)
+                setShadowLayer(2f, 0f, dp(1).toFloat(), 0xA6000000.toInt())
+                elevation = dp(if (selected) 6 else 4).toFloat()
+                isSelected = selected
+                contentDescription =
+                    if (selected) "$count players, selected" else "$count players"
+            }
             countRow.addView(
-                FriendsVisualKit.button(
-                    this,
-                    count.toString(),
-                    if (selectedPlayerCount == count) FriendsButtonStyle.GREEN else FriendsButtonStyle.BLUE,
-                ) {
-                    selectedPlayerCount = count
-                    renderRoom()
-                },
+                playerCountButton,
                 LinearLayout.LayoutParams(dp(42), dp(40)).apply {
                     if (index > 0) marginStart = dp(5)
                 },

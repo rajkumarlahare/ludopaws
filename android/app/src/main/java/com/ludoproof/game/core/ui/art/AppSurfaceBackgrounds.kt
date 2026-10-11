@@ -75,13 +75,19 @@ internal fun playerCountSelectionBackground(
     outerCornerRadiusDp: Float = 20f,
     checkBadgeAtTopEnd: Boolean = false,
     emphasizeSelected: Boolean = false,
+    showCheckBadge: Boolean = true,
 ): android.graphics.drawable.Drawable {
     val baseBackground = recessedPlywoodBackground(context, outerCornerRadiusDp)
     if (!selected) return baseBackground
     return android.graphics.drawable.LayerDrawable(
         arrayOf(
             baseBackground,
-            PlayerCountSelectionOverlayDrawable(context, checkBadgeAtTopEnd, emphasizeSelected),
+            PlayerCountSelectionOverlayDrawable(
+                context,
+                checkBadgeAtTopEnd,
+                emphasizeSelected,
+                showCheckBadge,
+            ),
         ),
     )
 }
@@ -90,6 +96,7 @@ private class PlayerCountSelectionOverlayDrawable(
     context: Context,
     private val checkBadgeAtTopEnd: Boolean,
     private val emphasizeSelected: Boolean,
+    private val showCheckBadge: Boolean,
 ) : android.graphics.drawable.Drawable() {
     private val density = context.resources.displayMetrics.density
     private val fillPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
@@ -127,6 +134,10 @@ private class PlayerCountSelectionOverlayDrawable(
         strokePaint.strokeWidth = dp(if (emphasizeSelected) 2f else 1.35f)
         val strokeRadius = (radius - dp(0.8f)).coerceAtLeast(1f)
         canvas.drawRoundRect(strokeRect, strokeRadius, strokeRadius, strokePaint)
+
+        // Small Friends-page count buttons use the inset gold outline alone so
+        // the selected numeral remains unobstructed.
+        if (!showCheckBadge) return
 
         // Compact tiles use a top-end badge; larger online cards use bottom-end.
         val badgeRadius = dp(7.2f)
