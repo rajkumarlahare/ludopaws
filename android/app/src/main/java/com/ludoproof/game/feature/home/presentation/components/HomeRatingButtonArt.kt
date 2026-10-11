@@ -72,8 +72,8 @@ internal class HomeGooglePlayIconView(
                 moveTo(52f, 50f)
                 lineTo(57f, 38f)
                 lineTo(71f, 31f)
-                lineTo(83f, 44f)
-                quadTo(93f, 50f, 83f, 56f)
+                // Clean pointed tip: avoid the rounded yellow bulge at the right edge.
+                lineTo(90f, 50f)
                 lineTo(71f, 69f)
                 lineTo(57f, 62f)
                 close()
