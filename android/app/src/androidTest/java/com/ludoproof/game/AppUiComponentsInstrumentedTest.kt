@@ -3,8 +3,8 @@ package com.ludoproof.game
 import android.content.Context
 import android.text.InputType
 import android.view.View
-import androidx.test.annotation.UiThreadTest
 import androidx.test.core.app.ApplicationProvider
+import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.ludoproof.game.core.ui.components.AppActionIconButton
 import com.ludoproof.game.core.ui.components.AppBadgeTone
@@ -32,28 +32,29 @@ class AppUiComponentsInstrumentedTest {
         get() = LudoProofTheme.dp(context, AppUiTokens.Icon.MIN_TOUCH_TARGET_DP)
 
     @Test
-    @UiThreadTest
     fun buttonUsesThemeAndHonorsEnabledAndClickContracts() {
-        var clickCount = 0
-        val button = AppButton.create(
-            context = context,
-            label = "Continue",
-            variant = AppButtonVariant.SECONDARY,
-            onClick = { clickCount++ },
-        )
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            var clickCount = 0
+            val button = AppButton.create(
+                context = context,
+                label = "Continue",
+                variant = AppButtonVariant.SECONDARY,
+                onClick = { clickCount++ },
+            )
 
-        assertEquals("Continue", button.text.toString())
-        assertTrue(button.isEnabled)
-        assertTrue(button.minHeight >= minimumTouchTargetPx)
-        assertTrue(button.performClick())
-        assertEquals(1, clickCount)
+            assertEquals("Continue", button.text.toString())
+            assertTrue(button.isEnabled)
+            assertTrue(button.minHeight >= minimumTouchTargetPx)
+            assertTrue(button.performClick())
+            assertEquals(1, clickCount)
 
-        val disabled = AppButton.create(
-            context = context,
-            label = "Unavailable",
-            enabled = false,
-        )
-        assertFalse(disabled.isEnabled)
+            val disabled = AppButton.create(
+                context = context,
+                label = "Unavailable",
+                enabled = false,
+            )
+            assertFalse(disabled.isEnabled)
+        }
     }
 
     @Test
