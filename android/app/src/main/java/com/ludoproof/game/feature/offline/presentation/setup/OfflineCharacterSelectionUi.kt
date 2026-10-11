@@ -258,7 +258,7 @@ private fun OfflineGameActivity.characterChoiceCard(
                 setTextColor(Color.WHITE)
                 gravity = Gravity.CENTER
                 includeFontPadding = false
-                setShadowLayer(2f, 0f, dp(1), 0xAA00112D.toInt())
+                setShadowLayer(2f, 0f, dp(1).toFloat(), 0xAA00112D.toInt())
                 tag = CHARACTER_NAME_TAG
             },
             LinearLayout.LayoutParams(
