@@ -1,7 +1,10 @@
 package com.ludoproof.game.feature.profile.presentation
 
 import android.app.Activity
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.Gravity
@@ -41,6 +44,43 @@ class ProfileActivity : Activity() {
     internal val profilePhotoUri: String?
         get() = getSharedPreferences(PHOTO_PREFS, MODE_PRIVATE)
             .getString(KEY_PROFILE_PHOTO_URI, null)
+
+    private var decodedProfilePhotoUri: String? = null
+    private var decodedProfilePhoto: Bitmap? = null
+
+    internal fun loadProfilePhoto(uriString: String): Bitmap? {
+        if (decodedProfilePhotoUri == uriString) return decodedProfilePhoto
+
+        val bitmap = runCatching {
+            val uri = Uri.parse(uriString)
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            contentResolver.openInputStream(uri)?.use {
+                BitmapFactory.decodeStream(it, null, bounds)
+            }
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+                return@runCatching null
+            }
+
+            var sampleSize = 1
+            while (
+                bounds.outWidth / sampleSize > PHOTO_MAX_DIMENSION ||
+                bounds.outHeight / sampleSize > PHOTO_MAX_DIMENSION
+            ) {
+                sampleSize *= 2
+            }
+
+            val options = BitmapFactory.Options().apply {
+                inSampleSize = sampleSize
+            }
+            contentResolver.openInputStream(uri)?.use {
+                BitmapFactory.decodeStream(it, null, options)
+            }
+        }.getOrNull()
+
+        decodedProfilePhotoUri = uriString
+        decodedProfilePhoto = bitmap
+        return bitmap
+    }
 
     internal fun chooseProfilePhoto() {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
@@ -373,5 +413,6 @@ class ProfileActivity : Activity() {
         const val REQUEST_PROFILE_PHOTO = 7412
         const val PHOTO_PREFS = "ludoproof_profile_photo"
         const val KEY_PROFILE_PHOTO_URI = "profile_photo_uri"
+        const val PHOTO_MAX_DIMENSION = 512
     }
 }
