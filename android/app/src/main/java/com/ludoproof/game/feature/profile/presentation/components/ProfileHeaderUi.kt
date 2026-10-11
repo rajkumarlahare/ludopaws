@@ -15,8 +15,6 @@ import com.ludoproof.game.LudoProofTheme
 import com.ludoproof.game.LudoPawsCharacterAvatarView
 import com.ludoproof.game.core.ui.components.AppFocusRing
 import com.ludoproof.game.core.ui.components.appIconActionButton
-import com.ludoproof.game.core.ui.icons.AppIconView
-import com.ludoproof.game.core.ui.icons.AppIconVariant
 import com.ludoproof.game.core.ui.icons.AppIconName
 import com.ludoproof.game.feature.characters.data.local.CharacterSelectionStore
 import com.ludoproof.game.feature.profile.domain.ProfileProgression
@@ -26,10 +24,24 @@ import com.ludoproof.game.feature.profile.presentation.ProfileActivity
 import com.ludoproof.game.feature.store.domain.model.StoreTab
 import com.ludoproof.game.feature.store.presentation.StoreActivity
 
-internal fun ProfileActivity.profileTopBar(): LinearLayout =
-    LinearLayout(this).apply {
-        orientation = LinearLayout.HORIZONTAL
-        gravity = Gravity.CENTER_VERTICAL
+internal fun ProfileActivity.profileTopBar(): FrameLayout =
+    FrameLayout(this).apply {
+        // Place the title at the true center of the whole top bar, independent of the Back button.
+        addView(
+            TextView(this@profileTopBar).apply {
+                text = "Profile"
+                textSize = 25f
+                setTypeface(Typeface.DEFAULT_BOLD)
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
+                includeFontPadding = false
+            },
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                dp(50),
+                Gravity.CENTER,
+            ),
+        )
 
         addView(
             appIconActionButton(
@@ -44,59 +56,7 @@ internal fun ProfileActivity.profileTopBar(): LinearLayout =
                     cornerRadiusDp = 25f,
                 )
             },
-            LinearLayout.LayoutParams(dp(50), dp(50)),
-        )
-
-        addView(
-            TextView(this@profileTopBar).apply {
-                text = "Profile"
-                textSize = 25f
-                setTypeface(Typeface.DEFAULT_BOLD)
-                setTextColor(Color.WHITE)
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding(dp(12), 0, 0, 0)
-            },
-            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f),
-        )
-
-        addView(
-            LinearLayout(this@profileTopBar).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER
-                setPadding(dp(10), 0, dp(10), 0)
-                background = LudoProofTheme.rounded(
-                    0xFFF3F5F8.toInt(),
-                    12f,
-                    0xFFDCE4EF.toInt(),
-                    1f,
-                    this@profileTopBar,
-                )
-                addView(
-                    AppIconView(
-                        this@profileTopBar,
-                        AppIconName.SETTINGS,
-                        iconTint = 0xFF303846.toInt(),
-                        iconVariant = AppIconVariant.OUTLINE,
-                        strokeWidthDp = 2f,
-                    ),
-                    LinearLayout.LayoutParams(dp(23), dp(23)),
-                )
-                addView(
-                    TextView(this@profileTopBar).apply {
-                        text = "SETUP"
-                        textSize = 13f
-                        setTypeface(Typeface.DEFAULT_BOLD)
-                        setTextColor(0xFF303846.toInt())
-                        setPadding(dp(6), 0, 0, 0)
-                    },
-                )
-                contentDescription = "Profile and Play Games setup"
-                isEnabled = !playGamesSignInInProgress
-                alpha = if (isEnabled) 1f else 0.72f
-                setOnClickListener { beginPlayGamesSignIn() }
-                AppFocusRing.apply(this, cornerRadiusDp = 12f)
-            },
-            LinearLayout.LayoutParams(dp(104), dp(42)),
+            FrameLayout.LayoutParams(dp(50), dp(50), Gravity.START or Gravity.CENTER_VERTICAL),
         )
     }
 
