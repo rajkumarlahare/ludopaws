@@ -9,7 +9,7 @@ import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.LudoPawsCharacterAvatarView
-import com.ludoproof.game.core.ui.art.recessedPlywoodBackground
+import com.ludoproof.game.core.ui.art.playerCountSelectionBackground
 import com.ludoproof.game.LudoProofTheme
 import com.ludoproof.game.OfflineGameActivity
 import com.ludoproof.game.feature.characters.domain.catalog.LudoPawsCharacterCatalog
@@ -117,18 +117,24 @@ internal fun OfflineGameActivity.characterPanel(
     selectionPanel(
         "CHOOSE YOUR PAW",
         if (isComputerMode) {
-            "Pick your animal. Your computer rivals get the remaining paws."
+            "CPU rivals use the other paws."
         } else {
             "Give every player a different animal."
         },
         embeddedInComputerPanel = embeddedInComputerPanel,
     ).apply {
-        characterSlotsRow =
-            LinearLayout(this@characterPanel).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER
-            }.also(::addView)
-        rebuildCharacterSlotButtons()
+        if (isComputerMode) {
+            // Computer mode needs no YOU/character slot tab; paw selection is direct.
+            characterSlotsRow = null
+            characterSlotButtons = emptyMap()
+        } else {
+            characterSlotsRow =
+                LinearLayout(this@characterPanel).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER
+                }.also(::addView)
+            rebuildCharacterSlotButtons()
+        }
 
         val scroll =
             HorizontalScrollView(this@characterPanel).apply {
@@ -163,24 +169,29 @@ internal fun OfflineGameActivity.characterPanel(
         scroll.addView(cardsRow)
         addView(scroll)
 
-        characterSummaryText =
-            TextView(this@characterPanel).apply {
-                LudoProofTheme.body(
-                    this,
-                    if (isCompactSetup()) 10.5f else 11.5f,
-                    centered = true,
-                    bright = true,
-                )
-                setTypeface(Typeface.DEFAULT_BOLD)
-                setPadding(dp(12), dp(8), dp(12), dp(8))
-                background = LudoProofTheme.rounded(
-                    0xC8062861.toInt(),
-                    999f,
-                    0xFF267ACF.toInt(),
-                    1f,
-                    this@characterPanel,
-                )
-            }.also(::addView)
+        if (isComputerMode) {
+            // The YOU/CPU assignment summary is redundant on the Computer page.
+            characterSummaryText = null
+        } else {
+            characterSummaryText =
+                TextView(this@characterPanel).apply {
+                    LudoProofTheme.body(
+                        this,
+                        if (isCompactSetup()) 10.5f else 11.5f,
+                        centered = true,
+                        bright = true,
+                    )
+                    setTypeface(Typeface.DEFAULT_BOLD)
+                    setPadding(dp(12), dp(8), dp(12), dp(8))
+                    background = LudoProofTheme.rounded(
+                        0xC8062861.toInt(),
+                        999f,
+                        0xFF267ACF.toInt(),
+                        1f,
+                        this@characterPanel,
+                    )
+                }.also(::addView)
+        }
 
         refreshCharacterSelectionUi()
     }
@@ -316,7 +327,7 @@ internal fun OfflineGameActivity.refreshCharacterSelectionUi() {
 
     val expectedSlots =
         if (isComputerMode) {
-            setOf(0)
+            emptySet()
         } else {
             (0 until selectedPlayers).toSet()
         }
@@ -356,45 +367,52 @@ internal fun OfflineGameActivity.refreshCharacterSelectionUi() {
     val activeCharacterId = selectedCharacterIds.getOrNull(selectedCharacterSlot)
     characterCards.forEach { (characterId, card) ->
         val selected = characterId == activeCharacterId
-        if (selected) {
+        if (isComputerMode) {
+            // Match the Friends page's recessed plywood + gold edge/check treatment.
+            // The shared background communicates selection without the old yellow tile flash.
+            card.background = playerCountSelectionBackground(
+                context = this@refreshCharacterSelectionUi,
+                selected = selected,
+                outerCornerRadiusDp = 12f,
+                checkBadgeAtTopEnd = true,
+                emphasizeSelected = true,
+                showCheckBadge = true,
+            )
+            card.elevation = dp(if (selected) 6 else 4).toFloat()
+        } else if (selected) {
             LudoProofTheme.selectedTile(card)
         } else {
             LudoProofTheme.normalTile(card)
-            if (isComputerMode) {
-                card.background = recessedPlywoodBackground(
-                    context = this@refreshCharacterSelectionUi,
-                    outerCornerRadiusDp = 12f,
-                )
-            }
         }
         card.findViewWithTag<LudoPawsCharacterAvatarView>(CHARACTER_AVATAR_TAG)
             ?.bind(
                 characterId = characterId,
                 ringColor =
-                    if (selected) {
+                    if (selected && !isComputerMode) {
                         0xFFFFC72C.toInt()
                     } else {
                         0xFF5BE0FF.toInt()
                     },
-                highlighted = selected,
+                highlighted = selected && !isComputerMode,
                 showCircularChrome = false,
             )
         card.findViewWithTag<TextView>(CHARACTER_NAME_TAG)
             ?.setTextColor(
-                if (selected) {
-                    0xFF052A68.toInt()
-                } else {
-                    Color.WHITE
+                when {
+                    isComputerMode && selected -> 0xFFFFD45E.toInt()
+                    !isComputerMode && selected -> 0xFF052A68.toInt()
+                    else -> Color.WHITE
                 },
             )
         card.findViewWithTag<TextView>(CHARACTER_PERSONALITY_TAG)?.apply {
+            val legacySelectedStyle = selected && !isComputerMode
             setTextColor(
-                if (selected) 0xFF174A78.toInt() else 0xFFBCD5FF.toInt(),
+                if (legacySelectedStyle) 0xFF174A78.toInt() else 0xFFBCD5FF.toInt(),
             )
             background = LudoProofTheme.rounded(
-                if (selected) 0xB5FFE59A.toInt() else 0xB803225C.toInt(),
+                if (legacySelectedStyle) 0xB5FFE59A.toInt() else 0xB803225C.toInt(),
                 999f,
-                if (selected) 0xCCFFB51D.toInt() else 0xFF178CD6.toInt(),
+                if (legacySelectedStyle) 0xCCFFB51D.toInt() else 0xFF178CD6.toInt(),
                 1f,
                 this@refreshCharacterSelectionUi,
             )

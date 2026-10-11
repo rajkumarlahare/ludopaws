@@ -18,6 +18,7 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.*
+import com.ludoproof.game.core.ui.art.playerCountSelectionBackground
 import com.ludoproof.game.core.ui.art.recessedPlywoodBackground
 import com.ludoproof.game.core.ui.icons.AppIconName
 import com.ludoproof.game.core.ui.icons.AppIconVariant
@@ -317,7 +318,7 @@ internal fun OfflineGameActivity.selectionPanel(
                 "SELECT PLAYERS" -> AppIconView(
                     this@selectionPanel,
                     AppIconName.PEOPLE,
-                    iconTint = 0xFF83C9FF.toInt(),
+                    iconTint = LudoProofTheme.GOLD,
                     iconVariant = AppIconVariant.FILLED,
                     strokeWidthDp = 2f,
                 )
@@ -523,19 +524,30 @@ private fun setupColor(name: String): Int =
 internal fun OfflineGameActivity.refreshSetupSelections() {
     playerButtons.forEach { (playerCount, tile) ->
         val selected = playerCount == selectedPlayers
-        if (selected) {
+        if (isComputerMode) {
+            tile.background = playerCountSelectionBackground(
+                context = this@refreshSetupSelections,
+                selected = selected,
+                outerCornerRadiusDp = 12f,
+                checkBadgeAtTopEnd = true,
+                emphasizeSelected = true,
+                showCheckBadge = true,
+            )
+            tile.elevation = dp(if (selected) 6 else 4).toFloat()
+        } else if (selected) {
             LudoProofTheme.selectedTile(tile)
         } else {
             LudoProofTheme.normalTile(tile)
         }
         (tile as? LinearLayout)?.let { content ->
             (content.getChildAt(0) as? ModeArtView)?.playerCountSelected = selected
-            (content.getChildAt(1) as? TextView)?.setTextColor(
-                if (selected) 0xFF062B68.toInt() else Color.WHITE,
-            )
-            (content.getChildAt(2) as? TextView)?.setTextColor(
-                if (selected) 0xFF062B68.toInt() else Color.WHITE,
-            )
+            val countTextColor = when {
+                isComputerMode && selected -> 0xFFFFD45E.toInt()
+                !isComputerMode && selected -> 0xFF062B68.toInt()
+                else -> Color.WHITE
+            }
+            (content.getChildAt(1) as? TextView)?.setTextColor(countTextColor)
+            (content.getChildAt(2) as? TextView)?.setTextColor(countTextColor)
         }
     }
 
@@ -584,7 +596,7 @@ internal fun OfflineGameActivity.setupTileParams(
 
 
 private class SetupPawIconView(context: android.content.Context) : View(context) {
-    private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF75B9FF.toInt() }
+    private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = LudoProofTheme.GOLD }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
