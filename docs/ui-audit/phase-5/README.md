@@ -8,7 +8,7 @@ Carry the shared UI foundation into Friends, Settings and multiplayer entry poin
 
 - Friends uses the shared `AppIconView` registry for common action glyphs: back, people, add/invite, search, copy, share, play, message, clock and more. Feature-specific identity-card, house and friend-request envelope artwork remains owned by Friends.
 - Friends search/add inputs and enabled action buttons receive the shared gold focus outline; Friend Requests and Room Invites cards receive the same focus treatment.
-- Settings' close control uses the shared `CLOSE` icon and has a 48dp minimum touch target. Dropdown fields and ON/OFF segments show a gold focus outline without changing selected values or callback behavior.
+- Settings' close control uses the shared `CLOSE` icon and has a 48dp minimum touch target. Music/Sound controls, dropdown fields, dropdown choice rows, ON/OFF segments, and the Privacy Policy action show a gold focus outline without changing selected values or callback behavior.
 - Public multiplayer player-count choices and PLAY, plus Team Up's FIND A TEAM and CANCEL SEARCH actions, show a visible gold outline on keyboard/accessibility focus. Existing selected/pressed surfaces and matchmaking actions remain intact.
 - The focus helper overlays the current foreground rather than replacing the background, so feature-owned surfaces remain unchanged and any existing foreground feedback is retained.
 
@@ -31,6 +31,7 @@ Carry the shared UI foundation into Friends, Settings and multiplayer entry poin
 - [x] Friends common action glyph adoption.
 - [x] Friends input/action/card focus visibility.
 - [x] Settings close icon consolidation and touch target.
+- [x] Settings audio controls, dropdown choices and Privacy Policy focus visibility.
 - [x] Settings dropdown and toggle-segment focus visibility.
 - [x] Public multiplayer mode selection and PLAY focus visibility.
 - [x] Team Up FIND A TEAM and CANCEL SEARCH focus visibility.

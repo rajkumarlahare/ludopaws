@@ -718,6 +718,8 @@ class FriendsActivity : Activity() {
         val more = FriendsVisualKit.iconView(this, FriendsIcon.MORE, FriendsVisualKit.TEXT).apply {
             isClickable = true
             isFocusable = true
+            contentDescription = "More actions for " + friend.optString("displayName", "friend")
+            AppFocusRing.apply(this, cornerRadiusDp = 8f, strokeWidthDp = 2f)
             setOnClickListener { anchor -> showFriendMenu(anchor, friend) }
         }
         actions.addView(more, LinearLayout.LayoutParams(dp(26), dp(34)).apply { marginStart = dp(2) })

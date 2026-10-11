@@ -550,6 +550,7 @@ internal fun showSettingsChoiceDialog(
                             settingsDp(context, 10)
                                 .toFloat()
                     }
+                AppFocusRing.apply(this, cornerRadiusDp = 10f, strokeWidthDp = 2f)
                 setOnClickListener {
                     onSelect(option)
                     dialog.dismiss()

@@ -5,6 +5,7 @@ import android.content.Context
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ScrollView
+import com.ludoproof.game.core.ui.components.AppFocusRing
 import com.ludoproof.game.DiceView
 import com.ludoproof.game.LudoBoardView
 import com.ludoproof.game.feature.profile.data.local.ProfileStore
@@ -447,6 +448,7 @@ internal fun showSettingsDialog(
         settingsPrivacyLink(
             context,
         ).apply {
+            AppFocusRing.apply(this, cornerRadiusDp = 8f, strokeWidthDp = 2f)
             setOnClickListener {
                 GameSoundFeedback.click(
                     context,
