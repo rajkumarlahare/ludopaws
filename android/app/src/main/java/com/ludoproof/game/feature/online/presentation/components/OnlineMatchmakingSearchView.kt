@@ -56,16 +56,6 @@ internal class MatchmakingOpponentRailView(
                 dp(10f)
         }
 
-    private val scanner =
-        Paint(
-            Paint.ANTI_ALIAS_FLAG,
-        ).apply {
-            style =
-                Paint.Style.FILL
-            color =
-                0x665BE7FF
-        }
-
     private var targetPlayerCount =
         2
     private var queuedPlayers =
@@ -273,17 +263,6 @@ internal class MatchmakingOpponentRailView(
                 } else {
                     centerX
                 }
-
-            if (
-                activeSearchSlot
-            ) {
-                canvas.drawCircle(
-                    avatarX,
-                    avatarCenterY,
-                    dp(20f),
-                    scanner,
-                )
-            }
 
             drawSilhouette(
                 canvas,
