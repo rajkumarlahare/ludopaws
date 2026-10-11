@@ -21,8 +21,8 @@ const fairDiceTest = read(
 const profileActivity = read(
   "android/app/src/main/java/com/ludoproof/game/feature/profile/presentation/ProfileActivity.kt",
 );
-const profilePaw = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/profile/presentation/components/ProfilePawIdentityUi.kt",
+const profileHeader = read(
+  "android/app/src/main/java/com/ludoproof/game/feature/profile/presentation/components/ProfileHeaderUi.kt",
 );
 const storeActivity = read(
   "android/app/src/main/java/com/ludoproof/game/feature/store/presentation/StoreActivity.kt",
@@ -78,8 +78,13 @@ rejectText(
 
 requireText(
   profileActivity,
+  "profileIdentityPanel(profile)",
+  "Profile must surface the equipped Ludo Paws character in its main hero panel.",
+);
+rejectText(
+  profileActivity,
   "profilePawIdentityPanel()",
-  "Profile must surface the equipped Ludo Paws character identity.",
+  "Profile must not render a duplicate Paw identity panel.",
 );
 requireText(
   profileActivity,
@@ -87,14 +92,14 @@ requireText(
   "Profile must refresh after returning from character/store selection.",
 );
 requireText(
-  profilePaw,
+  profileHeader,
   "CharacterSelectionStore",
-  "Profile Paw identity must come from the real persisted character selection.",
+  "The Profile hero Paw must come from the real persisted character selection.",
 );
 requireText(
   profilePaw,
   "importantForAccessibility",
-  "Equipped character portrait must be exposed to accessibility services.",
+  "The Profile hero character portrait must be exposed to accessibility services.",
 );
 requireText(
   profilePaw,
@@ -104,7 +109,7 @@ requireText(
 requireText(
   profilePaw,
   "StoreActivity.EXTRA_INITIAL_TAB",
-  "Profile must deep-link to the Paws store instead of dropping users into an unrelated tab.",
+  "The Change Paw control must deep-link to the Paws store instead of dropping users into an unrelated tab.",
 );
 requireText(
   storeActivity,
