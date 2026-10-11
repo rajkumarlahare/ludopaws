@@ -18,6 +18,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.*
 import com.ludoproof.game.core.ui.art.recessedPlywoodBackground
+import com.ludoproof.game.core.ui.art.playerCountSelectionBackground
 import com.ludoproof.game.core.ui.icons.AppIconName
 import com.ludoproof.game.core.ui.icons.AppIconVariant
 import com.ludoproof.game.core.ui.icons.AppIconView
@@ -512,18 +513,23 @@ private fun setupColor(name: String): Int =
 internal fun OfflineGameActivity.refreshSetupSelections() {
     playerButtons.forEach { (playerCount, tile) ->
         val selected = playerCount == selectedPlayers
-        if (selected) {
-            LudoProofTheme.selectedTile(tile)
-        } else {
-            LudoProofTheme.normalTile(tile)
-        }
+        tile.background = playerCountSelectionBackground(
+            context = this,
+            selected = selected,
+            outerCornerRadiusDp = 14f,
+            checkBadgeAtTopEnd = true,
+        )
+        tile.elevation = dp(if (selected) 5 else 4).toFloat()
+        tile.isSelected = selected
+        tile.contentDescription =
+            if (selected) "$playerCount players, selected" else "$playerCount players"
         (tile as? LinearLayout)?.let { content ->
             (content.getChildAt(0) as? ModeArtView)?.playerCountSelected = selected
             (content.getChildAt(1) as? TextView)?.setTextColor(
-                if (selected) 0xFF062B68.toInt() else Color.WHITE,
+                if (selected) 0xFFFFD45E.toInt() else Color.WHITE,
             )
             (content.getChildAt(2) as? TextView)?.setTextColor(
-                if (selected) 0xFF062B68.toInt() else Color.WHITE,
+                if (selected) 0xFFFFD45E.toInt() else Color.WHITE,
             )
         }
     }

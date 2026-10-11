@@ -20,7 +20,7 @@ import com.ludoproof.game.LudoProofTheme
 import com.ludoproof.game.ModeArtView
 import com.ludoproof.game.core.ui.art.plywoodBackground
 import com.ludoproof.game.core.ui.art.playGamesSignInBackground
-import com.ludoproof.game.core.ui.art.recessedPlywoodBackground
+import com.ludoproof.game.core.ui.art.playerCountSelectionBackground
 import com.ludoproof.game.core.ui.components.AppFocusRing
 import com.ludoproof.game.LudoPawsCharacterAvatarView
 import com.ludoproof.game.MainActivity
@@ -723,105 +723,14 @@ internal fun MainActivity.stylePublicPlayerCountButton(
         null,
         null,
     )
-    // Keep the recessed plywood pocket for both states. The selected card gets
-    // a translucent gold wash, a fine inset highlight, and a compact check badge.
-    val baseBackground =
-        recessedPlywoodBackground(
+    // Shared recessed plywood and selected-state overlay are also used by the
+    // local 2/3/4-player setup selector.
+    button.background =
+        playerCountSelectionBackground(
             context = button.context,
+            selected = selected,
             outerCornerRadiusDp = 20f,
         )
-    button.background =
-        if (selected) {
-            android.graphics.drawable.LayerDrawable(
-                arrayOf(
-                    baseBackground,
-                    PlayerCountSelectionOverlayDrawable(button.context),
-                ),
-            )
-        } else {
-            baseBackground
-        }
-}
-
-/**
- * Visible-only overlay for the active 2-player/4-player card.
- *
- * It is painted above the plywood background but below the card's art and text,
- * so the player colours remain unchanged and legible.
- */
-private class PlayerCountSelectionOverlayDrawable(
-    context: android.content.Context,
-) : Drawable() {
-    private val density = context.resources.displayMetrics.density
-    private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val strokePaint =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            strokeCap = Paint.Cap.ROUND
-            strokeJoin = Paint.Join.ROUND
-        }
-    private var drawableAlpha = 255
-
-    override fun draw(canvas: Canvas) {
-        val boundsRect = android.graphics.RectF(bounds)
-        if (boundsRect.width() <= 0f || boundsRect.height() <= 0f) return
-
-        // Soft gold tint within the carved pocket; the timber rim stays visible.
-        val inset = dp(7.5f)
-        val overlayRect = android.graphics.RectF(boundsRect).apply {
-            inset(inset, inset)
-        }
-        val radius = dp(12f).coerceAtMost(
-            minOf(overlayRect.width(), overlayRect.height()) / 2f,
-        )
-        fillPaint.style = Paint.Style.FILL
-        fillPaint.color = 0xFFFFD45E.toInt()
-        fillPaint.alpha = 46 * drawableAlpha / 255
-        canvas.drawRoundRect(overlayRect, radius, radius, fillPaint)
-
-        // Thin inset edge gives selection a clear boundary without an outside stroke.
-        val strokeRect = android.graphics.RectF(overlayRect).apply {
-            inset(dp(0.8f), dp(0.8f))
-        }
-        strokePaint.color = 0xFFFFD45E.toInt()
-        strokePaint.alpha = 220 * drawableAlpha / 255
-        strokePaint.strokeWidth = dp(1.35f)
-        val strokeRadius = (radius - dp(0.8f)).coerceAtLeast(1f)
-        canvas.drawRoundRect(strokeRect, strokeRadius, strokeRadius, strokePaint)
-
-        // Small check badge sits in the lower-right wood area, clear of the player art.
-        val badgeRadius = dp(7.2f)
-        val badgeX = boundsRect.right - dp(18f)
-        val badgeY = boundsRect.bottom - dp(19f)
-        fillPaint.alpha = drawableAlpha
-        canvas.drawCircle(badgeX, badgeY, badgeRadius, fillPaint)
-
-        strokePaint.color = 0xFF63451B.toInt()
-        strokePaint.alpha = drawableAlpha
-        strokePaint.strokeWidth = dp(1.8f)
-        val check = android.graphics.Path().apply {
-            moveTo(badgeX - badgeRadius * 0.43f, badgeY + badgeRadius * 0.02f)
-            lineTo(badgeX - badgeRadius * 0.10f, badgeY + badgeRadius * 0.34f)
-            lineTo(badgeX + badgeRadius * 0.44f, badgeY - badgeRadius * 0.36f)
-        }
-        canvas.drawPath(check, strokePaint)
-    }
-
-    override fun setAlpha(alpha: Int) {
-        drawableAlpha = alpha.coerceIn(0, 255)
-        invalidateSelf()
-    }
-
-    override fun setColorFilter(colorFilter: android.graphics.ColorFilter?) {
-        fillPaint.colorFilter = colorFilter
-        strokePaint.colorFilter = colorFilter
-        invalidateSelf()
-    }
-
-    @Deprecated("Deprecated in Java")
-    override fun getOpacity(): Int = android.graphics.PixelFormat.TRANSLUCENT
-
-    private fun dp(value: Float): Float = value * density
 }
 
 /**

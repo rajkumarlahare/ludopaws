@@ -62,6 +62,107 @@ internal fun recessedPlywoodBackground(
 ): android.graphics.drawable.Drawable =
     RecessedPlywoodDrawable(context.resources.displayMetrics.density, outerCornerRadiusDp)
 
+
+/**
+ * Shared selection treatment for player-count tiles.
+ *
+ * Both states use the carved plywood pocket. The active state adds a soft gold
+ * wash, inset highlight and a compact check badge without covering the tile art.
+ */
+internal fun playerCountSelectionBackground(
+    context: Context,
+    selected: Boolean,
+    outerCornerRadiusDp: Float = 20f,
+    checkBadgeAtTopEnd: Boolean = false,
+): android.graphics.drawable.Drawable {
+    val baseBackground = recessedPlywoodBackground(context, outerCornerRadiusDp)
+    if (!selected) return baseBackground
+    return android.graphics.drawable.LayerDrawable(
+        arrayOf(
+            baseBackground,
+            PlayerCountSelectionOverlayDrawable(context, checkBadgeAtTopEnd),
+        ),
+    )
+}
+
+private class PlayerCountSelectionOverlayDrawable(
+    context: Context,
+    private val checkBadgeAtTopEnd: Boolean,
+) : android.graphics.drawable.Drawable() {
+    private val density = context.resources.displayMetrics.density
+    private val fillPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+    private val strokePaint =
+        android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            style = android.graphics.Paint.Style.STROKE
+            strokeCap = android.graphics.Paint.Cap.ROUND
+            strokeJoin = android.graphics.Paint.Join.ROUND
+        }
+    private var drawableAlpha = 255
+
+    override fun draw(canvas: android.graphics.Canvas) {
+        val boundsRect = android.graphics.RectF(bounds)
+        if (boundsRect.width() <= 0f || boundsRect.height() <= 0f) return
+
+        // Soft gold tint inside the carved pocket, leaving the timber rim visible.
+        val inset = dp(7.5f)
+        val overlayRect = android.graphics.RectF(boundsRect).apply {
+            inset(inset, inset)
+        }
+        val radius = dp(12f).coerceAtMost(
+            minOf(overlayRect.width(), overlayRect.height()) / 2f,
+        )
+        fillPaint.style = android.graphics.Paint.Style.FILL
+        fillPaint.color = 0xFFFFD45E.toInt()
+        fillPaint.alpha = 46 * drawableAlpha / 255
+        canvas.drawRoundRect(overlayRect, radius, radius, fillPaint)
+
+        // Thin inset edge gives selection a clear boundary without an outside stroke.
+        val strokeRect = android.graphics.RectF(overlayRect).apply {
+            inset(dp(0.8f), dp(0.8f))
+        }
+        strokePaint.color = 0xFFFFD45E.toInt()
+        strokePaint.alpha = 220 * drawableAlpha / 255
+        strokePaint.strokeWidth = dp(1.35f)
+        val strokeRadius = (radius - dp(0.8f)).coerceAtLeast(1f)
+        canvas.drawRoundRect(strokeRect, strokeRadius, strokeRadius, strokePaint)
+
+        // Compact tiles use a top-end badge; larger online cards use bottom-end.
+        val badgeRadius = dp(7.2f)
+        val badgeX = boundsRect.right - dp(18f)
+        val badgeY =
+            if (checkBadgeAtTopEnd) boundsRect.top + dp(18f)
+            else boundsRect.bottom - dp(19f)
+        fillPaint.alpha = drawableAlpha
+        canvas.drawCircle(badgeX, badgeY, badgeRadius, fillPaint)
+
+        strokePaint.color = 0xFF63451B.toInt()
+        strokePaint.alpha = drawableAlpha
+        strokePaint.strokeWidth = dp(1.8f)
+        val check = android.graphics.Path().apply {
+            moveTo(badgeX - badgeRadius * 0.43f, badgeY + badgeRadius * 0.02f)
+            lineTo(badgeX - badgeRadius * 0.10f, badgeY + badgeRadius * 0.34f)
+            lineTo(badgeX + badgeRadius * 0.44f, badgeY - badgeRadius * 0.36f)
+        }
+        canvas.drawPath(check, strokePaint)
+    }
+
+    override fun setAlpha(alpha: Int) {
+        drawableAlpha = alpha.coerceIn(0, 255)
+        invalidateSelf()
+    }
+
+    override fun setColorFilter(colorFilter: android.graphics.ColorFilter?) {
+        fillPaint.colorFilter = colorFilter
+        strokePaint.colorFilter = colorFilter
+        invalidateSelf()
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun getOpacity(): Int = android.graphics.PixelFormat.TRANSLUCENT
+
+    private fun dp(value: Float): Float = value * density
+}
+
 /** Approved green/cyan Google Play sign-in action skin. */
 internal fun playGamesSignInBackground(context: Context): GradientDrawable =
     LudoProofTheme.rounded(
