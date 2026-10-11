@@ -3,9 +3,11 @@ package com.ludoproof.game.feature.profile.presentation.components
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.net.Uri
 import android.view.Gravity
 import android.widget.Button
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.LudoProofTheme
@@ -169,7 +171,7 @@ internal fun ProfileActivity.profileIdentityPanel(
                         )
                     }
 
-                addView(
+                val animalAvatar =
                     LudoPawsCharacterAvatarView(
                         this@profileIdentityPanel,
                     ).apply {
@@ -178,53 +180,60 @@ internal fun ProfileActivity.profileIdentityPanel(
                             ringColor = 0xFFFFD34A.toInt(),
                             highlighted = true,
                         )
-                    },
+                    }
+                addView(
+                    animalAvatar,
                     FrameLayout.LayoutParams(
                         FrameLayout.LayoutParams.MATCH_PARENT,
                         FrameLayout.LayoutParams.MATCH_PARENT,
                     ),
                 )
 
+                profilePhotoUri?.let { savedUri ->
+                    addView(
+                        ImageView(this@profileIdentityPanel).apply {
+                            setImageURI(Uri.parse(savedUri))
+                            scaleType = ImageView.ScaleType.CENTER_CROP
+                            background = LudoProofTheme.rounded(
+                                0xFF0B397A.toInt(),
+                                14f,
+                                0xFF5BE0FF.toInt(),
+                                1f,
+                                this@profileIdentityPanel,
+                            )
+                            clipToOutline = true
+                            contentDescription = "Profile picture"
+                        },
+                        FrameLayout.LayoutParams(
+                            FrameLayout.LayoutParams.MATCH_PARENT,
+                            FrameLayout.LayoutParams.MATCH_PARENT,
+                        ),
+                    )
+                }
+
                 addView(
-                    Button(
-                        this@profileIdentityPanel,
-                    ).apply {
-                        text =
-                            "✎"
-                        textSize =
-                            14f
-                        setTextColor(
-                            Color.WHITE,
-                        )
-                        minWidth =
-                            0
-                        minHeight =
-                            0
-                        setPadding(
-                            0,
-                            0,
-                            0,
-                            0,
-                        )
-                        background =
-                            GradientDrawable().apply {
-                                shape =
-                                    GradientDrawable.OVAL
-                                setColor(
-                                    0xFFFF9800.toInt(),
-                                )
-                            }
-                        contentDescription = "Edit profile name"
+                    Button(this@profileIdentityPanel).apply {
+                        text = "📷"
+                        textSize = 12f
+                        setTextColor(Color.WHITE)
+                        minWidth = 0
+                        minHeight = 0
+                        setPadding(0, 0, 0, 0)
+                        background = GradientDrawable().apply {
+                            shape = GradientDrawable.OVAL
+                            setColor(0xFF087FC4.toInt())
+                            setStroke(dp(1), 0xFFFFFFFF.toInt())
+                        }
+                        contentDescription = "Change profile picture"
                         setOnClickListener {
-                            showNameEditor()
+                            chooseProfilePhoto()
                         }
                         AppFocusRing.apply(this, cornerRadiusDp = 999f)
                     },
                     FrameLayout.LayoutParams(
-                        dp(30),
-                        dp(30),
-                        Gravity.BOTTOM or
-                            Gravity.END,
+                        dp(32),
+                        dp(32),
+                        Gravity.BOTTOM or Gravity.END,
                     ),
                 )
             }
@@ -251,22 +260,46 @@ internal fun ProfileActivity.profileIdentityPanel(
                 )
             }
 
-        copy.addView(
-            TextView(
-                this@profileIdentityPanel,
-            ).apply {
-                text =
-                    profile.displayName
-                textSize =
-                    22f
-                setTypeface(
-                    Typeface.DEFAULT_BOLD,
+        val nameRow =
+            LinearLayout(this@profileIdentityPanel).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+        nameRow.addView(
+            TextView(this@profileIdentityPanel).apply {
+                text = profile.displayName
+                textSize = 22f
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+                setTypeface(Typeface.DEFAULT_BOLD)
+                setTextColor(Color.WHITE)
+            },
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f),
+        )
+        nameRow.addView(
+            Button(this@profileIdentityPanel).apply {
+                text = "✎"
+                textSize = 15f
+                setTextColor(0xFF9BE8FF.toInt())
+                minWidth = 0
+                minHeight = 0
+                setPadding(dp(7), 0, dp(7), 0)
+                background = LudoProofTheme.rounded(
+                    0x3327C6F4,
+                    8f,
+                    0x6656D9FF,
+                    1f,
+                    this@profileIdentityPanel,
                 )
-                setTextColor(
-                    Color.WHITE,
-                )
+                contentDescription = "Edit profile name"
+                setOnClickListener { showNameEditor() }
+                AppFocusRing.apply(this, cornerRadiusDp = 8f)
+            },
+            LinearLayout.LayoutParams(dp(34), dp(32)).apply {
+                marginStart = dp(6)
             },
         )
+        copy.addView(nameRow)
 
         val progress =
             ProfileProgression
@@ -351,8 +384,8 @@ internal fun ProfileActivity.profileIdentityPanel(
                     GradientDrawable(
                         GradientDrawable.Orientation.LEFT_RIGHT,
                         intArrayOf(
-                            0xFFFFD43B.toInt(),
-                            0xFFFFB20F.toInt(),
+                            0xFF35D4C7.toInt(),
+                            0xFF168FE5.toInt(),
                         ),
                     ).apply {
                         cornerRadius =
