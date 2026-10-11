@@ -109,3 +109,12 @@ internal fun emptyPurchaseIconBackground(context: Context): GradientDrawable =
         setColor(0x1C3DBEFF)
         setStroke(LudoProofTheme.dp(context, 1), 0x663EABF3)
     }
+
+
+/** Darker blue icon backing used by the Classic mode tile. */
+internal fun classicModeIconBackground(context: Context): GradientDrawable =
+    blueIconBackground(
+        context = context,
+        fillColor = 0xE20A347A.toInt(),
+        strokeColor = 0xFF217BD0.toInt(),
+    )
