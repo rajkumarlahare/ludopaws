@@ -16,6 +16,8 @@ data class Cat3DPose(
     val headTiltDegrees: Float = 0f,
     val earTwitchDegrees: Float = 0f,
     val tailSwayDegrees: Float = 0f,
+    val legSwingDegrees: Float = 0f,
+    val legTuckDegrees: Float = 0f,
 )
 
 /** Pure, testable motion timeline for the code-generated 3D cat pawn. */
@@ -57,6 +59,8 @@ object Cat3DMotionTimeline {
                     headTiltDegrees = -5.5f * arc,
                     earTwitchDegrees = 12f * arc,
                     tailSwayDegrees = 22f * sin(p * PI * 2.0).toFloat(),
+                    legSwingDegrees = 26f * sin(p * PI * 2.0).toFloat() * arc,
+                    legTuckDegrees = 38f * arc,
                 )
             }
 
@@ -70,6 +74,8 @@ object Cat3DMotionTimeline {
                     headTiltDegrees = 8f * sin(p * PI * 2.0).toFloat(),
                     earTwitchDegrees = 10f * sin(p * PI * 4.0).toFloat(),
                     tailSwayDegrees = 50f * sin(p * PI * 5.0).toFloat(),
+                    legSwingDegrees = 10f * sin(p * PI * 6.0).toFloat(),
+                    legTuckDegrees = 8f * sin(p * PI * 3.0).toFloat().coerceAtLeast(0f),
                 )
             }
         }

@@ -8,6 +8,8 @@ import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.HomeActivity
+import com.ludoproof.game.LudoPawsCharacterAvatarView
+import com.ludoproof.game.feature.characters.data.local.CharacterSelectionStore
 import com.ludoproof.game.feature.leaderboard.presentation.LeaderboardActivity
 import com.ludoproof.game.feature.profile.data.local.ProfileStore
 import com.ludoproof.game.feature.profile.presentation.ProfileActivity
@@ -243,9 +245,16 @@ private fun HomeActivity.homeProfilePill(): LinearLayout =
         )
 
         addView(
-            HomeIconView(this@homeProfilePill).apply {
-                kind = HomeIconKind.PROFILE
-                iconColor = Color.WHITE
+            LudoPawsCharacterAvatarView(this@homeProfilePill).apply {
+                val selectedCharacterId =
+                    CharacterSelectionStore(
+                        this@homeProfilePill,
+                    ).load().characterId
+                bind(
+                    characterId = selectedCharacterId,
+                    ringColor = 0xFFFFD34A.toInt(),
+                    highlighted = true,
+                )
                 setPadding(
                     dp(6),
                     dp(6),

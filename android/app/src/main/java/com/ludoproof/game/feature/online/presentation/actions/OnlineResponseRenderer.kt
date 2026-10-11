@@ -92,6 +92,7 @@ internal fun MainActivity.applyResponse(
     }
 
     if (state.status == "FINISHED") {
+        stopFriendsVoice("Voice ended with the match.")
         realtimeClient.disconnect()
         realtimeConnected = false
         updateConnectionLabel()
@@ -172,7 +173,11 @@ internal fun MainActivity.applyResponse(
             current = state,
         )
 
-    if (transitionMessage != null) {
+    if (secureSessionPersistenceFailed) {
+        showStatus(
+            "Match is connected, but secure resume could not be saved. Keep this screen open until the match is finished.",
+        )
+    } else if (transitionMessage != null) {
         showStatus(transitionMessage)
     } else if (announce) {
         showStatus(

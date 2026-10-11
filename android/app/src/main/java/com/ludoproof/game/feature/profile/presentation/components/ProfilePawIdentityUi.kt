@@ -8,10 +8,10 @@ import android.view.Gravity
 import android.view.View
 import android.widget.Button
 import android.widget.FrameLayout
-import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.LudoProofTheme
+import com.ludoproof.game.LudoPawsCharacterAvatarView
 import com.ludoproof.game.feature.characters.data.local.CharacterSelectionStore
 import com.ludoproof.game.feature.characters.domain.catalog.LudoPawsCharacterCatalog
 import com.ludoproof.game.feature.profile.presentation.ProfileActivity
@@ -86,52 +86,20 @@ internal fun ProfileActivity.profilePawIdentityPanel():
                     }
             }
         val portrait =
-            ImageView(
+            LudoPawsCharacterAvatarView(
                 this@profilePawIdentityPanel,
             ).apply {
-                scaleType =
-                    ImageView.ScaleType.CENTER_CROP
                 setPadding(
                     dp(5),
                     dp(5),
                     dp(5),
                     dp(5),
                 )
-                val drawableId =
-                    character
-                        ?.fallbackDrawableName
-                        ?.let {
-                            resources.getIdentifier(
-                                it,
-                                "drawable",
-                                this@profilePawIdentityPanel.packageName,
-                            )
-                        }
-                        ?: 0
-                if (drawableId != 0) {
-                    setImageResource(
-                        drawableId,
-                    )
-                }
-                contentDescription =
-                    buildString {
-                        append("Equipped Ludo Paws character")
-                        character?.let {
-                            append(", ")
-                            append(it.displayName)
-                            append(", ")
-                            append(
-                                it.species.name
-                                    .lowercase(),
-                            )
-                            append(", ")
-                            append(
-                                it.personality.name
-                                    .lowercase(),
-                            )
-                            append(" personality")
-                        }
-                    }
+                bind(
+                    characterId = character?.id,
+                    ringColor = 0xFFFFC928.toInt(),
+                    highlighted = true,
+                )
                 importantForAccessibility =
                     View.IMPORTANT_FOR_ACCESSIBILITY_YES
             }

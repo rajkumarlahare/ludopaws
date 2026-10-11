@@ -286,9 +286,13 @@ internal fun MainActivity.applyPublicMatchmakingResponse(
             connectRealtimeIfPossible()
 
             showStatus(
-                "Match found • " +
-                    count +
-                    " real players • game started.",
+                if (secureSessionPersistenceFailed) {
+                    "Match is connected, but secure resume could not be saved. Keep this screen open until the match is finished."
+                } else {
+                    "Match found • " +
+                        count +
+                        " real players • game started."
+                },
             )
         }
 

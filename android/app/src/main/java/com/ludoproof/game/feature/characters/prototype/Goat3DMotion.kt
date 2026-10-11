@@ -17,6 +17,8 @@ data class Goat3DPose(
     val earFlickDegrees: Float = 0f,
     val beardSwingDegrees: Float = 0f,
     val tailFlickDegrees: Float = 0f,
+    val legSwingDegrees: Float = 0f,
+    val legTuckDegrees: Float = 0f,
 )
 
 /** Pure, testable motion timeline for the code-generated 3D goat pawn. */
@@ -61,6 +63,8 @@ object Goat3DMotionTimeline {
                     earFlickDegrees = 15f * arc,
                     beardSwingDegrees = 18f * arc + 4f * wobble,
                     tailFlickDegrees = 20f * wobble,
+                    legSwingDegrees = 27f * wobble * arc,
+                    legTuckDegrees = 32f * arc,
                 )
             }
 
@@ -75,6 +79,8 @@ object Goat3DMotionTimeline {
                     earFlickDegrees = 10f * sin(p * PI * 4.0).toFloat(),
                     beardSwingDegrees = 22f * sin(p * PI * 3.0).toFloat(),
                     tailFlickDegrees = 28f * sin(p * PI * 6.0).toFloat(),
+                    legSwingDegrees = 11f * sin(p * PI * 6.0).toFloat(),
+                    legTuckDegrees = 8f * sin(p * PI * 3.0).toFloat().coerceAtLeast(0f),
                 )
             }
         }

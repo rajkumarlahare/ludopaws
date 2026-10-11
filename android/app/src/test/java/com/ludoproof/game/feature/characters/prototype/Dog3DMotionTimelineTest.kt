@@ -9,13 +9,18 @@ class Dog3DMotionTimelineTest {
     @Test
     fun hopStartsAndEndsOnGroundWithVisibleApex() {
         val start = Dog3DMotionTimeline.sample(Dog3DMotion.HOP, 0f)
+        val airborne = Dog3DMotionTimeline.sample(Dog3DMotion.HOP, 0.25f)
         val apex = Dog3DMotionTimeline.sample(Dog3DMotion.HOP, 0.5f)
         val end = Dog3DMotionTimeline.sample(Dog3DMotion.HOP, 1f)
 
         assertEquals(0f, start.liftY, 0.0001f)
         assertTrue(apex.liftY > 0.50f)
         assertTrue(apex.earBounceDegrees > 12f)
+        assertTrue(abs(airborne.legSwingDegrees) > 5f)
+        assertTrue(apex.legTuckDegrees > 10f)
         assertEquals(0f, end.liftY, 0.0001f)
+        assertEquals(0f, end.legSwingDegrees, 0.0001f)
+        assertEquals(0f, end.legTuckDegrees, 0.0001f)
     }
 
     @Test

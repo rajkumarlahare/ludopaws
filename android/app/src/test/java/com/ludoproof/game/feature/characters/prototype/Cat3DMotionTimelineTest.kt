@@ -9,13 +9,18 @@ class Cat3DMotionTimelineTest {
     @Test
     fun hopStartsAndEndsOnGroundWithVisibleApex() {
         val start = Cat3DMotionTimeline.sample(Cat3DMotion.HOP, 0f)
+        val airborne = Cat3DMotionTimeline.sample(Cat3DMotion.HOP, 0.25f)
         val apex = Cat3DMotionTimeline.sample(Cat3DMotion.HOP, 0.5f)
         val end = Cat3DMotionTimeline.sample(Cat3DMotion.HOP, 1f)
 
         assertEquals(0f, start.liftY, 0.0001f)
         assertTrue(apex.liftY > 0.55f)
         assertTrue(apex.earTwitchDegrees > 8f)
+        assertTrue(abs(airborne.legSwingDegrees) > 5f)
+        assertTrue(apex.legTuckDegrees > 15f)
         assertEquals(0f, end.liftY, 0.0001f)
+        assertEquals(0f, end.legSwingDegrees, 0.0001f)
+        assertEquals(0f, end.legTuckDegrees, 0.0001f)
     }
 
     @Test

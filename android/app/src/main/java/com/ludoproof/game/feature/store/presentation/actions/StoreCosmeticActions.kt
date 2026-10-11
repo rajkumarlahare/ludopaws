@@ -53,21 +53,7 @@ internal fun StoreActivity.handleCosmeticTap(
         }
 
         CosmeticAcquireResult.NEED_REWARDED_ADS -> {
-            val progress =
-                cosmetics
-                    .rewardedAdProgress(
-                        cosmetic.id,
-                    )
-            showStoreMessage(
-                cosmetic.title +
-                    " unlocks after " +
-                    cosmetic.requiredAdViews +
-                    " verified rewarded ads. Progress: " +
-                    progress +
-                    "/" +
-                    cosmetic.requiredAdViews +
-                    ". Rewarded ads are not connected yet, so this build does not fake progress.",
-            )
+            requestRewardedAd(cosmetic.id)
         }
 
         CosmeticAcquireResult.NEED_EVENT -> {

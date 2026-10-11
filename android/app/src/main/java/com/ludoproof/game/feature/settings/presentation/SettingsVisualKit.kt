@@ -2,7 +2,9 @@ package com.ludoproof.game.ui.dialogs
 
 import android.app.Dialog
 import android.content.Context
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
@@ -11,6 +13,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import com.ludoproof.game.LudoProofTheme
 
 internal fun settingsCompactPanel(
     context: Context,
@@ -24,8 +27,11 @@ internal fun settingsCompactPanel(
             settingsDp(context, 8),
             settingsDp(context, 8),
         )
-        // Match the full-screen app backdrop inside this compact settings panel.
-        background = SettingsSharedWebpDrawable(context)
+        background =
+            LudoProofTheme.darkPanelDrawable(
+                context,
+                goldBorder = true,
+            )
 
         addView(
             settingsHeader(
@@ -83,33 +89,8 @@ private fun settingsHeader(
         )
 
         val close =
-            TextView(context).apply {
-                text = "×"
-                textSize = 27f
-                setTypeface(Typeface.DEFAULT_BOLD)
-                setTextColor(Color.WHITE)
-                gravity = Gravity.CENTER
-                isClickable = true
-                isFocusable = true
-                contentDescription = "Close settings"
-                background =
-                    GradientDrawable(
-                        GradientDrawable.Orientation.TOP_BOTTOM,
-                        intArrayOf(
-                            0xFFFFB62C.toInt(),
-                            0xFFF37D00.toInt(),
-                            0xFFD95500.toInt(),
-                        ),
-                    ).apply {
-                        shape = GradientDrawable.OVAL
-                        setStroke(
-                            settingsDp(context, 2),
-                            0xFFFFDC65.toInt(),
-                        )
-                    }
-                setOnClickListener {
-                    dialog.dismiss()
-                }
+            SettingsCloseButton(context) {
+                dialog.dismiss()
             }
 
         addView(
@@ -121,6 +102,63 @@ private fun settingsHeader(
             ),
         )
     }
+
+private class SettingsCloseButton(
+    context: Context,
+    onClose: () -> Unit,
+) : View(context) {
+    private val density = resources.displayMetrics.density
+    private val iconPaint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            style = Paint.Style.STROKE
+            strokeWidth = 2.5f * density
+            strokeCap = Paint.Cap.ROUND
+        }
+
+    init {
+        contentDescription = "Close settings"
+        isClickable = true
+        isFocusable = true
+        background =
+            GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(
+                    0xFFFFB62C.toInt(),
+                    0xFFF37D00.toInt(),
+                    0xFFD95500.toInt(),
+                ),
+            ).apply {
+                shape = GradientDrawable.OVAL
+                setStroke(
+                    settingsDp(context, 2),
+                    0xFFFFDC65.toInt(),
+                )
+            }
+        setOnClickListener { onClose() }
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        val radius = 4f * density
+        val centerX = width / 2f
+        val centerY = height / 2f
+        canvas.drawLine(
+            centerX - radius,
+            centerY - radius,
+            centerX + radius,
+            centerY + radius,
+            iconPaint,
+        )
+        canvas.drawLine(
+            centerX + radius,
+            centerY - radius,
+            centerX - radius,
+            centerY + radius,
+            iconPaint,
+        )
+    }
+}
 
 internal fun settingsCompactRow(
     context: Context,
@@ -460,7 +498,11 @@ internal fun showSettingsChoiceDialog(
                 settingsDp(context, 10),
                 settingsDp(context, 10),
             )
-            background = SettingsSharedWebpDrawable(context)
+            background =
+                LudoProofTheme.darkPanelDrawable(
+                    context,
+                    goldBorder = true,
+                )
 
             addView(
                 TextView(context).apply {

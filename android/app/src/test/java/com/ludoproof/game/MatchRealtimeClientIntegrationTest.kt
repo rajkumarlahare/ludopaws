@@ -18,6 +18,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 
 class MatchRealtimeClientIntegrationTest {
     private lateinit var server: MockWebServer
@@ -184,6 +185,77 @@ class MatchRealtimeClientIntegrationTest {
             "successful retry should surface connected state",
             connectionEvents.contains(true),
         )
+    }
+
+    @Test
+    fun friendsVoiceEventsAreDeliveredAndSentOnAuthenticatedSocket() {
+        val connectedLatch = CountDownLatch(1)
+        val peersLatch = CountDownLatch(1)
+        val signalLatch = CountDownLatch(1)
+        val outboundLatch = CountDownLatch(2)
+        val serverSocket = AtomicReference<WebSocket?>()
+        val outboundMessages = CopyOnWriteArrayList<String>()
+        val voicePeers = AtomicReference<Set<String>>()
+        val incomingSignal = AtomicReference<Pair<String, String>>()
+
+        server.enqueue(
+            MockResponse().withWebSocketUpgrade(
+                object : WebSocketListener() {
+                    override fun onOpen(webSocket: WebSocket, response: Response) {
+                        serverSocket.set(webSocket)
+                    }
+
+                    override fun onMessage(webSocket: WebSocket, text: String) {
+                        outboundMessages += text
+                        outboundLatch.countDown()
+                    }
+
+                    override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                        webSocket.close(code, reason)
+                    }
+                },
+            ),
+        )
+        realtimeClient =
+            MatchRealtimeClient(
+                baseUrl = server.url("/").toString().trimEnd('/'),
+                onRevision = { _, _ -> },
+                onConnectionChanged = { if (it) connectedLatch.countDown() },
+                onVoicePeers = {
+                    voicePeers.set(it)
+                    peersLatch.countDown()
+                },
+                onVoiceSignal = { playerId, signal ->
+                    incomingSignal.set(playerId to signal.optString("sdp"))
+                    signalLatch.countDown()
+                },
+                client = transportClient,
+                retryDelayMillis = { 25L },
+            )
+
+        realtimeClient.connect(MATCH_ID, PLAYER_TOKEN)
+        assertTrue("voice WebSocket did not connect", connectedLatch.await(5, TimeUnit.SECONDS))
+        assertTrue(realtimeClient.sendVoiceJoin())
+        assertTrue(
+            realtimeClient.sendVoiceSignal(
+                "LPPEER12345",
+                org.json.JSONObject().put("type", "offer").put("sdp", "test-offer"),
+            ),
+        )
+        assertTrue("voice messages were not sent", outboundLatch.await(5, TimeUnit.SECONDS))
+        val connectedSocket = serverSocket.get()
+        assertNotNull(connectedSocket)
+        connectedSocket?.send("""{"type":"VOICE_PEERS","playerIds":["LPPEER12345"]}""")
+        connectedSocket?.send(
+            """{"type":"VOICE_SIGNAL","fromPlayerId":"LPPEER12345","signal":{"type":"answer","sdp":"test-answer"}}""",
+        )
+
+        assertTrue("voice peer list was not delivered", peersLatch.await(5, TimeUnit.SECONDS))
+        assertTrue("voice signal was not delivered", signalLatch.await(5, TimeUnit.SECONDS))
+        assertEquals(setOf("LPPEER12345"), voicePeers.get())
+        assertEquals("LPPEER12345" to "test-answer", incomingSignal.get())
+        assertTrue(outboundMessages.any { it.contains("VOICE_JOIN") })
+        assertTrue(outboundMessages.any { it.contains("test-offer") && it.contains("LPPEER12345") })
     }
 
     private companion object {

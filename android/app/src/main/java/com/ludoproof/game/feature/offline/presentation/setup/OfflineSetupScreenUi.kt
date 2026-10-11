@@ -2,11 +2,14 @@ package com.ludoproof.game.ui.offline.setup
 
 import android.view.Gravity
 import android.view.View
+import android.graphics.Color
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import android.os.Build
+import android.view.WindowInsets
 import com.ludoproof.game.*
 import com.ludoproof.game.feature.offline.*
 import com.ludoproof.game.ui.offline.common.*
@@ -93,31 +96,41 @@ internal fun OfflineGameActivity.showSetup() {
     content.addView(
         characterPanel(),
         setupSectionParams(
-            if (isCompactSetup()) 12 else 14,
+            if (isComputerMode) {
+                if (isCompactSetup()) 10 else 12
+            } else if (isCompactSetup()) 12 else 14,
         ),
     )
 
     content.addView(
         playersPanel(),
         setupSectionParams(
-            if (isCompactSetup()) 10 else 12,
+            if (isComputerMode) {
+                if (isCompactSetup()) 8 else 10
+            } else if (isCompactSetup()) 10 else 12,
         ),
     )
 
-    content.addView(
-        colorPanel(),
-        setupSectionParams(
-            if (isCompactSetup()) 10 else 12,
-        ),
-    )
+    if (!isComputerMode) {
+        content.addView(
+            colorPanel(),
+            setupSectionParams(
+                if (isCompactSetup()) 10 else 12,
+            ),
+        )
+    }
 
     refreshSetupSelections()
 
     content.addView(
         Button(this).apply {
-            text = "PLAY"
+            text = if (isComputerMode) "🐾   ▶   PLAY   🐾" else "PLAY"
             textSize = if (isCompactSetup()) 18f else 20f
             LudoProofTheme.primary(this)
+            if (isComputerMode) {
+                setTextColor(0xFF693900.toInt())
+                setShadowLayer(0f, 0f, 0f, Color.TRANSPARENT)
+            }
             setOnClickListener {
                 persistActiveCharacterSetup()
                 showGame(
@@ -133,15 +146,42 @@ internal fun OfflineGameActivity.showSetup() {
             dp(if (isCompactSetup()) 58 else 62),
         ).apply {
             setMargins(
-                if (isCompactSetup()) dp(10) else dp(42),
+                if (isComputerMode) {
+                    if (isCompactSetup()) dp(22) else dp(42)
+                } else if (isCompactSetup()) dp(10) else dp(42),
                 dp(if (isCompactSetup()) 16 else 18),
-                if (isCompactSetup()) dp(10) else dp(42),
+                if (isComputerMode) {
+                    if (isCompactSetup()) dp(22) else dp(42)
+                } else if (isCompactSetup()) dp(10) else dp(42),
                 0,
             )
         },
     )
 
     setContentView(root)
+    root.setOnApplyWindowInsetsListener { _, insets ->
+        val cutoutTop =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                insets.displayCutout?.safeInsetTop ?: 0
+            } else {
+                0
+            }
+        val statusTop =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                insets.getInsetsIgnoringVisibility(WindowInsets.Type.statusBars()).top
+            } else {
+                @Suppress("DEPRECATION")
+                insets.systemWindowInsetTop
+            }
+        content.setPadding(
+            content.paddingLeft,
+            dp(if (isCompactSetup()) 10 else 12) + maxOf(cutoutTop, statusTop),
+            content.paddingRight,
+            content.paddingBottom,
+        )
+        insets
+    }
+    root.requestApplyInsets()
 }
 
 internal fun OfflineGameActivity.setupHero(): FrameLayout =

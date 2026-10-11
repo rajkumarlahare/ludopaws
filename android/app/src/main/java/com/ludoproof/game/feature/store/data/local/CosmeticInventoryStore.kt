@@ -262,14 +262,18 @@ class CosmeticInventoryStore(
                     cosmetic.requiredAdViews,
                 )
 
-        prefs.edit()
-            .putInt(
-                StorePreferences
-                    .KEY_AD_PROGRESS_PREFIX +
-                    cosmeticId,
-                next,
-            )
-            .commit()
+        check(
+            prefs.edit()
+                .putInt(
+                    StorePreferences
+                        .KEY_AD_PROGRESS_PREFIX +
+                        cosmeticId,
+                    next,
+                )
+                .commit(),
+        ) {
+            "Could not safely save rewarded-ad cosmetic progress."
+        }
 
         return next
     }

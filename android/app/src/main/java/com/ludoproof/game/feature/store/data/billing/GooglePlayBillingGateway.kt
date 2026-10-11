@@ -10,12 +10,16 @@ import com.android.billingclient.api.ProductDetails
 import com.android.billingclient.api.Purchase
 import com.android.billingclient.api.PurchasesUpdatedListener
 import com.android.billingclient.api.QueryProductDetailsParams
+import com.android.billingclient.api.QueryPurchasesParams
 import com.ludoproof.game.feature.store.domain.StoreCatalog
+import com.ludoproof.game.feature.store.domain.model.StoreProductKind
 import com.ludoproof.game.feature.store.domain.model.StoreBillingProduct
+import java.util.concurrent.ConcurrentHashMap
 
 class GooglePlayBillingGateway(
     private val activity: Activity,
     private val enabled: Boolean,
+    private val accountId: String,
     private val listener: Listener,
 ) : PurchasesUpdatedListener {
     private val productDetails =
@@ -27,6 +31,8 @@ class GooglePlayBillingGateway(
     @Volatile
     private var closed =
         false
+    private val processingPurchaseTokens =
+        ConcurrentHashMap.newKeySet<String>()
 
     private val billingClient =
         BillingClient
@@ -65,6 +71,7 @@ class GooglePlayBillingGateway(
                 .isReady
         ) {
             queryProducts()
+            queryExistingPurchases()
             return
         }
 
@@ -89,6 +96,7 @@ class GooglePlayBillingGateway(
                                 .OK
                         ) {
                             queryProducts()
+                            queryExistingPurchases()
                         } else {
                             listener
                                 .onBillingUnavailable(
@@ -190,6 +198,7 @@ class GooglePlayBillingGateway(
                     activity,
                     BillingFlowParams
                         .newBuilder()
+                        .setObfuscatedAccountId(accountId)
                         .setProductDetailsParamsList(
                             listOf(
                                 productParams,
@@ -245,46 +254,8 @@ class GooglePlayBillingGateway(
             BillingClient
                 .BillingResponseCode
                 .OK -> {
-                purchases
-                    .orEmpty()
-                    .forEach {
-                            purchase ->
-                        when (
-                            purchase.purchaseState
-                        ) {
-                            Purchase
-                                .PurchaseState
-                                .PURCHASED ->
-                                purchase.products
-                                    .forEach {
-                                            productId ->
-                                        listener
-                                            .onPurchaseRequiresVerification(
-                                                productId =
-                                                    productId,
-                                                purchaseToken =
-                                                    purchase.purchaseToken,
-                                            )
-                                    }
-
-                            Purchase
-                                .PurchaseState
-                                .PENDING ->
-                                purchase.products
-                                    .forEach {
-                                            productId ->
-                                        listener
-                                            .onPurchasePending(
-                                                productId,
-                                            )
-                                    }
-
-                            else ->
-                                Unit
-                        }
-                    }
+                processPurchases(purchases.orEmpty())
             }
-
             BillingClient
                 .BillingResponseCode
                 .USER_CANCELED ->
@@ -299,6 +270,82 @@ class GooglePlayBillingGateway(
                                 "Google Play purchase failed."
                             },
                     )
+        }
+    }
+
+    private fun queryExistingPurchases() {
+        if (closed || !billingClient.isReady) return
+        billingClient.queryPurchasesAsync(
+            QueryPurchasesParams
+                .newBuilder()
+                .setProductType(BillingClient.ProductType.INAPP)
+                .build(),
+        ) { billingResult, purchases ->
+            if (closed) return@queryPurchasesAsync
+            if (
+                billingResult.responseCode !=
+                BillingClient.BillingResponseCode.OK
+            ) {
+                listener.onBillingUnavailable(
+                            billingResult.debugMessage.ifBlank {
+                                "Google Play could not reload previous purchases."
+                            },
+                )
+                return@queryPurchasesAsync
+            }
+            processPurchases(purchases)
+        }
+    }
+
+    private fun processPurchases(purchases: List<Purchase>) {
+        purchases.forEach { purchase ->
+            when (purchase.purchaseState) {
+                Purchase.PurchaseState.PURCHASED -> {
+                    val purchaseAccountId =
+                        purchase.accountIdentifiers
+                            ?.obfuscatedAccountId
+                    val restorableNonConsumable =
+                        purchase.products.singleOrNull()
+                            ?.let(StoreCatalog::find)
+                            ?.kind ==
+                            StoreProductKind.NON_CONSUMABLE_REMOVE_ADS
+                    if (
+                        purchaseAccountId != accountId &&
+                        !restorableNonConsumable
+                    ) {
+                        listener.onBillingUnavailable(
+                            "A Play purchase could not be matched to this app installation; no content was granted.",
+                        )
+                        return@forEach
+                    }
+                    if (!processingPurchaseTokens.add(purchase.purchaseToken)) {
+                        return@forEach
+                    }
+                    if (purchase.products.size != 1) {
+                        processingPurchaseTokens.remove(purchase.purchaseToken)
+                        listener.onBillingUnavailable(
+                            "This purchase contains an unsupported number of products; no content was granted.",
+                        )
+                        return@forEach
+                    }
+                    purchase.products.forEach { productId ->
+                        listener.onPurchaseRequiresVerification(
+                            productId = productId,
+                            purchaseToken = purchase.purchaseToken,
+                            accountId = accountId,
+                        ) {
+                            processingPurchaseTokens.remove(purchase.purchaseToken)
+                        }
+                    }
+                }
+
+                Purchase.PurchaseState.PENDING ->
+                    purchase.products.forEach { productId ->
+                        listener.onPurchasePending(productId)
+                    }
+
+                else -> Unit
+            }
         }
     }
 
@@ -417,6 +464,8 @@ class GooglePlayBillingGateway(
         fun onPurchaseRequiresVerification(
             productId: String,
             purchaseToken: String,
+            accountId: String,
+            onFinished: () -> Unit,
         )
 
         fun onPurchasePending(

@@ -11,6 +11,7 @@ import android.widget.TextView
 import com.ludoproof.game.feature.profile.data.local.ProfileStore
 import com.ludoproof.game.feature.profile.domain.model.ProfileGameMode
 import com.ludoproof.game.feature.profile.domain.model.ProfileMatchSource
+import com.ludoproof.game.feature.online.retryPendingRemoteForfeits
 import com.ludoproof.game.ui.home.*
 
 class HomeActivity : Activity() {
@@ -278,6 +279,7 @@ class HomeActivity : Activity() {
 
     override fun onStart() {
         super.onStart()
+        retryPendingRemoteForfeits(this)
         connectivityMonitor.start()
     }
 

@@ -2,21 +2,37 @@ package com.ludoproof.game.feature.profile.presentation
 
 import android.app.Activity
 import android.os.Bundle
+import android.util.Log
 import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import com.ludoproof.game.LudoProofTheme
+import com.ludoproof.game.BuildConfig
+import com.ludoproof.game.R
+import com.google.android.gms.games.PlayGames
 import com.ludoproof.game.feature.profile.data.local.ProfileStore
 import com.ludoproof.game.feature.profile.presentation.components.profileBadgesPanel
 import com.ludoproof.game.feature.profile.presentation.components.profileIdentityPanel
 import com.ludoproof.game.feature.profile.presentation.components.profileModeStatsPanel
 import com.ludoproof.game.feature.profile.presentation.components.profilePawIdentityPanel
+import com.ludoproof.game.feature.profile.presentation.components.profilePlayGamesPanel
 import com.ludoproof.game.feature.profile.presentation.components.profilePurchasesPanel
 import com.ludoproof.game.feature.profile.presentation.components.profileTopBar
 
 class ProfileActivity : Activity() {
+    internal var playGamesAuthenticated = false
+        private set
+    internal var playGamesSignInInProgress = false
+        private set
+    internal var playGamesDisplayName: String? = null
+        private set
+    internal var playGamesStatus = ""
+        private set
+    internal val isPlayGamesConfigured: Boolean
+        get() = BuildConfig.PLAY_GAMES_PROJECT_ID.toLongOrNull()?.let { it > 0 } == true
+
     internal val profileStore by lazy {
         ProfileStore(this)
     }
@@ -31,12 +47,13 @@ class ProfileActivity : Activity() {
             .configureWindow(
                 this,
             )
+        playGamesStatus = getString(R.string.profile_play_games_sign_in_prompt)
         renderProfile()
     }
 
-    override fun onRestart() {
-        super.onRestart()
-        renderProfile()
+    override fun onResume() {
+        super.onResume()
+        refreshPlayGamesSignIn()
     }
 
     internal fun renderProfile() {
@@ -138,6 +155,10 @@ class ProfileActivity : Activity() {
             ),
         )
         content.addView(
+            profilePlayGamesPanel(),
+            sectionParams(12),
+        )
+        content.addView(
             profilePawIdentityPanel(),
             sectionParams(
                 12,
@@ -173,6 +194,113 @@ class ProfileActivity : Activity() {
         )
     }
 
+    internal fun beginPlayGamesSignIn() {
+        if (!isPlayGamesConfigured) {
+            playGamesStatus = getString(R.string.profile_play_games_setup_button_message)
+            renderProfile()
+            return
+        }
+        if (playGamesSignInInProgress) return
+        if (playGamesAuthenticated) {
+            playGamesStatus =
+                playGamesDisplayName?.let {
+                    getString(R.string.profile_play_games_signed_in_as, it)
+                } ?: getString(R.string.profile_play_games_connected)
+            renderProfile()
+            return
+        }
+
+        playGamesSignInInProgress = true
+        playGamesStatus = getString(R.string.profile_play_games_sign_in_opening)
+        renderProfile()
+        PlayGames.getGamesSignInClient(this)
+            .signIn()
+            .addOnCompleteListener { task ->
+                if (isFinishing || isDestroyed) return@addOnCompleteListener
+                playGamesSignInInProgress = false
+                if (!task.isSuccessful) {
+                    Log.w(TAG, "Play Games sign-in failed", task.exception)
+                    playGamesAuthenticated = false
+                    playGamesDisplayName = null
+                    playGamesStatus =
+                        task.exception?.localizedMessage
+                            ?.takeIf(String::isNotBlank)
+                            ?.let {
+                                getString(
+                                    R.string.profile_play_games_sign_in_failed_detail,
+                                    it,
+                                )
+                            }
+                            ?: getString(R.string.profile_play_games_sign_in_failed)
+                    renderProfile()
+                    return@addOnCompleteListener
+                }
+                playGamesAuthenticated = task.result.isAuthenticated
+                if (playGamesAuthenticated) {
+                    loadPlayGamesPlayer()
+                } else {
+                    playGamesStatus =
+                        getString(R.string.profile_play_games_sign_in_not_completed)
+                    renderProfile()
+                }
+            }
+    }
+
+    private fun refreshPlayGamesSignIn() {
+        if (!isPlayGamesConfigured) {
+            playGamesAuthenticated = false
+            playGamesDisplayName = null
+            playGamesStatus =
+                getString(R.string.profile_play_games_setup_required)
+            renderProfile()
+            return
+        }
+        if (playGamesSignInInProgress) return
+        PlayGames.getGamesSignInClient(this)
+            .isAuthenticated()
+            .addOnCompleteListener { task ->
+                if (isFinishing || isDestroyed) return@addOnCompleteListener
+                if (!task.isSuccessful) {
+                    Log.w(TAG, "Could not check Play Games sign-in state", task.exception)
+                    playGamesAuthenticated = false
+                    playGamesStatus =
+                        getString(R.string.profile_play_games_check_failed)
+                    renderProfile()
+                    return@addOnCompleteListener
+                }
+                playGamesAuthenticated = task.result.isAuthenticated
+                if (playGamesAuthenticated) {
+                    loadPlayGamesPlayer()
+                } else {
+                    playGamesDisplayName = null
+                    playGamesStatus = getString(R.string.profile_play_games_sign_in_prompt)
+                    renderProfile()
+                }
+            }
+    }
+
+    private fun loadPlayGamesPlayer() {
+        PlayGames.getPlayersClient(this)
+            .currentPlayer
+            .addOnCompleteListener { task ->
+                if (isFinishing || isDestroyed) return@addOnCompleteListener
+                if (!task.isSuccessful) {
+                    Log.w(TAG, "Play Games authenticated, but player profile could not be loaded", task.exception)
+                    playGamesDisplayName = null
+                    playGamesStatus = getString(R.string.profile_play_games_connected)
+                } else {
+                    playGamesDisplayName =
+                        task.result.displayName
+                            ?.takeIf(String::isNotBlank)
+                    playGamesStatus =
+                        playGamesDisplayName?.let {
+                            getString(R.string.profile_play_games_signed_in_as, it)
+                        } ?: getString(R.string.profile_play_games_connected)
+                }
+                renderProfile()
+            }
+    }
+
     internal fun dp(
         value: Int,
     ): Int =
@@ -195,4 +323,8 @@ class ProfileActivity : Activity() {
                     topDp,
                 )
         }
+
+    private companion object {
+        const val TAG = "ProfilePlayGames"
+    }
 }

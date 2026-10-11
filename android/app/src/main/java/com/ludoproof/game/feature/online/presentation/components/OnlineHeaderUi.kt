@@ -65,7 +65,15 @@ internal fun MainActivity.onlineTopBar(): LinearLayout =
                             )
                         accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
                     }
-                addView(connectionText)
+                addView(
+                    connectionText,
+                    LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                    ).apply {
+                        gravity = Gravity.CENTER_HORIZONTAL
+                    },
+                )
             },
             LinearLayout.LayoutParams(
                 0,
@@ -77,26 +85,50 @@ internal fun MainActivity.onlineTopBar(): LinearLayout =
     }
 
 internal fun MainActivity.requestRemoteExit() {
-    val activeTeamMatch =
-        gameMode == GameMode.TEAM_UP &&
-            currentState?.status == "ACTIVE"
+    val hasUnfinishedMatch =
+        !matchId.isNullOrBlank() &&
+            currentState?.status != "FINISHED"
+    val activeMatch =
+        currentState?.status == "ACTIVE"
 
-    if (!activeTeamMatch) {
-        abandonRemoteSessionState()
-        finish()
+    if (!hasUnfinishedMatch) {
+        if (abandonRemoteSessionState()) {
+            finish()
+        }
         return
     }
 
     AlertDialog.Builder(this)
-        .setTitle("Leave Team Up?")
+        .setTitle(
+            if (gameMode == GameMode.TEAM_UP) {
+                "Leave Team Up?"
+            } else {
+                "Leave Match?"
+            },
+        )
         .setMessage(
-            "Leaving an active 2 vs 2 match forfeits your whole team. " +
-                "Cancel to stay in the match.",
+            if (activeMatch && gameMode == GameMode.TEAM_UP) {
+                "Leaving an active 2 vs 2 match forfeits your whole team. " +
+                    "Cancel to stay in the match."
+            } else if (activeMatch) {
+                "Leaving attempts a server-side forfeit. Any ranked result is saved only after the server confirms the match is finished."
+            } else if (gameMode == GameMode.TEAM_UP) {
+                "Leave this Team Up room? If the match is already active, leaving attempts to forfeit your whole team."
+            } else {
+                "Your match is not confirmed as finished. Leaving attempts a server-side forfeit if it is active."
+            },
         )
         .setNegativeButton("CANCEL", null)
-        .setPositiveButton("EXIT TEAM") { _, _ ->
-            abandonRemoteSessionState()
-            finish()
+        .setPositiveButton(
+            if (gameMode == GameMode.TEAM_UP) {
+                "EXIT TEAM"
+            } else {
+                "LEAVE MATCH"
+            },
+        ) { _, _ ->
+            if (abandonRemoteSessionState()) {
+                finish()
+            }
         }
         .setCancelable(false)
         .show()

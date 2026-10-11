@@ -68,6 +68,7 @@ const QUICK_CHAT_EMOJIS = new Set([
   "😵‍💫", "😞", "🤣", "😆", "😤", "😡",
 ]);
 const QUICK_CHAT_COOLDOWN_MS = 700;
+const MAX_VOICE_SIGNAL_LENGTH = 16_000;
 
 export class MatchRoom {
   constructor(ctx, env) {
@@ -229,6 +230,8 @@ export class MatchRoom {
           // Socket is already gone.
         }
       }
+
+      this.#broadcastVoicePeers(state);
     }
   }
 
@@ -1397,6 +1400,10 @@ export class MatchRoom {
           player.playerId,
       ],
     );
+    server.serializeAttachment({
+      playerId: player.playerId,
+      voiceJoined: false,
+    });
 
     server.send(
       JSON.stringify({
@@ -1440,16 +1447,211 @@ export class MatchRoom {
       return;
     }
 
-    if (message.length > 512) return;
+    if (message.length > MAX_VOICE_SIGNAL_LENGTH) return;
     let payload;
     try {
       payload = JSON.parse(message);
     } catch {
       return;
     }
-    if (payload?.type !== "QUICK_CHAT_SEND") return;
+    if (payload?.type === "QUICK_CHAT_SEND") {
+      if (message.length > 512) return;
+      await this.#mutate(() => this.#handleQuickChat(socket, payload));
+      return;
+    }
+    if (
+      payload?.type === "VOICE_JOIN" ||
+      payload?.type === "VOICE_LEAVE" ||
+      payload?.type === "VOICE_SIGNAL"
+    ) {
+      await this.#mutate(() => this.#handleVoiceMessage(socket, payload));
+    }
+  }
 
-    await this.#mutate(() => this.#handleQuickChat(socket, payload));
+  async #handleVoiceMessage(socket, payload) {
+    const playerId = this.#socketPlayerId(socket);
+    if (!playerId) return;
+
+    const state = await this.ctx.storage.get(STATE_KEY);
+    if (
+      !state ||
+      state.matchMode !== "FRIENDS" ||
+      state.status !== "ACTIVE" ||
+      !Array.isArray(state.players)
+    ) {
+      if (payload.type === "VOICE_LEAVE") {
+        this.#setVoiceJoined(socket, false);
+      }
+      return;
+    }
+
+    const player = state.players.find(
+      (candidate) =>
+        candidate?.playerId === playerId &&
+        !Number.isSafeInteger(candidate.forfeitedAt),
+    );
+    if (!player) return;
+
+    if (payload.type === "VOICE_JOIN") {
+      this.#setVoiceJoined(socket, true);
+      this.#broadcastVoicePeers(state);
+      return;
+    }
+
+    if (payload.type === "VOICE_LEAVE") {
+      this.#setVoiceJoined(socket, false);
+      this.#broadcastVoicePeers(state);
+      return;
+    }
+
+    if (!this.#isVoiceJoined(socket)) return;
+    const targetPlayerId =
+      typeof payload.toPlayerId === "string"
+        ? payload.toPlayerId
+        : "";
+    const target = state.players.find(
+      (candidate) =>
+        candidate?.playerId === targetPlayerId &&
+        !Number.isSafeInteger(candidate.forfeitedAt),
+    );
+    const signal = payload.signal;
+    const signalType = signal?.type;
+    if (
+      targetPlayerId === playerId ||
+      !target ||
+      !this.#isVoicePlayerJoined(targetPlayerId) ||
+      !signal ||
+      typeof signal !== "object" ||
+      !(
+        (signalType === "offer" || signalType === "answer") &&
+        typeof signal.sdp === "string" &&
+        signal.sdp.length > 0 &&
+        signal.sdp.length <= MAX_VOICE_SIGNAL_LENGTH
+      ) &&
+      !(
+        signalType === "candidate" &&
+        typeof signal.candidate === "string" &&
+        signal.candidate.length > 0 &&
+        signal.candidate.length <= 2_048 &&
+        (signal.sdpMid == null || typeof signal.sdpMid === "string") &&
+        (signal.sdpMLineIndex == null ||
+          Number.isInteger(signal.sdpMLineIndex))
+      )
+    ) {
+      return;
+    }
+
+    const outgoing = JSON.stringify({
+      type: "VOICE_SIGNAL",
+      matchId: state.matchId,
+      fromPlayerId: playerId,
+      signal,
+    });
+    for (const recipient of this.#voiceSockets(targetPlayerId)) {
+      try {
+        recipient.send(outgoing);
+      } catch {
+        try {
+          recipient.close(1011, "voice signal delivery failed");
+        } catch {
+          // Socket is already closing.
+        }
+      }
+    }
+  }
+
+  #socketPlayerId(socket) {
+    const tags =
+      typeof this.ctx.getTags === "function"
+        ? this.ctx.getTags(socket)
+        : [];
+    const playerTag = Array.isArray(tags)
+      ? tags.find(
+          (tag) =>
+            typeof tag === "string" &&
+            tag.startsWith("player:"),
+        )
+      : null;
+    return playerTag?.slice("player:".length) || null;
+  }
+
+  #setVoiceJoined(socket, joined) {
+    try {
+      const attachment = socket.deserializeAttachment?.() ?? {};
+      socket.serializeAttachment?.({
+        ...attachment,
+        voiceJoined: joined,
+      });
+    } catch {
+      // A socket that is already closing cannot rejoin voice.
+    }
+  }
+
+  #isVoiceJoined(socket) {
+    try {
+      return socket.deserializeAttachment?.()?.voiceJoined === true;
+    } catch {
+      return false;
+    }
+  }
+
+  #isVoicePlayerJoined(playerId) {
+    return this.#voiceSockets(playerId).length > 0;
+  }
+
+  #voiceSockets(playerId) {
+    if (typeof this.ctx.getWebSockets !== "function") return [];
+    return this.ctx.getWebSockets().filter(
+      (socket) =>
+        this.#socketPlayerId(socket) === playerId &&
+        this.#isVoiceJoined(socket),
+    );
+  }
+
+  #broadcastVoicePeers(state) {
+    if (typeof this.ctx.getWebSockets !== "function") return;
+    const sockets = this.ctx.getWebSockets();
+    if (
+      state.matchMode !== "FRIENDS" ||
+      state.status !== "ACTIVE" ||
+      !Array.isArray(state.players)
+    ) {
+      for (const socket of sockets) {
+        if (!this.#isVoiceJoined(socket)) continue;
+        try {
+          socket.send(JSON.stringify({ type: "VOICE_ENDED" }));
+        } catch {
+          // Socket is already closing.
+        }
+        this.#setVoiceJoined(socket, false);
+      }
+      return;
+    }
+
+    const playerIds = [...new Set(
+      sockets
+        .filter((socket) => this.#isVoiceJoined(socket))
+        .map((socket) => this.#socketPlayerId(socket))
+        .filter((playerId) =>
+          state.players.some(
+            (player) =>
+              player?.playerId === playerId &&
+              !Number.isSafeInteger(player.forfeitedAt),
+          ),
+        ),
+    )];
+    for (const socket of sockets) {
+      if (!this.#isVoiceJoined(socket)) continue;
+      const playerId = this.#socketPlayerId(socket);
+      try {
+        socket.send(JSON.stringify({
+          type: "VOICE_PEERS",
+          playerIds: playerIds.filter((id) => id !== playerId),
+        }));
+      } catch {
+        // Socket is already closing.
+      }
+    }
   }
 
   async #handleQuickChat(socket, payload) {
@@ -1514,6 +1716,8 @@ export class MatchRoom {
     code,
     reason,
   ) {
+    const wasVoiceJoined = this.#isVoiceJoined(socket);
+    this.#setVoiceJoined(socket, false);
     try {
       socket.close(
         code,
@@ -1521,6 +1725,10 @@ export class MatchRoom {
       );
     } catch {
       // Socket is already closed.
+    }
+    if (wasVoiceJoined) {
+      const state = await this.ctx.storage.get(STATE_KEY);
+      if (state) this.#broadcastVoicePeers(state);
     }
   }
 

@@ -287,6 +287,7 @@ internal fun MainActivity.rollVerifiedDice() {
                 pendingSecret = null
                 revealed
             },
+            reconcileOnError = true,
         )
     }
 }
@@ -329,6 +330,7 @@ internal fun MainActivity.moveToken(
                     eventIndex,
                 )
             },
+            reconcileOnError = true,
         )
     }
 }

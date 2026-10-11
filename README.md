@@ -251,3 +251,63 @@ ENTRONEX_SERVICE -> entronex-v4-eval
 ```
 
 The same-account Worker binding is preferred over the public `workers.dev` network path. The public URL remains only as the canonical request URL and local/test fallback.
+
+## Google Play Games sign-in
+
+The Android profile uses Google Play Games Services v2 for native player sign-in. To enable it:
+
+1. Create/link the Android game in Play Console's Play Games Services setup and use the numeric **Games Services project ID** (not the OAuth client ID).
+2. Add the app's package name (`com.ludoproof.game`) and the SHA-1 signing certificate fingerprints for every build distributed to testers or players. The debug build needs its debug-key SHA-1; store builds need the app-signing certificate SHA-1.
+3. Provide the project ID to Gradle without committing it to source:
+
+   ```text
+   PLAY_GAMES_PROJECT_ID=123456789012
+   ```
+
+   Set this property in the local `android/gradle.properties`, CI Gradle properties, or pass `-PPLAY_GAMES_PROJECT_ID=123456789012` to Gradle. A value of `0` is used by default so builds remain possible before Play Console setup; the profile will show that configuration is required and will not start sign-in.
+4. Add tester accounts and publish the Play Games Services configuration to a testing track before testing authentication.
+
+The Profile screen checks the Play Games authentication state when opened, offers a native sign-in action, and displays the signed-in Play Games player name. This authenticates the player with Play Games Services on the device; it does **not** upload local profile statistics or provide cross-device profile sync.
+
+## Google Play Billing
+
+Digital gems and remove-ads purchases use the native Google Play Billing Library. The app never grants a purchase from the on-device Billing callback alone: the Worker verifies each purchase through the Google Play Developer API, consumes gem packs or acknowledges the non-consumable remove-ads item, and records a token-hash redemption in a Durable Object before the app grants the local wallet entitlement. Pending verification tokens are kept in the app's private, backup-disabled storage so the store can retry them the next time it opens.
+
+The checkout intentionally stays disabled until both Play Console products and the verification service are ready. Before enabling it:
+
+1. Create each one-time in-app product in Play Console using the IDs in `android/app/src/main/java/com/ludoproof/game/feature/store/domain/StoreCatalog.kt`: `remove_ads`, `gems_300`, `gems_1500`, `gems_3500`, `gems_20000`, `gems_40000`, and `gems_200000`. Configure the displayed prices and quantities to match the catalog. Publish the products to an internal testing track and add tester accounts.
+2. In Google Cloud Console, enable the Google Play Developer API and create a service account. Grant that account the Play Console permissions **View financial data, orders, and cancellation survey responses** and **Manage orders and subscriptions**.
+3. Set the service account email as a Worker variable named `GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL`. Store its private key only as a Cloudflare Worker secret:
+
+   ```text
+   cd server
+   npx --yes wrangler@4.135.0 secret put GOOGLE_PLAY_SERVICE_ACCOUNT_PRIVATE_KEY
+   ```
+
+   Paste the PEM private key value when prompted. Never put the private key in Android, `wrangler.json`, source control, build arguments, or chat. The Worker package name is fixed to `com.ludoproof.game`.
+4. Deploy the Worker so the `LUDOPROOF_STORE_PURCHASES` Durable Object binding/migration is active. In Cloudflare Worker settings, add the non-secret variable `GOOGLE_PLAY_BILLING_ENABLED=false` while configuring the app and service account.
+5. For internal testing only, set `GOOGLE_PLAY_BILLING_ENABLED=true` in Cloudflare and build with `-PLUDOPROOF_BILLING_ENABLED=true`. Check `GET /api/store/status`; `billingAvailable` must be `true`, and complete a tester purchase/restore/refund test before public release. The Android build flag defaults to `false`; the Worker must independently report billing enabled before checkout is opened.
+
+Google Play remains responsible for purchase UI and payment collection. The backend service-account credentials, product activation, release signing, and real tester purchase remain external setup steps; do not sell products before all those settings are verified. The wallet/profile inventory is currently stored on the device and is not cloud-synced: the non-consumable remove-ads item can be restored through Google Play, but consumed gem balances do not currently sync across devices or survive reinstall.
+
+## Google AdMob rewarded ads
+
+The Store supports opt-in rewarded ads: a completed reward ad grants 5 local gems, and watching an ad from a locked ad-based cosmetic adds one view to that cosmetic's unlock progress. Google User Messaging Platform (UMP) consent is requested before the Mobile Ads SDK initializes or loads ads. The app includes an Ad privacy options entry on the Store's Gems tab.
+
+Ads are disabled by default. The build uses Google's official sample App ID and rewarded-ad unit ID only as harmless defaults; the sample IDs do not load ads unless the explicit test flags are enabled for a debug build. Configure the following Gradle properties in `android/gradle.properties` or supply them on the Gradle command line:
+
+```text
+ADMOB_APP_ID=ca-app-pub-xxxxxxxxxxxxxxxx~xxxxxxxxxx
+ADMOB_REWARDED_AD_UNIT_ID=ca-app-pub-xxxxxxxxxxxxxxxx/xxxxxxxxxx
+LUDOPROOF_ADS_ENABLED=true
+LUDOPROOF_ADS_USE_TEST_IDS=false
+```
+
+Before enabling ads:
+
+1. Register `com.ludoproof.game` in AdMob and create a rewarded ad unit. Add the real App ID and rewarded ad-unit ID above (these IDs are not secrets).
+2. Publish the applicable privacy/consent messages in the AdMob Privacy & messaging settings. Verify the UMP consent and privacy-options flow in the internal test track.
+3. For debug-only SDK integration tests before receiving real IDs, build with Google's sample IDs using `-PLUDOPROOF_ADS_ENABLED=true -PLUDOPROOF_ADS_USE_TEST_IDS=true`. This test-ID mode is automatically disabled in release builds.
+4. Only enable production ads with your real IDs and `LUDOPROOF_ADS_USE_TEST_IDS=false`; the build rejects enabling ads with the default sample IDs in this mode.
+
+Reward fulfillment currently uses the Mobile Ads SDK's client-side rewarded callback and device-local storage; it does not yet use AdMob server-side verification or cloud-sync rewarded entitlements. Do not treat these rewards as server-authoritative currency. Follow Google AdMob's consent, child-directed treatment, and Families-policy requirements for the app's actual audience before serving production ads.

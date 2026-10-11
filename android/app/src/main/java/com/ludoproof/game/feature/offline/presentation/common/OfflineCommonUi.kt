@@ -1,8 +1,14 @@
 package com.ludoproof.game.ui.offline.common
 
+import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.RectF
+import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.*
@@ -10,8 +16,83 @@ import com.ludoproof.game.ui.dialogs.showSettingsDialog
 import com.ludoproof.game.ui.offline.gameplay.showGame
 import com.ludoproof.game.ui.offline.setup.showSetup
 
-internal fun OfflineGameActivity.backHeader(label: String?): LinearLayout =
-    LinearLayout(this).apply {
+internal fun OfflineGameActivity.backHeader(label: String?): View {
+    if (isComputerMode) {
+        return FrameLayout(this).apply {
+            minimumHeight = dp(54)
+            clipChildren = false
+            clipToPadding = false
+
+            addView(
+                Button(this@backHeader).apply {
+                    LudoProofTheme.homeCircularAction(this, "←")
+                    includeFontPadding = false
+                    textSize = 27f
+                    contentDescription = "Back"
+                    setOnClickListener { requestOfflineExit() }
+                },
+                FrameLayout.LayoutParams(dp(44), dp(44), Gravity.START or Gravity.CENTER_VERTICAL)
+                    .apply { marginStart = dp(4) },
+            )
+
+            val badge =
+                LinearLayout(this@backHeader).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER
+                    setPadding(dp(12), dp(4), dp(12), dp(4))
+                    background =
+                        GradientDrawable(
+                            GradientDrawable.Orientation.TOP_BOTTOM,
+                            intArrayOf(0xFF0C55B5.toInt(), 0xFF082963.toInt()),
+                        ).apply {
+                            cornerRadius = dp(999).toFloat()
+                            setStroke(dp(2), LudoProofTheme.GOLD)
+                        }
+                    elevation = dp(6).toFloat()
+                    addView(
+                        SetupPawMarkView(this@backHeader),
+                        LinearLayout.LayoutParams(dp(22), dp(22)),
+                    )
+                    addView(
+                        TextView(this@backHeader).apply {
+                            text = label.orEmpty()
+                            LudoProofTheme.title(this, 16f)
+                            setPadding(dp(8), 0, dp(8), 0)
+                        },
+                    )
+                    addView(
+                        SetupPawMarkView(this@backHeader),
+                        LinearLayout.LayoutParams(dp(22), dp(22)),
+                    )
+                }
+            addView(
+                badge,
+                FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    dp(42),
+                    Gravity.CENTER,
+                ),
+            )
+
+            addView(
+                Button(this@backHeader).apply {
+                    LudoProofTheme.homeCircularAction(this, "⚙")
+                    textSize = 23f
+                    contentDescription = "Game settings"
+                    setOnClickListener {
+                        showSettingsDialog(this@backHeader) {
+                            val current = engine.snapshot()
+                            if (current != null) showGame(current) else showSetup()
+                        }
+                    }
+                },
+                FrameLayout.LayoutParams(dp(44), dp(44), Gravity.END or Gravity.CENTER_VERTICAL)
+                    .apply { marginEnd = dp(4) },
+            )
+        }
+    }
+
+    return LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
         addView(
@@ -97,6 +178,7 @@ internal fun OfflineGameActivity.backHeader(label: String?): LinearLayout =
             ),
         )
     }
+}
 
 internal fun OfflineGameActivity.isCompactSetup():
     Boolean =
@@ -105,3 +187,28 @@ internal fun OfflineGameActivity.isCompactSetup():
 
 internal fun OfflineGameActivity.dp(value: Int): Int =
     LudoProofTheme.dp(this, value)
+
+private class SetupPawMarkView(context: Context) : View(context) {
+    private val pawPaint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = 0xFF55C9FF.toInt()
+            style = Paint.Style.FILL
+        }
+
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        val size = minOf(width, height).toFloat()
+        if (size <= 0f) return
+        val left = (width - size) / 2f
+        val top = (height - size) / 2f
+        canvas.save()
+        canvas.translate(left, top)
+        canvas.scale(size / 100f, size / 100f)
+        canvas.drawOval(RectF(23f, 48f, 77f, 91f), pawPaint)
+        canvas.drawOval(RectF(12f, 29f, 30f, 50f), pawPaint)
+        canvas.drawOval(RectF(33f, 15f, 51f, 39f), pawPaint)
+        canvas.drawOval(RectF(57f, 15f, 75f, 39f), pawPaint)
+        canvas.drawOval(RectF(75f, 29f, 93f, 50f), pawPaint)
+        canvas.restore()
+    }
+}

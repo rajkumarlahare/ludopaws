@@ -2,6 +2,10 @@ package com.ludoproof.game.ui.offline.setup
 
 import android.app.Activity
 import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -102,34 +106,62 @@ internal fun OfflineGameActivity.colorPanel():
             )
 
         val colorMap =
-            linkedMapOf<String, Button>()
+            linkedMapOf<String, View>()
 
         colors.forEach {
                 entry ->
-            val button =
-                Button(
-                    this@colorPanel,
-                ).apply {
-                    text =
-                        "●\n" +
-                            entry.key
-                    textSize =
-                        if (isCompactSetup()) 13f else 14f
-                    setTextColor(
-                        entry.value,
-                    )
-                    gravity =
-                        Gravity.CENTER
-                    setPadding(
-                        dp(2),
-                        dp(6),
-                        dp(2),
-                        dp(6),
-                    )
-                    setOnClickListener {
-                        selectedColor =
-                            entry.key
-                        refreshSetupSelections()
+            val button: View =
+                if (isComputerMode) {
+                    LinearLayout(this@colorPanel).apply {
+                        orientation = LinearLayout.VERTICAL
+                        gravity = Gravity.CENTER
+                        setPadding(dp(4), dp(5), dp(4), dp(5))
+                        isClickable = true
+                        isFocusable = true
+                        elevation = dp(3).toFloat()
+                        addView(
+                            View(this@colorPanel).apply {
+                                background =
+                                    GradientDrawable(
+                                        GradientDrawable.Orientation.TOP_BOTTOM,
+                                        intArrayOf(
+                                            blendWithWhite(entry.value, 0.38f),
+                                            entry.value,
+                                            blendWithBlack(entry.value, 0.18f),
+                                        ),
+                                    ).apply {
+                                        shape = GradientDrawable.OVAL
+                                        setStroke(dp(2), 0x99FFFFFF.toInt())
+                                    }
+                            },
+                            LinearLayout.LayoutParams(dp(42), dp(42)),
+                        )
+                        addView(
+                            TextView(this@colorPanel).apply {
+                                text = entry.key
+                                textSize = if (isCompactSetup()) 11f else 12f
+                                setTypeface(android.graphics.Typeface.DEFAULT_BOLD)
+                                setTextColor(entry.value)
+                                gravity = Gravity.CENTER
+                                setPadding(0, dp(3), 0, 0)
+                            },
+                        )
+                        setOnClickListener {
+                            selectedColor = entry.key
+                            refreshSetupSelections()
+                        }
+                    }
+                } else {
+                    Button(this@colorPanel).apply {
+                        text = "●\n${entry.key}"
+                        textSize = if (isCompactSetup()) 13f else 14f
+                        setTextColor(entry.value)
+                        gravity = Gravity.CENTER
+                        setPadding(dp(2), dp(6), dp(2), dp(6))
+                        setOnClickListener {
+                            selectedColor = entry.key
+                            refreshSetupSelections()
+                        }
                     }
                 }
             colorMap[entry.key] =
@@ -137,7 +169,9 @@ internal fun OfflineGameActivity.colorPanel():
             colorRow.addView(
                 button,
                 setupTileParams(
-                    if (isCompactSetup()) 86 else 94,
+                    if (isComputerMode) {
+                        if (isCompactSetup()) 90 else 98
+                    } else if (isCompactSetup()) 86 else 94,
                     marginDp =
                         if (isCompactSetup()) 3 else 5,
                 ),
@@ -252,15 +286,51 @@ internal fun OfflineGameActivity.selectionPanel(
             dp(if (isCompactSetup()) 12 else 14),
             dp(if (isCompactSetup()) 12 else 14),
         )
+        if (isComputerMode) {
+            background = LudoProofTheme.darkPanelDrawable(this@selectionPanel)
+        }
 
         addView(
             TextView(this@selectionPanel).apply {
                 text =
-                    title
+                    if (isComputerMode) {
+                        when (title) {
+                            "CHOOSE YOUR PAW",
+                            "SELECT PLAYERS",
+                            "CHOOSE YOUR COLOR",
+                            -> title
+                            else -> title
+                        }
+                    } else {
+                        title
+                    }
                 LudoProofTheme.title(
                     this,
-                    if (isCompactSetup()) 18f else 20f,
+                    if (isCompactSetup()) 17f else 19f,
                 )
+                if (isComputerMode) {
+                    gravity = Gravity.CENTER
+                    val highlightedWord =
+                        when (title) {
+                            "CHOOSE YOUR PAW" -> "PAW"
+                            "SELECT PLAYERS" -> "PLAYERS"
+                            "CHOOSE YOUR COLOR" -> "COLOR"
+                            else -> null
+                        }
+                    val wordStart =
+                        highlightedWord?.let(title::lastIndexOf) ?: -1
+                    if (wordStart >= 0 && highlightedWord != null) {
+                        text =
+                            SpannableString(title).apply {
+                                setSpan(
+                                    ForegroundColorSpan(LudoProofTheme.GOLD),
+                                    wordStart,
+                                    wordStart + highlightedWord.length,
+                                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+                                )
+                            }
+                    }
+                }
             },
         )
 
@@ -273,6 +343,7 @@ internal fun OfflineGameActivity.selectionPanel(
                     11f,
                     centered = true,
                 )
+                if (isComputerMode) setTextColor(0xFFC5DEFF.toInt())
                 setPadding(
                     0,
                     dp(2),
@@ -397,6 +468,28 @@ internal fun OfflineGameActivity.tileButton(
         }
     }
 
+private fun blendWithWhite(color: Int, amount: Float): Int =
+    Color.rgb(
+        (Color.red(color) + (255 - Color.red(color)) * amount).toInt(),
+        (Color.green(color) + (255 - Color.green(color)) * amount).toInt(),
+        (Color.blue(color) + (255 - Color.blue(color)) * amount).toInt(),
+    )
+
+private fun blendWithBlack(color: Int, amount: Float): Int =
+    Color.rgb(
+        (Color.red(color) * (1f - amount)).toInt(),
+        (Color.green(color) * (1f - amount)).toInt(),
+        (Color.blue(color) * (1f - amount)).toInt(),
+    )
+
+private fun setupColor(name: String): Int =
+    when (name) {
+        "BLUE" -> 0xFF298DFF.toInt()
+        "RED" -> 0xFFF22E35.toInt()
+        "GREEN" -> 0xFF1FB257.toInt()
+        else -> 0xFFFFD324.toInt()
+    }
+
 internal fun OfflineGameActivity.refreshSetupSelections() {
     if (playerButtons.isNotEmpty()) {
         playerButtons.forEach { entry ->
@@ -409,13 +502,19 @@ internal fun OfflineGameActivity.refreshSetupSelections() {
     }
     if (colorButtons.isNotEmpty()) {
         colorButtons.forEach { entry ->
-            if (entry.key == selectedColor) {
+            val selected = entry.key == selectedColor
+            if (selected) {
                 LudoProofTheme.selectedTile(entry.value)
             } else {
                 LudoProofTheme.normalTile(entry.value)
             }
+            ((entry.value as? LinearLayout)?.getChildAt(1) as? TextView)
+                ?.setTextColor(
+                    if (selected) 0xFF052A68.toInt() else setupColor(entry.key),
+                )
         }
     }
+
     refreshCharacterSelectionUi()
 }
 

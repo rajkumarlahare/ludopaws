@@ -930,6 +930,108 @@ test(
 );
 
 test(
+  "FRIENDS voice signaling only relays between authenticated active voice peers",
+  async () => {
+    const ctx = makeContext();
+    const room = new MatchRoom(ctx, makeEnv());
+    const host = await createMatch(room);
+    const guest = await joinMatch(room, "Bob");
+    const sockets = [];
+    ctx.getWebSockets = () => sockets;
+    ctx.getTags = (socket) => socket.tags;
+    const makeSocket = (playerId) => {
+      const socket = {
+        tags: ["player:" + playerId],
+        messages: [],
+        attachment: {},
+        send(message) {
+          this.messages.push(JSON.parse(message));
+        },
+        serializeAttachment(attachment) {
+          this.attachment = structuredClone(attachment);
+        },
+        deserializeAttachment() {
+          return structuredClone(this.attachment);
+        },
+      };
+      sockets.push(socket);
+      return socket;
+    };
+    const hostSocket = makeSocket(host.playerId);
+    const guestSocket = makeSocket(guest.playerId);
+    const state = await ctx.storage.get("match-state");
+    state.matchMode = "FRIENDS";
+    state.status = "ACTIVE";
+    await ctx.storage.put("match-state", state);
+
+    await room.webSocketMessage(
+      hostSocket,
+      JSON.stringify({ type: "VOICE_JOIN" }),
+    );
+    await room.webSocketMessage(
+      guestSocket,
+      JSON.stringify({ type: "VOICE_JOIN" }),
+    );
+
+    assert.deepEqual(
+      hostSocket.messages.at(-1),
+      { type: "VOICE_PEERS", playerIds: [guest.playerId] },
+    );
+    assert.deepEqual(
+      guestSocket.messages.at(-1),
+      { type: "VOICE_PEERS", playerIds: [host.playerId] },
+    );
+
+    await room.webSocketMessage(
+      hostSocket,
+      JSON.stringify({
+        type: "VOICE_SIGNAL",
+        toPlayerId: guest.playerId,
+        fromPlayerId: "spoofed-player",
+        signal: { type: "offer", sdp: "offer-sdp" },
+      }),
+    );
+    assert.deepEqual(
+      guestSocket.messages.at(-1),
+      {
+        type: "VOICE_SIGNAL",
+        matchId: state.matchId,
+        fromPlayerId: host.playerId,
+        signal: { type: "offer", sdp: "offer-sdp" },
+      },
+    );
+    assert.equal(
+      hostSocket.messages.some((message) => message.type === "VOICE_SIGNAL"),
+      false,
+    );
+
+    const beforeInvalidTarget = guestSocket.messages.length;
+    await room.webSocketMessage(
+      hostSocket,
+      JSON.stringify({
+        type: "VOICE_SIGNAL",
+        toPlayerId: "LP-NOT-IN-ROOM",
+        signal: { type: "offer", sdp: "offer-sdp" },
+      }),
+    );
+    assert.equal(guestSocket.messages.length, beforeInvalidTarget);
+
+    const nonFriendState = { ...state, matchMode: "ONLINE" };
+    await ctx.storage.put("match-state", nonFriendState);
+    const beforeWrongMode = guestSocket.messages.length;
+    await room.webSocketMessage(
+      hostSocket,
+      JSON.stringify({
+        type: "VOICE_SIGNAL",
+        toPlayerId: guest.playerId,
+        signal: { type: "offer", sdp: "offer-sdp" },
+      }),
+    );
+    assert.equal(guestSocket.messages.length, beforeWrongMode);
+  },
+);
+
+test(
   "legacy clients stay unranked while authenticated profiles cannot be spoofed",
   { concurrency: false },
   async () => {

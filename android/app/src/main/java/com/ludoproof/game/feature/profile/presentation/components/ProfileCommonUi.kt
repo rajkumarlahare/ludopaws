@@ -11,6 +11,7 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.LudoProofTheme
+import com.ludoproof.game.R
 import com.ludoproof.game.feature.profile.presentation.ProfileActivity
 
 internal fun ProfileActivity.profilePanel():
@@ -77,6 +78,64 @@ internal fun ProfileActivity.profileBody(
         )
     }
 
+internal fun ProfileActivity.profilePlayGamesPanel(): LinearLayout =
+    profilePanel().apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding(dp(14), dp(12), dp(14), dp(12))
+
+        val accountMark =
+            TextView(this@profilePlayGamesPanel).apply {
+                text = "G"
+                textSize = 22f
+                setTypeface(Typeface.DEFAULT_BOLD)
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
+                background =
+                    LudoProofTheme.rounded(
+                        0xFF4285F4.toInt(),
+                        999f,
+                        Color.WHITE,
+                        1f,
+                        this@profilePlayGamesPanel,
+                    )
+            }
+        addView(
+            accountMark,
+            LinearLayout.LayoutParams(dp(42), dp(42)),
+        )
+
+        val copy =
+            LinearLayout(this@profilePlayGamesPanel).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(12), 0, 0, 0)
+                addView(
+                    TextView(this@profilePlayGamesPanel).apply {
+                        text = getString(R.string.profile_play_games_title)
+                        textSize = 13f
+                        setTypeface(Typeface.DEFAULT_BOLD)
+                        setTextColor(Color.WHITE)
+                    },
+                )
+                addView(
+                    TextView(this@profilePlayGamesPanel).apply {
+                        text =
+                            playGamesDisplayName
+                                ?.takeIf { playGamesAuthenticated }
+                                ?.let { "Signed in as $it" }
+                                ?: playGamesStatus
+                        textSize = 11f
+                        setTextColor(0xFFD4E6FF.toInt())
+                        maxLines = 2
+                    },
+                )
+            }
+        addView(
+            copy,
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f),
+        )
+    }
+
 internal fun ProfileActivity.showNameEditor() {
     val current =
         profileStore
@@ -121,22 +180,6 @@ internal fun ProfileActivity.showNameEditor() {
                 )
             renderProfile()
         }
-        .show()
-}
-
-internal fun ProfileActivity.showGoogleSetupInfo() {
-    AlertDialog
-        .Builder(this)
-        .setTitle(
-            "Google sign-in",
-        )
-        .setMessage(
-            "The profile is fully usable as a guest. Google account sign-in needs the production OAuth client configuration before it can authenticate safely.",
-        )
-        .setPositiveButton(
-            "OK",
-            null,
-        )
         .show()
 }
 

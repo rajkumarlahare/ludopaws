@@ -13,6 +13,7 @@ import com.ludoproof.game.feature.store.domain.StoreCatalog
 import com.ludoproof.game.feature.store.domain.model.StoreProduct
 import com.ludoproof.game.feature.store.domain.model.StoreTab
 import com.ludoproof.game.feature.store.presentation.StoreActivity
+import com.ludoproof.game.feature.store.presentation.art.GemClusterView
 
 internal fun StoreActivity.storeContent():
     LinearLayout =
@@ -39,6 +40,24 @@ private fun StoreActivity.gemsContent():
         orientation =
             LinearLayout.VERTICAL
 
+        addView(
+            gemIntroCard(),
+        )
+        addView(
+            TextView(this@gemsContent).apply {
+                text = "GEM POUCHES"
+                textSize = 13f
+                setTypeface(Typeface.DEFAULT_BOLD)
+                setTextColor(0xFFEAF7FF.toInt())
+                letterSpacing = 0.14f
+                setPadding(dp(6), dp(14), dp(6), dp(2))
+            },
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ),
+        )
+
         val removeAds =
             requireNotNull(
                 StoreCatalog
@@ -47,23 +66,6 @@ private fun StoreActivity.gemsContent():
                             .REMOVE_ADS,
                     ),
             )
-        addView(
-            featuredRemoveAdsCard(
-                removeAds,
-            ),
-        )
-
-        addView(
-            rewardedAdCard(),
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            ).apply {
-                topMargin =
-                    dp(12)
-            },
-        )
-
         val packs =
             StoreCatalog
                 .products
@@ -72,7 +74,7 @@ private fun StoreActivity.gemsContent():
                 }
 
         packs.chunked(
-            3,
+            2,
         ).forEach {
                 rowProducts ->
             val row =
@@ -97,9 +99,9 @@ private fun StoreActivity.gemsContent():
                         1f,
                     ).apply {
                         setMargins(
-                            dp(4),
+                            dp(5),
                             0,
-                            dp(4),
+                            dp(5),
                             0,
                         )
                     },
@@ -107,7 +109,7 @@ private fun StoreActivity.gemsContent():
             }
 
             repeat(
-                3 -
+                2 -
                     rowProducts.size,
             ) {
                 row.addView(
@@ -129,8 +131,49 @@ private fun StoreActivity.gemsContent():
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                 ).apply {
                     topMargin =
-                        dp(12)
+                        dp(10)
                 },
+            )
+        }
+
+        addView(
+            featuredRemoveAdsCard(
+                removeAds,
+            ),
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                topMargin = dp(18)
+            },
+        )
+
+        addView(
+            rewardedAdCard(),
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                topMargin = dp(10)
+            },
+        )
+
+        if (adsEnabledForBuild) {
+            addView(
+                TextView(this@gemsContent).apply {
+                    text = "Ad privacy options"
+                    textSize = 12f
+                    setTextColor(0xFFB8D9FF.toInt())
+                    gravity = Gravity.CENTER
+                    setPadding(dp(8), dp(10), dp(8), dp(4))
+                    setOnClickListener {
+                        showAdPrivacyOptions()
+                    }
+                },
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ),
             )
         }
 
@@ -143,6 +186,52 @@ private fun StoreActivity.gemsContent():
                 topMargin =
                     dp(16)
             },
+        )
+    }
+
+private fun StoreActivity.gemIntroCard(): LinearLayout =
+    LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding(dp(14), dp(10), dp(14), dp(10))
+        background =
+            GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                intArrayOf(0xFF124F91.toInt(), 0xFF34246F.toInt()),
+            ).apply {
+                cornerRadius = dp(16).toFloat()
+                setStroke(dp(1), 0xFF53DFFF.toInt())
+            }
+
+        addView(
+            GemClusterView(this@gemIntroCard, gemCount = 3).apply {
+                contentDescription = "A cluster of shining gems"
+            },
+            LinearLayout.LayoutParams(dp(76), dp(72)),
+        )
+
+        addView(
+            LinearLayout(this@gemIntroCard).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(10), 0, 0, 0)
+                addView(
+                    TextView(this@gemIntroCard).apply {
+                        text = "A LITTLE SPARK GOES A LONG WAY"
+                        textSize = 14f
+                        setTypeface(Typeface.DEFAULT_BOLD)
+                        setTextColor(Color.WHITE)
+                    },
+                )
+                addView(
+                    TextView(this@gemIntroCard).apply {
+                        text = "Pick a gem pouch for your next style upgrade."
+                        textSize = 12f
+                        setTextColor(0xFFD4E6FF.toInt())
+                        setPadding(0, dp(5), 0, 0)
+                    },
+                )
+            },
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f),
         )
     }
 
@@ -437,84 +526,80 @@ private fun StoreActivity.gemProductCard(
         )
         background =
             GradientDrawable(
-                GradientDrawable.Orientation.TOP_BOTTOM,
+                GradientDrawable.Orientation.TL_BR,
                 intArrayOf(
-                    0xFF164FA3.toInt(),
-                    0xFF0C397D.toInt(),
+                    0xFF1A65AA.toInt(),
+                    0xFF123D82.toInt(),
+                    0xFF111D55.toInt(),
                 ),
             ).apply {
                 cornerRadius =
-                    dp(13)
+                    dp(16)
                         .toFloat()
                 setStroke(
-                    dp(2),
-                    0xFFA7429B.toInt(),
+                    dp(1),
+                    0xFF55DFFF.toInt(),
+                )
+            }
+        elevation = dp(3).toFloat()
+
+        product.title
+            .substringAfter("·", "")
+            .trim()
+            .takeIf(String::isNotBlank)
+            ?.let { badge ->
+                addView(
+                    TextView(this@gemProductCard).apply {
+                        text = badge.uppercase()
+                        textSize = 9f
+                        setTypeface(Typeface.DEFAULT_BOLD)
+                        setTextColor(0xFF082B57.toInt())
+                        gravity = Gravity.CENTER
+                        setPadding(dp(8), dp(4), dp(8), dp(4))
+                        background =
+                            LudoProofTheme.rounded(
+                                0xFFFFD96A.toInt(),
+                                999f,
+                                0xFFFFF0A8.toInt(),
+                                1f,
+                                this@gemProductCard,
+                            )
+                    },
                 )
             }
 
         addView(
-            TextView(
+            GemClusterView(
                 this@gemProductCard,
+                gemCount = gemClusterSize(product.gemAmount),
             ).apply {
-                text =
-                    formatGemAmount(
-                        product.gemAmount,
-                    ) +
-                        " ◆"
-                textSize =
-                    18f
-                setTypeface(
-                    Typeface.DEFAULT_BOLD,
-                )
-                setTextColor(
-                    LudoProofTheme.GOLD,
-                )
-                gravity =
-                    Gravity.CENTER
-            },
-        )
-
-        addView(
-            TextView(
-                this@gemProductCard,
-            ).apply {
-                text =
-                    if (
-                        product.gemAmount >=
-                            20_000
-                    ) {
-                        "▰\n◆◆◆"
-                    } else {
-                        "◆\n◆◆"
-                    }
-                textSize =
-                    if (
-                        product.gemAmount >=
-                            20_000
-                    ) {
-                        24f
-                    } else {
-                        28f
-                    }
-                setTypeface(
-                    Typeface.DEFAULT_BOLD,
-                )
-                setTextColor(
-                    0xFF43EF66.toInt(),
-                )
-                gravity =
-                    Gravity.CENTER
-                setPadding(
-                    0,
-                    dp(10),
-                    0,
-                    dp(8),
-                )
+                contentDescription = "${product.gemAmount} gems"
             },
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(100),
+                dp(78),
             ),
+        )
+
+        addView(
+            TextView(this@gemProductCard).apply {
+                text = formatGemAmount(product.gemAmount)
+                textSize = 19f
+                setTypeface(Typeface.DEFAULT_BOLD)
+                setTextColor(LudoProofTheme.GOLD)
+                gravity = Gravity.CENTER
+            },
+        )
+        addView(
+            TextView(this@gemProductCard).apply {
+                text = "GEMS"
+                textSize = 10f
+                setTypeface(Typeface.DEFAULT_BOLD)
+                setTextColor(0xFFB9D8F7.toInt())
+                gravity = Gravity.CENTER
+                letterSpacing = 0.12f
+                setPadding(0, dp(1), 0, dp(8))
+            },
         )
 
         addView(
@@ -605,4 +690,12 @@ private fun StoreActivity.formatGemAmount(
         else ->
             amount
                 .toString()
+    }
+
+private fun StoreActivity.gemClusterSize(amount: Int): Int =
+    when {
+        amount >= 20_000 -> 5
+        amount >= 3_500 -> 4
+        amount >= 1_500 -> 3
+        else -> 2
     }

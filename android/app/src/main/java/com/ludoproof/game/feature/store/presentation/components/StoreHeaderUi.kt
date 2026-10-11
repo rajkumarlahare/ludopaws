@@ -9,6 +9,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.LudoProofTheme
 import com.ludoproof.game.feature.store.presentation.StoreActivity
+import com.ludoproof.game.feature.store.presentation.art.GemClusterView
 import com.ludoproof.game.feature.store.presentation.art.StoreAwningView
 
 internal fun StoreActivity.storeHeader():
@@ -101,24 +102,14 @@ internal fun StoreActivity.storeHeader():
             }
 
         gemPill.addView(
-            TextView(
+            GemClusterView(
                 this@storeHeader,
             ).apply {
-                text =
-                    "◆"
-                textSize =
-                    24f
-                setTypeface(
-                    Typeface.DEFAULT_BOLD,
-                )
-                setTextColor(
-                    0xFF48F36B.toInt(),
-                )
-                gravity =
-                    Gravity.CENTER
+                contentDescription =
+                    "Gems"
             },
             LinearLayout.LayoutParams(
-                dp(40),
+                dp(42),
                 LinearLayout.LayoutParams.MATCH_PARENT,
             ),
         )

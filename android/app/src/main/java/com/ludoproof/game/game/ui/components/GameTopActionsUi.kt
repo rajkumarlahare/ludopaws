@@ -24,7 +24,7 @@ internal fun addGameTopActions(
     context: android.content.Context,
     onBack: () -> Unit,
     onSettings: () -> Unit,
-) {
+): FrameLayout {
     val bar =
         FrameLayout(context).apply {
             clipChildren = false
@@ -79,6 +79,7 @@ internal fun addGameTopActions(
             FrameLayout.LayoutParams.MATCH_PARENT,
         ),
     )
+    return bar
 }
 
 private fun gameTopButton(

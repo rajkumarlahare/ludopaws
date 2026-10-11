@@ -1,0 +1,345 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { StorePurchaseLedger } from "../src/store-purchase-ledger.js";
+import {
+  GOOGLE_PLAY_PRODUCTS,
+  verifyAndRedeemGooglePlayPurchase,
+} from "../src/google-play-billing.js";
+import worker from "../src/index.js";
+
+class FakeStorage {
+  constructor() {
+    this.values = new Map();
+  }
+
+  async get(key) {
+    const value = this.values.get(key);
+    return value === undefined ? undefined : structuredClone(value);
+  }
+
+  async put(key, value) {
+    this.values.set(key, structuredClone(value));
+  }
+}
+
+function makeLedgerNamespace() {
+  const objects = new Map();
+  return {
+    idFromName(name) {
+      return name;
+    },
+    get(id) {
+      if (!objects.has(id)) {
+        objects.set(id, new StorePurchaseLedger({
+          storage: new FakeStorage(),
+        }));
+      }
+      return objects.get(id);
+    },
+  };
+}
+
+async function serviceAccountKey() {
+  const keyPair = await crypto.subtle.generateKey(
+    {
+      name: "RSASSA-PKCS1-v1_5",
+      modulusLength: 2048,
+      publicExponent: new Uint8Array([1, 0, 1]),
+      hash: "SHA-256",
+    },
+    true,
+    ["sign", "verify"],
+  );
+  const encoded =
+    Buffer.from(
+      await crypto.subtle.exportKey("pkcs8", keyPair.privateKey),
+    ).toString("base64");
+  return [
+    "-----BEGIN PRIVATE KEY-----",
+    ...encoded.match(/.{1,64}/g),
+    "-----END PRIVATE KEY-----",
+  ].join("\n");
+}
+
+function mockPlayApi({
+  productId,
+  accountId,
+  purchaseState = 0,
+  consumptionState = 0,
+  acknowledgementState = 0,
+} = {}) {
+  const calls = [];
+  const fetchImpl = async (input, init = {}) => {
+    const url = String(input);
+    calls.push({ url, init });
+    if (url === "https://oauth2.googleapis.com/token") {
+      const form = new URLSearchParams(init.body);
+      const assertion = form.get("assertion");
+      assert.equal(form.get("grant_type"), "urn:ietf:params:oauth:grant-type:jwt-bearer");
+      assert.equal(assertion.split(".").length, 3);
+      const claims = JSON.parse(
+        Buffer.from(assertion.split(".")[1], "base64url").toString("utf8"),
+      );
+      assert.equal(claims.scope, "https://www.googleapis.com/auth/androidpublisher");
+      return Response.json({ access_token: "test-access-token", expires_in: 3600 });
+    }
+    if (init.method === "GET") {
+      return Response.json({
+        productId,
+        purchaseState,
+        consumptionState,
+        acknowledgementState,
+        obfuscatedExternalAccountId: accountId,
+      });
+    }
+    if (url.endsWith(":consume") || url.endsWith(":acknowledge")) {
+      return new Response(null, { status: 204 });
+    }
+    throw new Error("Unexpected Google API request: " + url);
+  };
+  return { calls, fetchImpl };
+}
+
+async function makeEnv() {
+  return {
+    GOOGLE_PLAY_BILLING_ENABLED: "true",
+    GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL:
+      "ludo-publisher@ludo-project.iam.gserviceaccount.com",
+    GOOGLE_PLAY_SERVICE_ACCOUNT_PRIVATE_KEY:
+      await serviceAccountKey(),
+    LUDOPROOF_STORE_PURCHASES: makeLedgerNamespace(),
+  };
+}
+
+test("server product grants match the Android product definitions", () => {
+  assert.deepEqual(
+    Object.fromEntries(
+      Object.entries(GOOGLE_PLAY_PRODUCTS).map(([productId, product]) => [
+        productId,
+        [product.gemAmount, product.removeAds],
+      ]),
+    ),
+    {
+      remove_ads: [5, true],
+      gems_300: [300, false],
+      gems_1500: [1_200, false],
+      gems_3500: [3_000, false],
+      gems_20000: [7_500, false],
+      gems_40000: [16_000, false],
+      gems_200000: [35_000, false],
+    },
+  );
+});
+
+test("verified purchases are consumed, redeemed once, and recover idempotently", async () => {
+  const env = await makeEnv();
+  const accountId = "a".repeat(64);
+  const productId = "gems_300";
+  const purchaseToken = "google-play-test-purchase-token";
+  const { calls, fetchImpl } = mockPlayApi({ productId, accountId });
+
+  const result = await verifyAndRedeemGooglePlayPurchase(
+    env,
+    { productId, purchaseToken, accountId },
+    fetchImpl,
+  );
+  assert.deepEqual(result, {
+    verified: true,
+    productId,
+    gemAmount: 300,
+    removeAds: false,
+    replay: false,
+  });
+  assert.equal(calls.filter(({ url }) => url.endsWith(":consume")).length, 1);
+
+  const recovered = await verifyAndRedeemGooglePlayPurchase(
+    env,
+    { productId, purchaseToken, accountId },
+    fetchImpl,
+  );
+  assert.equal(recovered.replay, true);
+  assert.equal(recovered.gemAmount, 300);
+  assert.equal(
+    calls.filter(
+      ({ url, init }) =>
+        url.includes("/purchases/products/") && init.method === "GET",
+    ).length,
+    1,
+  );
+
+  await assert.rejects(
+    verifyAndRedeemGooglePlayPurchase(
+      env,
+      { productId, purchaseToken, accountId: "b".repeat(64) },
+      fetchImpl,
+    ),
+    (error) => error.status === 409 && error.code === "PURCHASE_ALREADY_REDEEMED",
+  );
+});
+
+test("invalid and pending Play purchases are never reserved or acknowledged", async () => {
+  const env = await makeEnv();
+  const accountId = "c".repeat(64);
+  const pending = mockPlayApi({
+    productId: "gems_300",
+    accountId,
+    purchaseState: 2,
+  });
+
+  await assert.rejects(
+    verifyAndRedeemGooglePlayPurchase(
+      env,
+      {
+        productId: "gems_300",
+        purchaseToken: "pending-purchase-token",
+        accountId,
+      },
+      pending.fetchImpl,
+    ),
+    (error) => error.status === 400 && error.code === "PLAY_PURCHASE_NOT_VALID",
+  );
+  assert.equal(
+    pending.calls.some(({ url }) => url.endsWith(":consume") || url.endsWith(":acknowledge")),
+    false,
+  );
+  assert.equal(
+    pending.calls.some(({ url }) => url.includes("/purchases/products/")),
+    true,
+  );
+
+  await assert.rejects(
+    verifyAndRedeemGooglePlayPurchase(
+      env,
+      {
+        productId: "unknown-product",
+        purchaseToken: "pending-purchase-token",
+        accountId,
+      },
+      pending.fetchImpl,
+    ),
+    (error) => error.status === 400 && error.code === "UNKNOWN_STORE_PRODUCT",
+  );
+
+  const consumed = mockPlayApi({
+    productId: "gems_300",
+    accountId,
+    consumptionState: 1,
+  });
+  await assert.rejects(
+    verifyAndRedeemGooglePlayPurchase(
+      env,
+      {
+        productId: "gems_300",
+        purchaseToken: "previously-consumed-token",
+        accountId,
+      },
+      consumed.fetchImpl,
+    ),
+    (error) =>
+      error.status === 409 &&
+      error.code === "PLAY_PURCHASE_ALREADY_CONSUMED",
+  );
+});
+
+test("non-consumable purchase is acknowledged after Play verification", async () => {
+  const env = await makeEnv();
+  const accountId = "d".repeat(64);
+  const { calls, fetchImpl } = mockPlayApi({
+    productId: "remove_ads",
+    accountId,
+  });
+  const result = await verifyAndRedeemGooglePlayPurchase(
+    env,
+    {
+      productId: "remove_ads",
+      purchaseToken: "remove-ads-test-token",
+      accountId,
+    },
+    fetchImpl,
+  );
+  assert.equal(result.removeAds, true);
+  assert.equal(result.gemAmount, 5);
+  assert.equal(calls.filter(({ url }) => url.endsWith(":acknowledge")).length, 1);
+  assert.equal(calls.filter(({ url }) => url.endsWith(":consume")).length, 0);
+
+  const restored = await verifyAndRedeemGooglePlayPurchase(
+    env,
+    {
+      productId: "remove_ads",
+      purchaseToken: "remove-ads-test-token",
+      accountId: "9".repeat(64),
+    },
+    fetchImpl,
+  );
+  assert.equal(restored.removeAds, true);
+  assert.equal(restored.replay, true);
+  assert.equal(calls.filter(({ url }) => url.includes("/purchases/products/")).length, 2);
+});
+
+test("store purchase ledger rejects token reuse by another installation", async () => {
+  const ledger = new StorePurchaseLedger({ storage: new FakeStorage() });
+  const reserve = (accountId) =>
+    ledger.fetch(
+      new Request("https://store-purchase/reserve", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          productId: "gems_300",
+          accountId,
+          gemAmount: 300,
+          removeAds: false,
+        }),
+      }),
+    );
+  assert.equal((await reserve("e".repeat(64))).status, 200);
+  assert.equal((await reserve("f".repeat(64))).status, 409);
+});
+
+test("store status and verification routes stay closed until server billing is enabled", async () => {
+  const env = {
+    ...await makeEnv(),
+    GOOGLE_PLAY_BILLING_ENABLED: "false",
+    LUDOPROOF_API_GATE: {
+      idFromName: (name) => name,
+      get: () => ({
+        fetch: async () => Response.json({ allowed: true }),
+      }),
+    },
+  };
+  const status = await worker.fetch(
+    new Request("https://api.example.test/api/store/status"),
+    env,
+  );
+  assert.deepEqual(await status.json(), {
+    ok: true,
+    billingAvailable: false,
+  });
+
+  const verification = await worker.fetch(
+    new Request("https://api.example.test/api/store/purchases/verify", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        productId: "gems_300",
+        purchaseToken: "unconfigured-purchase-token",
+        accountId: "7".repeat(64),
+      }),
+    }),
+    env,
+  );
+  assert.equal(verification.status, 503);
+  assert.equal(
+    (await verification.json()).error,
+    "PLAY_BILLING_NOT_ENABLED",
+  );
+
+  env.GOOGLE_PLAY_BILLING_ENABLED = "true";
+  const enabledStatus = await worker.fetch(
+    new Request("https://api.example.test/api/store/status"),
+    env,
+  );
+  assert.deepEqual(await enabledStatus.json(), {
+    ok: true,
+    billingAvailable: true,
+  });
+});

@@ -3,11 +3,14 @@ package com.ludoproof.game.feature.online
 import android.os.SystemClock
 import android.view.Gravity
 import android.view.View
+import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.TextView
 import com.ludoproof.game.LudoPawsPlayerCardView
 import com.ludoproof.game.LudoPawsReactiveBoardView
 import com.ludoproof.game.MainActivity
+import com.ludoproof.game.GameMode
 import com.ludoproof.game.MatchSnapshot
 import com.ludoproof.game.OfflinePlayerLayout
 import com.ludoproof.game.PlayerSnapshot
@@ -17,6 +20,7 @@ import com.ludoproof.game.feature.online.domain.OnlineLudoPawsCharacterPolicy
 import com.ludoproof.game.feature.settings.data.local.GameSettingsStore
 import com.ludoproof.game.feature.settings.data.local.GameSoundFeedback
 import com.ludoproof.game.feature.settings.data.local.LudoPawsHaptics
+import com.ludoproof.game.ui.online.button
 import com.ludoproof.game.ui.quickchat.QuickChatButtonView
 import com.ludoproof.game.ui.quickchat.animateQuickChatReaction
 import com.ludoproof.game.ui.quickchat.showQuickChatPopup
@@ -28,6 +32,10 @@ internal object OnlineLudoPawsPresentation {
         val board: LudoPawsReactiveBoardView,
         val topRail: LinearLayout,
         val bottomRail: LinearLayout,
+        val voiceControls: LinearLayout,
+        val voiceStatus: TextView,
+        val voiceToggle: Button,
+        val micToggle: Button,
         val feedbackLedger: LudoPawsFeedbackLedger = LudoPawsFeedbackLedger(),
         var quickChatReactionView: View? = null,
         var lastQuickChatAtMs: Long = 0L,
@@ -66,6 +74,7 @@ internal object OnlineLudoPawsPresentation {
             characterIdsBySeat = characterIdsBySeat,
             perspectiveColor = localColor,
         )
+        refreshVoiceControls(activity, current)
         dispatchFeedback(
             activity = activity,
             host = host,
@@ -86,6 +95,7 @@ internal object OnlineLudoPawsPresentation {
         host.board.visibility = View.GONE
         host.topRail.visibility = View.GONE
         host.bottomRail.visibility = View.GONE
+        host.voiceControls.visibility = View.GONE
         runCatching {
             activity.boardFrame.removeView(host.board)
             activity.matchStatusPanel.removeView(host.topRail)
@@ -159,11 +169,85 @@ internal object OnlineLudoPawsPresentation {
             },
         )
 
+        val voiceStatus =
+            TextView(activity).apply {
+                textSize = 10f
+                setTextColor(0xFFEAF7FF.toInt())
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+                gravity = Gravity.CENTER_VERTICAL
+            }
+        val voiceToggle =
+            activity.button("VOICE ON") {
+                activity.toggleFriendsVoice()
+            }.apply {
+                textSize = 10f
+                setPadding(dp(activity, 7), 0, dp(activity, 7), 0)
+                minHeight = dp(activity, 34)
+            }
+        val micToggle =
+            activity.button("MIC ON") {
+                activity.toggleFriendsMic()
+            }.apply {
+                textSize = 10f
+                setPadding(dp(activity, 7), 0, dp(activity, 7), 0)
+                minHeight = dp(activity, 34)
+            }
+        val voiceControls =
+            LinearLayout(activity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(activity, 5), dp(activity, 2), dp(activity, 5), dp(activity, 2))
+                addView(
+                    voiceStatus,
+                    LinearLayout.LayoutParams(0, dp(activity, 38), 1f),
+                )
+                addView(
+                    voiceToggle,
+                    LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        dp(activity, 38),
+                    ).apply { marginStart = dp(activity, 4) },
+                )
+                addView(
+                    micToggle,
+                    LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        dp(activity, 38),
+                    ).apply { marginStart = dp(activity, 4) },
+                )
+                visibility = View.GONE
+            }
+        activity.matchStatusPanel.addView(
+            voiceControls,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ),
+        )
+
         return Host(
             board = reactiveBoard,
             topRail = topRail,
             bottomRail = bottomRail,
+            voiceControls = voiceControls,
+            voiceStatus = voiceStatus,
+            voiceToggle = voiceToggle,
+            micToggle = micToggle,
         )
+    }
+
+    fun refreshVoiceControls(activity: MainActivity, state: MatchSnapshot) {
+        val host = host(activity) ?: return
+        val visible = activity.gameMode == GameMode.FRIENDS &&
+            state.matchMode == "FRIENDS" &&
+            state.status == "ACTIVE"
+        host.voiceControls.visibility = if (visible) View.VISIBLE else View.GONE
+        host.voiceStatus.text = activity.friendsVoiceStatus
+        host.voiceToggle.text = if (activity.friendsVoiceEnabled) "VOICE OFF" else "VOICE ON"
+        host.micToggle.text = if (activity.friendsMicEnabled) "MIC ON" else "MIC MUTED"
+        host.micToggle.isEnabled = activity.friendsVoiceEnabled
+        host.micToggle.alpha = if (activity.friendsVoiceEnabled) 1f else .55f
     }
 
     private fun playerRail(activity: MainActivity): LinearLayout =

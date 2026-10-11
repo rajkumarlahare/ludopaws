@@ -1,6 +1,7 @@
 package com.ludoproof.game.feature.online
 
 import android.content.Intent
+import android.util.Log
 import android.view.View
 import com.ludoproof.game.*
 import org.json.JSONObject
@@ -36,7 +37,7 @@ internal fun MainActivity.persistSessionSecurely(
     code: String,
     id: String,
     token: String,
-) {
+): Boolean {
     try {
         secureSessionStore.save(
             PlayerSession(
@@ -46,8 +47,20 @@ internal fun MainActivity.persistSessionSecurely(
                 modeWire = gameMode.wireValue,
             ),
         )
-    } catch (_: Exception) {
+        secureSessionPersistenceFailed = false
+        return true
+    } catch (error: Exception) {
+        Log.e(
+            "LudoPawsSession",
+            "Could not securely persist the online match session",
+            error,
+        )
         secureSessionStore.clear()
+        secureSessionPersistenceFailed = true
+        showStatus(
+            "Match is connected, but secure resume could not be saved. Keep this screen open until the match is finished.",
+        )
+        return false
     }
 }
 
@@ -67,6 +80,7 @@ internal fun MainActivity.runNetwork(
     action: () -> JSONObject,
     onSuccess: (JSONObject) -> Unit = { applyResponse(it) },
     showWorking: Boolean = true,
+    reconcileOnError: Boolean = false,
 ) {
     if (!canRenderUi()) return
 
@@ -101,6 +115,9 @@ internal fun MainActivity.runNetwork(
                             setNetworkControls(enabled = true)
                             showStatus("Error: " + (error.message ?: error.toString()))
                             currentState?.let { updateControls(it) }
+                            if (reconcileOnError) {
+                                refreshState(silent = true)
+                            }
                         }
                         updateRollButton()
                     }

@@ -17,6 +17,50 @@ val ludoProofBillingEnabled =
         .get()
         .toBooleanStrictOrNull()
         ?: false
+val ludoProofAdsEnabled =
+    providers.gradleProperty("LUDOPROOF_ADS_ENABLED")
+        .orElse("false")
+        .get()
+        .toBooleanStrictOrNull()
+        ?: false
+val ludoProofAdsUseTestIds =
+    providers.gradleProperty("LUDOPROOF_ADS_USE_TEST_IDS")
+        .orElse("false")
+        .get()
+        .toBooleanStrictOrNull()
+        ?: false
+val admobAppId =
+    providers.gradleProperty("ADMOB_APP_ID")
+        .orElse("ca-app-pub-3940256099942544~3347511713")
+        .get()
+val admobRewardedAdUnitId =
+    providers.gradleProperty("ADMOB_REWARDED_AD_UNIT_ID")
+        .orElse("ca-app-pub-3940256099942544/5224354917")
+        .get()
+require(admobAppId.isNotBlank()) {
+    "ADMOB_APP_ID must not be blank."
+}
+require(admobRewardedAdUnitId.isNotBlank()) {
+    "ADMOB_REWARDED_AD_UNIT_ID must not be blank."
+}
+if (ludoProofAdsEnabled && !ludoProofAdsUseTestIds) {
+    require(
+        admobAppId != "ca-app-pub-3940256099942544~3347511713" &&
+            admobRewardedAdUnitId != "ca-app-pub-3940256099942544/5224354917",
+    ) {
+        "Set your real AdMob IDs or enable LUDOPROOF_ADS_USE_TEST_IDS for debug testing."
+    }
+}
+val playGamesProjectId =
+    providers.gradleProperty("PLAY_GAMES_PROJECT_ID")
+        .orElse("0")
+        .get()
+require(
+    playGamesProjectId == "0" ||
+        playGamesProjectId.toLongOrNull()?.let { it > 0 } == true,
+) {
+    "PLAY_GAMES_PROJECT_ID must be a positive numeric Play Games Services project ID."
+}
 
 val releaseStoreFile = providers.environmentVariable("LUDOPROOF_RELEASE_STORE_FILE").orNull
 val releaseStorePassword = providers.environmentVariable("LUDOPROOF_RELEASE_STORE_PASSWORD").orNull
@@ -75,6 +119,32 @@ android {
             "boolean",
             "LUDOPROOF_BILLING_ENABLED",
             ludoProofBillingEnabled.toString(),
+        )
+        buildConfigField(
+            "boolean",
+            "LUDOPROOF_ADS_ENABLED",
+            ludoProofAdsEnabled.toString(),
+        )
+        buildConfigField(
+            "boolean",
+            "LUDOPROOF_ADS_USE_TEST_IDS",
+            ludoProofAdsUseTestIds.toString(),
+        )
+        buildConfigField(
+            "String",
+            "ADMOB_REWARDED_AD_UNIT_ID",
+            "\"${admobRewardedAdUnitId.replace("\\", "\\\\").replace("\"", "\\\"")}\"",
+        )
+        manifestPlaceholders["ADMOB_APP_ID"] = admobAppId
+        buildConfigField(
+            "String",
+            "PLAY_GAMES_PROJECT_ID",
+            "\"$playGamesProjectId\"",
+        )
+        resValue(
+            "string",
+            "game_services_project_id",
+            playGamesProjectId,
         )
     }
 
@@ -142,7 +212,11 @@ tasks.named("preBuild").configure {
 dependencies {
     implementation("androidx.activity:activity:1.13.0")
     implementation("com.android.billingclient:billing:9.1.0")
+    implementation("com.google.android.gms:play-services-ads:25.5.0")
+    implementation("com.google.android.ump:user-messaging-platform:4.0.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("io.github.webrtc-sdk:android:144.7559.15")
+    implementation("com.google.android.gms:play-services-games-v2:22.1.0")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")

@@ -12,4 +12,15 @@
     <string name="rate_accessibility_label">Rate Ludo Paws</string>
     <string name="rate_dialog_title">RATE LUDO PAWS</string>
     <string name="rate_dialog_question">Loving Ludo Paws?</string>
+    <string name="profile_play_games_title">GOOGLE PLAY GAMES</string>
+    <string name="profile_play_games_signed_in_as">Signed in as %1$s</string>
+    <string name="profile_play_games_connected">Play Games is connected.</string>
+    <string name="profile_play_games_sign_in_prompt">Sign in to connect your Play Games profile.</string>
+    <string name="profile_play_games_setup_required">Add the Play Games Services project ID to enable sign-in.</string>
+    <string name="profile_play_games_sign_in_opening">Opening Play Games sign-in…</string>
+    <string name="profile_play_games_sign_in_not_completed">Sign-in was not completed. You can try again any time.</string>
+    <string name="profile_play_games_sign_in_failed">Play Games sign-in failed. Check your Google Play Games setup.</string>
+    <string name="profile_play_games_sign_in_failed_detail">Play Games sign-in failed: %1$s</string>
+    <string name="profile_play_games_check_failed">Could not check Play Games sign-in. Tap to try again.</string>
+    <string name="profile_play_games_setup_button_message">Play Games sign-in needs the Play Console project ID in the app configuration.</string>
 </resources>

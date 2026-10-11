@@ -9,7 +9,8 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.LudoProofTheme
-import com.ludoproof.game.core.ui.components.ProfilePlaceholderView
+import com.ludoproof.game.LudoPawsCharacterAvatarView
+import com.ludoproof.game.feature.characters.data.local.CharacterSelectionStore
 import com.ludoproof.game.feature.profile.domain.ProfileProgression
 import com.ludoproof.game.feature.profile.domain.model.ProfileSnapshot
 import com.ludoproof.game.feature.profile.presentation.ProfileActivity
@@ -106,7 +107,12 @@ internal fun ProfileActivity.profileTopBar():
                 this@profileTopBar,
             ).apply {
                 text =
-                    "G  SIGN IN"
+                    when {
+                        !isPlayGamesConfigured -> "SETUP"
+                        playGamesSignInInProgress -> "CONNECTING…"
+                        playGamesAuthenticated -> "CONNECTED"
+                        else -> "G  SIGN IN"
+                    }
                 textSize =
                     11f
                 setTypeface(
@@ -134,8 +140,13 @@ internal fun ProfileActivity.profileTopBar():
                             1f,
                             this@profileTopBar,
                         )
+                isEnabled =
+                    isPlayGamesConfigured &&
+                        !playGamesAuthenticated &&
+                        !playGamesSignInInProgress
+                alpha = if (isEnabled) 1f else .72f
                 setOnClickListener {
-                    showGoogleSetupInfo()
+                    beginPlayGamesSignIn()
                 }
             },
             LinearLayout.LayoutParams(
@@ -162,6 +173,10 @@ internal fun ProfileActivity.profileIdentityPanel(
                 gravity =
                     Gravity.CENTER_VERTICAL
             }
+        val selectedCharacterId =
+            CharacterSelectionStore(
+                this@profileIdentityPanel,
+            ).load().characterId
 
         val avatar =
             FrameLayout(
@@ -185,16 +200,13 @@ internal fun ProfileActivity.profileIdentityPanel(
                     }
 
                 addView(
-                    ProfilePlaceholderView(
+                    LudoPawsCharacterAvatarView(
                         this@profileIdentityPanel,
                     ).apply {
-                        contentDescription =
-                            "Profile placeholder"
-                        setPadding(
-                            dp(16),
-                            dp(16),
-                            dp(16),
-                            dp(16),
+                        bind(
+                            characterId = selectedCharacterId,
+                            ringColor = 0xFFFFD34A.toInt(),
+                            highlighted = true,
                         )
                     },
                     FrameLayout.LayoutParams(
