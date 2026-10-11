@@ -367,13 +367,6 @@ class TeamUpActivity : Activity() {
         )
 
         content.addView(
-            TextView(this).apply {
-                text = "SERVER-AUTHORITATIVE  •  VERIFIED DICE  •  TEAM RULESET V1"
-                LudoProofTheme.body(this, 9.5f, centered = true)
-                setPadding(dp(8), dp(8), dp(8), 0)
-            },
-        )
-        content.addView(
             View(this),
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
