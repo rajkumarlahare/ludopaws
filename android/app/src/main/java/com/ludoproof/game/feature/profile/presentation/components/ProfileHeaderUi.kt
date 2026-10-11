@@ -7,6 +7,8 @@ import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
+import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -215,7 +217,16 @@ internal fun ProfileActivity.profileIdentityPanel(profile: ProfileSnapshot): Lin
                 text = when {
                     playGamesSignInInProgress -> "CONNECTING…"
                     playGamesAuthenticated -> "✓  CONNECTED"
-                    else -> "▶  SIGN IN"
+                    else -> "SIGN IN"
+                }
+                if (!playGamesSignInInProgress && !playGamesAuthenticated) {
+                    val playGamesIcon = context.getDrawable(com.ludoproof.game.R.drawable.ic_google_play_games)?.mutate()
+                    playGamesIcon?.setBounds(0, 0, dp(18), dp(18))
+                    setCompoundDrawables(playGamesIcon, null, null, null)
+                    compoundDrawablePadding = dp(2)
+                } else {
+                    setCompoundDrawablesWithIntrinsicBounds(0, 0, 0, 0)
+                    compoundDrawablePadding = 0
                 }
                 textSize = 11f
                 setTypeface(Typeface.DEFAULT_BOLD)
@@ -240,30 +251,39 @@ internal fun ProfileActivity.profileIdentityPanel(profile: ProfileSnapshot): Lin
         )
         details.addView(signInRow)
 
+        val profileScreenWidthDp = resources.displayMetrics.widthPixels / resources.displayMetrics.density
+        val pageHorizontalPaddingDp =
+            if (LudoProofTheme.isCompactWidth(this@profileIdentityPanel)) 24f else 36f
+        val maxProfileContentWidthDp = minOf(
+            profileScreenWidthDp - pageHorizontalPaddingDp,
+            LudoProofTheme.pageMaxContentWidthDp(this@profileIdentityPanel).toFloat(),
+        )
+        val maxNameTextWidthDp =
+            (((maxProfileContentWidthDp - 20f) * 0.57f) - 50f)
+                .toInt()
+                .coerceIn(90, 176)
         val nameRow = LinearLayout(this@profileIdentityPanel).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, dp(4), 0, 0)
+            setPadding(0, dp(4), dp(6), 0)
         }
         nameRow.addView(
             TextView(this@profileIdentityPanel).apply {
                 text = profile.displayName
                 textSize = 21f
                 maxLines = 1
+                maxWidth = dp(maxNameTextWidthDp)
                 ellipsize = android.text.TextUtils.TruncateAt.END
                 setTypeface(Typeface.DEFAULT_BOLD)
                 setTextColor(Color.WHITE)
             },
-            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f),
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT),
         )
         nameRow.addView(
-            Button(this@profileIdentityPanel).apply {
-                text = "✎"
-                textSize = 15f
-                setTextColor(0xFFE2F8FF.toInt())
-                minWidth = 0
-                minHeight = 0
-                setPadding(dp(6), 0, dp(6), 0)
+            ImageButton(this@profileIdentityPanel).apply {
+                setImageResource(com.ludoproof.game.R.drawable.ic_profile_edit_pen)
+                scaleType = ImageView.ScaleType.CENTER_INSIDE
+                setPadding(dp(5), dp(5), dp(5), dp(5))
                 background = LudoProofTheme.rounded(
                     0x3327C6F4,
                     8f,
@@ -275,7 +295,7 @@ internal fun ProfileActivity.profileIdentityPanel(profile: ProfileSnapshot): Lin
                 setOnClickListener { showNameEditor() }
                 AppFocusRing.apply(this, cornerRadiusDp = 8f)
             },
-            LinearLayout.LayoutParams(dp(32), dp(30)).apply { marginStart = dp(4) },
+            LinearLayout.LayoutParams(dp(30), dp(30)).apply { marginStart = dp(5) },
         )
         details.addView(nameRow)
 
