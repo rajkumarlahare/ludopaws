@@ -24,6 +24,9 @@ const profileActivity = read(
 const profileHeader = read(
   "android/app/src/main/java/com/ludoproof/game/feature/profile/presentation/components/ProfileHeaderUi.kt",
 );
+const profileStats = read(
+  "android/app/src/main/java/com/ludoproof/game/feature/profile/presentation/components/ProfileStatsUi.kt",
+);
 const storeActivity = read(
   "android/app/src/main/java/com/ludoproof/game/feature/store/presentation/StoreActivity.kt",
 );
@@ -110,6 +113,31 @@ requireText(
   profileHeader,
   "StoreActivity.EXTRA_INITIAL_TAB",
   "The Change Paw control must deep-link to the Paws store instead of dropping users into an unrelated tab.",
+);
+requireText(
+  profileHeader,
+  "Change selected Paw",
+  "The hero Change action must operate on the real selected Paw, not a profile-picture avatar.",
+);
+rejectText(
+  profileHeader,
+  "chooseProfilePhoto()",
+  "Profile must not contain a separate profile-photo avatar workflow.",
+);
+rejectText(
+  profileActivity,
+  "profilePhotoUri",
+  "Profile must not load a second profile photo over the selected Paw.",
+);
+rejectText(
+  profileStats,
+  "profile.rush",
+  "Profile Game Stats must show only Classic.",
+);
+rejectText(
+  profileStats,
+  "profile.snakeLadder",
+  "Profile Game Stats must not show Snakes & Ladders.",
 );
 requireText(
   storeActivity,
