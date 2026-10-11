@@ -2,17 +2,14 @@ package com.ludoproof.game.ui.home
 
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
-import android.graphics.Shader
 import android.view.View
 import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.sin
 
-/** Smooth, four-colour Google Play mark used by the Home rating action. */
+/** Crisp, high-contrast four-colour Google Play mark for the Home rating action. */
 internal class HomeGooglePlayIconView(
     context: Context,
 ) : View(context) {
@@ -32,122 +29,59 @@ internal class HomeGooglePlayIconView(
         canvas.translate((width - size) / 2f, (height - size) / 2f)
         canvas.scale(scale, scale)
 
-        // Keep the Play mark broad and give the two left corners a soft radius,
-        // instead of rendering it as one hard, samosa-like triangle.
-        val outer =
-            Path().apply {
-                moveTo(22f, 11f)
-                quadTo(14f, 11f, 14f, 21f)
-                lineTo(14f, 79f)
-                quadTo(14f, 89f, 22f, 89f)
-                lineTo(83f, 56f)
-                quadTo(93f, 50f, 83f, 44f)
-                close()
-            }
-
-        paint.shader = null
-        paint.color = 0x66000000
-        canvas.save()
-        canvas.translate(0f, 3f)
-        canvas.drawPath(outer, paint)
-        canvas.restore()
-
-        // Blue forms the rounded back of the mark.
+        // Flat, fully opaque brand colours keep the small mark sharp and readable.
+        // A broad rounded silhouette avoids a narrow, samosa-like triangle.
         val blue =
             Path().apply {
                 moveTo(22f, 11f)
                 quadTo(14f, 11f, 14f, 21f)
                 lineTo(14f, 79f)
                 quadTo(14f, 89f, 22f, 89f)
-                lineTo(51f, 50f)
+                lineTo(52f, 50f)
                 close()
             }
-        paint.shader =
-            LinearGradient(
-                16f, 15f, 52f, 86f,
-                intArrayOf(0xFF39C9F5.toInt(), 0xFF1687E4.toInt()),
-                null,
-                Shader.TileMode.CLAMP,
-            )
+        paint.color = 0xFF18A8F4.toInt()
         canvas.drawPath(blue, paint)
 
-        // Green and red split the upper and lower arms of the Play symbol.
         val green =
             Path().apply {
                 moveTo(22f, 11f)
                 quadTo(24f, 11f, 28f, 14f)
-                lineTo(56f, 39f)
-                lineTo(51f, 50f)
-                lineTo(22f, 11f)
+                lineTo(57f, 38f)
+                lineTo(52f, 50f)
                 close()
             }
-        paint.shader =
-            LinearGradient(
-                22f, 12f, 63f, 44f,
-                intArrayOf(0xFF42E477.toInt(), 0xFF08B96A.toInt()),
-                null,
-                Shader.TileMode.CLAMP,
-            )
+        paint.color = 0xFF00D66F.toInt()
         canvas.drawPath(green, paint)
 
         val red =
             Path().apply {
                 moveTo(22f, 89f)
                 quadTo(24f, 89f, 28f, 86f)
-                lineTo(56f, 61f)
-                lineTo(51f, 50f)
-                lineTo(22f, 89f)
+                lineTo(57f, 62f)
+                lineTo(52f, 50f)
                 close()
             }
-        paint.shader =
-            LinearGradient(
-                22f, 88f, 63f, 56f,
-                intArrayOf(0xFFFF7467.toInt(), 0xFFEA3348.toInt()),
-                null,
-                Shader.TileMode.CLAMP,
-            )
+        paint.color = 0xFFFF3B49.toInt()
         canvas.drawPath(red, paint)
 
-        // Yellow makes the recognisable forward-facing tip; curved joins keep
-        // the four colours reading as one continuous Play Store symbol.
         val yellow =
             Path().apply {
-                moveTo(51f, 50f)
-                lineTo(56f, 39f)
-                lineTo(70f, 31f)
+                moveTo(52f, 50f)
+                lineTo(57f, 38f)
+                lineTo(71f, 31f)
                 lineTo(83f, 44f)
                 quadTo(93f, 50f, 83f, 56f)
-                lineTo(70f, 69f)
-                lineTo(56f, 61f)
+                lineTo(71f, 69f)
+                lineTo(57f, 62f)
                 close()
             }
-        paint.shader =
-            LinearGradient(
-                56f, 34f, 85f, 66f,
-                intArrayOf(0xFFFFE36A.toInt(), 0xFFFFB82F.toInt()),
-                null,
-                Shader.TileMode.CLAMP,
-            )
+        paint.color = 0xFFFFC928.toInt()
         canvas.drawPath(yellow, paint)
 
-        // A restrained gloss softens the finish without a harsh white divider.
-        val gloss =
-            Path().apply {
-                moveTo(21f, 20f)
-                quadTo(20f, 17f, 24f, 19f)
-                lineTo(45f, 40f)
-                lineTo(40f, 43f)
-                close()
-            }
-        paint.shader =
-            LinearGradient(
-                20f, 18f, 47f, 44f,
-                intArrayOf(0x9EFFFFFF.toInt(), 0x18FFFFFF, Color.TRANSPARENT),
-                floatArrayOf(0f, 0.62f, 1f),
-                Shader.TileMode.CLAMP,
-            )
-        canvas.drawPath(gloss, paint)
-        paint.shader = null
+        // Tiny opaque centre join removes muddy overlapping gradients at this size.
+        paint.color = 0xFF20B8E8.toInt()
+        canvas.drawCircle(52f, 50f, 2.2f, paint)
 
         canvas.restore()
     }
