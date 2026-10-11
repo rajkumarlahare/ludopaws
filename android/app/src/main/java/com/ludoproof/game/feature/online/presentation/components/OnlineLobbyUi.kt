@@ -1,6 +1,9 @@
 package com.ludoproof.game.ui.online
 
 import android.graphics.Color
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.RelativeSizeSpan
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.drawable.Drawable
@@ -635,13 +638,23 @@ internal fun MainActivity.stylePublicPlayerCountButton(
     selected: Boolean,
 ) {
     val isTwoPlayer = button === twoPlayerButton
-    val playerLabel = (if (isTwoPlayer) "2" else "4") + " PLAYERS"
-    button.text = playerLabel
+    val playerNumber = if (isTwoPlayer) "2" else "4"
+    val playerLabel = "$playerNumber PLAYERS"
+    button.text =
+        SpannableString("$playerNumber\nPLAYERS").apply {
+            setSpan(
+                RelativeSizeSpan(1.65f),
+                0,
+                playerNumber.length,
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+            )
+        }
     button.isSelected = selected
     button.contentDescription = if (selected) "$playerLabel, selected" else playerLabel
 
+    // Keep the label compact below the large number so icon and caption fit together.
     button.textSize =
-        if (isCompactOnline()) 14f else 16f
+        if (isCompactOnline()) 11.5f else 13f
     button.setTypeface(
         Typeface.DEFAULT_BOLD,
     )
@@ -656,7 +669,7 @@ internal fun MainActivity.stylePublicPlayerCountButton(
     )
     button.gravity = Gravity.CENTER
     button.isAllCaps = false
-    button.compoundDrawablePadding = dp(10)
+    button.compoundDrawablePadding = dp(if (isCompactOnline()) 6 else 7)
     button.setCompoundDrawables(
         null,
         HomeModePlayerCountDrawable(
