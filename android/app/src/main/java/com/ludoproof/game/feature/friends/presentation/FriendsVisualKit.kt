@@ -13,6 +13,10 @@ import android.view.View
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.ludoproof.game.core.ui.components.AppFocusRing
+import com.ludoproof.game.core.ui.icons.AppIconName
+import com.ludoproof.game.core.ui.icons.AppIconVariant
+import com.ludoproof.game.core.ui.icons.AppIconView
 import kotlin.math.min
 
 internal enum class FriendsIcon {
@@ -184,6 +188,7 @@ internal object FriendsVisualKit {
                 dp(context, 16),
                 0,
             )
+            AppFocusRing.apply(this, cornerRadiusDp = 15f, strokeWidthDp = 2f)
         }
 
     fun button(
@@ -218,16 +223,47 @@ internal object FriendsVisualKit {
             isClickable = enabled
             isFocusable = enabled
             if (enabled) {
+                AppFocusRing.apply(this, cornerRadiusDp = 22f, strokeWidthDp = 2f)
                 setOnClickListener { onClick() }
             }
         }
 
+    /**
+     * Use the shared icon registry for common actions so Friends matches the
+     * newer app-wide outline geometry. Feature-specific artwork remains local.
+     */
     fun iconView(
         context: Context,
         icon: FriendsIcon,
         tint: Int = TEXT,
-    ): FriendsIconView =
-        FriendsIconView(context, icon, tint)
+    ): View {
+        val sharedName = when (icon) {
+            FriendsIcon.BACK -> AppIconName.BACK
+            FriendsIcon.PEOPLE, FriendsIcon.INVITES -> AppIconName.PEOPLE
+            FriendsIcon.ADD_FRIEND, FriendsIcon.INVITE -> AppIconName.ADD
+            FriendsIcon.SEARCH -> AppIconName.SEARCH
+            FriendsIcon.COPY -> AppIconName.COPY
+            FriendsIcon.SHARE -> AppIconName.SHARE
+            FriendsIcon.PLAY -> AppIconName.PLAY
+            FriendsIcon.MESSAGE -> AppIconName.MESSAGE
+            FriendsIcon.CLOCK -> AppIconName.CLOCK
+            FriendsIcon.MORE -> AppIconName.MORE
+            FriendsIcon.ID_CARD, FriendsIcon.HOUSE, FriendsIcon.REQUESTS -> null
+        }
+        if (sharedName == null) return FriendsIconView(context, icon, tint)
+
+        val variant = if (icon == FriendsIcon.PEOPLE || icon == FriendsIcon.INVITES) {
+            AppIconVariant.FILLED
+        } else {
+            AppIconVariant.OUTLINE
+        }
+        return AppIconView(
+            context = context,
+            iconName = sharedName,
+            iconTint = tint,
+            iconVariant = variant,
+        )
+    }
 
     fun avatar(
         context: Context,

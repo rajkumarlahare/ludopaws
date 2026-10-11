@@ -7,6 +7,7 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.view.View
+import com.ludoproof.game.core.ui.components.AppFocusRing
 import kotlin.math.min
 
 internal enum class SettingsAudioIconKind {
@@ -46,6 +47,7 @@ internal class SettingsAudioIconView(
         isFocusable = true
         importantForAccessibility =
             IMPORTANT_FOR_ACCESSIBILITY_YES
+        AppFocusRing.apply(this, cornerRadiusDp = 999f, strokeWidthDp = 2.5f)
     }
 
     override fun onMeasure(
