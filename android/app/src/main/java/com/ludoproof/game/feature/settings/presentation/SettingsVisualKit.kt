@@ -15,6 +15,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import com.ludoproof.game.LudoProofTheme
 import com.ludoproof.game.core.ui.art.plywoodBackground
+import com.ludoproof.game.core.ui.art.recessedPlywoodBackground
 import com.ludoproof.game.core.ui.components.AppFocusRing
 
 internal fun settingsCompactPanel(
@@ -134,8 +135,12 @@ private class SettingsCloseButton(
         isFocusable = true
         minimumWidth = settingsDp(context, 40)
         minimumHeight = settingsDp(context, 40)
-        // Transparent view: only the red cross is drawn.
-        background = null
+        // Recessed plywood pocket behind the red cross. The cross is drawn
+        // in the same view bounds, so the doubled arms stay fully visible.
+        background = recessedPlywoodBackground(
+            context = context,
+            outerCornerRadiusDp = 18f,
+        )
         elevation = 0f
         setOnClickListener { onClose() }
     }
