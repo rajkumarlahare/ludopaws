@@ -263,15 +263,15 @@ class FriendsActivity : Activity() {
                 ),
             )
             addView(
-                LinearLayout(this@buildHeader).apply {
+                LinearLayout(this@FriendsActivity).apply {
                     orientation = LinearLayout.HORIZONTAL
                     gravity = Gravity.CENTER
                     addView(
-                        LaserStatusDotView(this@buildHeader),
+                        LaserStatusDotView(this@FriendsActivity),
                         LinearLayout.LayoutParams(dp(10), dp(10)).apply { marginEnd = dp(5) },
                     )
                     addView(
-                        FriendsVisualKit.body(this@buildHeader, "ONLINE", sizeSp = 10f).apply {
+                        FriendsVisualKit.body(this@FriendsActivity, "ONLINE", sizeSp = 10f).apply {
                             setTextColor(0xFFD4FFB2.toInt())
                             includeFontPadding = false
                         },
