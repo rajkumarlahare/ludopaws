@@ -154,16 +154,16 @@ class TeamUpActivity : Activity() {
                             AppIconView(
                                 context = this@TeamUpActivity,
                                 iconName = AppIconName.PEOPLE,
-                                iconTint = LudoProofTheme.GOLD,
+                                iconTint = Color.WHITE,
                             ),
-                            LinearLayout.LayoutParams(dp(26), dp(26)).apply {
+                            LinearLayout.LayoutParams(dp(34), dp(34)).apply {
                                 marginEnd = dp(8)
                             },
                         )
                         addView(
                             TextView(this@TeamUpActivity).apply {
                                 text = "TEAM UP"
-                                LudoProofTheme.title(this, 19f)
+                                LudoProofTheme.title(this, 25f)
                                 gravity = Gravity.CENTER
                             },
                         )
@@ -214,7 +214,7 @@ class TeamUpActivity : Activity() {
             headerTitle,
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(52),
+                dp(62),
             ).apply { bottomMargin = dp(10) },
         )
         setupContent = teamSetupPanel()
