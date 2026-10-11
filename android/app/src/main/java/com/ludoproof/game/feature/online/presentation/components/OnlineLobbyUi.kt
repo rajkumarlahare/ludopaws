@@ -15,6 +15,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.LudoProofTheme
+import com.ludoproof.game.ModeArtView
 import com.ludoproof.game.core.ui.art.plywoodBackground
 import com.ludoproof.game.core.ui.art.playGamesSignInBackground
 import com.ludoproof.game.core.ui.art.recessedPlywoodBackground
@@ -658,9 +659,9 @@ internal fun MainActivity.stylePublicPlayerCountButton(
     button.compoundDrawablePadding = dp(10)
     button.setCompoundDrawables(
         null,
-        PlayerGroupDrawable(
+        HomeModePlayerCountDrawable(
+            context = button.context,
             count = if (isTwoPlayer) 2 else 4,
-            color = if (selected) 0xFFFFC52E.toInt() else 0xFF29B9FF.toInt(),
             selected = selected,
         ).apply {
             val iconWidth = dp(if (isCompactOnline()) 92 else 108)
@@ -678,260 +679,49 @@ internal fun MainActivity.stylePublicPlayerCountButton(
         )
 }
 
-private class PlayerGroupDrawable(
-    private val count: Int,
-    private val color: Int,
-    private val selected: Boolean,
+/**
+ * Reuses the exact character illustration renderer from Home mode tiles for the
+ * 2-player and 4-player choices instead of maintaining a second, divergent drawing.
+ */
+private class HomeModePlayerCountDrawable(
+    context: android.content.Context,
+    count: Int,
+    selected: Boolean,
 ) : Drawable() {
-    private val paint =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.FILL
+    private val art =
+        ModeArtView(context).apply {
+            playerCount = count
+            playerCountSelected = selected
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
-    private val outline =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            strokeWidth = 1.5f
-        }
-    private val glint =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.FILL
-        }
-    private val shadow =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.FILL
-            color = 0x66020A18
-        }
-    private val radioPaint =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            strokeCap = Paint.Cap.ROUND
-        }
-    private val radioFill =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.FILL
-        }
-    private val neckPaint =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.FILL
-        }
+
+    override fun onBoundsChange(bounds: android.graphics.Rect) {
+        val width = bounds.width().coerceAtLeast(1)
+        val height = bounds.height().coerceAtLeast(1)
+        art.measure(
+            View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY),
+        )
+        art.layout(0, 0, width, height)
+    }
 
     override fun draw(canvas: Canvas) {
-        val bounds = bounds
-        val width = bounds.width().toFloat()
-        val height = bounds.height().toFloat()
-        if (width <= 0f || height <= 0f) return
-
-        val figures =
-            if (count == 2) {
-                listOf(
-                    Figure(0.31f, 0.06f, 0.90f),
-                    Figure(0.69f, 0.06f, 0.90f),
-                )
-            } else {
-                listOf(
-                    Figure(0.39f, 0.12f, 0.68f),
-                    Figure(0.61f, 0.12f, 0.68f),
-                    Figure(0.19f, 0.20f, 0.80f),
-                    Figure(0.81f, 0.20f, 0.80f),
-                )
-            }
-        figures.forEach { figure ->
-            drawPerson(
-                canvas = canvas,
-                x = bounds.left + width * figure.x,
-                top = bounds.top + height * figure.top,
-                width = width,
-                height = height * (0.62f - figure.top),
-                headRadius = width * (if (count == 2) 0.12f else 0.095f) * figure.scale,
-                sizeScale = figure.scale,
-            )
-        }
-
-        val radioRadius = width * 0.075f
-        val radioX = bounds.exactCenterX()
-        val radioY = bounds.top + height * 0.91f
-        radioPaint.color = if (selected) 0xFFFFE177.toInt() else 0xFFE3F0FF.toInt()
-        radioPaint.strokeWidth = width * 0.025f
-        canvas.drawCircle(radioX, radioY, radioRadius, radioPaint)
-        if (selected) {
-            radioFill.color = color
-            canvas.drawCircle(radioX, radioY, radioRadius * 0.62f, radioFill)
-            canvas.drawCircle(radioX - radioRadius * 0.22f, radioY - radioRadius * 0.28f, radioRadius * 0.18f, glint)
-        }
-    }
-
-    private data class Figure(
-        val x: Float,
-        val top: Float,
-        val scale: Float,
-    )
-
-    private fun drawPerson(
-        canvas: Canvas,
-        x: Float,
-        top: Float,
-        width: Float,
-        height: Float,
-        headRadius: Float,
-        sizeScale: Float,
-    ) {
-        val base = color
-        val light = blend(base, android.graphics.Color.WHITE, 0.32f)
-        val dark = blend(base, 0xFF071B3B.toInt(), 0.24f)
-        val headY = top + height * 0.22f
-        val headCenterX = x
-        val shoulderWidth = width * (if (count == 2) 0.15f else 0.135f) * sizeScale
-        val bodyTop = top + height * 0.48f
-        val bodyBottom = top + height * 0.91f
-        val neckWidth = headRadius * 0.62f
-        val neckBottom = bodyTop + height * 0.08f
-        val bodyPath =
-            android.graphics.Path().apply {
-                moveTo(x - shoulderWidth * 0.46f, bodyTop)
-                cubicTo(
-                    x - shoulderWidth * 1.02f,
-                    bodyTop + height * 0.08f,
-                    x - shoulderWidth * 1.28f,
-                    bodyBottom,
-                    x - shoulderWidth * 1.15f,
-                    bodyBottom,
-                )
-                lineTo(x + shoulderWidth * 1.15f, bodyBottom)
-                cubicTo(
-                    x + shoulderWidth * 1.28f,
-                    bodyBottom,
-                    x + shoulderWidth * 1.02f,
-                    bodyTop + height * 0.05f,
-                    x + shoulderWidth * 0.46f,
-                    bodyTop,
-                )
-                close()
-            }
-
-        canvas.drawOval(
-            x - shoulderWidth * 0.86f,
-            bodyBottom - height * 0.05f,
-            x + shoulderWidth * 0.86f,
-            bodyBottom + height * 0.10f,
-            shadow,
-        )
-        neckPaint.shader =
-            android.graphics.LinearGradient(
-                x - neckWidth,
-                headY,
-                x + neckWidth,
-                neckBottom,
-                light,
-                dark,
-                android.graphics.Shader.TileMode.CLAMP,
-            )
-        canvas.drawRoundRect(
-            x - neckWidth,
-            headY + headRadius * 0.62f,
-            x + neckWidth,
-            neckBottom,
-            neckWidth * 0.35f,
-            neckWidth * 0.35f,
-            neckPaint,
-        )
-        neckPaint.shader = null
-
-        val shadowPath =
-            android.graphics.Path(bodyPath).apply {
-                offset(width * 0.025f, height * 0.06f)
-            }
-        paint.color = dark
-        canvas.drawPath(shadowPath, paint)
-        paint.shader =
-            android.graphics.RadialGradient(
-                x - shoulderWidth * 0.55f,
-                bodyTop + height * 0.1f,
-                shoulderWidth * 2.2f,
-                intArrayOf(light, base, dark),
-                floatArrayOf(0f, 0.52f, 1f),
-                android.graphics.Shader.TileMode.CLAMP,
-            )
-        canvas.drawPath(bodyPath, paint)
-        paint.shader = null
+        val b = bounds
+        if (b.width() <= 0 || b.height() <= 0) return
         canvas.save()
-        canvas.clipPath(bodyPath)
-        glint.shader =
-            android.graphics.RadialGradient(
-                x - shoulderWidth * 0.28f,
-                bodyTop + height * 0.10f,
-                shoulderWidth * 1.4f,
-                intArrayOf(0x88FFFFFF.toInt(), 0x22FFFFFF, Color.TRANSPARENT),
-                null,
-                android.graphics.Shader.TileMode.CLAMP,
-            )
-        canvas.drawRect(
-            x - shoulderWidth * 1.5f,
-            bodyTop,
-            x + shoulderWidth * 1.5f,
-            bodyBottom,
-            glint,
-        )
-        glint.shader = null
+        canvas.translate(b.left.toFloat(), b.top.toFloat())
+        art.draw(canvas)
         canvas.restore()
-        outline.color = blend(base, 0xFF071327.toInt(), 0.42f)
-        outline.strokeWidth = width * 0.018f
-        canvas.drawPath(bodyPath, outline)
-
-        outline.color = blend(light, android.graphics.Color.WHITE, 0.35f)
-        outline.strokeWidth = width * 0.028f
-        canvas.drawLine(
-            x - shoulderWidth * 0.55f,
-            bodyTop + height * 0.05f,
-            x + shoulderWidth * 0.55f,
-            bodyTop + height * 0.05f,
-            outline,
-        )
-
-        paint.shader =
-            android.graphics.RadialGradient(
-                headCenterX - headRadius * 0.38f,
-                headY - headRadius * 0.42f,
-                headRadius * 1.72f,
-                intArrayOf(light, base, dark),
-                floatArrayOf(0f, 0.50f, 1f),
-                android.graphics.Shader.TileMode.CLAMP,
-            )
-        canvas.drawCircle(headCenterX, headY, headRadius, paint)
-        paint.shader = null
-        outline.color = blend(base, 0xFF071327.toInt(), 0.36f)
-        outline.strokeWidth = width * 0.018f
-        canvas.drawCircle(headCenterX, headY, headRadius, outline)
-        glint.color = 0x99FFFFFF.toInt()
-        canvas.drawOval(
-            headCenterX - headRadius * 0.58f,
-            headY - headRadius * 0.66f,
-            headCenterX - headRadius * 0.05f,
-            headY - headRadius * 0.26f,
-            glint,
-        )
-        glint.color = 0x55FFFFFF
-        canvas.drawCircle(headCenterX + headRadius * 0.38f, headY + headRadius * 0.36f, headRadius * 0.12f, glint)
-    }
-
-    private fun blend(
-        first: Int,
-        second: Int,
-        amount: Float,
-    ): Int {
-        val inverse = 1f - amount
-        return android.graphics.Color.rgb(
-            (android.graphics.Color.red(first) * inverse + android.graphics.Color.red(second) * amount).toInt(),
-            (android.graphics.Color.green(first) * inverse + android.graphics.Color.green(second) * amount).toInt(),
-            (android.graphics.Color.blue(first) * inverse + android.graphics.Color.blue(second) * amount).toInt(),
-        )
     }
 
     override fun setAlpha(alpha: Int) {
-        paint.alpha = alpha
+        art.alpha = alpha.coerceIn(0, 255) / 255f
+        invalidateSelf()
     }
 
     override fun setColorFilter(colorFilter: android.graphics.ColorFilter?) {
-        paint.colorFilter = colorFilter
+        // The Home artwork defines its own palette; don't tint it here.
+        invalidateSelf()
     }
 
     @Deprecated("Deprecated in Java")
