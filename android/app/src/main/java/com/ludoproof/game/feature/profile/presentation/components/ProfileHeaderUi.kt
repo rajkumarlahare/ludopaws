@@ -14,6 +14,8 @@ import com.ludoproof.game.LudoProofTheme
 import com.ludoproof.game.LudoPawsCharacterAvatarView
 import com.ludoproof.game.core.ui.components.AppFocusRing
 import com.ludoproof.game.core.ui.components.appIconActionButton
+import com.ludoproof.game.core.ui.icons.AppIconView
+import com.ludoproof.game.core.ui.icons.AppIconVariant
 import com.ludoproof.game.core.ui.icons.AppIconName
 import com.ludoproof.game.feature.characters.data.local.CharacterSelectionStore
 import com.ludoproof.game.feature.profile.domain.ProfileProgression
@@ -51,13 +53,9 @@ internal fun ProfileActivity.profileTopBar(): LinearLayout =
         )
 
         addView(
-            Button(this@profileTopBar).apply {
-                text = "⚙  SETUP"
-                textSize = 13f
-                setTypeface(Typeface.DEFAULT_BOLD)
-                setTextColor(0xFF303846.toInt())
-                minWidth = 0
-                minHeight = 0
+            LinearLayout(this@profileTopBar).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER
                 setPadding(dp(10), 0, dp(10), 0)
                 background = LudoProofTheme.rounded(
                     0xFFF3F5F8.toInt(),
@@ -65,6 +63,25 @@ internal fun ProfileActivity.profileTopBar(): LinearLayout =
                     0xFFDCE4EF.toInt(),
                     1f,
                     this@profileTopBar,
+                )
+                addView(
+                    AppIconView(
+                        this@profileTopBar,
+                        AppIconName.SETTINGS,
+                        iconTint = 0xFF303846.toInt(),
+                        iconVariant = AppIconVariant.OUTLINE,
+                        strokeWidthDp = 2f,
+                    ),
+                    LinearLayout.LayoutParams(dp(23), dp(23)),
+                )
+                addView(
+                    TextView(this@profileTopBar).apply {
+                        text = "SETUP"
+                        textSize = 13f
+                        setTypeface(Typeface.DEFAULT_BOLD)
+                        setTextColor(0xFF303846.toInt())
+                        setPadding(dp(6), 0, 0, 0)
+                    },
                 )
                 contentDescription = "Profile and Play Games setup"
                 isEnabled = !playGamesSignInInProgress
