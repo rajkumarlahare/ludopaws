@@ -389,9 +389,9 @@ internal fun ProfileActivity.profileIdentityPanel(profile: ProfileSnapshot): Lin
             gravity = Gravity.CENTER
             setPadding(dp(2), dp(7), dp(2), dp(7))
             background = LudoProofTheme.rounded(
-                0xC9082A69.toInt(),
-                14f,
-                0xFF176FCC.toInt(),
+                0x33104483,
+                18f,
+                0xFF247FCB.toInt(),
                 1f,
                 this@profileIdentityPanel,
             )
