@@ -1,6 +1,5 @@
 package com.ludoproof.game
 
-import android.app.Activity
 import android.os.Build
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -17,6 +16,8 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import org.json.JSONObject
 import java.util.concurrent.Executors
 import com.ludoproof.game.ui.game.addGameTopActions
@@ -24,12 +25,7 @@ import com.ludoproof.game.ui.online.*
 import com.ludoproof.game.feature.online.*
 import com.ludoproof.game.feature.online.FriendsVoiceChatSession
 
-class MainActivity : Activity() {
-    @Deprecated("Handled by the registered back callback on Android 13 and newer")
-    override fun onBackPressed() {
-        requestRemoteExit()
-    }
-
+class MainActivity : ComponentActivity() {
     internal val gameMode:
         GameMode by lazy {
         GameMode
@@ -431,6 +427,14 @@ class MainActivity : Activity() {
     ) {
         super.onCreate(
             savedInstanceState,
+        )
+        onBackPressedDispatcher.addCallback(
+            this,
+            object : OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    requestRemoteExit()
+                }
+            },
         )
         LudoProofTheme.configureWindow(
             this,
@@ -890,7 +894,7 @@ class MainActivity : Activity() {
     @Deprecated("Use the activity result API for new permission requests")
     override fun onRequestPermissionsResult(
         requestCode: Int,
-        permissions: Array<out String>,
+        permissions: Array<String>,
         grantResults: IntArray,
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
