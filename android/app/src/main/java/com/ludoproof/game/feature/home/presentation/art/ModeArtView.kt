@@ -113,23 +113,60 @@ class ModeArtView @JvmOverloads constructor(
             3 -> 0.165f
             else -> 0.135f
         }
+        // Match the four standard Ludo yard colours. Two-player mode uses
+        // a clear red/blue pair; four-player mode shows all four colours.
+        val red = PlayerCountPalette(
+            selectedTop = 0xFFFF777D.toInt(),
+            selectedBottom = 0xFFC91422.toInt(),
+            idleTop = 0xFFE85B62.toInt(),
+            idleBottom = 0xFFA20E19.toInt(),
+        )
+        val yellow = PlayerCountPalette(
+            selectedTop = 0xFFFFF49B.toInt(),
+            selectedBottom = 0xFFD6A100.toInt(),
+            idleTop = 0xFFE7D26C.toInt(),
+            idleBottom = 0xFFA78308.toInt(),
+        )
+        val green = PlayerCountPalette(
+            selectedTop = 0xFF75E5A1.toInt(),
+            selectedBottom = 0xFF008343.toInt(),
+            idleTop = 0xFF47B878.toInt(),
+            idleBottom = 0xFF006632.toInt(),
+        )
+        val blue = PlayerCountPalette(
+            selectedTop = 0xFF8ADBFF.toInt(),
+            selectedBottom = 0xFF1C72B8.toInt(),
+            idleTop = 0xFF5CA7D8.toInt(),
+            idleBottom = 0xFF12517F.toInt(),
+        )
+        val palettes =
+            if (count == 2) {
+                listOf(red, blue)
+            } else {
+                listOf(red, yellow, green, blue).take(count)
+            }
+
         positions.forEachIndexed { index, position ->
-            val selectedTop = 0xFF0B3678.toInt()
-            val selectedBottom = 0xFF061F50.toInt()
-            val blueTop = 0xFFB4E8FF.toInt()
-            val blueBottom = 0xFF277BD8.toInt()
+            val palette = palettes[index]
             val centerFront = count == 3 && index == 1
             drawPerson(
                 canvas = canvas,
                 cx = w * position,
                 cy = h * (if (centerFront) 0.57f else 0.55f),
                 radius = radius * (if (centerFront) 1.10f else 1f),
-                topColor = if (playerCountSelected) selectedTop else blueTop,
-                bottomColor = if (playerCountSelected) selectedBottom else blueBottom,
+                topColor = if (playerCountSelected) palette.selectedTop else palette.idleTop,
+                bottomColor = if (playerCountSelected) palette.selectedBottom else palette.idleBottom,
                 front = centerFront || count == 2,
             )
         }
     }
+
+    private data class PlayerCountPalette(
+        val selectedTop: Int,
+        val selectedBottom: Int,
+        val idleTop: Int,
+        val idleBottom: Int,
+    )
 
     private fun drawOnline(
         canvas: Canvas,
