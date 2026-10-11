@@ -150,13 +150,14 @@ class FriendsActivity : Activity() {
                 cornerRadiusDp = 24f,
             )
         }
+        // Center the whole plywood panel in the ScrollView viewport when it fits.
+        // ScrollView.fillViewport keeps this viewport-sized on short content while
+        // allowing the panel to scroll from the top when its content is taller.
         val contentLayoutParams = FrameLayout.LayoutParams(
             width,
             FrameLayout.LayoutParams.WRAP_CONTENT,
-            Gravity.TOP or Gravity.CENTER_HORIZONTAL,
-        ).apply {
-            topMargin = dp(12)
-        }
+            Gravity.CENTER,
+        )
         contentHost.addView(content, contentLayoutParams)
         host.addView(
             scroll,
@@ -221,11 +222,8 @@ class FriendsActivity : Activity() {
                     insets.systemWindowInsetTop
                 }
             val safeTopInset = maxOf(cutoutTop, statusTop)
-            // Move the whole plywood panel below the system bars instead of
-            // pushing only its inner content down and leaving the panel clipped at the top.
-            contentLayoutParams.topMargin = dp(12) + safeTopInset
-            content.layoutParams = contentLayoutParams
-            content.setPadding(content.paddingLeft, dp(12), content.paddingRight, content.paddingBottom)
+            // Keep Back/Settings aligned to the system-bar safe area independently;
+            // the plywood panel itself is centered by contentLayoutParams.
             topActionsBar.translationY = safeTopInset.toFloat()
             insets
         }
