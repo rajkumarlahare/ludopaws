@@ -83,7 +83,13 @@ internal fun OfflineGameActivity.showSetup() {
         FrameLayout.LayoutParams(
             contentWidth,
             FrameLayout.LayoutParams.WRAP_CONTENT,
-            Gravity.TOP or Gravity.CENTER_HORIZONTAL,
+            if (isComputerMode) {
+                // Center the complete VS COMPUTER plywood panel in the mobile
+                // viewport when it fits; Pass & Play keeps its existing top flow.
+                Gravity.CENTER
+            } else {
+                Gravity.TOP or Gravity.CENTER_HORIZONTAL
+            },
         ),
     )
 
