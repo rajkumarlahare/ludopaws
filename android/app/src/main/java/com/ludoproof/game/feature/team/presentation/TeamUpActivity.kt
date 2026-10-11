@@ -1051,21 +1051,6 @@ class TeamUpActivity : Activity() {
                 canvas.drawLine(centers[index], cy, centers[index + 1], cy, paint)
             }
 
-            if (isSearching) {
-                val sourceX = centers[sourceIndex]
-                val targetX = centers[targetIndex]
-                val targetEdgeX = targetX - radius - dp(5f)
-                val reachedX = sourceX + (targetEdgeX - sourceX) * approachFraction
-                paint.color = 0xFF59DEFF.toInt()
-                paint.strokeWidth = dp(2.8f)
-                canvas.drawLine(sourceX, cy, reachedX, cy, paint)
-                paint.style = Paint.Style.FILL
-                paint.color = 0x8859DEFF.toInt()
-                canvas.drawCircle(reachedX, cy, dp(5f), paint)
-                paint.color = 0xFFE5FCFF.toInt()
-                canvas.drawCircle(reachedX, cy, dp(2.3f), paint)
-            }
-
             // Confirmed players get their production character portraits as child views.
             // Empty slots retain a neutral placeholder silhouette only.
             for (index in 0..3) {
@@ -1076,41 +1061,74 @@ class TeamUpActivity : Activity() {
                 paint.color = if (isQueued) playerColors[index] else 0xFF132A4A.toInt()
                 canvas.drawCircle(x, cy, radius, paint)
 
-                paint.style = Paint.Style.STROKE
-                paint.strokeWidth = dp(if (isTarget) 2.6f else 2f)
-                paint.color = when {
-                    isQueued -> 0xFFFFF4D1.toInt()
-                    isTarget -> 0xFF57DFFF.toInt()
-                    else -> 0xFF8CA9C7.toInt()
+                // The moving search arc is the target's outer ring.
+                // Do not draw a second, static cyan ring beneath it.
+                if (!isTarget) {
+                    paint.style = Paint.Style.STROKE
+                    paint.strokeWidth = dp(2f)
+                    paint.color = if (isQueued) 0xFFFFF4D1.toInt() else 0xFF8CA9C7.toInt()
+                    canvas.drawCircle(x, cy, radius, paint)
                 }
-                canvas.drawCircle(x, cy, radius, paint)
 
                 if (!isQueued || queuedCharacterIds.getOrNull(index) == null) {
                     drawPlayerPlaceholder(canvas, x, cy, radius, isQueued)
                 }
             }
 
-            if (isSearching && approachFraction >= 1f) {
-                val orbitRadius = radius + dp(4.5f)
+            if (isSearching) {
+                val sourceX = centers[sourceIndex]
+                val targetX = centers[targetIndex]
+                // Keep the travel endpoint and orbit on one shared path. The arc
+                // sits directly on the target's edge so it becomes the outer ring.
+                val orbitRadius = radius + dp(1f)
+                val targetEdgeX = targetX - orbitRadius
+                val approachElapsed = (now - approachStartedAt).coerceAtLeast(0L)
                 val arcBounds = android.graphics.RectF(
-                    centers[targetIndex] - orbitRadius,
+                    targetX - orbitRadius,
                     cy - orbitRadius,
-                    centers[targetIndex] + orbitRadius,
+                    targetX + orbitRadius,
                     cy + orbitRadius,
                 )
-                val angle = (now % ORBIT_DURATION_MS).toFloat() / ORBIT_DURATION_MS.toFloat() * 360f - 90f
-                val sweep = 96f
-                paint.style = Paint.Style.STROKE
-                paint.strokeCap = Paint.Cap.ROUND
-                paint.strokeWidth = dp(3.2f)
-                paint.color = 0xFF62E8FF.toInt()
-                canvas.drawArc(arcBounds, angle, sweep, false, paint)
-                val tipAngle = Math.toRadians((angle + sweep).toDouble())
-                val tipX = centers[targetIndex] + (kotlin.math.cos(tipAngle) * orbitRadius).toFloat()
-                val tipY = cy + (kotlin.math.sin(tipAngle) * orbitRadius).toFloat()
+
+                val headX: Float
+                val headY: Float
+                if (approachElapsed < APPROACH_DURATION_MS) {
+                    val approach = (approachElapsed / APPROACH_DURATION_MS.toFloat()).coerceIn(0f, 1f)
+                    headX = sourceX + (targetEdgeX - sourceX) * approach
+                    headY = cy
+
+                    paint.style = Paint.Style.STROKE
+                    paint.strokeCap = Paint.Cap.ROUND
+                    paint.strokeWidth = dp(2.8f)
+                    paint.color = 0xFF59DEFF.toInt()
+                    canvas.drawLine(sourceX, cy, headX, headY, paint)
+                } else {
+                    // At hand-off, the same light pin continues around the
+                    // target's perimeter; no leftover pin remains on the line.
+                    val orbitElapsed = approachElapsed - APPROACH_DURATION_MS
+                    val orbitProgress = (orbitElapsed % ORBIT_DURATION_MS).toFloat() / ORBIT_DURATION_MS.toFloat()
+                    val headAngle = 180f + orbitProgress * 360f
+                    val sweep = 104f * (orbitElapsed / ORBIT_ENTRY_MS.toFloat()).coerceIn(0f, 1f)
+
+                    paint.style = Paint.Style.STROKE
+                    paint.strokeCap = Paint.Cap.ROUND
+                    paint.strokeWidth = dp(2.8f)
+                    paint.color = 0xFF59DEFF.toInt()
+                    if (sweep > 0f) {
+                        canvas.drawArc(arcBounds, headAngle - sweep, sweep, false, paint)
+                    }
+                    val angleRadians = Math.toRadians(headAngle.toDouble())
+                    headX = targetX + (kotlin.math.cos(angleRadians) * orbitRadius).toFloat()
+                    headY = cy + (kotlin.math.sin(angleRadians) * orbitRadius).toFloat()
+                }
+
+                // A single, shared head makes the white pin feel attached to
+                // both the advancing line and the orbiting perimeter.
                 paint.style = Paint.Style.FILL
-                paint.color = 0xFFE4FCFF.toInt()
-                canvas.drawCircle(tipX, tipY, dp(2.6f), paint)
+                paint.color = 0x8859DEFF.toInt()
+                canvas.drawCircle(headX, headY, dp(5f), paint)
+                paint.color = 0xFFE5FCFF.toInt()
+                canvas.drawCircle(headX, headY, dp(2.3f), paint)
             }
 
             for (index in 0..3) {
@@ -1159,6 +1177,7 @@ class TeamUpActivity : Activity() {
         private companion object {
             const val APPROACH_DURATION_MS = 850L
             const val ORBIT_DURATION_MS = 1_250L
+            const val ORBIT_ENTRY_MS = 180L
         }
     }
 
