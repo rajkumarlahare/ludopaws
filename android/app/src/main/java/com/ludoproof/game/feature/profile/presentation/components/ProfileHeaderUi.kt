@@ -37,7 +37,13 @@ internal fun ProfileActivity.profileTopBar(): LinearLayout =
                 contentDescription = "Back",
                 iconName = AppIconName.CHEVRON_LEFT,
                 sizeDp = 50,
-            ) { finish() },
+            ) { finish() }.apply {
+                // Keep the Back button circular while using the shared plywood texture.
+                background = PlywoodTextureDrawable(
+                    resources.displayMetrics.density,
+                    cornerRadiusDp = 25f,
+                )
+            },
             LinearLayout.LayoutParams(dp(50), dp(50)),
         )
 
