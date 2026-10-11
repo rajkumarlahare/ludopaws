@@ -124,12 +124,14 @@ internal fun OfflineGameActivity.showSetup() {
 
     content.addView(
         Button(this).apply {
-            text = if (isComputerMode) "🐾   ▶   PLAY   🐾" else "PLAY"
-            textSize = if (isCompactSetup()) 18f else 20f
+            text = "▶  PLAY"
+            textSize = if (isCompactSetup()) 21f else 24f
+            isAllCaps = false
             LudoProofTheme.primary(this)
-            if (isComputerMode) {
-                setTextColor(0xFF693900.toInt())
-                setShadowLayer(0f, 0f, 0f, Color.TRANSPARENT)
+            contentDescription = if (isComputerMode) {
+                "Start game against computer"
+            } else {
+                "Start Pass and Play game"
             }
             setOnClickListener {
                 persistActiveCharacterSetup()
@@ -143,16 +145,13 @@ internal fun OfflineGameActivity.showSetup() {
         },
         LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
-            dp(if (isCompactSetup()) 58 else 62),
+            dp(if (isCompactSetup()) 60 else 66),
         ).apply {
+            val sideMargin = if (isCompactSetup()) dp(10) else dp(34)
             setMargins(
-                if (isComputerMode) {
-                    if (isCompactSetup()) dp(22) else dp(42)
-                } else if (isCompactSetup()) dp(10) else dp(42),
-                dp(if (isCompactSetup()) 16 else 18),
-                if (isComputerMode) {
-                    if (isCompactSetup()) dp(22) else dp(42)
-                } else if (isCompactSetup()) dp(10) else dp(42),
+                sideMargin,
+                dp(if (isCompactSetup()) 14 else 18),
+                sideMargin,
                 0,
             )
         },
