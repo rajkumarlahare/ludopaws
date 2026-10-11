@@ -1,7 +1,14 @@
 package com.ludoproof.game.ui.offline.setup
 
 import android.app.Activity
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.RectF
+import android.graphics.RadialGradient
+import android.graphics.Shader
+import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.text.SpannableString
 import android.text.Spanned
@@ -20,6 +27,9 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import com.ludoproof.game.*
+import com.ludoproof.game.core.ui.icons.AppIconName
+import com.ludoproof.game.core.ui.icons.AppIconVariant
+import com.ludoproof.game.core.ui.icons.AppIconView
 import com.ludoproof.game.feature.offline.*
 import com.ludoproof.game.ui.offline.common.*
 import com.ludoproof.game.ui.offline.gameplay.*
@@ -28,61 +38,83 @@ internal fun OfflineGameActivity.playersPanel():
     LinearLayout =
     selectionPanel(
         "SELECT PLAYERS",
-        if (
-            isComputerMode
-        ) {
+        if (isComputerMode) {
             "You + 1–3 computer players"
         } else {
-            "2–4 players on this device"
+            "Choose 2–4 players on this device."
         },
     ).apply {
-        val playersRow =
-            LinearLayout(
-                this@playersPanel,
-            ).apply {
-                orientation =
-                    LinearLayout.HORIZONTAL
-                gravity =
-                    Gravity.CENTER
-            }
-        val playerMap =
-            linkedMapOf<Int, Button>()
+        val playersRow = LinearLayout(this@playersPanel).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            clipChildren = false
+            clipToPadding = false
+        }
+        val playerMap = linkedMapOf<Int, View>()
 
         listOf(2, 3, 4).forEach { playerCount ->
-            val button =
-                tileButton(
-                    playerCount.toString() + "\nPLAYERS",
-                ) {
+            val number = TextView(this@playersPanel).apply {
+                text = playerCount.toString()
+                textSize = if (isCompactSetup()) 28f else 31f
+                setTypeface(Typeface.DEFAULT_BOLD)
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
+                includeFontPadding = false
+                setShadowLayer(2f, 0f, dp(1), 0x7A00112D)
+            }
+            val label = TextView(this@playersPanel).apply {
+                text = "PLAYERS"
+                textSize = if (isCompactSetup()) 10f else 11.5f
+                setTypeface(Typeface.DEFAULT_BOLD)
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
+                includeFontPadding = false
+            }
+            val tile = LinearLayout(this@playersPanel).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                clipChildren = false
+                clipToPadding = false
+                setPadding(dp(4), dp(5), dp(4), dp(6))
+                isClickable = true
+                isFocusable = true
+                contentDescription = "$playerCount players"
+                addView(
+                    SetupPlayerCountIconView(this@playersPanel, playerCount),
+                    LinearLayout.LayoutParams(
+                        dp(if (isCompactSetup()) 42 else 46),
+                        dp(30),
+                    ),
+                )
+                addView(
+                    number,
+                    LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        dp(31),
+                    ),
+                )
+                addView(
+                    label,
+                    LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                    ),
+                )
+                setOnClickListener {
                     updateSelectedPlayerCount(playerCount)
                 }
-            val numberLength = playerCount.toString().length
-            button.text =
-                SpannableString(playerCount.toString() + "\nPLAYERS").apply {
-                    setSpan(
-                        RelativeSizeSpan(1.6f),
-                        0,
-                        numberLength,
-                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
-                    )
-                    setSpan(
-                        StyleSpan(Typeface.BOLD),
-                        0,
-                        numberLength,
-                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
-                    )
-                }
-            button.contentDescription = playerCount.toString() + " players"
-            playerMap[playerCount] = button
+            }
+            playerMap[playerCount] = tile
             playersRow.addView(
-                button,
+                tile,
                 setupTileParams(
                     if (isCompactSetup()) 98 else 106,
+                    marginDp = if (isCompactSetup()) 3 else 5,
                 ),
             )
         }
 
-        playerButtons =
-            playerMap
+        playerButtons = playerMap
         addView(playersRow)
     }
 
@@ -90,105 +122,72 @@ internal fun OfflineGameActivity.colorPanel():
     LinearLayout =
     selectionPanel(
         "CHOOSE YOUR COLOR",
-        "Your color will rotate to the bottom-left side",
+        "Your color will rotate to the bottom-left side.",
     ).apply {
-        val colorRow =
-            LinearLayout(
-                this@colorPanel,
-            ).apply {
-                orientation =
-                    LinearLayout.HORIZONTAL
-                gravity =
-                    Gravity.CENTER
-            }
+        val colorRow = LinearLayout(this@colorPanel).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            clipChildren = false
+            clipToPadding = false
+        }
 
-        val colors =
-            linkedMapOf(
-                "BLUE" to
-                    0xFF298DFF.toInt(),
-                "RED" to
-                    0xFFF22E35.toInt(),
-                "GREEN" to
-                    0xFF1FB257.toInt(),
-                "YELLOW" to
-                    0xFFFFD324.toInt(),
-            )
+        val colors = linkedMapOf(
+            "BLUE" to 0xFF167BFF.toInt(),
+            "RED" to 0xFFF22E35.toInt(),
+            "GREEN" to 0xFF22C653.toInt(),
+            "YELLOW" to 0xFFFFD324.toInt(),
+        )
+        val colorMap = linkedMapOf<String, View>()
 
-        val colorMap =
-            linkedMapOf<String, View>()
+        colors.forEach { entry ->
+            val colorTile = LinearLayout(this@colorPanel).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                clipChildren = false
+                clipToPadding = false
+                setPadding(dp(3), dp(5), dp(3), dp(5))
+                isClickable = true
+                isFocusable = true
+                contentDescription = "${entry.key.lowercase().replaceFirstChar(Char::uppercase)} color"
 
-        colors.forEach {
-                entry ->
-            val button: View =
-                if (isComputerMode) {
-                    LinearLayout(this@colorPanel).apply {
-                        orientation = LinearLayout.VERTICAL
+                addView(
+                    SetupColorOrbView(this@colorPanel, entry.value),
+                    LinearLayout.LayoutParams(
+                        dp(if (isCompactSetup()) 48 else 56),
+                        dp(if (isCompactSetup()) 48 else 56),
+                    ),
+                )
+                addView(
+                    TextView(this@colorPanel).apply {
+                        text = entry.key
+                        textSize = if (isCompactSetup()) 10f else 11.5f
+                        setTypeface(Typeface.DEFAULT_BOLD)
+                        setTextColor(Color.WHITE)
                         gravity = Gravity.CENTER
-                        setPadding(dp(4), dp(5), dp(4), dp(5))
-                        isClickable = true
-                        isFocusable = true
-                        elevation = dp(3).toFloat()
-                        addView(
-                            View(this@colorPanel).apply {
-                                background =
-                                    GradientDrawable(
-                                        GradientDrawable.Orientation.TOP_BOTTOM,
-                                        intArrayOf(
-                                            blendWithWhite(entry.value, 0.38f),
-                                            entry.value,
-                                            blendWithBlack(entry.value, 0.18f),
-                                        ),
-                                    ).apply {
-                                        shape = GradientDrawable.OVAL
-                                        setStroke(dp(2), 0x99FFFFFF.toInt())
-                                    }
-                            },
-                            LinearLayout.LayoutParams(dp(42), dp(42)),
-                        )
-                        addView(
-                            TextView(this@colorPanel).apply {
-                                text = entry.key
-                                textSize = if (isCompactSetup()) 11f else 12f
-                                setTypeface(android.graphics.Typeface.DEFAULT_BOLD)
-                                setTextColor(entry.value)
-                                gravity = Gravity.CENTER
-                                setPadding(0, dp(3), 0, 0)
-                            },
-                        )
-                        setOnClickListener {
-                            selectedColor = entry.key
-                            refreshSetupSelections()
-                        }
-                    }
-                } else {
-                    Button(this@colorPanel).apply {
-                        text = "●\n${entry.key}"
-                        textSize = if (isCompactSetup()) 13f else 14f
-                        setTextColor(entry.value)
-                        gravity = Gravity.CENTER
-                        setPadding(dp(2), dp(6), dp(2), dp(6))
-                        setOnClickListener {
-                            selectedColor = entry.key
-                            refreshSetupSelections()
-                        }
-                    }
+                        includeFontPadding = false
+                        setPadding(0, dp(4), 0, 0)
+                    },
+                    LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                    ),
+                )
+                setOnClickListener {
+                    selectedColor = entry.key
+                    refreshSetupSelections()
                 }
-            colorMap[entry.key] =
-                button
+            }
+            colorMap[entry.key] = colorTile
             colorRow.addView(
-                button,
+                colorTile,
                 setupTileParams(
-                    if (isComputerMode) {
-                        if (isCompactSetup()) 90 else 98
-                    } else if (isCompactSetup()) 86 else 94,
-                    marginDp =
-                        if (isCompactSetup()) 3 else 5,
+                    if (isCompactSetup()) 94 else 104,
+                    marginDp = if (isCompactSetup()) 3 else 5,
                 ),
             )
         }
 
-        colorButtons =
-            colorMap
+        colorButtons = colorMap
         addView(colorRow)
     }
 
@@ -287,77 +286,88 @@ internal fun OfflineGameActivity.localTrustStrip():
 internal fun OfflineGameActivity.selectionPanel(
     title: String,
     subtitle: String,
-): LinearLayout =
+):
+    LinearLayout =
     LudoProofTheme.panel(this).apply {
         setPadding(
-            dp(if (isCompactSetup()) 12 else 14),
-            dp(if (isCompactSetup()) 12 else 14),
-            dp(if (isCompactSetup()) 12 else 14),
-            dp(if (isCompactSetup()) 12 else 14),
+            dp(if (isCompactSetup()) 10 else 14),
+            dp(if (isCompactSetup()) 10 else 14),
+            dp(if (isCompactSetup()) 10 else 14),
+            dp(if (isCompactSetup()) 10 else 14),
         )
-        if (isComputerMode) {
-            background = LudoProofTheme.darkPanelDrawable(this@selectionPanel)
-        }
+        // The setup reference uses one deep navy/cyan visual language for
+        // Pass & Play and Computer, while their actual setup rules stay separate.
+        background = LudoProofTheme.darkPanelDrawable(this@selectionPanel)
 
-        addView(
-            TextView(this@selectionPanel).apply {
-                text =
-                    if (isComputerMode) {
-                        when (title) {
-                            "CHOOSE YOUR PAW",
-                            "SELECT PLAYERS",
-                            "CHOOSE YOUR COLOR",
-                            -> title
-                            else -> title
-                        }
-                    } else {
-                        title
-                    }
-                LudoProofTheme.title(
-                    this,
-                    if (isCompactSetup()) 17f else 19f,
+        val heading = LinearLayout(this@selectionPanel).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            val sectionIcon: View = when (title) {
+                "SELECT PLAYERS" -> AppIconView(
+                    this@selectionPanel,
+                    AppIconName.PEOPLE,
+                    iconTint = 0xFF83C9FF.toInt(),
+                    iconVariant = AppIconVariant.FILLED,
+                    strokeWidthDp = 2f,
                 )
-                if (isComputerMode) {
-                    gravity = Gravity.CENTER
-                    val highlightedWord =
-                        when (title) {
-                            "CHOOSE YOUR PAW" -> "PAW"
-                            "SELECT PLAYERS" -> "PLAYERS"
-                            "CHOOSE YOUR COLOR" -> "COLOR"
-                            else -> null
+                "CHOOSE YOUR COLOR" -> SetupPaletteIconView(this@selectionPanel)
+                else -> SetupPawIconView(this@selectionPanel)
+            }
+            addView(
+                sectionIcon,
+                LinearLayout.LayoutParams(
+                    dp(if (isCompactSetup()) 30 else 36),
+                    dp(if (isCompactSetup()) 30 else 36),
+                ).apply {
+                    marginEnd = dp(7)
+                },
+            )
+
+            val highlightedWord = when (title) {
+                "CHOOSE YOUR PAW" -> "PAW"
+                "SELECT PLAYERS" -> "PLAYERS"
+                "CHOOSE YOUR COLOR" -> "COLOR"
+                else -> null
+            }
+            addView(
+                TextView(this@selectionPanel).apply {
+                    text = SpannableString(title).apply {
+                        val wordStart = highlightedWord?.let(title::lastIndexOf) ?: -1
+                        if (wordStart >= 0 && highlightedWord != null) {
+                            setSpan(
+                                ForegroundColorSpan(LudoProofTheme.GOLD),
+                                wordStart,
+                                wordStart + highlightedWord.length,
+                                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+                            )
                         }
-                    val wordStart =
-                        highlightedWord?.let(title::lastIndexOf) ?: -1
-                    if (wordStart >= 0 && highlightedWord != null) {
-                        text =
-                            SpannableString(title).apply {
-                                setSpan(
-                                    ForegroundColorSpan(LudoProofTheme.GOLD),
-                                    wordStart,
-                                    wordStart + highlightedWord.length,
-                                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
-                                )
-                            }
                     }
-                }
-            },
-        )
+                    textSize = if (isCompactSetup()) 17f else 19f
+                    setTypeface(Typeface.DEFAULT_BOLD)
+                    setTextColor(Color.WHITE)
+                    gravity = Gravity.CENTER_VERTICAL
+                    includeFontPadding = false
+                    setShadowLayer(3f, 0f, dp(1), 0xB0000000.toInt())
+                },
+            )
+        }
+        addView(heading)
 
         addView(
             TextView(this@selectionPanel).apply {
-                text =
-                    subtitle
+                text = subtitle
                 LudoProofTheme.body(
                     this,
-                    11f,
+                    if (isCompactSetup()) 10.5f else 11.5f,
                     centered = true,
+                    bright = true,
                 )
-                if (isComputerMode) setTextColor(0xFFC5DEFF.toInt())
+                setTextColor(0xFFD4E8FF.toInt())
                 setPadding(
                     0,
-                    dp(2),
+                    dp(3),
                     0,
-                    dp(11),
+                    dp(if (isCompactSetup()) 8 else 11),
                 )
             },
         )
@@ -500,28 +510,34 @@ private fun setupColor(name: String): Int =
     }
 
 internal fun OfflineGameActivity.refreshSetupSelections() {
-    if (playerButtons.isNotEmpty()) {
-        playerButtons.forEach { entry ->
-            if (entry.key == selectedPlayers) {
-                LudoProofTheme.selectedTile(entry.value)
-            } else {
-                LudoProofTheme.normalTile(entry.value)
-            }
+    playerButtons.forEach { (playerCount, tile) ->
+        val selected = playerCount == selectedPlayers
+        if (selected) {
+            LudoProofTheme.selectedTile(tile)
+        } else {
+            LudoProofTheme.normalTile(tile)
+        }
+        (tile as? LinearLayout)?.let { content ->
+            (content.getChildAt(0) as? SetupPlayerCountIconView)?.isSelectedIcon = selected
+            (content.getChildAt(1) as? TextView)?.setTextColor(
+                if (selected) 0xFF062B68.toInt() else Color.WHITE,
+            )
+            (content.getChildAt(2) as? TextView)?.setTextColor(
+                if (selected) 0xFF062B68.toInt() else Color.WHITE,
+            )
         }
     }
-    if (colorButtons.isNotEmpty()) {
-        colorButtons.forEach { entry ->
-            val selected = entry.key == selectedColor
-            if (selected) {
-                LudoProofTheme.selectedTile(entry.value)
-            } else {
-                LudoProofTheme.normalTile(entry.value)
-            }
-            ((entry.value as? LinearLayout)?.getChildAt(1) as? TextView)
-                ?.setTextColor(
-                    if (selected) 0xFF052A68.toInt() else setupColor(entry.key),
-                )
+
+    colorButtons.forEach { (colorName, tile) ->
+        val selected = colorName == selectedColor
+        if (selected) {
+            LudoProofTheme.selectedTile(tile)
+        } else {
+            LudoProofTheme.normalTile(tile)
         }
+        ((tile as? LinearLayout)?.getChildAt(1) as? TextView)?.setTextColor(
+            if (selected) 0xFF052A68.toInt() else Color.WHITE,
+        )
     }
 
     refreshCharacterSelectionUi()
@@ -554,3 +570,207 @@ internal fun OfflineGameActivity.setupTileParams(
             0,
         )
     }
+
+
+private class SetupPawIconView(context: android.content.Context) : View(context) {
+    private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF75B9FF.toInt() }
+
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        val size = minOf(width, height).toFloat()
+        if (size <= 0f) return
+        canvas.save()
+        canvas.translate((width - size) / 2f, (height - size) / 2f)
+        canvas.scale(size / 100f, size / 100f)
+        canvas.drawOval(RectF(22f, 48f, 78f, 91f), fill)
+        canvas.drawOval(RectF(8f, 29f, 29f, 52f), fill)
+        canvas.drawOval(RectF(30f, 13f, 49f, 39f), fill)
+        canvas.drawOval(RectF(53f, 13f, 72f, 39f), fill)
+        canvas.drawOval(RectF(72f, 29f, 93f, 52f), fill)
+        canvas.restore()
+    }
+}
+
+private class SetupPaletteIconView(context: android.content.Context) : View(context) {
+    private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        val size = minOf(width, height).toFloat()
+        if (size <= 0f) return
+        canvas.save()
+        canvas.translate((width - size) / 2f, (height - size) / 2f)
+        canvas.scale(size / 100f, size / 100f)
+
+        val palette = Path().apply {
+            moveTo(49f, 12f)
+            cubicTo(24f, 10f, 11f, 28f, 13f, 49f)
+            cubicTo(15f, 71f, 34f, 87f, 55f, 82f)
+            cubicTo(66f, 79f, 58f, 68f, 57f, 61f)
+            cubicTo(55f, 53f, 62f, 48f, 70f, 51f)
+            cubicTo(86f, 58f, 93f, 43f, 83f, 27f)
+            cubicTo(75f, 15f, 62f, 12f, 49f, 12f)
+            close()
+        }
+        fill.shader = RadialGradient(
+            34f, 28f, 72f,
+            intArrayOf(0xFFBCEBFF.toInt(), 0xFF55A6F8.toInt(), 0xFF1264D3.toInt()),
+            floatArrayOf(0f, 0.58f, 1f),
+            Shader.TileMode.CLAMP,
+        )
+        canvas.drawPath(palette, fill)
+        fill.shader = null
+        stroke.color = 0xFFBCEBFF.toInt()
+        stroke.strokeWidth = 2.6f
+        canvas.drawPath(palette, stroke)
+
+        fill.color = 0xFF073276.toInt()
+        canvas.drawCircle(35f, 31f, 5.5f, fill)
+        canvas.drawCircle(54f, 25f, 5.5f, fill)
+        canvas.drawCircle(69f, 35f, 5.5f, fill)
+        fill.color = 0xFFFFD13B.toInt()
+        canvas.drawCircle(38f, 52f, 5.5f, fill)
+        fill.color = 0xFF72E9FF.toInt()
+        canvas.drawCircle(55f, 45f, 5.5f, fill)
+        canvas.restore()
+    }
+}
+
+private class SetupPlayerCountIconView(
+    context: android.content.Context,
+    private val personCount: Int,
+) : View(context) {
+    private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val outline = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 2f
+    }
+
+    var isSelectedIcon: Boolean = false
+        set(value) {
+            field = value
+            invalidate()
+        }
+
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        val w = width.toFloat()
+        val h = height.toFloat()
+        if (w <= 0f || h <= 0f) return
+        val positions = when (personCount) {
+            2 -> listOf(0.34f, 0.66f)
+            3 -> listOf(0.23f, 0.50f, 0.77f)
+            else -> listOf(0.17f, 0.39f, 0.61f, 0.83f)
+        }
+        val radius = minOf(h * 0.25f, w / (positions.size * 2.8f))
+        positions.forEachIndexed { index, fraction ->
+            val cx = w * fraction
+            val headY = h * (if (personCount >= 3 && index % 2 == 1) 0.30f else 0.34f)
+            val bodyTop = headY + radius * 0.75f
+            val bodyWidth = radius * 1.85f
+            val bodyBottom = h * 0.97f
+
+            fill.shader = null
+            fill.color = 0x55001A46
+            canvas.drawOval(
+                RectF(cx - bodyWidth * 0.62f, bodyTop + 1f, cx + bodyWidth * 0.62f, bodyBottom + 1f),
+                fill,
+            )
+
+            if (isSelectedIcon) {
+                fill.color = 0xFF07316F.toInt()
+            } else {
+                fill.shader = RadialGradient(
+                    cx - radius * 0.35f, headY - radius * 0.38f, radius * 2.3f,
+                    intArrayOf(0xFFE6FBFF.toInt(), 0xFF83C7FF.toInt(), 0xFF2878D9.toInt()),
+                    null,
+                    Shader.TileMode.CLAMP,
+                )
+            }
+            canvas.drawCircle(cx, headY, radius, fill)
+            fill.shader = null
+
+            val body = RectF(
+                cx - bodyWidth / 2f,
+                bodyTop,
+                cx + bodyWidth / 2f,
+                bodyBottom,
+            )
+            if (isSelectedIcon) {
+                fill.color = 0xFF07316F.toInt()
+            } else {
+                fill.shader = android.graphics.LinearGradient(
+                    body.left, body.top, body.right, body.bottom,
+                    intArrayOf(0xFFB3E3FF.toInt(), 0xFF64ABF8.toInt(), 0xFF145CC4.toInt()),
+                    null,
+                    Shader.TileMode.CLAMP,
+                )
+            }
+            canvas.drawRoundRect(body, radius * 0.6f, radius * 0.6f, fill)
+            fill.shader = null
+
+            if (!isSelectedIcon) {
+                outline.color = 0xDFFFFFFF.toInt()
+                outline.strokeWidth = 0.7f
+                canvas.drawCircle(cx, headY, radius, outline)
+                canvas.drawRoundRect(body, radius * 0.6f, radius * 0.6f, outline)
+            }
+        }
+    }
+}
+
+private class SetupColorOrbView(
+    context: android.content.Context,
+    private val baseColor: Int,
+) : View(context) {
+    private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+    }
+    private val shine = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xA8FFFFFF.toInt() }
+
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        val diameter = minOf(width, height).toFloat()
+        if (diameter <= 0f) return
+        val radius = diameter * 0.42f
+        val cx = width * 0.5f
+        val cy = height * 0.49f
+
+        fill.shader = null
+        fill.color = 0x7000183B
+        fill.setShadowLayer(dp(3f), 0f, dp(2f), 0x9900102D.toInt())
+        canvas.drawCircle(cx, cy + dp(1f), radius * 1.03f, fill)
+        fill.clearShadowLayer()
+
+        fill.shader = RadialGradient(
+            cx - radius * 0.38f,
+            cy - radius * 0.43f,
+            radius * 1.55f,
+            intArrayOf(blendWithWhite(baseColor, 0.68f), baseColor, blendWithBlack(baseColor, 0.48f)),
+            floatArrayOf(0f, 0.46f, 1f),
+            Shader.TileMode.CLAMP,
+        )
+        canvas.drawCircle(cx, cy, radius, fill)
+        fill.shader = null
+
+        stroke.color = 0xDFFFFFFF.toInt()
+        stroke.strokeWidth = dp(1.2f)
+        canvas.drawCircle(cx, cy, radius, stroke)
+
+        shine.alpha = 200
+        canvas.drawOval(
+            RectF(cx - radius * 0.62f, cy - radius * 0.67f, cx - radius * 0.02f, cy - radius * 0.30f),
+            shine,
+        )
+        shine.alpha = 95
+        canvas.drawCircle(cx - radius * 0.48f, cy - radius * 0.43f, radius * 0.09f, shine)
+    }
+
+    private fun dp(value: Float): Float = value * resources.displayMetrics.density
+}
