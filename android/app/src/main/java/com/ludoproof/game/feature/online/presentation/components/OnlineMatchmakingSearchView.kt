@@ -210,24 +210,19 @@ internal class MatchmakingOpponentRailView(
                     index ==
                     foundOpponents
 
+            // Match the Profile page's translucent blue surface (#33104483).
+            // The outer recessed plywood pocket remains on the parent container.
             cardFill.color =
-                if (
-                    found
-                ) {
-                    0xD90A4385.toInt()
-                } else {
-                    0xB8072356.toInt()
-                }
+                0x33104483
             border.color =
                 when {
+                    // Keep a green outline only for a slot whose opponent is found.
                     found ->
                         0xFF62ED91.toInt()
 
-                    activeSearchSlot ->
-                        0xFFFFD45E.toInt()
-
+                    // Searching and waiting slots use the Profile page's blue stroke.
                     else ->
-                        0x7753DFFF
+                        0xFF247FCB.toInt()
                 }
 
             canvas.drawRoundRect(
