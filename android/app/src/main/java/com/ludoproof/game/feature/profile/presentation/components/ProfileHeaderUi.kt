@@ -7,8 +7,6 @@ import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
-import android.widget.ImageButton
-import android.widget.ImageView
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -222,7 +220,7 @@ internal fun ProfileActivity.profileIdentityPanel(profile: ProfileSnapshot): Lin
                 if (!playGamesSignInInProgress && !playGamesAuthenticated) {
                     val playGamesIcon = context.getDrawable(com.ludoproof.game.R.drawable.ic_google_play_games)?.mutate()
                     playGamesIcon?.setBounds(0, 0, dp(18), dp(18))
-                    setCompoundDrawables(playGamesIcon, null, null, null)
+                    setCompoundDrawablesRelative(playGamesIcon, null, null, null)
                     compoundDrawablePadding = dp(2)
                 } else {
                     setCompoundDrawablesWithIntrinsicBounds(0, 0, 0, 0)
@@ -247,7 +245,10 @@ internal fun ProfileActivity.profileIdentityPanel(profile: ProfileSnapshot): Lin
                 setOnClickListener { beginPlayGamesSignIn() }
                 AppFocusRing.apply(this, cornerRadiusDp = 13f)
             },
-            LinearLayout.LayoutParams(dp(126), dp(38)),
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                dp(38),
+            ),
         )
         details.addView(signInRow)
 
@@ -280,20 +281,18 @@ internal fun ProfileActivity.profileIdentityPanel(profile: ProfileSnapshot): Lin
             LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT),
         )
         nameRow.addView(
-            ImageButton(this@profileIdentityPanel).apply {
-                setImageResource(com.ludoproof.game.R.drawable.ic_profile_edit_pen)
-                scaleType = ImageView.ScaleType.CENTER_INSIDE
-                setPadding(dp(5), dp(5), dp(5), dp(5))
-                background = LudoProofTheme.rounded(
-                    0x3327C6F4,
-                    8f,
-                    0xAA55DFFF.toInt(),
-                    1f,
-                    this@profileIdentityPanel,
-                )
+            TextView(this@profileIdentityPanel).apply {
+                text = "✏️"
+                textSize = 18f
+                gravity = Gravity.CENTER
+                includeFontPadding = false
+                isClickable = true
+                isFocusable = true
+                setPadding(dp(2), dp(2), dp(2), dp(2))
+                background = null
                 contentDescription = "Edit profile name"
                 setOnClickListener { showNameEditor() }
-                AppFocusRing.apply(this, cornerRadiusDp = 8f)
+                AppFocusRing.apply(this, cornerRadiusDp = 15f)
             },
             LinearLayout.LayoutParams(dp(30), dp(30)).apply { marginStart = dp(5) },
         )
