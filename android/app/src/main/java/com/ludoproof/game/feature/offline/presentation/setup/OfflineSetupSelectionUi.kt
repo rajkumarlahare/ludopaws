@@ -1,6 +1,5 @@
 package com.ludoproof.game.ui.offline.setup
 
-import android.app.Activity
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -9,22 +8,13 @@ import android.graphics.RectF
 import android.graphics.RadialGradient
 import android.graphics.Shader
 import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.style.ForegroundColorSpan
-import android.text.style.RelativeSizeSpan
-import android.text.style.StyleSpan
-import android.graphics.Typeface
-import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
-import android.widget.FrameLayout
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.widget.TextView
 import com.ludoproof.game.*
 import com.ludoproof.game.core.ui.icons.AppIconName
@@ -32,7 +22,6 @@ import com.ludoproof.game.core.ui.icons.AppIconVariant
 import com.ludoproof.game.core.ui.icons.AppIconView
 import com.ludoproof.game.feature.offline.*
 import com.ludoproof.game.ui.offline.common.*
-import com.ludoproof.game.ui.offline.gameplay.*
 
 internal fun OfflineGameActivity.playersPanel():
     LinearLayout =
@@ -60,7 +49,7 @@ internal fun OfflineGameActivity.playersPanel():
                 setTextColor(Color.WHITE)
                 gravity = Gravity.CENTER
                 includeFontPadding = false
-                setShadowLayer(2f, 0f, dp(1), 0x7A00112D)
+                setShadowLayer(2f, 0f, dp(1).toFloat(), 0x7A00112D)
             }
             val label = TextView(this@playersPanel).apply {
                 text = "PLAYERS"
