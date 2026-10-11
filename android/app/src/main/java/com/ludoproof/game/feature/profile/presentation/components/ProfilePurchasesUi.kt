@@ -135,16 +135,6 @@ private class PlywoodTextureDrawable(
     }
     private var drawableAlpha = 255
 
-    private val boardWidthsDp = floatArrayOf(62f, 70f, 66f, 74f, 60f, 68f)
-    private val boardPalettes = arrayOf(
-        intArrayOf(0xFFF2D49D.toInt(), 0xFFE4B978.toInt(), 0xFFC78D4F.toInt(), 0xFFE9C58B.toInt()),
-        intArrayOf(0xFFEAC38A.toInt(), 0xFFD5A263.toInt(), 0xFFB97C42.toInt(), 0xFFE0B474.toInt()),
-        intArrayOf(0xFFF5DCA8.toInt(), 0xFFE9C487.toInt(), 0xFFC88C4F.toInt(), 0xFFE7BD7E.toInt()),
-        intArrayOf(0xFFE4B87B.toInt(), 0xFFD09A5A.toInt(), 0xFFAC713C.toInt(), 0xFFDBAD70.toInt()),
-        intArrayOf(0xFFF0D09A.toInt(), 0xFFE0B476.toInt(), 0xFFC48A4E.toInt(), 0xFFE5BC80.toInt()),
-        intArrayOf(0xFFE8C087.toInt(), 0xFFD9A968.toInt(), 0xFFB67A43.toInt(), 0xFFDDB176.toInt()),
-    )
-
     override fun draw(canvas: Canvas) {
         val b = RectF(bounds)
         if (b.width() <= 0f || b.height() <= 0f) return
@@ -175,97 +165,95 @@ private class PlywoodTextureDrawable(
         canvas.drawRect(b, fill)
         fill.shader = null
 
-        var x = b.left
-        var boardIndex = 0
-        while (x < b.right) {
-            val width = minOf(boardWidthsDp[boardIndex % boardWidthsDp.size] * density, b.right - x)
-            val palette = boardPalettes[boardIndex % boardPalettes.size]
-            val boardRect = RectF(x, b.top, x + width, b.bottom)
-
-            fill.shader = LinearGradient(
-                boardRect.left,
-                boardRect.top,
-                boardRect.right,
-                boardRect.top,
-                palette,
-                floatArrayOf(0f, 0.24f, 0.70f, 1f),
-                Shader.TileMode.CLAMP,
-            )
-            canvas.drawRect(boardRect, fill)
-            fill.shader = null
-
-            // Dark seam and a narrow reflected edge make each plank read as wood.
-            fill.color = Color.argb(88, 91, 48, 22)
-            canvas.drawRect(
-                x,
-                b.top,
-                minOf(x + 1.25f * density, b.right),
-                b.bottom,
-                fill,
-            )
-            fill.color = Color.argb(100, 255, 235, 190)
-            canvas.drawRect(
-                minOf(x + 2f * density, b.right),
-                b.top,
-                minOf(x + 2.7f * density, b.right),
-                b.bottom,
-                fill,
-            )
-
-            // Fine, slightly wandering vertical grain lines with restrained contrast.
-            for (grainIndex in 0..4) {
-                val gx = x + width * (0.14f + grainIndex * 0.17f)
-                if (gx >= b.right) continue
-                val wave = density * (1.1f + ((boardIndex + grainIndex) % 3) * 0.65f)
-                val yShift = ((boardIndex * 17 + grainIndex * 23) % 43) * density
-                val grain = Path().apply {
-                    moveTo(gx, b.top - yShift * 0.15f)
-                    cubicTo(
-                        gx + wave,
-                        b.top + b.height() * 0.22f,
-                        gx - wave * 0.75f,
-                        b.top + b.height() * 0.43f,
-                        gx + wave * 0.25f,
-                        b.top + b.height() * 0.61f,
-                    )
-                    cubicTo(
-                        gx + wave * 0.7f,
-                        b.top + b.height() * 0.77f,
-                        gx - wave * 0.45f,
-                        b.bottom - yShift * 0.12f,
-                        gx + wave * 0.10f,
-                        b.bottom,
-                    )
-                }
-                line.color = if (grainIndex % 2 == 0) {
-                    Color.argb(42, 111, 62, 31)
-                } else {
-                    Color.argb(35, 255, 237, 194)
-                }
-                line.strokeWidth = (if (grainIndex % 2 == 0) 0.7f else 0.55f) * density
-                canvas.drawPath(grain, line)
-            }
-
-            // Occasional tiny knots, drawn as natural low-contrast curved rings.
-            if (boardIndex % 3 == 1 && width > 28f * density && b.height() > 70f * density) {
-                val knotX = x + width * 0.58f
-                val knotY = b.top + b.height() * (if (boardIndex % 2 == 0) 0.38f else 0.68f)
-                line.color = Color.argb(62, 119, 65, 32)
-                line.strokeWidth = 0.85f * density
-                canvas.drawOval(
-                    RectF(knotX - 3.2f * density, knotY - 7f * density, knotX + 3.2f * density, knotY + 7f * density),
-                    line,
+        // Continuous plywood sheet: avoid repeated plank blocks or hard vertical seams.
+        // The reference has organic wood grain, not separate boards.
+        val grainCount = 25
+        for (index in 0 until grainCount) {
+            val fraction = (index + 0.35f + (index % 4) * 0.11f) / grainCount
+            val gx = b.left + b.width() * fraction
+            val wave = density * (1.8f + (index % 5) * 0.8f)
+            val driftA = ((index * 13) % 17 - 8) * density
+            val driftB = ((index * 7) % 13 - 6) * density
+            val grain = Path().apply {
+                moveTo(gx + driftA * 0.15f, b.top)
+                cubicTo(
+                    gx - wave,
+                    b.top + b.height() * 0.18f,
+                    gx + wave * 0.55f + driftA,
+                    b.top + b.height() * 0.34f,
+                    gx + driftB,
+                    b.top + b.height() * 0.51f,
                 )
-                line.color = Color.argb(42, 255, 232, 181)
-                line.strokeWidth = 0.65f * density
-                canvas.drawOval(
-                    RectF(knotX - 1.6f * density, knotY - 4f * density, knotX + 1.6f * density, knotY + 4f * density),
-                    line,
+                cubicTo(
+                    gx - wave * 0.7f + driftB,
+                    b.top + b.height() * 0.70f,
+                    gx + wave * 0.8f + driftA * 0.25f,
+                    b.top + b.height() * 0.84f,
+                    gx + driftA * 0.1f,
+                    b.bottom,
                 )
             }
+            line.color = when (index % 4) {
+                0 -> Color.argb(22, 112, 66, 32)
+                1 -> Color.argb(15, 255, 241, 205)
+                2 -> Color.argb(18, 128, 76, 35)
+                else -> Color.argb(12, 255, 240, 205)
+            }
+            line.strokeWidth = (if (index % 5 == 0) 1.05f else 0.6f) * density
+            canvas.drawPath(grain, line)
+        }
 
-            x += width
-            boardIndex += 1
+        // A few faint, irregular grain streaks add natural plywood variation
+        // without the regular spacing that made the previous version look striped.
+        for (index in 0 until 8) {
+            val yOffset = b.height() * (0.08f + (index * 0.113f))
+            val gx = b.left + b.width() * (((index * 19) % 83) / 100f + 0.04f)
+            val streak = Path().apply {
+                moveTo(gx, b.top + yOffset)
+                cubicTo(
+                    gx + density * (4f + index % 3),
+                    b.top + yOffset + density * 2f,
+                    gx - density * (5f + index % 4),
+                    b.top + yOffset + density * 4f,
+                    gx + density * 2f,
+                    b.top + yOffset + density * 6f,
+                )
+            }
+            line.color = Color.argb(13, 119, 71, 36)
+            line.strokeWidth = 0.55f * density
+            canvas.drawPath(streak, line)
+        }
+
+        // Tiny low-contrast wood knots, spaced irregularly and without plank seams.
+        if (b.width() > 150f * density && b.height() > 70f * density) {
+            val knots = listOf(
+                (b.left + b.width() * 0.24f) to (b.top + b.height() * 0.31f),
+                (b.left + b.width() * 0.73f) to (b.top + b.height() * 0.72f),
+            )
+            knots.forEachIndexed { index, (knotX, knotY) ->
+                line.color = Color.argb(24, 119, 65, 32)
+                line.strokeWidth = 0.7f * density
+                canvas.drawOval(
+                    RectF(
+                        knotX - 2.4f * density,
+                        knotY - 4.8f * density,
+                        knotX + 2.4f * density,
+                        knotY + 4.8f * density,
+                    ),
+                    line,
+                )
+                line.color = Color.argb(18, 255, 232, 181)
+                line.strokeWidth = 0.55f * density
+                canvas.drawOval(
+                    RectF(
+                        knotX - 1.1f * density,
+                        knotY - 2.4f * density,
+                        knotX + 1.1f * density,
+                        knotY + 2.4f * density,
+                    ),
+                    line,
+                )
+            }
         }
 
         canvas.restore()
