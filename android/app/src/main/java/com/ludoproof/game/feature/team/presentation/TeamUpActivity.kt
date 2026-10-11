@@ -385,7 +385,7 @@ class TeamUpActivity : Activity() {
                         0xFFB62D36.toInt(),
                     ),
                 ).apply {
-                    cornerRadius = dp(10f).toFloat()
+                    cornerRadius = dp(10).toFloat()
                     setStroke(dp(1), 0xFFE56A70.toInt())
                 }
                 minWidth = dp(108)
