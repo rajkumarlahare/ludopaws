@@ -1,10 +1,7 @@
 package com.ludoproof.game.feature.profile.presentation
 
 import android.app.Activity
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.Gravity
@@ -20,8 +17,6 @@ import com.ludoproof.game.feature.profile.data.local.ProfileStore
 import com.ludoproof.game.feature.profile.presentation.components.profileBadgesPanel
 import com.ludoproof.game.feature.profile.presentation.components.profileIdentityPanel
 import com.ludoproof.game.feature.profile.presentation.components.profileModeStatsPanel
-import com.ludoproof.game.feature.profile.presentation.components.profilePawIdentityPanel
-import com.ludoproof.game.feature.profile.presentation.components.profilePlayGamesPanel
 import com.ludoproof.game.feature.profile.presentation.components.profilePurchasesPanel
 import com.ludoproof.game.feature.profile.presentation.components.profileTopBar
 
@@ -39,75 +34,6 @@ class ProfileActivity : Activity() {
 
     internal val profileStore by lazy {
         ProfileStore(this)
-    }
-
-    internal val profilePhotoUri: String?
-        get() = getSharedPreferences(PHOTO_PREFS, MODE_PRIVATE)
-            .getString(KEY_PROFILE_PHOTO_URI, null)
-
-    private var decodedProfilePhotoUri: String? = null
-    private var decodedProfilePhoto: Bitmap? = null
-
-    internal fun loadProfilePhoto(uriString: String): Bitmap? {
-        if (decodedProfilePhotoUri == uriString) return decodedProfilePhoto
-
-        val bitmap = runCatching {
-            val uri = Uri.parse(uriString)
-            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            contentResolver.openInputStream(uri)?.use {
-                BitmapFactory.decodeStream(it, null, bounds)
-            }
-            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
-                return@runCatching null
-            }
-
-            var sampleSize = 1
-            while (
-                bounds.outWidth / sampleSize > PHOTO_MAX_DIMENSION ||
-                bounds.outHeight / sampleSize > PHOTO_MAX_DIMENSION
-            ) {
-                sampleSize *= 2
-            }
-
-            val options = BitmapFactory.Options().apply {
-                inSampleSize = sampleSize
-            }
-            contentResolver.openInputStream(uri)?.use {
-                BitmapFactory.decodeStream(it, null, options)
-            }
-        }.getOrNull()
-
-        decodedProfilePhotoUri = uriString
-        decodedProfilePhoto = bitmap
-        return bitmap
-    }
-
-    internal fun chooseProfilePhoto() {
-        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-            addCategory(Intent.CATEGORY_OPENABLE)
-            type = "image/*"
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
-        }
-        startActivityForResult(intent, REQUEST_PROFILE_PHOTO)
-    }
-
-    @Deprecated("Uses the platform activity result contract for compatibility with the existing Activity.")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode != REQUEST_PROFILE_PHOTO || resultCode != RESULT_OK) return
-        val uri = data?.data ?: return
-        runCatching {
-            contentResolver.takePersistableUriPermission(
-                uri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION,
-            )
-        }
-        getSharedPreferences(PHOTO_PREFS, MODE_PRIVATE)
-            .edit()
-            .putString(KEY_PROFILE_PHOTO_URI, uri.toString())
-            .apply()
-        renderProfile()
     }
 
     override fun onCreate(
@@ -200,7 +126,7 @@ class ProfileActivity : Activity() {
                     0,
                     dp(12),
                     0,
-                    dp(34),
+                    dp(24),
                 )
             }
         contentHost.addView(
@@ -225,46 +151,20 @@ class ProfileActivity : Activity() {
             profileTopBar(),
         )
         content.addView(
-            profileIdentityPanel(
-                profile,
-            ),
-            sectionParams(
-                14,
-            ),
+            profileIdentityPanel(profile),
+            sectionParams(10),
         )
         content.addView(
-            profilePlayGamesPanel(),
+            profileModeStatsPanel(profile),
             sectionParams(12),
         )
         content.addView(
-            profilePawIdentityPanel(),
-            sectionParams(
-                12,
-            ),
+            profileBadgesPanel(profile),
+            sectionParams(12),
         )
         content.addView(
-            profileModeStatsPanel(
-                profile,
-            ),
-            sectionParams(
-                16,
-            ),
-        )
-        content.addView(
-            profileBadgesPanel(
-                profile,
-            ),
-            sectionParams(
-                16,
-            ),
-        )
-        content.addView(
-            profilePurchasesPanel(
-                profile,
-            ),
-            sectionParams(
-                16,
-            ),
+            profilePurchasesPanel(profile),
+            sectionParams(12),
         )
 
         setContentView(
@@ -410,9 +310,5 @@ class ProfileActivity : Activity() {
 
     private companion object {
         const val TAG = "ProfilePlayGames"
-        const val REQUEST_PROFILE_PHOTO = 7412
-        const val PHOTO_PREFS = "ludoproof_profile_photo"
-        const val KEY_PROFILE_PHOTO_URI = "profile_photo_uri"
-        const val PHOTO_MAX_DIMENSION = 512
     }
 }
