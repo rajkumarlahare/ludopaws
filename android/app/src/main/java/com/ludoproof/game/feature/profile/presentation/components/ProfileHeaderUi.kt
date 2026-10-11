@@ -8,6 +8,7 @@ import android.view.Gravity
 import android.view.View
 import android.widget.Button
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.LudoProofTheme
@@ -176,8 +177,8 @@ internal fun ProfileActivity.profileIdentityPanel(profile: ProfileSnapshot): Lin
                         setBounds(0, 0, dp(16), dp(16))
                     }
                 setCompoundDrawablesRelative(pencil, null, null, null)
-                compoundDrawablePadding = dp(5)
-                setPadding(dp(10), 0, dp(10), 0)
+                compoundDrawablePadding = dp(2)
+                setPadding(dp(6), 0, dp(6), 0)
                 background = LudoProofTheme.rounded(
                     0xFF064EAE.toInt(),
                     999f,
@@ -199,8 +200,8 @@ internal fun ProfileActivity.profileIdentityPanel(profile: ProfileSnapshot): Lin
                 dp(36),
                 Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL,
             ).apply {
-                leftMargin = dp(8)
-                rightMargin = dp(8)
+                leftMargin = dp(4)
+                rightMargin = dp(4)
                 bottomMargin = dp(3)
             },
         )
@@ -293,20 +294,20 @@ internal fun ProfileActivity.profileIdentityPanel(profile: ProfileSnapshot): Lin
             LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT),
         )
         nameRow.addView(
-            TextView(this@profileIdentityPanel).apply {
-                text = "✏️"
-                textSize = 18f
-                gravity = Gravity.CENTER
-                includeFontPadding = false
+            ImageView(this@profileIdentityPanel).apply {
+                setImageDrawable(
+                    context.getDrawable(com.ludoproof.game.R.drawable.ic_profile_edit_pen)
+                        ?.mutate()
+                        ?.apply { setTint(Color.WHITE) },
+                )
+                scaleType = ImageView.ScaleType.CENTER_INSIDE
                 isClickable = true
                 isFocusable = true
-                setPadding(dp(2), dp(2), dp(2), dp(2))
-                background = null
                 contentDescription = "Edit profile name"
                 setOnClickListener { showNameEditor() }
                 AppFocusRing.apply(this, cornerRadiusDp = 15f)
             },
-            LinearLayout.LayoutParams(dp(30), dp(30)).apply { marginStart = dp(5) },
+            LinearLayout.LayoutParams(dp(30), dp(30)).apply { marginStart = dp(3) },
         )
         details.addView(nameRow)
 
