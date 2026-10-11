@@ -167,10 +167,8 @@ class GemClusterView(
 
         val crown =
             Path().apply {
-                moveTo(left, crownY)
-                lineTo(shoulderLeft, top)
+                moveTo(shoulderLeft, top)
                 lineTo(shoulderRight, top)
-                lineTo(right, crownY)
                 lineTo(centerX, crownY)
                 close()
             }
