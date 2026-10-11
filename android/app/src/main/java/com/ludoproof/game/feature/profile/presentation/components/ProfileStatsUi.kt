@@ -2,14 +2,12 @@ package com.ludoproof.game.feature.profile.presentation.components
 
 import android.graphics.Color
 import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
-import com.ludoproof.game.LudoProofTheme
-import com.ludoproof.game.core.ui.art.blueIconBackground
+import com.ludoproof.game.core.ui.art.classicModeIconBackground
 import com.ludoproof.game.core.ui.art.classicStatsProgressTrackBackground
 import com.ludoproof.game.core.ui.art.classicStatsProgressFillBackground
 import com.ludoproof.game.core.ui.art.transparentDarkBlueStrokeBackground
@@ -62,11 +60,7 @@ private fun ProfileActivity.classicRow(stats: ProfileModeStats): LinearLayout =
                 setTypeface(Typeface.DEFAULT_BOLD)
                 setTextColor(Color.WHITE)
                 gravity = Gravity.CENTER
-                background = blueIconBackground(
-                    context = this@classicRow,
-                    fillColor = 0xE20A347A.toInt(),
-                    strokeColor = 0xFF217BD0.toInt(),
-                )
+                background = classicModeIconBackground(this@classicRow)
                 contentDescription = "Classic"
             },
             LinearLayout.LayoutParams(dp(48), dp(48)),
