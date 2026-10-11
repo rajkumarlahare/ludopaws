@@ -322,6 +322,7 @@ class FriendsActivity : Activity() {
             LinearLayout.LayoutParams(dp(38), LinearLayout.LayoutParams.WRAP_CONTENT),
         )
         addFriendInput = FriendsVisualKit.input(this, "Enter Friend ID")
+        addFriendInput.setHintTextColor(Color.WHITE)
         addFriendInput.textSize = 12f
         addFriendInput.setPadding(dp(9), 0, dp(9), 0)
         row.addView(addFriendInput, LinearLayout.LayoutParams(0, dp(42), 1f))
@@ -593,6 +594,7 @@ class FriendsActivity : Activity() {
         )
         header.addView(heading, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         val search = FriendsVisualKit.input(this, "Search friends…").apply {
+            setHintTextColor(Color.WHITE)
             textSize = 12f
             setText(friendQuery)
             setSelection(text.length)
