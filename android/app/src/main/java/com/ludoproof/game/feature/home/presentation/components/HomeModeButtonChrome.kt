@@ -70,12 +70,19 @@ private class HomeModeButtonChromeDrawable(
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = 0x2B001126
         }
+    private val focusedPaint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = dp(3f)
+            color = 0xFFFFD45E.toInt()
+        }
 
     private val rect = RectF()
     private val innerRect = RectF()
     private val clipPath = Path()
     private var radius = 0f
     private var pressed = false
+    private var focused = false
     private var drawableAlpha = 255
 
     override fun onBoundsChange(bounds: android.graphics.Rect) {
@@ -180,6 +187,7 @@ private class HomeModeButtonChromeDrawable(
         pawPaint.alpha = (0x72 * alphaScale).toInt()
         sparklePaint.alpha = (0x80 * alphaScale).toInt()
         pressedPaint.alpha = if (pressed) (0x2B * alphaScale).toInt() else 0
+        focusedPaint.alpha = if (focused) drawableAlpha else 0
 
         // Diffuse neon halo first, then a crisp pale rim like the supplied art.
         canvas.drawRoundRect(rect, radius, radius, glowPaint)
@@ -282,6 +290,9 @@ private class HomeModeButtonChromeDrawable(
             (radius - dp(2.5f)).coerceAtLeast(0f),
             innerRimPaint,
         )
+        if (focused) {
+            canvas.drawRoundRect(rect, radius, radius, focusedPaint)
+        }
     }
 
     private fun drawPaw(
@@ -320,8 +331,10 @@ private class HomeModeButtonChromeDrawable(
 
     override fun onStateChange(stateSet: IntArray): Boolean {
         val nextPressed = stateSet.contains(android.R.attr.state_pressed)
-        if (nextPressed == pressed) return false
+        val nextFocused = stateSet.contains(android.R.attr.state_focused)
+        if (nextPressed == pressed && nextFocused == focused) return false
         pressed = nextPressed
+        focused = nextFocused
         invalidateSelf()
         return true
     }
@@ -336,6 +349,7 @@ private class HomeModeButtonChromeDrawable(
         glowPaint.colorFilter = colorFilter
         outerRimPaint.colorFilter = colorFilter
         innerRimPaint.colorFilter = colorFilter
+        focusedPaint.colorFilter = colorFilter
         glossPaint.colorFilter = colorFilter
         reflectionPaint.colorFilter = colorFilter
         shadePaint.colorFilter = colorFilter

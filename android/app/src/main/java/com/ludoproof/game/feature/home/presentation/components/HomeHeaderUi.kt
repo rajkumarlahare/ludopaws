@@ -286,6 +286,7 @@ private fun HomeActivity.homeShortcutRow(): LinearLayout =
                 label = "Shop",
                 tint = 0xFFFFC928.toInt(),
                 iconKind = HomeIconKind.SHOP,
+                enabled = true,
             ),
             HeaderShortcut(
                 label = "Badge",
@@ -296,6 +297,7 @@ private fun HomeActivity.homeShortcutRow(): LinearLayout =
                 label = "Leaderboard",
                 tint = 0xFFFFC928.toInt(),
                 iconKind = HomeIconKind.LEADERBOARD,
+                enabled = true,
             ),
             HeaderShortcut(
                 label = "Remove Ads",
@@ -323,9 +325,12 @@ private fun HomeActivity.homeShortcut(
     LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         gravity = Gravity.CENTER
-        isClickable = true
-        isFocusable = true
-        contentDescription = item.label
+        isClickable = item.enabled
+        isFocusable = item.enabled
+        isEnabled = item.enabled
+        contentDescription =
+            if (item.enabled) item.label else "${item.label} unavailable"
+        alpha = if (item.enabled) 1f else 0.56f
         background =
             homeGlassBackground(
                 context = this@homeShortcut,
@@ -338,25 +343,27 @@ private fun HomeActivity.homeShortcut(
             dp(3),
             dp(5),
         )
-        setOnClickListener {
-            when (item.iconKind) {
-                HomeIconKind.SHOP ->
-                    startActivity(
-                        Intent(
-                            this@homeShortcut,
-                            StoreActivity::class.java,
-                        ),
-                    )
+        if (item.enabled) {
+            setOnClickListener {
+                when (item.iconKind) {
+                    HomeIconKind.SHOP ->
+                        startActivity(
+                            Intent(
+                                this@homeShortcut,
+                                StoreActivity::class.java,
+                            ),
+                        )
 
-                HomeIconKind.LEADERBOARD ->
-                    startActivity(
-                        Intent(
-                            this@homeShortcut,
-                            LeaderboardActivity::class.java,
-                        ),
-                    )
-
-                else -> Unit
+                    HomeIconKind.LEADERBOARD ->
+                        startActivity(
+                            Intent(
+                                this@homeShortcut,
+                                LeaderboardActivity::class.java,
+                            ),
+                        )
+                    
+                    else -> Unit
+                }
             }
         }
 
@@ -430,4 +437,5 @@ private data class HeaderShortcut(
     val label: String,
     val tint: Int,
     val iconKind: HomeIconKind,
+    val enabled: Boolean = false,
 )
