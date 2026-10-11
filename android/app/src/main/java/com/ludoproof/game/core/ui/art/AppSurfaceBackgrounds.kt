@@ -139,18 +139,21 @@ private class PlayerCountSelectionOverlayDrawable(
         // the selected numeral remains unobstructed.
         if (!showCheckBadge) return
 
-        // Compact tiles use a top-end badge; larger online cards use bottom-end.
-        val badgeRadius = dp(7.2f)
-        val badgeX = boundsRect.right - dp(18f)
+        // The Friends page uses a compact 42dp control: pin its marker to the
+        // actual top-right corner. Larger online cards keep their bottom-right badge.
+        val badgeRadius = dp(if (checkBadgeAtTopEnd) 5.2f else 7.2f)
+        val badgeX = boundsRect.right - dp(if (checkBadgeAtTopEnd) 8f else 18f)
         val badgeY =
-            if (checkBadgeAtTopEnd) boundsRect.top + dp(18f)
+            if (checkBadgeAtTopEnd) boundsRect.top + dp(8f)
             else boundsRect.bottom - dp(19f)
         fillPaint.alpha = drawableAlpha
         canvas.drawCircle(badgeX, badgeY, badgeRadius, fillPaint)
 
-        strokePaint.color = 0xFF63451B.toInt()
+        // A white tick stays legible over the gold badge on the compact Friends controls.
+        strokePaint.color =
+            if (checkBadgeAtTopEnd) 0xFFFFFFFF.toInt() else 0xFF63451B.toInt()
         strokePaint.alpha = drawableAlpha
-        strokePaint.strokeWidth = dp(1.8f)
+        strokePaint.strokeWidth = dp(if (checkBadgeAtTopEnd) 1.5f else 1.8f)
         val check = android.graphics.Path().apply {
             moveTo(badgeX - badgeRadius * 0.43f, badgeY + badgeRadius * 0.02f)
             lineTo(badgeX - badgeRadius * 0.10f, badgeY + badgeRadius * 0.34f)
