@@ -5,8 +5,8 @@ import android.graphics.drawable.GradientDrawable
 import com.ludoproof.game.LudoProofTheme
 
 /**
- * Shared translucent navy surface used by Profile's Classic card and the Games/Streak/Wins strip.
- * Defaults intentionally match the approved UI: #33104483 fill, #FF247FCB stroke, 18dp radius.
+ * Shared translucent navy surface for cards and sections across the app.
+ * Defaults match the approved UI: #33104483 fill, #FF247FCB stroke, 18dp radius.
  */
 internal fun transparentDarkBlueStrokeBackground(
     context: Context,
