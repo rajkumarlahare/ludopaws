@@ -127,10 +127,10 @@ internal fun ProfileActivity.profilePurchasesPanel(profile: ProfileSnapshot): Li
 private class PlywoodTextureDrawable(
     private val density: Float,
 ) : Drawable() {
-    // Multiplying RGB by ~0.6 darkens the entire plywood finish by about 40%
-    // while retaining the natural tone differences between the grain and highlights.
+    // Multiplying RGB by ~0.7 keeps the wood finish about 10 percentage points
+    // lighter than the previous 40%-darkened test, while preserving its warm tone.
     private val plywoodShade = android.graphics.LightingColorFilter(
-        0xFF999999.toInt(),
+        0xFFB3B3B3.toInt(),
         Color.TRANSPARENT,
     )
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -213,8 +213,62 @@ private class PlywoodTextureDrawable(
             canvas.drawPath(grain, line)
         }
 
-        // A few faint, irregular grain streaks add natural plywood variation
-        // without the regular spacing that made the previous version look striped.
+        // Broader, softly wandering veneer grain gives the surface more plywood character.
+        // These are low-contrast grain bands, not plank edges or hard seams.
+        for (index in 0 until 17) {
+            val fraction = ((index * 37) % 101) / 100f
+            val gx = b.left + b.width() * fraction
+            val wave = density * (5f + (index % 5) * 2.4f)
+            val drift = density * (((index * 11) % 19) - 9).toFloat()
+            val grain = Path().apply {
+                moveTo(gx + drift * 0.12f, b.top)
+                cubicTo(
+                    gx - wave * 0.35f,
+                    b.top + b.height() * 0.19f,
+                    gx + wave * 0.70f + drift,
+                    b.top + b.height() * 0.40f,
+                    gx - wave * 0.15f,
+                    b.top + b.height() * 0.58f,
+                )
+                cubicTo(
+                    gx - wave * 0.55f + drift * 0.2f,
+                    b.top + b.height() * 0.73f,
+                    gx + wave * 0.45f,
+                    b.top + b.height() * 0.88f,
+                    gx + drift * 0.08f,
+                    b.bottom,
+                )
+            }
+            line.color = when (index % 5) {
+                0 -> Color.argb(36, 116, 69, 36)
+                1 -> Color.argb(28, 255, 238, 194)
+                2 -> Color.argb(25, 132, 79, 39)
+                3 -> Color.argb(22, 255, 235, 190)
+                else -> Color.argb(30, 146, 91, 47)
+            }
+            line.strokeWidth = when (index % 6) {
+                0 -> 1.7f * density
+                1 -> 1.2f * density
+                else -> 0.85f * density
+            }
+            canvas.drawPath(grain, line)
+
+            // A faint companion line creates the fine fibre detail found in veneer.
+            if (index % 3 == 0) {
+                line.color = Color.argb(22, 255, 239, 204)
+                line.strokeWidth = 0.55f * density
+                canvas.drawLine(
+                    gx + 2.8f * density,
+                    b.top + b.height() * 0.08f,
+                    gx + 3.6f * density,
+                    b.bottom - b.height() * 0.06f,
+                    line,
+                )
+            }
+        }
+
+        // Small low-contrast natural pores/knots; avoid repeating seams or equal board widths.
+
         for (index in 0 until 8) {
             val yOffset = b.height() * (0.08f + (index * 0.113f))
             val gx = b.left + b.width() * (((index * 19) % 83) / 100f + 0.04f)
