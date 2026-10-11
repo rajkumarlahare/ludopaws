@@ -6,6 +6,7 @@ import android.graphics.Paint
 import android.graphics.drawable.Drawable
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.LayerDrawable
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
@@ -16,6 +17,7 @@ import android.widget.TextView
 import com.ludoproof.game.LudoProofTheme
 import com.ludoproof.game.core.ui.art.plywoodBackground
 import com.ludoproof.game.core.ui.art.playGamesSignInBackground
+import com.ludoproof.game.core.ui.art.recessedPlywoodBackground
 import com.ludoproof.game.core.ui.components.AppFocusRing
 import com.ludoproof.game.LudoPawsCharacterAvatarView
 import com.ludoproof.game.MainActivity
@@ -247,7 +249,7 @@ internal fun MainActivity.onlineLobbyPanel():
                     Button(
                         this@onlineLobbyPanel,
                     ).apply {
-                        text = "▶   PLAY"
+                        text = "PLAY"
                         textSize =
                             if (
                                 isCompactOnline()
@@ -257,7 +259,16 @@ internal fun MainActivity.onlineLobbyPanel():
                                 18f
                             }
                         setTypeface(Typeface.DEFAULT_BOLD)
-                        setTextColor(0xFF342000.toInt())
+                        setTextColor(Color.WHITE)
+                        gravity = Gravity.CENTER_VERTICAL or Gravity.START
+                        minWidth = 0
+                        minHeight = 0
+                        setPadding(dp(22), 0, dp(20), 0)
+                        val playTriangle =
+                            context.getDrawable(com.ludoproof.game.R.drawable.ic_play_triangle_white)?.mutate()
+                        playTriangle?.setBounds(0, 0, dp(20), dp(20))
+                        setCompoundDrawablesRelative(null, null, playTriangle, null)
+                        compoundDrawablePadding = dp(8)
                         // Reuse the exact Google Play sign-in fill, radius and stroke from Profile.
                         background =
                             playGamesSignInBackground(
@@ -641,26 +652,24 @@ internal fun MainActivity.stylePublicPlayerCountButton(
         null,
         null,
     )
+    // Reuse Profile's recessed plywood pocket; keep a thin state outline above it.
     button.background =
-        GradientDrawable(
-            GradientDrawable.Orientation.TOP_BOTTOM,
-            if (
-                selected
-            ) {
-                intArrayOf(
-                    0xFF34250C.toInt(),
-                    0xFF151D31.toInt(),
-                )
-            } else {
-                intArrayOf(
-                    0xFF0C3564.toInt(),
-                    0xFF092344.toInt(),
-                )
-            },
-        ).apply {
-            cornerRadius = dp(20).toFloat()
-            setStroke(dp(if (selected) 3 else 1), if (selected) 0xFFFFC52E.toInt() else 0xFF1689D0.toInt())
-        }
+        LayerDrawable(
+            arrayOf(
+                recessedPlywoodBackground(
+                    context = button.context,
+                    outerCornerRadiusDp = 20f,
+                ),
+                GradientDrawable().apply {
+                    setColor(Color.TRANSPARENT)
+                    cornerRadius = dp(20).toFloat()
+                    setStroke(
+                        dp(if (selected) 3 else 1),
+                        if (selected) 0xFFFFC52E.toInt() else 0xFF1689D0.toInt(),
+                    )
+                },
+            ),
+        )
 }
 
 private class PlayerGroupDrawable(
