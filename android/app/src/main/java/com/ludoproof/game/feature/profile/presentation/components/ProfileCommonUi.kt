@@ -3,11 +3,9 @@ package com.ludoproof.game.feature.profile.presentation.components
 import android.app.AlertDialog
 import android.graphics.Color
 import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
-import com.ludoproof.game.LudoProofTheme
 import com.ludoproof.game.feature.profile.presentation.ProfileActivity
 
 internal fun ProfileActivity.profilePanel():
@@ -22,21 +20,7 @@ internal fun ProfileActivity.profilePanel():
             dp(14),
         )
         background =
-            GradientDrawable(
-                GradientDrawable.Orientation.TOP_BOTTOM,
-                intArrayOf(
-                    0xF20B6DD2.toInt(),
-                    0xF0074EAE.toInt(),
-                ),
-            ).apply {
-                cornerRadius =
-                    dp(15)
-                        .toFloat()
-                setStroke(
-                    dp(1),
-                    0xFF27BDF6.toInt(),
-                )
-            }
+            PlywoodTextureDrawable(resources.displayMetrics.density)
         elevation =
             dp(4)
                 .toFloat()
