@@ -49,7 +49,7 @@ internal fun ProfileActivity.profilePurchasesPanel(profile: ProfileSnapshot): Li
             val emptyState = LinearLayout(this@profilePurchasesPanel).apply {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER
-                setPadding(0, dp(14), 0, dp(4))
+                setPadding(0, dp(10), 0, 0)
             }
             emptyState.addView(
                 TextView(this@profilePurchasesPanel).apply {
@@ -63,7 +63,7 @@ internal fun ProfileActivity.profilePurchasesPanel(profile: ProfileSnapshot): Li
                         setStroke(dp(1), 0x663EABF3)
                     }
                 },
-                LinearLayout.LayoutParams(dp(72), dp(72)),
+                LinearLayout.LayoutParams(dp(60), dp(60)),
             )
             emptyState.addView(
                 TextView(this@profilePurchasesPanel).apply {
@@ -85,7 +85,7 @@ internal fun ProfileActivity.profilePurchasesPanel(profile: ProfileSnapshot): Li
                     setTextColor(0xFFD0E7FF.toInt())
                     gravity = Gravity.CENTER
                     setLineSpacing(dp(2).toFloat(), 1f)
-                    setPadding(dp(4), dp(5), dp(4), 0)
+                    setPadding(dp(4), dp(4), dp(4), 0)
                 },
                 LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
