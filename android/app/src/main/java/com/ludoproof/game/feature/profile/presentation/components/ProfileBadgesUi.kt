@@ -6,7 +6,7 @@ import android.view.Gravity
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
-import com.ludoproof.game.LudoProofTheme
+import com.ludoproof.game.core.ui.art.blueIconBackground
 import com.ludoproof.game.feature.profile.domain.ProfileProgression
 import com.ludoproof.game.feature.profile.domain.model.ProfileSnapshot
 import com.ludoproof.game.feature.profile.presentation.ProfileActivity
@@ -151,14 +151,7 @@ internal fun ProfileActivity.profileBadgesPanel(
                             gravity =
                                 Gravity.CENTER
                             background =
-                                LudoProofTheme
-                                    .rounded(
-                                        0xFF073F8C.toInt(),
-                                        999f,
-                                        0xFF1C8BDA.toInt(),
-                                        1f,
-                                        this@profileBadgesPanel,
-                                    )
+                                blueIconBackground(this@profileBadgesPanel)
                         },
                         LinearLayout.LayoutParams(
                             dp(44),
