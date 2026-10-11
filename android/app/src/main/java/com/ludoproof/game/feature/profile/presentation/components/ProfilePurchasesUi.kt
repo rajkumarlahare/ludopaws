@@ -355,70 +355,105 @@ private class PlywoodTextureDrawable(
 
         canvas.restore()
 
-        // Layered timber rim: shadow, warm edge, bevel gradient, and inner lip.
-        // Multiple contours create visible thickness instead of a single outlined stroke.
-        val outerRim = RectF(b).apply { inset(1.2f * density, 1.2f * density) }
-        val outerRadius = (radius - 1.2f * density).coerceAtLeast(1f)
+        // Continuous 3D timber rim. Each bevel is a filled rounded-rect ring
+        // with a full-perimeter gradient, so corners do not show colour breaks.
+        val rimPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        val outerRim = RectF(b).apply { inset(0.6f * density, 0.6f * density) }
+        val bronzeRim = RectF(b).apply { inset(1.5f * density, 1.5f * density) }
+        val innerRim = RectF(b).apply { inset(5.5f * density, 5.5f * density) }
+        val glintRim = RectF(b).apply { inset(2.2f * density, 2.2f * density) }
+        val innerGlintCutout = RectF(b).apply { inset(3.2f * density, 3.2f * density) }
 
-        reliefPaint.shader = null
-        reliefPaint.color = Color.argb(145, 76, 39, 18)
-        reliefPaint.strokeWidth = 4.8f * density
-        canvas.drawRoundRect(outerRim, outerRadius, outerRadius, reliefPaint)
+        // Deep outside edge supplies thickness under the brighter bevel.
+        rimPaint.shader = LinearGradient(
+            b.left,
+            b.top,
+            b.left,
+            b.bottom,
+            intArrayOf(
+                0xFFB77A3D.toInt(),
+                0xFF875027.toInt(),
+                0xFF573018.toInt(),
+                0xFF70401F.toInt(),
+            ),
+            floatArrayOf(0f, 0.36f, 0.72f, 1f),
+            Shader.TileMode.CLAMP,
+        )
+        drawRoundedRing(
+            canvas,
+            outerRim,
+            (radius - 0.6f * density).coerceAtLeast(1f),
+            innerRim,
+            (radius - 5.5f * density).coerceAtLeast(1f),
+            rimPaint,
+        )
 
-        val bronzeRim = RectF(b).apply { inset(3.2f * density, 3.2f * density) }
-        val bronzeRadius = (radius - 3.2f * density).coerceAtLeast(1f)
-        reliefPaint.shader = LinearGradient(
+        // Warm bevel gradient runs continuously around the curved corners.
+        rimPaint.shader = LinearGradient(
             bronzeRim.left,
             bronzeRim.top,
             bronzeRim.right,
             bronzeRim.bottom,
             intArrayOf(
-                0xFFFFE2A6.toInt(),
-                0xFFD69A55.toInt(),
-                0xFF9A572B.toInt(),
-                0xFFEBC184.toInt(),
+                0xFFFFE7B0.toInt(),
+                0xFFE9B96F.toInt(),
+                0xFFC18649.toInt(),
+                0xFF8A512C.toInt(),
             ),
-            floatArrayOf(0f, 0.36f, 0.72f, 1f),
+            floatArrayOf(0f, 0.38f, 0.72f, 1f),
             Shader.TileMode.CLAMP,
         )
-        reliefPaint.strokeWidth = 3.8f * density
-        canvas.drawRoundRect(bronzeRim, bronzeRadius, bronzeRadius, reliefPaint)
-        reliefPaint.shader = null
+        drawRoundedRing(
+            canvas,
+            bronzeRim,
+            (radius - 1.5f * density).coerceAtLeast(1f),
+            innerRim,
+            (radius - 5.5f * density).coerceAtLeast(1f),
+            rimPaint,
+        )
 
-        // Upper/left raised bevel catches the light; lower/right bevel falls into shadow.
-        val lip = RectF(b).apply { inset(5.0f * density, 5.0f * density) }
-        val lipRadius = (radius - 5.0f * density).coerceAtLeast(1f)
-
-        val raisedHighlight = Path().apply {
-            moveTo(lip.left + lipRadius, lip.top)
-            lineTo(lip.right - lipRadius * 1.1f, lip.top)
-            quadTo(lip.right, lip.top, lip.right, lip.top + lipRadius * 0.65f)
-            moveTo(lip.left, lip.top + lipRadius)
-            lineTo(lip.left, lip.bottom - lipRadius * 0.8f)
-        }
-        reliefPaint.color = Color.argb(190, 255, 242, 209)
-        reliefPaint.strokeWidth = 2.0f * density
-        reliefPaint.strokeCap = Paint.Cap.ROUND
-        canvas.drawPath(raisedHighlight, reliefPaint)
-
-        val recessedShadow = Path().apply {
-            moveTo(lip.right, lip.top + lipRadius * 0.8f)
-            lineTo(lip.right, lip.bottom - lipRadius)
-            quadTo(lip.right, lip.bottom, lip.right - lipRadius, lip.bottom)
-            lineTo(lip.left + lipRadius, lip.bottom)
-        }
-        reliefPaint.color = Color.argb(150, 91, 46, 20)
-        reliefPaint.strokeWidth = 2.4f * density
-        canvas.drawPath(recessedShadow, reliefPaint)
-
-        // Fine inner glint makes the lip read as lacquered wood, not a flat border.
-        val innerEdge = RectF(b).apply { inset(7.0f * density, 7.0f * density) }
-        val innerRadius = (radius - 7.0f * density).coerceAtLeast(1f)
-        reliefPaint.color = Color.argb(88, 255, 238, 194)
-        reliefPaint.strokeWidth = 0.9f * density
-        canvas.drawRoundRect(innerEdge, innerRadius, innerRadius, reliefPaint)
+        // Very narrow inner glint is also a complete ring, not separate top/side strokes.
+        rimPaint.shader = LinearGradient(
+            glintRim.left,
+            glintRim.top,
+            glintRim.left,
+            glintRim.bottom,
+            intArrayOf(
+                0xFFFFF0CC.toInt(),
+                0x88F6D18B.toInt(),
+                0x55925A2C.toInt(),
+                0x88F4CF89.toInt(),
+            ),
+            floatArrayOf(0f, 0.35f, 0.72f, 1f),
+            Shader.TileMode.CLAMP,
+        )
+        drawRoundedRing(
+            canvas,
+            glintRim,
+            (radius - 2.2f * density).coerceAtLeast(1f),
+            innerGlintCutout,
+            (radius - 3.2f * density).coerceAtLeast(1f),
+            rimPaint,
+        )
+        rimPaint.shader = null
 
         canvas.restoreToCount(layer)
+    }
+
+    private fun drawRoundedRing(
+        canvas: Canvas,
+        outer: RectF,
+        outerRadius: Float,
+        inner: RectF,
+        innerRadius: Float,
+        paint: Paint,
+    ) {
+        val ringPath = Path().apply {
+            fillType = Path.FillType.EVEN_ODD
+            addRoundRect(outer, outerRadius, outerRadius, Path.Direction.CW)
+            addRoundRect(inner, innerRadius, innerRadius, Path.Direction.CW)
+        }
+        canvas.drawPath(ringPath, paint)
     }
 
     override fun setAlpha(alpha: Int) {
