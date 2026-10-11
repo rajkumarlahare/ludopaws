@@ -74,7 +74,7 @@ private fun MainActivity.onlineModePanelHeader(): LinearLayout =
                 LaserStatusDotView(this@onlineModePanelHeader),
                 LinearLayout.LayoutParams(dp(10), dp(10)).apply { marginEnd = dp(5) },
             )
-            connectionText = TextView(this@onlineModePanelHeader).apply {
+            val statusLabel = TextView(this@onlineModePanelHeader).apply {
                 text = "ONLINE"
                 LudoProofTheme.body(this, if (compact) 10f else 11f, centered = true, bright = true)
                 setTextColor(0xFFD4FFB2.toInt())
@@ -82,7 +82,8 @@ private fun MainActivity.onlineModePanelHeader(): LinearLayout =
                 accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
                 setPadding(0, 0, 0, 0)
             }
-            addView(connectionText)
+            this@onlineModePanelHeader.connectionTexts.add(statusLabel)
+            addView(statusLabel)
         }
         addView(
             statusRow,
@@ -91,12 +92,13 @@ private fun MainActivity.onlineModePanelHeader(): LinearLayout =
                 LinearLayout.LayoutParams.WRAP_CONTENT,
             ).apply { topMargin = dp(2) },
         )
-        updateConnectionLabel()
+        this@onlineModePanelHeader.updateConnectionLabel()
     }
 
 internal fun MainActivity.onlineLobbyPanel():
     LinearLayout =
     LinearLayout(this).apply {
+        this@onlineLobbyPanel.connectionTexts.clear()
         orientation =
             LinearLayout.VERTICAL
         gravity =

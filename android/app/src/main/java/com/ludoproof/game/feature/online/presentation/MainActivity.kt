@@ -88,7 +88,7 @@ class MainActivity : ComponentActivity() {
     internal lateinit var verificationPanel: LinearLayout
     internal lateinit var proofDetailsText: TextView
     internal lateinit var statusText: TextView
-    internal lateinit var connectionText: TextView
+    internal val connectionTexts = mutableListOf<TextView>()
     internal lateinit var boardView: LudoBoardView
     internal lateinit var diceView: DiceView
     internal lateinit var findMatchButton: LinearLayout
@@ -922,38 +922,16 @@ class MainActivity : ComponentActivity() {
             ::fourPlayerButton.isInitialized
 
     internal fun updateConnectionLabel() {
-        if (
-            !::connectionText
-                .isInitialized
-        ) {
-            return
+        if (connectionTexts.isEmpty()) return
+
+        val (label, tint) = when {
+            !isOnline -> "OFFLINE" to LudoProofTheme.GOLD
+            realtimeConnected -> "LIVE" to 0xFF65EF55.toInt()
+            else -> "ONLINE" to 0xFFD4FFB2.toInt()
         }
-
-        when {
-            !isOnline -> {
-                connectionText.text =
-                    "OFFLINE"
-                connectionText.setTextColor(
-                    LudoProofTheme.GOLD,
-                )
-            }
-
-            realtimeConnected -> {
-                connectionText.text =
-                    "LIVE"
-                connectionText.setTextColor(
-                    0xFF65EF55.toInt(),
-                )
-            }
-
-            else -> {
-                connectionText.text =
-                    "ONLINE"
-                // Soft, light parrot-green for the online status on the dark header.
-                connectionText.setTextColor(
-                    0xFFD4FFB2.toInt(),
-                )
-            }
+        connectionTexts.forEach { statusLabel ->
+            statusLabel.text = label
+            statusLabel.setTextColor(tint)
         }
     }
 
