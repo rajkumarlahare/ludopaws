@@ -3,6 +3,7 @@ package com.ludoproof.game.feature.online
 import android.view.View
 import com.ludoproof.game.*
 import com.ludoproof.game.feature.profile.data.local.ProfileStore
+import com.ludoproof.game.core.ui.components.playSelectionPopAnimation
 import com.ludoproof.game.ui.online.stylePublicPlayerCountButton
 import org.json.JSONObject
 import java.util.UUID
@@ -31,28 +32,13 @@ internal fun MainActivity.selectPublicPlayerCount(
         playerCount
     updatePublicPlayerCountButtons()
 
-    // A short press-and-return animation gives immediate feedback on selection.
     val tappedButton =
         if (playerCount == 2) {
             twoPlayerButton
         } else {
             fourPlayerButton
         }
-    tappedButton.animate().cancel()
-    tappedButton.scaleX = 1f
-    tappedButton.scaleY = 1f
-    tappedButton.animate()
-        .scaleX(0.965f)
-        .scaleY(0.965f)
-        .setDuration(75L)
-        .withEndAction {
-            tappedButton.animate()
-                .scaleX(1f)
-                .scaleY(1f)
-                .setDuration(135L)
-                .start()
-        }
-        .start()
+    tappedButton.playSelectionPopAnimation()
 }
 
 internal fun MainActivity.beginPublicMatchmaking() {

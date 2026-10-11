@@ -10,6 +10,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.LudoPawsCharacterAvatarView
 import com.ludoproof.game.core.ui.art.playerCountSelectionBackground
+import com.ludoproof.game.core.ui.components.playSelectionPopAnimation
 import com.ludoproof.game.core.ui.art.transparentDarkBlueStrokeBackground
 import com.ludoproof.game.LudoProofTheme
 import com.ludoproof.game.OfflineGameActivity
@@ -191,9 +192,11 @@ private fun OfflineGameActivity.rebuildCharacterSlotButtons() {
                 } else {
                     "P${slot + 1}"
                 },
-            ) {
-                selectCharacterSlot(slot)
-            }
+            ) {}
+        button.setOnClickListener { clicked ->
+            clicked.playSelectionPopAnimation()
+            selectCharacterSlot(slot)
+        }
         slotMap[slot] = button
         slotsRow.addView(
             button,
@@ -288,7 +291,8 @@ private fun OfflineGameActivity.characterChoiceCard(
         )
 
         contentDescription = "Choose ${character.displayName}"
-        setOnClickListener {
+        setOnClickListener { clicked ->
+            clicked.playSelectionPopAnimation()
             selectCharacterForActiveSlot(character.id)
         }
     }

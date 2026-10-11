@@ -31,6 +31,7 @@ import com.ludoproof.game.GameModeIntent
 import com.ludoproof.game.LudoProofTheme
 import com.ludoproof.game.core.ui.art.plywoodBackground
 import com.ludoproof.game.core.ui.art.playerCountSelectionBackground
+import com.ludoproof.game.core.ui.components.playSelectionPopAnimation
 import com.ludoproof.game.core.ui.components.AppFocusRing
 import com.ludoproof.game.MainActivity
 import com.ludoproof.game.PendingOperationStore
@@ -410,10 +411,7 @@ class FriendsActivity : Activity() {
                 this,
                 count.toString(),
                 if (selected) FriendsButtonStyle.GREEN else FriendsButtonStyle.BLUE,
-            ) {
-                selectedPlayerCount = count
-                renderRoom()
-            }.apply {
+            ) {}.apply {
                 // These are the compact PRIVATE ROOM size controls (not the
                 // separate Offline setup tiles). Reuse Online's recessed timber
                 // and gold selected treatment, with a small top-end check badge
@@ -432,6 +430,10 @@ class FriendsActivity : Activity() {
                 isSelected = selected
                 contentDescription =
                     if (selected) "$count players, selected" else "$count players"
+            }
+            playerCountButton.setOnClickListener {
+                selectedPlayerCount = count
+                playerCountButton.playSelectionPopAnimation { renderRoom() }
             }
             countRow.addView(
                 playerCountButton,

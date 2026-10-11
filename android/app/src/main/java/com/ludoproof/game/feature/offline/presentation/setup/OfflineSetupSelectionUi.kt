@@ -19,6 +19,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.*
 import com.ludoproof.game.core.ui.art.playerCountSelectionBackground
+import com.ludoproof.game.core.ui.components.playSelectionPopAnimation
 import com.ludoproof.game.core.ui.art.recessedPlywoodBackground
 import com.ludoproof.game.core.ui.icons.AppIconName
 import com.ludoproof.game.core.ui.icons.AppIconVariant
@@ -94,7 +95,8 @@ internal fun OfflineGameActivity.playersPanel(
                         LinearLayout.LayoutParams.WRAP_CONTENT,
                     ),
                 )
-                setOnClickListener {
+                setOnClickListener { clicked ->
+                    clicked.playSelectionPopAnimation()
                     updateSelectedPlayerCount(playerCount)
                 }
             }
@@ -175,7 +177,8 @@ internal fun OfflineGameActivity.colorPanel(
                         LinearLayout.LayoutParams.WRAP_CONTENT,
                     ),
                 )
-                setOnClickListener {
+                setOnClickListener { clicked ->
+                    clicked.playSelectionPopAnimation()
                     selectedColor = entry.key
                     refreshSetupSelections()
                 }

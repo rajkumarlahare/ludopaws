@@ -23,6 +23,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import com.ludoproof.game.CachedMatchStore
 import com.ludoproof.game.LudoPawsCharacterAvatarView
+import com.ludoproof.game.core.ui.components.playSelectionPopAnimation
 import com.ludoproof.game.GameMode
 import com.ludoproof.game.GameModeIntent
 import com.ludoproof.game.LudoProofTheme
@@ -219,7 +220,7 @@ class TeamUpActivity : Activity() {
                 }
             contentDescription = "Find a team online"
             AppFocusRing.apply(this, cornerRadiusDp = 999f, strokeWidthDp = 3f)
-            setOnClickListener { beginSearch() }
+            setOnClickListener { playSelectionPopAnimation { beginSearch() } }
         }
         setupContent.addView(
             quickTeamButton,
@@ -302,7 +303,7 @@ class TeamUpActivity : Activity() {
                 LudoProofTheme.danger(this)
                 contentDescription = "Cancel team search"
                 AppFocusRing.apply(this, cornerRadiusDp = 12f, strokeWidthDp = 2.5f)
-                setOnClickListener { cancelSearch() }
+                setOnClickListener { playSelectionPopAnimation { cancelSearch() } }
             }
             addView(
                 cancelButton,
@@ -957,6 +958,8 @@ class TeamUpActivity : Activity() {
         fun setQueuedPlayers(value: Int, characterIds: List<String>) {
             val next = value.coerceIn(1, 4)
             val safeCharacterIds = characterIds.take(4)
+            val previousQueuedPlayers = queuedPlayers
+            val previousCharacterIds = queuedCharacterIds
             if (
                 approachStartedAt == 0L ||
                 next != queuedPlayers ||
@@ -970,12 +973,16 @@ class TeamUpActivity : Activity() {
             characterViews.forEachIndexed { index, avatar ->
                 val characterId = safeCharacterIds.getOrNull(index)
                 if (index < next && characterId != null) {
+                    val newlyFilledSlot =
+                        index >= previousQueuedPlayers ||
+                            previousCharacterIds.getOrNull(index) != characterId
                     avatar.visibility = View.VISIBLE
                     avatar.bind(
                         characterId = characterId,
                         ringColor = 0xFF62E8FF.toInt(),
                         showCircularChrome = false,
                     )
+                    if (newlyFilledSlot) avatar.playSelectionPopAnimation()
                 } else {
                     avatar.visibility = View.INVISIBLE
                 }
