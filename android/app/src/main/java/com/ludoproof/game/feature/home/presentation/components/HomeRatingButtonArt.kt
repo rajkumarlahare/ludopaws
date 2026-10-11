@@ -69,12 +69,13 @@ internal class HomeGooglePlayIconView(
 
         val yellow =
             Path().apply {
+                // Keep the yellow segment tight around the Play mark's right-facing point.
+                // The previous wide diamond made the tip read like a yellow smudge.
                 moveTo(52f, 50f)
                 lineTo(57f, 38f)
-                lineTo(71f, 31f)
-                // Clean pointed tip: avoid the rounded yellow bulge at the right edge.
-                lineTo(90f, 50f)
-                lineTo(71f, 69f)
+                lineTo(72f, 34f)
+                lineTo(88f, 50f)
+                lineTo(72f, 66f)
                 lineTo(57f, 62f)
                 close()
             }
