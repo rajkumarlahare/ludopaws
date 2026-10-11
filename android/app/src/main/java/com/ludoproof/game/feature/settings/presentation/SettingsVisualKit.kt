@@ -237,9 +237,9 @@ internal fun settingsDropdownField(
             }
         setTypeface(Typeface.DEFAULT_BOLD)
         setTextColor(0xFFFFE07A.toInt())
-        gravity = Gravity.CENTER_VERTICAL
+        gravity = Gravity.CENTER
         setPadding(
-            settingsDp(context, 12),
+            settingsDp(context, 10),
             0,
             settingsDp(context, 10),
             0,
@@ -287,7 +287,7 @@ internal fun settingsDropdownField(
 internal fun settingsDropdownLabel(
     value: String,
 ): String =
-    "$value        ▼"
+    "$value  ▼"
 
 internal class SettingsBooleanControl(
     context: Context,
