@@ -6,6 +6,9 @@ import android.graphics.drawable.GradientDrawable
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.style.ForegroundColorSpan
+import android.text.style.RelativeSizeSpan
+import android.text.style.StyleSpan
+import android.graphics.Typeface
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -45,25 +48,31 @@ internal fun OfflineGameActivity.playersPanel():
         val playerMap =
             linkedMapOf<Int, Button>()
 
-        listOf(
-            2 to "♟♟",
-            3 to "♟♟♟",
-            4 to "♟♟♟♟",
-        ).forEach {
-                entry ->
+        listOf(2, 3, 4).forEach { playerCount ->
             val button =
                 tileButton(
-                    entry.second +
-                        "\n" +
-                        entry.first +
-                        " PLAYERS",
+                    playerCount.toString() + "\nPLAYERS",
                 ) {
-                    updateSelectedPlayerCount(
-                        entry.first,
+                    updateSelectedPlayerCount(playerCount)
+                }
+            val numberLength = playerCount.toString().length
+            button.text =
+                SpannableString(playerCount.toString() + "\nPLAYERS").apply {
+                    setSpan(
+                        RelativeSizeSpan(1.6f),
+                        0,
+                        numberLength,
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+                    )
+                    setSpan(
+                        StyleSpan(Typeface.BOLD),
+                        0,
+                        numberLength,
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
                     )
                 }
-            playerMap[entry.first] =
-                button
+            button.contentDescription = playerCount.toString() + " players"
+            playerMap[playerCount] = button
             playersRow.addView(
                 button,
                 setupTileParams(
