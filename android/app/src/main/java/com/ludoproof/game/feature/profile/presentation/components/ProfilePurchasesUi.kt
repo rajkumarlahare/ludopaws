@@ -147,27 +147,27 @@ private class PlywoodTextureDrawable(
         canvas.save()
         canvas.clipPath(outerPath)
 
-        // Even, lightly warm plywood tone. Keep the center and lower area
-        // close in brightness so it reads as one naturally lit sheet, not a dark patch.
+        // Reference plywood is fairly evenly lit, with only a soft warm shift.
+        // Avoid the darker band through the middle/lower part of the card.
         fill.shader = LinearGradient(
             b.left,
             b.top,
             b.left,
             b.bottom,
             intArrayOf(
-                0xFFF0D4A4.toInt(),
-                0xFFECCB98.toInt(),
-                0xFFE9C590.toInt(),
-                0xFFEED0A0.toInt(),
+                0xFFF0D0A1.toInt(),
+                0xFFECC796.toInt(),
+                0xFFECC796.toInt(),
+                0xFFEFD0A0.toInt(),
             ),
-            floatArrayOf(0f, 0.32f, 0.68f, 1f),
+            floatArrayOf(0f, 0.28f, 0.72f, 1f),
             Shader.TileMode.CLAMP,
         )
         canvas.drawRect(b, fill)
         fill.shader = null
 
-        // Continuous plywood sheet: avoid repeated plank blocks or hard vertical seams.
-        // The reference has organic wood grain, not separate boards.
+        // Fine, restrained plywood grain: lower opacity keeps it from reading as stripes.
+        // Irregular paths vary from one another, like natural veneer texture.
         val grainCount = 25
         for (index in 0 until grainCount) {
             val fraction = (index + 0.35f + (index % 4) * 0.11f) / grainCount
@@ -195,10 +195,10 @@ private class PlywoodTextureDrawable(
                 )
             }
             line.color = when (index % 4) {
-                0 -> Color.argb(22, 112, 66, 32)
-                1 -> Color.argb(15, 255, 241, 205)
-                2 -> Color.argb(18, 128, 76, 35)
-                else -> Color.argb(12, 255, 240, 205)
+                0 -> Color.argb(16, 112, 66, 32)
+                1 -> Color.argb(12, 255, 241, 205)
+                2 -> Color.argb(14, 128, 76, 35)
+                else -> Color.argb(10, 255, 240, 205)
             }
             line.strokeWidth = (if (index % 5 == 0) 1.05f else 0.6f) * density
             canvas.drawPath(grain, line)
@@ -220,7 +220,7 @@ private class PlywoodTextureDrawable(
                     b.top + yOffset + density * 6f,
                 )
             }
-            line.color = Color.argb(13, 119, 71, 36)
+            line.color = Color.argb(8, 119, 71, 36)
             line.strokeWidth = 0.55f * density
             canvas.drawPath(streak, line)
         }
@@ -232,8 +232,8 @@ private class PlywoodTextureDrawable(
                 (b.left + b.width() * 0.73f) to (b.top + b.height() * 0.72f),
             )
             knots.forEachIndexed { index, (knotX, knotY) ->
-                line.color = Color.argb(15, 119, 65, 32)
-                line.strokeWidth = 0.6f * density
+                line.color = Color.argb(11, 119, 65, 32)
+                line.strokeWidth = 0.55f * density
                 canvas.drawOval(
                     RectF(
                         knotX - 2.4f * density,
@@ -243,8 +243,8 @@ private class PlywoodTextureDrawable(
                     ),
                     line,
                 )
-                line.color = Color.argb(14, 255, 232, 181)
-                line.strokeWidth = 0.5f * density
+                line.color = Color.argb(10, 255, 232, 181)
+                line.strokeWidth = 0.45f * density
                 canvas.drawOval(
                     RectF(
                         knotX - 1.1f * density,
