@@ -83,6 +83,8 @@ private fun HomeActivity.homeIdentityRow(): LinearLayout =
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
         minimumHeight = dp(if (isCompact()) 36 else 39)
+        // Keep only the Gems and Profile chips comfortably inset from the screen edges.
+        setPadding(dp(if (isCompact()) 8 else 10), 0, dp(if (isCompact()) 8 else 10), 0)
 
         addView(
             homeCurrencyPill(),
