@@ -25,9 +25,9 @@ internal fun OfflineGameActivity.backHeader(label: String?): View {
         }
     }
 
-    if (isComputerMode) {
+    if (isComputerMode || label == "PASS & PLAY") {
         return FrameLayout(this).apply {
-            minimumHeight = dp(54)
+            minimumHeight = dp(if (isCompactSetup()) 50 else 56)
             clipChildren = false
             clipToPadding = false
 
@@ -51,37 +51,58 @@ internal fun OfflineGameActivity.backHeader(label: String?): View {
                 LinearLayout(this@backHeader).apply {
                     orientation = LinearLayout.HORIZONTAL
                     gravity = Gravity.CENTER
-                    setPadding(dp(12), dp(4), dp(12), dp(4))
+                    setPadding(
+                        dp(if (isCompactSetup()) 10 else 14),
+                        dp(4),
+                        dp(if (isCompactSetup()) 10 else 14),
+                        dp(4),
+                    )
                     background =
                         GradientDrawable(
                             GradientDrawable.Orientation.TOP_BOTTOM,
-                            intArrayOf(0xFF0C55B5.toInt(), 0xFF082963.toInt()),
+                            intArrayOf(
+                                0xFF1476D9.toInt(),
+                                0xFF0750AB.toInt(),
+                                0xFF04295F.toInt(),
+                            ),
                         ).apply {
                             cornerRadius = dp(999).toFloat()
                             setStroke(dp(2), LudoProofTheme.GOLD)
                         }
-                    elevation = dp(6).toFloat()
+                    elevation = dp(7).toFloat()
                     addView(
                         SetupPawMarkView(this@backHeader),
-                        LinearLayout.LayoutParams(dp(22), dp(22)),
+                        LinearLayout.LayoutParams(
+                            dp(if (isCompactSetup()) 18 else 22),
+                            dp(if (isCompactSetup()) 18 else 22),
+                        ),
                     )
                     addView(
                         TextView(this@backHeader).apply {
                             text = label.orEmpty()
-                            LudoProofTheme.title(this, 16f)
-                            setPadding(dp(8), 0, dp(8), 0)
+                            LudoProofTheme.title(
+                                this,
+                                if (isCompactSetup()) 15f else 19f,
+                                gold = true,
+                            )
+                            setPadding(dp(7), 0, dp(7), 0)
+                            includeFontPadding = false
+                            maxLines = 1
                         },
                     )
                     addView(
                         SetupPawMarkView(this@backHeader),
-                        LinearLayout.LayoutParams(dp(22), dp(22)),
+                        LinearLayout.LayoutParams(
+                            dp(if (isCompactSetup()) 18 else 22),
+                            dp(if (isCompactSetup()) 18 else 22),
+                        ),
                     )
                 }
             addView(
                 badge,
                 FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.WRAP_CONTENT,
-                    dp(42),
+                    dp(if (isCompactSetup()) 222 else 274),
+                    dp(if (isCompactSetup()) 42 else 48),
                     Gravity.CENTER,
                 ),
             )
