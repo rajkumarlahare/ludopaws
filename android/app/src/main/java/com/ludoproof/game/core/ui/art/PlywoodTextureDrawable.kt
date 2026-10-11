@@ -12,7 +12,7 @@ import android.graphics.Shader
 import android.graphics.drawable.Drawable
 
 /**
- * Reusable code-drawn plywood texture for Profile panels.
+ * Reusable code-drawn plywood texture for cards, panels and buttons across the app.
  * Grain, knots, shading and the continuous 3D timber rim are painted at runtime;
  * no bitmap/image asset is used.
  */
