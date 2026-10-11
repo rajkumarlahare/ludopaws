@@ -83,7 +83,7 @@ requireText(
 );
 rejectText(
   profileActivity,
-  "profileHeaderIdentityPanel()",
+  "profilePawIdentityPanel()",
   "Profile must not render a duplicate Paw identity panel.",
 );
 requireText(
