@@ -117,11 +117,7 @@ internal fun OfflineGameActivity.characterPanel(
 ): LinearLayout =
     selectionPanel(
         "CHOOSE YOUR PAW",
-        if (isComputerMode) {
-            "CPU rivals use the other paws."
-        } else {
-            "Give every player a different animal."
-        },
+        if (isComputerMode) "CPU rivals use the other paws." else "",
         embeddedInCombinedPanel = embeddedInCombinedPanel,
     ).apply {
         if (isComputerMode) {

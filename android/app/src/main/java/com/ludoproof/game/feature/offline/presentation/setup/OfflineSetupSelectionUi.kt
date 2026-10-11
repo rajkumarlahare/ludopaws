@@ -32,11 +32,7 @@ internal fun OfflineGameActivity.playersPanel(
     LinearLayout =
     selectionPanel(
         "SELECT PLAYERS",
-        if (isComputerMode) {
-            "You + 1–3 computer players"
-        } else {
-            "Choose 2–4 players on this device."
-        },
+        if (isComputerMode) "You + 1–3 computer players" else "",
         embeddedInCombinedPanel = embeddedInCombinedPanel,
     ).apply {
         val playersRow = LinearLayout(this@playersPanel).apply {
@@ -122,7 +118,7 @@ internal fun OfflineGameActivity.colorPanel(
     LinearLayout =
     selectionPanel(
         "CHOOSE YOUR COLOR",
-        "Your color will rotate to the bottom-left side.",
+        if (isComputerMode) "Your color will rotate to the bottom-left side." else "",
         embeddedInCombinedPanel = embeddedInCombinedPanel,
     ).apply {
         val colorRow = LinearLayout(this@colorPanel).apply {
@@ -371,24 +367,26 @@ internal fun OfflineGameActivity.selectionPanel(
         }
         addView(heading)
 
-        addView(
-            TextView(this@selectionPanel).apply {
-                text = subtitle
-                LudoProofTheme.body(
-                    this,
-                    if (isCompactSetup()) 10.5f else 11.5f,
-                    centered = true,
-                    bright = true,
-                )
-                setTextColor(0xFFD4E8FF.toInt())
-                setPadding(
-                    0,
-                    dp(3),
-                    0,
-                    dp(if (isCompactSetup()) 8 else 11),
-                )
-            },
-        )
+        if (subtitle.isNotBlank()) {
+            addView(
+                TextView(this@selectionPanel).apply {
+                    text = subtitle
+                    LudoProofTheme.body(
+                        this,
+                        if (isCompactSetup()) 10.5f else 11.5f,
+                        centered = true,
+                        bright = true,
+                    )
+                    setTextColor(0xFFD4E8FF.toInt())
+                    setPadding(
+                        0,
+                        dp(3),
+                        0,
+                        dp(if (isCompactSetup()) 8 else 11),
+                    )
+                },
+            )
+        }
     }
 
 internal fun OfflineGameActivity.choiceTile(
