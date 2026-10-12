@@ -8,6 +8,7 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.LudoProofTheme
+import com.ludoproof.game.core.ui.art.recessedPlywoodBackground
 import com.ludoproof.game.core.ui.components.AppFocusRing
 import com.ludoproof.game.feature.store.presentation.StoreActivity
 import com.ludoproof.game.feature.store.presentation.art.GemClusterView
@@ -107,6 +108,7 @@ internal fun StoreActivity.storeHeader():
             GemClusterView(
                 this@storeHeader,
             ).apply {
+                background = recessedPlywoodBackground(this@storeHeader, outerCornerRadiusDp = 12f)
                 contentDescription =
                     "Gems"
             },

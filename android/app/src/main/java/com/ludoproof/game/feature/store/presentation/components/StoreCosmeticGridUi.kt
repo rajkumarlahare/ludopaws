@@ -2,7 +2,6 @@ package com.ludoproof.game.feature.store.presentation.components
 
 import android.graphics.Color
 import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.widget.Button
 import android.widget.LinearLayout
@@ -135,38 +134,23 @@ private fun StoreActivity.cosmeticCard(
                 .level
 
         background =
-            GradientDrawable(
-                GradientDrawable.Orientation.TOP_BOTTOM,
-                if (cosmetic.contentAvailable) {
-                    intArrayOf(
-                        0xFF164FA3.toInt(),
-                        0xFF0C397D.toInt(),
-                    )
-                } else {
-                    intArrayOf(
-                        0xFF34445F.toInt(),
-                        0xFF202D43.toInt(),
-                    )
-                },
-            ).apply {
-                cornerRadius =
-                    dp(13)
-                        .toFloat()
-                setStroke(
-                    dp(
-                        if (selected) {
-                            3
-                        } else {
-                            2
-                        },
-                    ),
+            storePlywoodCardBackground(
+                cornerRadiusDp = 13f,
+                fillColors =
+                    if (cosmetic.contentAvailable) {
+                        intArrayOf(0xC8164FA3.toInt(), 0xC80C397D.toInt())
+                    } else {
+                        intArrayOf(0xC834445F.toInt(), 0xC8202D43.toInt())
+                    },
+                strokeColor =
                     if (selected) {
                         0xFF49F073.toInt()
                     } else {
                         borderColor
                     },
-                )
-            }
+                strokeWidthDp = if (selected) 3 else 2,
+                insetDp = 5,
+            )
 
         addView(
             TextView(
@@ -213,21 +197,25 @@ private fun StoreActivity.cosmeticCard(
                 gravity =
                     Gravity.CENTER
                 background =
-                    GradientDrawable(
-                        GradientDrawable.Orientation.TOP_BOTTOM,
-                        intArrayOf(
-                            cosmetic.previewPrimary,
-                            cosmetic.previewSecondary,
+                    storeRecessedSurfaceBackground(
+                        cornerRadiusDp = 12f,
+                        fillColors = intArrayOf(
+                            Color.argb(
+                                190,
+                                Color.red(cosmetic.previewPrimary),
+                                Color.green(cosmetic.previewPrimary),
+                                Color.blue(cosmetic.previewPrimary),
+                            ),
+                            Color.argb(
+                                205,
+                                Color.red(cosmetic.previewSecondary),
+                                Color.green(cosmetic.previewSecondary),
+                                Color.blue(cosmetic.previewSecondary),
+                            ),
                         ),
-                    ).apply {
-                        cornerRadius =
-                            dp(12)
-                                .toFloat()
-                        setStroke(
-                            dp(1),
-                            0x885FE1FF.toInt(),
-                        )
-                    }
+                        strokeColor = 0x885FE1FF.toInt(),
+                        insetDp = 7,
+                    )
             },
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,

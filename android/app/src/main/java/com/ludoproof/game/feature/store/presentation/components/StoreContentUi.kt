@@ -9,6 +9,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.LudoProofTheme
+import com.ludoproof.game.core.ui.art.recessedPlywoodBackground
 import com.ludoproof.game.core.ui.components.AppFocusRing
 import com.ludoproof.game.feature.store.domain.StoreCatalog
 import com.ludoproof.game.feature.store.domain.model.StoreProduct
@@ -196,16 +197,16 @@ private fun StoreActivity.gemIntroCard(): LinearLayout =
         gravity = Gravity.CENTER_VERTICAL
         setPadding(dp(14), dp(10), dp(14), dp(10))
         background =
-            GradientDrawable(
-                GradientDrawable.Orientation.TL_BR,
-                intArrayOf(0xFF124F91.toInt(), 0xFF34246F.toInt()),
-            ).apply {
-                cornerRadius = dp(16).toFloat()
-                setStroke(dp(1), 0xFF53DFFF.toInt())
-            }
+            storePlywoodCardBackground(
+                cornerRadiusDp = 16f,
+                fillColors = intArrayOf(0xD9124F91.toInt(), 0xD934246F.toInt()),
+                strokeColor = 0xFF53DFFF.toInt(),
+                insetDp = 5,
+            )
 
         addView(
             GemClusterView(this@gemIntroCard, gemCount = 3).apply {
+                background = recessedPlywoodBackground(this@gemIntroCard, outerCornerRadiusDp = 12f)
                 contentDescription = "A cluster of shining gems"
             },
             LinearLayout.LayoutParams(dp(76), dp(72)),
@@ -244,21 +245,13 @@ private fun StoreActivity.featuredRemoveAdsCard(
         orientation =
             LinearLayout.VERTICAL
         background =
-            GradientDrawable(
-                GradientDrawable.Orientation.TOP_BOTTOM,
-                intArrayOf(
-                    0xFF4A156F.toInt(),
-                    0xFF2A0C54.toInt(),
-                ),
-            ).apply {
-                cornerRadius =
-                    dp(15)
-                        .toFloat()
-                setStroke(
-                    dp(2),
-                    0xFF8939A8.toInt(),
-                )
-            }
+            storePlywoodCardBackground(
+                cornerRadiusDp = 15f,
+                fillColors = intArrayOf(0xD94A156F.toInt(), 0xD92A0C54.toInt()),
+                strokeColor = 0xFF8939A8.toInt(),
+                strokeWidthDp = 2,
+                insetDp = 5,
+            )
 
         val body =
             LinearLayout(
@@ -293,14 +286,13 @@ private fun StoreActivity.featuredRemoveAdsCard(
                 gravity =
                     Gravity.CENTER
                 background =
-                    LudoProofTheme
-                        .rounded(
-                            0xFF1067B8.toInt(),
-                            16f,
-                            0xFF64E0FF.toInt(),
-                            2f,
-                            this@featuredRemoveAdsCard,
-                        )
+                    storeRecessedSurfaceBackground(
+                        cornerRadiusDp = 16f,
+                        fillColors = intArrayOf(0xCC1067B8.toInt(), 0xCC094A92.toInt()),
+                        strokeColor = 0xFF64E0FF.toInt(),
+                        strokeWidthDp = 2,
+                        insetDp = 6,
+                    )
             },
             LinearLayout.LayoutParams(
                 dp(118),
@@ -442,14 +434,13 @@ private fun StoreActivity.rewardedAdCard():
             dp(10),
         )
         background =
-            LudoProofTheme
-                .rounded(
-                    0xE9144C9D.toInt(),
-                    13f,
-                    0xFFA7429B.toInt(),
-                    2f,
-                    this@rewardedAdCard,
-                )
+            storeRecessedSurfaceBackground(
+                cornerRadiusDp = 13f,
+                fillColors = intArrayOf(0xD9144C9D.toInt(), 0xD90C2E66.toInt()),
+                strokeColor = 0xFFA7429B.toInt(),
+                strokeWidthDp = 2,
+                insetDp = 6,
+            )
 
         addView(
             TextView(
@@ -528,22 +519,16 @@ private fun StoreActivity.gemProductCard(
             dp(10),
         )
         background =
-            GradientDrawable(
-                GradientDrawable.Orientation.TL_BR,
-                intArrayOf(
-                    0xFF1A65AA.toInt(),
-                    0xFF123D82.toInt(),
-                    0xFF111D55.toInt(),
+            storePlywoodCardBackground(
+                cornerRadiusDp = 16f,
+                fillColors = intArrayOf(
+                    0xD01A65AA.toInt(),
+                    0xD0123D82.toInt(),
+                    0xD0111D55.toInt(),
                 ),
-            ).apply {
-                cornerRadius =
-                    dp(16)
-                        .toFloat()
-                setStroke(
-                    dp(1),
-                    0xFF55DFFF.toInt(),
-                )
-            }
+                strokeColor = 0xFF55DFFF.toInt(),
+                insetDp = 5,
+            )
         elevation = dp(3).toFloat()
 
         product.title
@@ -576,6 +561,7 @@ private fun StoreActivity.gemProductCard(
                 this@gemProductCard,
                 gemCount = gemClusterSize(product.gemAmount),
             ).apply {
+                background = recessedPlywoodBackground(this@gemProductCard, outerCornerRadiusDp = 12f)
                 contentDescription = "${product.gemAmount} gems"
             },
             LinearLayout.LayoutParams(
