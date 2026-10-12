@@ -4,12 +4,14 @@ import android.app.Activity
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
+import android.view.WindowInsets
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -416,6 +418,30 @@ class LeaderboardActivity :
         setContentView(
             root,
         )
+        root.setOnApplyWindowInsetsListener { _, insets ->
+            val cutoutTop =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    insets.displayCutout?.safeInsetTop ?: 0
+                } else {
+                    0
+                }
+            val statusTop =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    insets.getInsetsIgnoringVisibility(WindowInsets.Type.statusBars()).top
+                } else {
+                    @Suppress("DEPRECATION")
+                    insets.systemWindowInsetTop
+                }
+            val safeTopInset = maxOf(cutoutTop, statusTop)
+            content.setPadding(
+                content.paddingLeft,
+                dp(12) + safeTopInset,
+                content.paddingRight,
+                content.paddingBottom,
+            )
+            insets
+        }
+        root.requestApplyInsets()
     }
 
     private fun topBar():
@@ -439,6 +465,7 @@ class LeaderboardActivity :
                             this,
                             "←",
                         )
+                    applyPlywoodActionBackground(this)
                     contentDescription =
                         "Back"
                     setOnClickListener {
@@ -543,6 +570,7 @@ class LeaderboardActivity :
                             this,
                             "↻",
                         )
+                    applyPlywoodActionBackground(this)
                     contentDescription =
                         "Refresh leaderboard"
                     isEnabled =
@@ -566,6 +594,18 @@ class LeaderboardActivity :
                 ),
             )
         }
+
+    private fun applyPlywoodActionBackground(button: Button) {
+        button.backgroundTintList = null
+        button.foreground = null
+        button.stateListAnimator = null
+        button.setPadding(0, 0, 0, 0)
+        button.background =
+            plywoodBackground(
+                context = button.context,
+                cornerRadiusDp = 999f,
+            )
+    }
 
     private fun currentPlayerCard():
         LinearLayout {
