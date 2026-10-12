@@ -16,6 +16,7 @@ import {
   billingAccountId,
   hashGoogleSubject,
   verifyAccessToken,
+  verifyAccessTokenForDeletionReplay,
   verifyGoogleIdToken,
 } from "./account-security.js";
 import { GOOGLE_PLAY_PRODUCTS, googlePlayBillingEnabled, verifyAndRedeemGooglePlayPurchase } from "./google-play-billing.js";
@@ -194,7 +195,10 @@ async function handleAccountRequest(request, env) {
         try {
           session = await authenticate(request, env);
         } catch (error) {
-          const claims = await verifyAccessToken(env, bearerToken(request));
+          // A deletion can commit before the client receives its response. Permit
+          // signature-valid expired access tokens only to check the deletion
+          // tombstone; never treat the token as an active session.
+          const claims = await verifyAccessTokenForDeletionReplay(env, bearerToken(request));
           const status = await playerRequest(env, claims.accountId, "/account/delete-preview", { accountId: claims.accountId, sessionId: claims.sessionId });
           if (status.deleted === true) return json(200, { ok: true, deleted: true, replay: true });
           throw error;
