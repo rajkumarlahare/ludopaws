@@ -205,8 +205,14 @@ export class PlayerAccount {
     if (!cosmetic || !cosmetic.available) throw httpError(400, "COSMETIC_UNAVAILABLE", "this cosmetic is not available for purchase");
     if (cosmetic.level > 0) throw httpError(409, "PROFILE_PROGRESSION_NOT_SERVER_AUTHORITATIVE", "this cosmetic requires server-verified progression before it can be unlocked");
     if (cosmetic.kind === "FREE") {
-      this.ctx.storage.sql.exec("INSERT OR IGNORE INTO owned_cosmetics (cosmetic_id, category, source, acquired_at, source_ref_hash) VALUES (?, ?, 'DEFAULT', ?, NULL)", cosmeticId, cosmetic.category, Date.now());
-      return json(200, { ok: true, alreadyOwned: true, wallet: this.#walletSnapshot(accountId) });
+      let alreadyOwned = false;
+      this.ctx.storage.transactionSync(() => {
+        const now = Date.now();
+        const inserted = this.ctx.storage.sql.exec("INSERT OR IGNORE INTO owned_cosmetics (cosmetic_id, category, source, acquired_at, source_ref_hash) VALUES (?, ?, 'DEFAULT', ?, NULL)", cosmeticId, cosmetic.category, now);
+        alreadyOwned = Number(inserted.rowsWritten ?? 0) === 0;
+        this.ctx.storage.sql.exec("INSERT INTO selected_cosmetics (category, cosmetic_id, updated_at) VALUES (?, ?, ?) ON CONFLICT(category) DO UPDATE SET cosmetic_id = excluded.cosmetic_id, updated_at = excluded.updated_at", cosmetic.category, cosmeticId, now);
+      });
+      return json(200, { ok: true, alreadyOwned, wallet: this.#walletSnapshot(accountId) });
     }
     if (cosmetic.kind === "GEMS") {
       if (!Number.isSafeInteger(cosmetic.gemPrice) || cosmetic.gemPrice < 1) throw httpError(400, "COSMETIC_PRICE_INVALID", "cosmetic price is invalid");
@@ -222,12 +228,17 @@ export class PlayerAccount {
         }
         const balance = Number([...this.ctx.storage.sql.exec("SELECT balance FROM wallet WHERE account_id = ? LIMIT 1", accountId)][0]?.balance ?? 0);
         const owned = [...this.ctx.storage.sql.exec("SELECT cosmetic_id FROM owned_cosmetics WHERE cosmetic_id = ? LIMIT 1", cosmeticId)];
-        if (owned.length) { result = { alreadyOwned: true, replay: false, balance }; return; }
+        if (owned.length) {
+          const now = Date.now();
+          this.ctx.storage.sql.exec("INSERT INTO selected_cosmetics (category, cosmetic_id, updated_at) VALUES (?, ?, ?) ON CONFLICT(category) DO UPDATE SET cosmetic_id = excluded.cosmetic_id, updated_at = excluded.updated_at", cosmetic.category, cosmeticId, now);
+          result = { alreadyOwned: true, replay: false, balance }; return;
+        }
         if (balance < cosmetic.gemPrice) throw httpError(409, "INSUFFICIENT_GEMS", "not enough gems to purchase this cosmetic");
         const next = balance - cosmetic.gemPrice, now = Date.now();
         this.ctx.storage.sql.exec("UPDATE wallet SET balance = ?, updated_at = ? WHERE account_id = ?", next, now, accountId);
         this.ctx.storage.sql.exec("INSERT INTO wallet_transactions (transaction_id, idempotency_key, payload_hash, kind, delta, balance_after, source_ref_hash, created_at) VALUES (?, ?, ?, 'COSMETIC_PURCHASE', ?, ?, ?, ?)", crypto.randomUUID().toLowerCase(), idem, payloadHash, -cosmetic.gemPrice, next, sourceRefHash, now);
         this.ctx.storage.sql.exec("INSERT INTO owned_cosmetics (cosmetic_id, category, source, acquired_at, source_ref_hash) VALUES (?, ?, 'GEMS', ?, ?)", cosmeticId, cosmetic.category, now, sourceRefHash);
+        this.ctx.storage.sql.exec("INSERT INTO selected_cosmetics (category, cosmetic_id, updated_at) VALUES (?, ?, ?) ON CONFLICT(category) DO UPDATE SET cosmetic_id = excluded.cosmetic_id, updated_at = excluded.updated_at", cosmetic.category, cosmeticId, now);
         result = { replay: false, balance: next };
       });
       return json(200, { ok: true, ...result, cosmeticId, wallet: this.#walletSnapshot(accountId) });
@@ -235,8 +246,14 @@ export class PlayerAccount {
     if (cosmetic.kind === "REWARDED_ADS") {
       const progress = Number([...this.ctx.storage.sql.exec("SELECT progress FROM cosmetic_ad_progress WHERE cosmetic_id = ? LIMIT 1", cosmeticId)][0]?.progress ?? 0);
       if (progress < cosmetic.ads) throw httpError(409, "NEED_REWARDED_ADS", "this cosmetic needs more verified rewarded ads");
-      this.ctx.storage.sql.exec("INSERT OR IGNORE INTO owned_cosmetics (cosmetic_id, category, source, acquired_at, source_ref_hash) VALUES (?, ?, 'REWARDED_ADS', ?, NULL)", cosmeticId, cosmetic.category, Date.now());
-      return json(200, { ok: true, replay: false, cosmeticId, wallet: this.#walletSnapshot(accountId) });
+      let alreadyOwned = false;
+      this.ctx.storage.transactionSync(() => {
+        const now = Date.now();
+        const inserted = this.ctx.storage.sql.exec("INSERT OR IGNORE INTO owned_cosmetics (cosmetic_id, category, source, acquired_at, source_ref_hash) VALUES (?, ?, 'REWARDED_ADS', ?, NULL)", cosmeticId, cosmetic.category, now);
+        alreadyOwned = Number(inserted.rowsWritten ?? 0) === 0;
+        this.ctx.storage.sql.exec("INSERT INTO selected_cosmetics (category, cosmetic_id, updated_at) VALUES (?, ?, ?) ON CONFLICT(category) DO UPDATE SET cosmetic_id = excluded.cosmetic_id, updated_at = excluded.updated_at", cosmetic.category, cosmeticId, now);
+      });
+      return json(200, { ok: true, replay: false, alreadyOwned, cosmeticId, wallet: this.#walletSnapshot(accountId) });
     }
     throw httpError(409, "COSMETIC_UNLOCK_UNAVAILABLE", "this cosmetic unlock method is not available yet");
   }
