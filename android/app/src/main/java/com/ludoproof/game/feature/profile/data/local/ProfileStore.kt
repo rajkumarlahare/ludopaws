@@ -39,6 +39,18 @@ class ProfileStore(
         return true
     }
 
+    @Synchronized
+    fun clearForAccountDeletion(accountId: String) {
+        require(accountId.matches(Regex("^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$", RegexOption.IGNORE_CASE)))
+        check(
+            prefs.edit()
+                .remove(PROFILE_JSON_PREFIX + accountId)
+                .remove(KEY_PROFILE_JSON)
+                .remove(KEY_QUARANTINED_PROFILE_JSON)
+                .commit(),
+        ) { "Local profile data could not be cleared after account deletion." }
+    }
+
     /**
      * Stops a legacy unscoped profile from being adopted by a Google account restored on a fresh
      * device/session. If an old account is still active, pin its local profile to that account;
