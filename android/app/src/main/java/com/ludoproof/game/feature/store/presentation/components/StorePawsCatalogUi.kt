@@ -42,6 +42,23 @@ internal fun StoreActivity.pawsCatalogContent(): LinearLayout =
             }
         if (upcomingPacks.isNotEmpty()) {
             addView(
+                TextView(this@pawsCatalogContent).apply {
+                    text = "Only complete content-ready packs can be selected. More Paws are coming soon."
+                    textSize = 11f
+                    setTypeface(Typeface.DEFAULT, Typeface.NORMAL)
+                    setTextColor(0xFFD9EEFF.toInt())
+                    gravity = Gravity.CENTER
+                    includeFontPadding = false
+                    setPadding(dp(8), dp(4), dp(8), dp(4))
+                },
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ).apply {
+                    topMargin = dp(8)
+                },
+            )
+            addView(
                 this@pawsCatalogContent.pawsComingSoonGrid(upcomingPacks),
                 LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
