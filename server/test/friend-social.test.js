@@ -19,6 +19,10 @@ class MemoryStorage {
   async put(key, value) {
     this.values.set(key, structuredClone(value));
   }
+
+  async delete(key) {
+    return this.values.delete(key);
+  }
 }
 
 function jsonRequest(path, body) {
@@ -189,4 +193,55 @@ test("recent-player history deduplicates opponents and keeps newest first", asyn
   assert.equal(body.recent[0].displayName, "Beta Updated");
   assert.equal(body.recent[0].playedAt, 300);
   assert.equal(body.recent[1].opponentFriendId, C);
+});
+
+
+test("account deletion removes conversation data only for a participant", async () => {
+  const storage = new MemoryStorage();
+  const room = new FriendConversation({ storage });
+  const sent = await room.fetch(jsonRequest("/send", {
+    senderId: A,
+    receiverId: B,
+    text: "Delete this conversation",
+    clientRequestId: REQUEST_1,
+  }));
+  assert.equal(sent.status, 201);
+
+  const denied = await room.fetch(jsonRequest("/delete-for-friend", { friendId: C }));
+  assert.equal(denied.status, 403);
+
+  const deleted = await room.fetch(jsonRequest("/delete-for-friend", { friendId: A }));
+  assert.equal(deleted.status, 200);
+  assert.equal((await deleted.json()).deleted, true);
+
+  const list = await room.fetch(jsonRequest("/list", { meId: A, otherId: B }));
+  assert.equal(list.status, 200);
+  assert.equal((await list.json()).messages.length, 0);
+});
+
+test("account deletion purges opponent mentions and the deleted owner's recent history", async () => {
+  const storage = new MemoryStorage();
+  const room = new FriendRecentRoom({ storage });
+  for (const [opponentFriendId, matchId, playedAt] of [
+    [B, "LPABCDEFGH", 100],
+    [C, "LPBCDEFGH2", 200],
+  ]) {
+    const saved = await room.fetch(jsonRequest("/record", {
+      ownerFriendId: A, opponentFriendId, displayName: opponentFriendId, matchId, playedAt,
+    }));
+    assert.equal(saved.status, 200);
+  }
+
+  const purge = await room.fetch(jsonRequest("/purge-opponent", {
+    ownerFriendId: A, opponentFriendId: B,
+  }));
+  assert.equal(purge.status, 200);
+  assert.equal((await purge.json()).removed, 1);
+  const afterPurge = await room.fetch(jsonRequest("/list", { ownerFriendId: A }));
+  assert.deepEqual((await afterPurge.json()).recent.map(item => item.opponentFriendId), [C]);
+
+  const deleted = await room.fetch(jsonRequest("/delete-owner", { ownerFriendId: A }));
+  assert.equal(deleted.status, 200);
+  const afterDelete = await room.fetch(jsonRequest("/list", { ownerFriendId: A }));
+  assert.deepEqual((await afterDelete.json()).recent, []);
 });
