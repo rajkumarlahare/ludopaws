@@ -205,8 +205,9 @@ jobs:
         shell: bash
         run: |
           SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
-          # Keep CI on the supported software renderer with Vulkan disabled.
-          # The current hosted Linux emulator has been segfaulting in the old SwiftShader/Vulkan path.
+          # Pin the SwiftShader backend rather than the generic software selector.
+          # Emulator 37.2.12 selected swangle/lavapipe with -gpu software and
+          # segfaulted mid-suite on the hosted Linux runner.
           nohup "$SDK_ROOT/emulator/emulator" \
             -avd ludopaws-ci \
             -no-window \
@@ -215,7 +216,7 @@ jobs:
             -no-snapshot \
             -camera-back none \
             -camera-front none \
-            -gpu software \
+            -gpu swiftshader \
             -feature -Vulkan \
             > /tmp/ludopaws-emulator.log 2>&1 &
           EMULATOR_PID=$!
@@ -277,6 +278,10 @@ jobs:
         run: |
           timeout 10s adb logcat -d > /tmp/ludopaws-logcat.txt || true
           timeout 10s adb shell dumpsys activity activities > /tmp/ludopaws-activities.txt || true
+          # Preserve emulator crash databases when the native emulator process segfaults.
+          if [ -d /tmp/android-runner ]; then
+            find /tmp/android-runner -maxdepth 1 -type f -name 'emu-crash-*.db' -exec cp {} /tmp/ \; || true
+          fi
       - name: Upload instrumentation evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -288,6 +293,7 @@ jobs:
             /tmp/ludopaws-avd-list.txt
             /tmp/ludopaws-emulator.log
             /tmp/ludopaws-emulator-retry.log
+            /tmp/emu-crash-*.db
             /tmp/ludopaws-logcat.txt
             /tmp/ludopaws-activities.txt
           if-no-files-found: warn
