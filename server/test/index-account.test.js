@@ -276,7 +276,7 @@ test("expired token replay still rejects a forged signature before checking the 
   const { env, player } = makeDeletionReplayEnv(true);
   const token = await issueAccessToken(env, ACCOUNT_A, SESSION_A, Date.now() - 20 * 60 * 1000);
   const parts = token.split(".");
-  parts[1] = (parts[1][0] === "A" ? "B" : "A") + parts[1].slice(1);
+  parts[2] = (parts[2][0] === "A" ? "B" : "A") + parts[2].slice(1);
   const tamperedToken = parts.join(".");
 
   const response = await accountWorker.fetch(
