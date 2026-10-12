@@ -2,13 +2,15 @@ package com.ludoproof.game.feature.profile.presentation.components
 
 import android.graphics.Color
 import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
-import com.ludoproof.game.LudoProofTheme
+import com.ludoproof.game.core.ui.art.classicModeIconBackground
+import com.ludoproof.game.core.ui.art.classicStatsProgressTrackBackground
+import com.ludoproof.game.core.ui.art.classicStatsProgressFillBackground
+import com.ludoproof.game.core.ui.art.transparentDarkBlueStrokeBackground
 import com.ludoproof.game.feature.profile.domain.model.ProfileModeStats
 import com.ludoproof.game.feature.profile.domain.model.ProfileSnapshot
 import com.ludoproof.game.feature.profile.presentation.ProfileActivity
@@ -49,13 +51,7 @@ private fun ProfileActivity.classicRow(stats: ProfileModeStats): LinearLayout =
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
         setPadding(dp(10), dp(10), dp(10), dp(10))
-        background = LudoProofTheme.rounded(
-            0x33104483,
-            18f,
-            0xFF247FCB.toInt(),
-            1f,
-            this@classicRow,
-        )
+        background = transparentDarkBlueStrokeBackground(this@classicRow)
 
         addView(
             TextView(this@classicRow).apply {
@@ -64,13 +60,7 @@ private fun ProfileActivity.classicRow(stats: ProfileModeStats): LinearLayout =
                 setTypeface(Typeface.DEFAULT_BOLD)
                 setTextColor(Color.WHITE)
                 gravity = Gravity.CENTER
-                background = LudoProofTheme.rounded(
-                    0xE20A347A.toInt(),
-                    999f,
-                    0xFF217BD0.toInt(),
-                    1f,
-                    this@classicRow,
-                )
+                background = classicModeIconBackground(this@classicRow)
                 contentDescription = "Classic"
             },
             LinearLayout.LayoutParams(dp(48), dp(48)),
@@ -112,20 +102,11 @@ private fun ProfileActivity.classicRow(stats: ProfileModeStats): LinearLayout =
             0f
         }
         val track = FrameLayout(this@classicRow).apply {
-            background = LudoProofTheme.rounded(
-                0xFF062E70.toInt(),
-                999f,
-                0xFF1E73BE.toInt(),
-                1f,
-                this@classicRow,
-            )
+            background = classicStatsProgressTrackBackground(this@classicRow)
             clipToOutline = true
         }
         val fill = View(this@classicRow).apply {
-            background = GradientDrawable(
-                GradientDrawable.Orientation.LEFT_RIGHT,
-                intArrayOf(0xFFFFD93D.toInt(), 0xFFFFB91A.toInt()),
-            ).apply { cornerRadius = dp(999).toFloat() }
+            background = classicStatsProgressFillBackground(this@classicRow)
         }
         track.addView(
             fill,

@@ -178,8 +178,10 @@ class HomeActivity : Activity() {
                 gravity =
                     Gravity.CENTER_HORIZONTAL
                 topMargin =
+                    // Keep the mode cards in their existing position after
+                    // the Profile/Gems HUD and shortcut row are reduced by 25%.
                     dp(
-                        if (isCompact()) 302 else 312,
+                        if (isCompact()) 338 else 351,
                     )
             },
         )

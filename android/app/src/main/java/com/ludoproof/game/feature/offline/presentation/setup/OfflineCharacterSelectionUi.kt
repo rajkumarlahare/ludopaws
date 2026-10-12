@@ -1,12 +1,20 @@
 package com.ludoproof.game.ui.offline.setup
 
 import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.ValueAnimator
+import android.view.animation.DecelerateInterpolator
 import android.view.Gravity
 import android.widget.Button
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.LudoPawsCharacterAvatarView
+import com.ludoproof.game.core.ui.art.playerCountSelectionBackground
+import com.ludoproof.game.core.ui.components.playSelectionPopAnimation
 import com.ludoproof.game.LudoProofTheme
 import com.ludoproof.game.OfflineGameActivity
 import com.ludoproof.game.feature.characters.domain.catalog.LudoPawsCharacterCatalog
@@ -108,21 +116,26 @@ internal fun OfflineGameActivity.persistActiveCharacterSetup() {
     )
 }
 
-internal fun OfflineGameActivity.characterPanel(): LinearLayout =
+internal fun OfflineGameActivity.characterPanel(
+    embeddedInCombinedPanel: Boolean = false,
+): LinearLayout =
     selectionPanel(
         "CHOOSE YOUR PAW",
-        if (isComputerMode) {
-            "Pick your animal. Your computer rivals get the remaining paws."
-        } else {
-            "Give every player a different animal."
-        },
+        if (isComputerMode) "CPU rivals use the other paws." else "",
+        embeddedInCombinedPanel = embeddedInCombinedPanel,
     ).apply {
-        characterSlotsRow =
-            LinearLayout(this@characterPanel).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER
-            }.also(::addView)
-        rebuildCharacterSlotButtons()
+        if (isComputerMode) {
+            // Computer mode needs no YOU/character slot tab; paw selection is direct.
+            characterSlotsRow = null
+            characterSlotButtons = emptyMap()
+        } else {
+            characterSlotsRow =
+                LinearLayout(this@characterPanel).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER
+                }.also(::addView)
+            rebuildCharacterSlotButtons()
+        }
 
         val scroll =
             HorizontalScrollView(this@characterPanel).apply {
@@ -147,7 +160,7 @@ internal fun OfflineGameActivity.characterPanel(): LinearLayout =
                     card,
                     LinearLayout.LayoutParams(
                         dp(if (isCompactSetup()) 100 else 112),
-                        dp(if (isCompactSetup()) 132 else 144),
+                        dp(if (isCompactSetup()) 140 else 152),
                     ).apply {
                         setMargins(dp(4), 0, dp(4), 0)
                     },
@@ -157,19 +170,49 @@ internal fun OfflineGameActivity.characterPanel(): LinearLayout =
         scroll.addView(cardsRow)
         addView(scroll)
 
-        characterSummaryText =
-            TextView(this@characterPanel).apply {
-                LudoProofTheme.body(
-                    this,
-                    if (isCompactSetup()) 10.5f else 11.5f,
-                    centered = true,
-                    bright = true,
-                )
-                setPadding(dp(6), dp(8), dp(6), 0)
-            }.also(::addView)
+        // On both Pass & Play and Computer/Robot entry, briefly reveal the
+        // far-right character and smoothly return to the starting position.
+        scroll.post {
+            val maxScrollX = (cardsRow.width - scroll.width).coerceAtLeast(0)
+            if (maxScrollX > 0 && scroll.isAttachedToWindow) {
+                scroll.animateCharacterRowTo(maxScrollX) {
+                    scroll.postDelayed({
+                        if (scroll.isAttachedToWindow) {
+                            scroll.animateCharacterRowTo(0)
+                        }
+                    }, 180L)
+                }
+            }
+        }
+
+
+
+
 
         refreshCharacterSelectionUi()
     }
+
+private fun HorizontalScrollView.animateCharacterRowTo(
+    targetX: Int,
+    onEnd: (() -> Unit)? = null,
+) {
+    ValueAnimator.ofInt(scrollX, targetX).apply {
+        duration = 420L
+        interpolator = DecelerateInterpolator()
+        addUpdateListener { animator ->
+            scrollTo(animator.animatedValue as Int, 0)
+        }
+        if (onEnd != null) {
+            addListener(
+                object : AnimatorListenerAdapter() {
+                    override fun onAnimationEnd(animation: Animator) {
+                        onEnd()
+                    }
+                },
+            )
+        }
+    }.start()
+}
 
 private fun OfflineGameActivity.rebuildCharacterSlotButtons() {
     val slotsRow = characterSlotsRow ?: return
@@ -191,9 +234,11 @@ private fun OfflineGameActivity.rebuildCharacterSlotButtons() {
                 } else {
                     "P${slot + 1}"
                 },
-            ) {
-                selectCharacterSlot(slot)
-            }
+            ) {}
+        button.setOnClickListener { clicked ->
+            clicked.playSelectionPopAnimation()
+            selectCharacterSlot(slot)
+        }
         slotMap[slot] = button
         slotsRow.addView(
             button,
@@ -218,21 +263,24 @@ private fun OfflineGameActivity.characterChoiceCard(
     LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         gravity = Gravity.CENTER
-        setPadding(dp(6), dp(7), dp(6), dp(7))
+        clipChildren = false
+        clipToPadding = false
+        setPadding(dp(5), dp(7), dp(5), dp(7))
 
-        // fallbackDrawableName remains the catalog contract for future authored
-        // portrait assets; this vector avatar guarantees a non-blank current UI.
+        // Keep the existing production 3D portrait, but show it as a clean
+        // cut-out inside the selection card rather than a white circular badge.
         LudoPawsCharacterAvatarView(this@characterChoiceCard).also { avatar ->
             avatar.tag = CHARACTER_AVATAR_TAG
             avatar.bind(
                 characterId = character.id,
                 ringColor = 0xFF5BE0FF.toInt(),
+                showCircularChrome = false,
             )
             addView(
                 avatar,
                 LinearLayout.LayoutParams(
-                    dp(if (isCompactSetup()) 66 else 74),
-                    dp(if (isCompactSetup()) 66 else 74),
+                    dp(if (isCompactSetup()) 70 else 80),
+                    dp(if (isCompactSetup()) 70 else 80),
                 ),
             )
         }
@@ -240,14 +288,18 @@ private fun OfflineGameActivity.characterChoiceCard(
         addView(
             TextView(this@characterChoiceCard).apply {
                 text = character.displayName
-                LudoProofTheme.body(
-                    this,
-                    if (isCompactSetup()) 12f else 13f,
-                    centered = true,
-                    bright = true,
-                )
+                textSize = if (isCompactSetup()) 14f else 15f
+                setTypeface(Typeface.DEFAULT_BOLD)
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
+                includeFontPadding = false
+                setShadowLayer(2f, 0f, dp(1).toFloat(), 0xAA00112D.toInt())
                 tag = CHARACTER_NAME_TAG
             },
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply { topMargin = dp(1) },
         )
 
         addView(
@@ -256,15 +308,31 @@ private fun OfflineGameActivity.characterChoiceCard(
                     character.personality.name
                         .lowercase()
                         .replaceFirstChar(Char::uppercase)
-                textSize = if (isCompactSetup()) 9.5f else 10f
+                textSize = if (isCompactSetup()) 9.5f else 10.5f
                 setTextColor(0xFFBCD5FF.toInt())
                 gravity = Gravity.CENTER
+                includeFontPadding = false
+                setPadding(dp(5), dp(4), dp(5), dp(4))
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+                // Keep the personality subtitle text unboxed over the card surface.
+                background = null
                 tag = CHARACTER_PERSONALITY_TAG
+            },
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                topMargin = dp(3)
+                // Keep the shared subtitle stroke tucked inside the card edges.
+                marginStart = dp(4)
+                marginEnd = dp(4)
             },
         )
 
         contentDescription = "Choose ${character.displayName}"
-        setOnClickListener {
+        setOnClickListener { clicked ->
+            clicked.playSelectionPopAnimation()
             selectCharacterForActiveSlot(character.id)
         }
     }
@@ -282,7 +350,7 @@ internal fun OfflineGameActivity.refreshCharacterSelectionUi() {
 
     val expectedSlots =
         if (isComputerMode) {
-            setOf(0)
+            emptySet()
         } else {
             (0 until selectedPlayers).toSet()
         }
@@ -294,11 +362,18 @@ internal fun OfflineGameActivity.refreshCharacterSelectionUi() {
     }
 
     characterSlotButtons.forEach { (slot, button) ->
-        if (slot == selectedCharacterSlot) {
-            LudoProofTheme.selectedTile(button)
-        } else {
-            LudoProofTheme.normalTile(button)
-        }
+        val selected = slot == selectedCharacterSlot
+        button.background = playerCountSelectionBackground(
+            context = this@refreshCharacterSelectionUi,
+            selected = selected,
+            outerCornerRadiusDp = 12f,
+            checkBadgeAtTopEnd = true,
+            emphasizeSelected = true,
+            showCheckBadge = true,
+            checkMarkScale = 2f,
+        )
+        button.elevation = dp(if (selected) 3 else 1).toFloat()
+        button.isSelected = selected
         val characterName =
             selectedCharacterIds
                 .getOrNull(slot)
@@ -310,73 +385,39 @@ internal fun OfflineGameActivity.refreshCharacterSelectionUi() {
                 isComputerMode -> "YOU\n$characterName"
                 else -> "P${slot + 1}\n$characterName"
             }
-        button.setTextColor(
-            if (slot == selectedCharacterSlot) {
-                0xFF052A68.toInt()
-            } else {
-                Color.WHITE
-            },
-        )
+        button.setTextColor(if (selected) 0xFFFFD45E.toInt() else Color.WHITE)
     }
 
     val activeCharacterId = selectedCharacterIds.getOrNull(selectedCharacterSlot)
     characterCards.forEach { (characterId, card) ->
         val selected = characterId == activeCharacterId
-        if (selected) {
-            LudoProofTheme.selectedTile(card)
-        } else {
-            LudoProofTheme.normalTile(card)
-        }
+        // Share the Friends/Computer recessed plywood card and gold check treatment.
+        card.background = playerCountSelectionBackground(
+            context = this@refreshCharacterSelectionUi,
+            selected = selected,
+            outerCornerRadiusDp = 12f,
+            checkBadgeAtTopEnd = true,
+            emphasizeSelected = true,
+            showCheckBadge = true,
+            checkMarkScale = 3f,
+        )
+        card.elevation = dp(if (selected) 6 else 4).toFloat()
         card.findViewWithTag<LudoPawsCharacterAvatarView>(CHARACTER_AVATAR_TAG)
             ?.bind(
                 characterId = characterId,
-                ringColor =
-                    if (selected) {
-                        0xFFFFC72C.toInt()
-                    } else {
-                        0xFF5BE0FF.toInt()
-                    },
-                highlighted = selected,
+                ringColor = 0xFF5BE0FF.toInt(),
+                highlighted = false,
+                showCircularChrome = false,
             )
         card.findViewWithTag<TextView>(CHARACTER_NAME_TAG)
-            ?.setTextColor(
-                if (selected) {
-                    0xFF052A68.toInt()
-                } else {
-                    Color.WHITE
-                },
-            )
-        card.findViewWithTag<TextView>(CHARACTER_PERSONALITY_TAG)
-            ?.setTextColor(
-                if (selected) {
-                    0xFF174A78.toInt()
-                } else {
-                    0xFFBCD5FF.toInt()
-                },
-            )
+            ?.setTextColor(if (selected) 0xFFFFD45E.toInt() else Color.WHITE)
+        card.findViewWithTag<TextView>(CHARACTER_PERSONALITY_TAG)?.apply {
+            setTextColor(0xFFBCD5FF.toInt())
+            background = null
+        }
     }
 
-    characterSummaryText?.text =
-        selectedCharacterIds
-            .mapIndexed { index, characterId ->
-                val characterName =
-                    LudoPawsCharacterCatalog
-                        .character(characterId)
-                        ?.displayName
-                        ?: characterId
-                val owner =
-                    if (isComputerMode) {
-                        if (index == 0) {
-                            "YOU"
-                        } else {
-                            "CPU $index"
-                        }
-                    } else {
-                        "P${index + 1}"
-                    }
-                "$owner $characterName"
-            }
-            .joinToString("  •  ")
+
 }
 
 private const val CHARACTER_AVATAR_TAG =

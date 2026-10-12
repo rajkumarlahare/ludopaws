@@ -3,6 +3,7 @@ package com.ludoproof.game.feature.profile.presentation
 import android.app.Activity
 import android.app.AlertDialog
 import android.os.Bundle
+import android.os.Build
 import android.util.Log
 import android.view.Gravity
 import android.view.View
@@ -168,9 +169,37 @@ class ProfileActivity : Activity() {
             sectionParams(12),
         )
 
+        // This screen uses immersive full-screen layout. Respect the physical camera cutout
+        // so both the centered title and Back button (and all content below) start in the safe area.
+        root.setOnApplyWindowInsetsListener { _, insets ->
+            val systemTopInset = insets.systemWindowInsetTop
+            val cutoutTopInset =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    val cutout = insets.displayCutout
+                    maxOf(
+                        cutout?.safeInsetTop ?: 0,
+                        cutout?.boundingRects
+                            ?.filter { it.top == 0 }
+                            ?.maxOfOrNull { it.bottom }
+                            ?: 0,
+                    )
+                } else {
+                    0
+                }
+            val safeTopInset = maxOf(systemTopInset, cutoutTopInset)
+            content.setPadding(
+                0,
+                maxOf(dp(12), safeTopInset + dp(8)),
+                0,
+                dp(24),
+            )
+            insets
+        }
+
         setContentView(
             root,
         )
+        root.requestApplyInsets()
     }
 
     internal fun beginPlayGamesSignIn() {

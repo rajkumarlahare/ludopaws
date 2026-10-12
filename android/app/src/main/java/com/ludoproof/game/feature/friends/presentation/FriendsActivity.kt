@@ -6,6 +6,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -28,7 +29,11 @@ import com.ludoproof.game.GameApiException
 import com.ludoproof.game.GameMode
 import com.ludoproof.game.GameModeIntent
 import com.ludoproof.game.LudoProofTheme
+import com.ludoproof.game.core.ui.art.plywoodBackground
+import com.ludoproof.game.core.ui.art.playerCountSelectionBackground
+import com.ludoproof.game.core.ui.components.playSelectionPopAnimation
 import com.ludoproof.game.core.ui.components.AppFocusRing
+import com.ludoproof.game.core.ui.components.LaserStatusDotView
 import com.ludoproof.game.MainActivity
 import com.ludoproof.game.PendingOperationStore
 import com.ludoproof.game.PlayerSession
@@ -143,16 +148,21 @@ class FriendsActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             clipChildren = false
             clipToPadding = false
-            setPadding(0, dp(12), 0, dp(42))
+            setPadding(dp(8), dp(12), dp(8), dp(42))
+            background = plywoodBackground(
+                context = this@FriendsActivity,
+                cornerRadiusDp = 24f,
+            )
         }
-        contentHost.addView(
-            content,
-            FrameLayout.LayoutParams(
-                width,
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                Gravity.TOP or Gravity.CENTER_HORIZONTAL,
-            ),
+        // Center the whole plywood panel in the ScrollView viewport when it fits.
+        // ScrollView.fillViewport keeps this viewport-sized on short content while
+        // allowing the panel to scroll from the top when its content is taller.
+        val contentLayoutParams = FrameLayout.LayoutParams(
+            width,
+            FrameLayout.LayoutParams.WRAP_CONTENT,
+            Gravity.CENTER,
         )
+        contentHost.addView(content, contentLayoutParams)
         host.addView(
             scroll,
             FrameLayout.LayoutParams(
@@ -194,7 +204,12 @@ class FriendsActivity : Activity() {
                 context = this,
                 onBack = { finish() },
                 onSettings = { ArcadeDialogs.showSettings(this) },
-            )
+            ).apply {
+                for (index in 0 until childCount) {
+                    getChildAt(index).background =
+                        plywoodBackground(context = this@FriendsActivity, cornerRadiusDp = 999f)
+                }
+            }
         setContentView(root)
         root.setOnApplyWindowInsetsListener { _, insets ->
             val cutoutTop =
@@ -211,7 +226,8 @@ class FriendsActivity : Activity() {
                     insets.systemWindowInsetTop
                 }
             val safeTopInset = maxOf(cutoutTop, statusTop)
-            content.setPadding(content.paddingLeft, dp(12) + safeTopInset, content.paddingRight, content.paddingBottom)
+            // Keep Back/Settings aligned to the system-bar safe area independently;
+            // the plywood panel itself is centered by contentLayoutParams.
             topActionsBar.translationY = safeTopInset.toFloat()
             insets
         }
@@ -219,7 +235,7 @@ class FriendsActivity : Activity() {
     }
 
     private fun buildHeader(): View {
-        val row = FrameLayout(this).apply { minimumHeight = dp(62) }
+        val row = FrameLayout(this).apply { minimumHeight = dp(76) }
         val titleRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -235,11 +251,43 @@ class FriendsActivity : Activity() {
                 LinearLayout.LayoutParams.WRAP_CONTENT,
             ).apply { marginStart = dp(8) },
         )
+
+        val titleStack = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            addView(
+                titleRow,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    dp(54),
+                ),
+            )
+            addView(
+                LinearLayout(this@FriendsActivity).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER
+                    addView(
+                        LaserStatusDotView(this@FriendsActivity),
+                        LinearLayout.LayoutParams(dp(10), dp(10)).apply { marginEnd = dp(5) },
+                    )
+                    addView(
+                        FriendsVisualKit.body(this@FriendsActivity, "ONLINE", sizeSp = 10f).apply {
+                            setTextColor(0xFFD4FFB2.toInt())
+                            includeFontPadding = false
+                        },
+                    )
+                },
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ).apply { topMargin = dp(2) },
+            )
+        }
         row.addView(
-            titleRow,
+            titleStack,
             FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT,
-                dp(54),
+                FrameLayout.LayoutParams.WRAP_CONTENT,
                 Gravity.CENTER,
             ),
         )
@@ -308,6 +356,7 @@ class FriendsActivity : Activity() {
             LinearLayout.LayoutParams(dp(38), LinearLayout.LayoutParams.WRAP_CONTENT),
         )
         addFriendInput = FriendsVisualKit.input(this, "Enter Friend ID")
+        addFriendInput.setHintTextColor(Color.WHITE)
         addFriendInput.textSize = 12f
         addFriendInput.setPadding(dp(9), 0, dp(9), 0)
         row.addView(addFriendInput, LinearLayout.LayoutParams(0, dp(42), 1f))
@@ -390,15 +439,37 @@ class FriendsActivity : Activity() {
 
         val countRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         listOf(2, 3, 4).forEachIndexed { index, count ->
+            val selected = selectedPlayerCount == count
+            val playerCountButton = FriendsVisualKit.button(
+                this,
+                count.toString(),
+                if (selected) FriendsButtonStyle.GREEN else FriendsButtonStyle.BLUE,
+            ) {}.apply {
+                // These are the compact PRIVATE ROOM size controls (not the
+                // separate Offline setup tiles). Reuse Online's recessed timber
+                // and gold selected treatment, with a small top-end check badge
+                // so the selected option is recognizable at this compact size.
+                background = playerCountSelectionBackground(
+                    context = this@FriendsActivity,
+                    selected = selected,
+                    outerCornerRadiusDp = 14f,
+                    checkBadgeAtTopEnd = true,
+                    emphasizeSelected = true,
+                    showCheckBadge = true,
+                )
+                setTextColor(if (selected) 0xFFFFD45E.toInt() else Color.WHITE)
+                setShadowLayer(2f, 0f, dp(1).toFloat(), 0xA6000000.toInt())
+                elevation = dp(if (selected) 6 else 4).toFloat()
+                isSelected = selected
+                contentDescription =
+                    if (selected) "$count players, selected" else "$count players"
+            }
+            playerCountButton.setOnClickListener {
+                selectedPlayerCount = count
+                playerCountButton.playSelectionPopAnimation { renderRoom() }
+            }
             countRow.addView(
-                FriendsVisualKit.button(
-                    this,
-                    count.toString(),
-                    if (selectedPlayerCount == count) FriendsButtonStyle.GREEN else FriendsButtonStyle.BLUE,
-                ) {
-                    selectedPlayerCount = count
-                    renderRoom()
-                },
+                playerCountButton,
                 LinearLayout.LayoutParams(dp(42), dp(40)).apply {
                     if (index > 0) marginStart = dp(5)
                 },
@@ -444,7 +515,7 @@ class FriendsActivity : Activity() {
                 summary = if (inviteCount == 0) "No invites" else "$inviteCount waiting",
                 icon = FriendsIcon.INVITES,
                 count = inviteCount,
-                accent = 0xFFB36DFF.toInt(),
+                accent = 0xFF39E73B.toInt(),
             ) { showInvitesDialog() },
             LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
                 marginStart = dp(5)
@@ -558,6 +629,7 @@ class FriendsActivity : Activity() {
         )
         header.addView(heading, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         val search = FriendsVisualKit.input(this, "Search friends…").apply {
+            setHintTextColor(Color.WHITE)
             textSize = 12f
             setText(friendQuery)
             setSelection(text.length)
@@ -573,8 +645,37 @@ class FriendsActivity : Activity() {
                 }
             })
         }
+        search.setPadding(
+            search.paddingLeft,
+            search.paddingTop,
+            dp(31),
+            search.paddingBottom,
+        )
+        val searchInputWithIcon = FrameLayout(this).apply {
+            addView(
+                search,
+                FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                ),
+            )
+            addView(
+                FriendsVisualKit.iconView(this@FriendsActivity, FriendsIcon.SEARCH, Color.WHITE).apply {
+                    isClickable = false
+                    isFocusable = false
+                    importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                },
+                FrameLayout.LayoutParams(
+                    dp(if (isCompact()) 16 else 18),
+                    dp(if (isCompact()) 16 else 18),
+                    Gravity.END or Gravity.CENTER_VERTICAL,
+                ).apply {
+                    marginEnd = dp(9)
+                },
+            )
+        }
         header.addView(
-            search,
+            searchInputWithIcon,
             LinearLayout.LayoutParams(if (isCompact()) dp(132) else dp(180), dp(36))
                 .apply { marginStart = dp(6) },
         )

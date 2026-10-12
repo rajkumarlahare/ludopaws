@@ -11,78 +11,15 @@ import android.window.OnBackInvokedDispatcher
 import com.ludoproof.game.*
 import com.ludoproof.game.feature.online.*
 
-internal fun MainActivity.onlineTopBar(): LinearLayout =
-    LinearLayout(this).apply {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            onBackInvokedDispatcher.registerOnBackInvokedCallback(
-                OnBackInvokedDispatcher.PRIORITY_DEFAULT,
-            ) {
-                requestRemoteExit()
-            }
+internal fun MainActivity.registerOnlineBackCallback() {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        onBackInvokedDispatcher.registerOnBackInvokedCallback(
+            OnBackInvokedDispatcher.PRIORITY_DEFAULT,
+        ) {
+            requestRemoteExit()
         }
-
-        orientation = LinearLayout.HORIZONTAL
-        gravity = Gravity.CENTER_VERTICAL
-
-        addView(
-            LinearLayout(this@onlineTopBar).apply {
-                orientation = LinearLayout.VERTICAL
-                gravity = Gravity.CENTER
-                setPadding(dp(8), 0, dp(8), 0)
-
-                addView(
-                    TextView(this@onlineTopBar).apply {
-                        text =
-                            if (gameMode == GameMode.TEAM_UP) {
-                                "TEAM UP • 2 VS 2"
-                            } else {
-                                "ONLINE MATCH"
-                            }
-                        LudoProofTheme.title(
-                            this,
-                            if (isCompactOnline()) 17f else 19f,
-                        )
-                    },
-                )
-
-                connectionText =
-                    TextView(this@onlineTopBar).apply {
-                        text = "● CHECKING"
-                        LudoProofTheme.body(
-                            this,
-                            10.5f,
-                            centered = true,
-                            bright = true,
-                        )
-                        setPadding(dp(10), dp(3), dp(10), dp(3))
-                        background =
-                            LudoProofTheme.rounded(
-                                0xCC071C49.toInt(),
-                                999f,
-                                0x6647D7FF,
-                                1f,
-                                this@onlineTopBar,
-                            )
-                        accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
-                    }
-                addView(
-                    connectionText,
-                    LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.WRAP_CONTENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT,
-                    ).apply {
-                        gravity = Gravity.CENTER_HORIZONTAL
-                    },
-                )
-            },
-            LinearLayout.LayoutParams(
-                0,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                1f,
-            ),
-        )
-
     }
+}
 
 internal fun MainActivity.requestRemoteExit() {
     val hasUnfinishedMatch =

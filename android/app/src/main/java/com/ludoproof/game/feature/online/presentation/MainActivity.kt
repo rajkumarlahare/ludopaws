@@ -21,6 +21,7 @@ import androidx.activity.OnBackPressedCallback
 import org.json.JSONObject
 import java.util.concurrent.Executors
 import com.ludoproof.game.ui.game.addGameTopActions
+import com.ludoproof.game.core.ui.art.plywoodBackground
 import com.ludoproof.game.ui.online.*
 import com.ludoproof.game.feature.online.*
 import com.ludoproof.game.feature.online.FriendsVoiceChatSession
@@ -87,10 +88,10 @@ class MainActivity : ComponentActivity() {
     internal lateinit var verificationPanel: LinearLayout
     internal lateinit var proofDetailsText: TextView
     internal lateinit var statusText: TextView
-    internal lateinit var connectionText: TextView
+    internal val connectionTexts = mutableListOf<TextView>()
     internal lateinit var boardView: LudoBoardView
     internal lateinit var diceView: DiceView
-    internal lateinit var findMatchButton: Button
+    internal lateinit var findMatchButton: LinearLayout
     internal lateinit var cancelMatchmakingButton: Button
     internal lateinit var twoPlayerButton: Button
     internal lateinit var fourPlayerButton: Button
@@ -547,18 +548,7 @@ class MainActivity : ComponentActivity() {
             ),
         )
 
-        content.addView(
-            onlineTopBar(),
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            ).apply {
-                leftMargin =
-                    sectionSideMargin
-                rightMargin =
-                    sectionSideMargin
-            },
-        )
+        registerOnlineBackCallback()
 
         if (
             gameMode !=
@@ -678,21 +668,30 @@ class MainActivity : ComponentActivity() {
 
         val topActionsBar =
             addGameTopActions(
-            host = host,
-            context = this,
-            onBack = { requestRemoteExit() },
-            onSettings = {
-                ArcadeDialogs.showSettings(this) {
-                    currentState?.let { state ->
-                        OnlineLudoPawsPresentation.render(
-                            activity = this,
-                            previous = state,
-                            current = state,
-                        )
+                host = host,
+                context = this,
+                onBack = { requestRemoteExit() },
+                onSettings = {
+                    ArcadeDialogs.showSettings(this) {
+                        currentState?.let { state ->
+                            OnlineLudoPawsPresentation.render(
+                                activity = this,
+                                previous = state,
+                                current = state,
+                            )
+                        }
                     }
+                },
+            ).apply {
+                // Use the shared plywood skin only for the Online screen's Back and Settings.
+                for (index in 0 until childCount) {
+                    getChildAt(index).background =
+                        plywoodBackground(
+                            context = this@MainActivity,
+                            cornerRadiusDp = 999f,
+                        )
                 }
-            },
-        )
+            }
 
         setContentView(root)
         root.setOnApplyWindowInsetsListener { _, insets ->
@@ -923,37 +922,16 @@ class MainActivity : ComponentActivity() {
             ::fourPlayerButton.isInitialized
 
     internal fun updateConnectionLabel() {
-        if (
-            !::connectionText
-                .isInitialized
-        ) {
-            return
+        if (connectionTexts.isEmpty()) return
+
+        val (label, tint) = when {
+            !isOnline -> "OFFLINE" to LudoProofTheme.GOLD
+            realtimeConnected -> "LIVE" to 0xFF65EF55.toInt()
+            else -> "ONLINE" to 0xFFD4FFB2.toInt()
         }
-
-        when {
-            !isOnline -> {
-                connectionText.text =
-                    "● OFFLINE"
-                connectionText.setTextColor(
-                    LudoProofTheme.GOLD,
-                )
-            }
-
-            realtimeConnected -> {
-                connectionText.text =
-                    "● LIVE"
-                connectionText.setTextColor(
-                    0xFF65EF55.toInt(),
-                )
-            }
-
-            else -> {
-                connectionText.text =
-                    "● ONLINE"
-                connectionText.setTextColor(
-                    0xFF6EE7FF.toInt(),
-                )
-            }
+        connectionTexts.forEach { statusLabel ->
+            statusLabel.text = label
+            statusLabel.setTextColor(tint)
         }
     }
 

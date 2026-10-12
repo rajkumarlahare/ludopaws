@@ -460,10 +460,14 @@ internal fun showSettingsDialog(
         },
     )
 
+    val overflowGutter = settingsDp(context, 12)
     val scroll =
         ScrollView(context).apply {
             isFillViewport = true
             overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
+            clipChildren = false
+            clipToPadding = false
+            setPadding(overflowGutter, overflowGutter, overflowGutter, overflowGutter)
             addView(
                 panel,
                 ViewGroup.LayoutParams(
@@ -483,6 +487,7 @@ internal fun showSettingsDialog(
     sizeDialog(
         dialog,
         .84f,
+        overflowGutterDp = 12,
     )
     dialog.show()
 }

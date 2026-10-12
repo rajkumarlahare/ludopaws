@@ -31,6 +31,22 @@ class ModeArtView @JvmOverloads constructor(
             invalidate()
         }
 
+    /**
+     * Optional player-count glyph mode used by local game setup tiles.
+     * When null, the normal Home game-mode illustration is rendered unchanged.
+     */
+    var playerCount: Int? = null
+        set(value) {
+            field = value?.takeIf { it in 2..4 }
+            invalidate()
+        }
+
+    var playerCountSelected: Boolean = false
+        set(value) {
+            field = value
+            invalidate()
+        }
+
     private val density = resources.displayMetrics.density
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val stroke =
@@ -65,6 +81,12 @@ class ModeArtView @JvmOverloads constructor(
         val w = width.toFloat()
         val h = height.toFloat()
 
+        val count = playerCount
+        if (count != null) {
+            drawPlayerCount(canvas, w, h, count)
+            return
+        }
+
         when (mode) {
             Mode.ONLINE -> drawOnline(canvas, w, h)
             Mode.TEAM_UP -> drawTeamUp(canvas, w, h)
@@ -73,6 +95,78 @@ class ModeArtView @JvmOverloads constructor(
             Mode.PASS_AND_PLAY -> drawPassAndPlay(canvas, w, h)
         }
     }
+
+    private fun drawPlayerCount(
+        canvas: Canvas,
+        w: Float,
+        h: Float,
+        count: Int,
+    ) {
+        val size = min(w, h)
+        val positions = when (count) {
+            2 -> listOf(0.35f, 0.65f)
+            3 -> listOf(0.23f, 0.50f, 0.77f)
+            else -> listOf(0.16f, 0.39f, 0.61f, 0.84f)
+        }
+        val radius = size * when (count) {
+            2 -> 0.205f
+            3 -> 0.165f
+            else -> 0.135f
+        }
+        // Match the four standard Ludo yard colours. Two-player mode uses
+        // a clear red/blue pair; four-player mode shows all four colours.
+        val red = PlayerCountPalette(
+            selectedTop = 0xFFFF777D.toInt(),
+            selectedBottom = 0xFFC91422.toInt(),
+            idleTop = 0xFFE85B62.toInt(),
+            idleBottom = 0xFFA20E19.toInt(),
+        )
+        val yellow = PlayerCountPalette(
+            selectedTop = 0xFFFFF49B.toInt(),
+            selectedBottom = 0xFFD6A100.toInt(),
+            idleTop = 0xFFE7D26C.toInt(),
+            idleBottom = 0xFFA78308.toInt(),
+        )
+        val green = PlayerCountPalette(
+            selectedTop = 0xFF75E5A1.toInt(),
+            selectedBottom = 0xFF008343.toInt(),
+            idleTop = 0xFF47B878.toInt(),
+            idleBottom = 0xFF006632.toInt(),
+        )
+        val blue = PlayerCountPalette(
+            selectedTop = 0xFF8ADBFF.toInt(),
+            selectedBottom = 0xFF1C72B8.toInt(),
+            idleTop = 0xFF5CA7D8.toInt(),
+            idleBottom = 0xFF12517F.toInt(),
+        )
+        val palettes =
+            if (count == 2) {
+                listOf(red, blue)
+            } else {
+                listOf(red, yellow, green, blue).take(count)
+            }
+
+        positions.forEachIndexed { index, position ->
+            val palette = palettes[index]
+            val centerFront = count == 3 && index == 1
+            drawPerson(
+                canvas = canvas,
+                cx = w * position,
+                cy = h * (if (centerFront) 0.57f else 0.55f),
+                radius = radius * (if (centerFront) 1.10f else 1f),
+                topColor = if (playerCountSelected) palette.selectedTop else palette.idleTop,
+                bottomColor = if (playerCountSelected) palette.selectedBottom else palette.idleBottom,
+                front = centerFront || count == 2,
+            )
+        }
+    }
+
+    private data class PlayerCountPalette(
+        val selectedTop: Int,
+        val selectedBottom: Int,
+        val idleTop: Int,
+        val idleBottom: Int,
+    )
 
     private fun drawOnline(
         canvas: Canvas,

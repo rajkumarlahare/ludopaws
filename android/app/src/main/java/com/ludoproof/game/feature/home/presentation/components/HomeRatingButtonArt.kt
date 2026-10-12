@@ -2,131 +2,38 @@ package com.ludoproof.game.ui.home
 
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.LinearGradient
+import android.graphics.Shader
 import android.graphics.Paint
 import android.graphics.Path
-import android.graphics.Shader
 import android.view.View
+import com.ludoproof.game.R
 import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.sin
 
-/** Reference-style Google Play mark used only by the Home rating action. */
+/** Google Play mark rendered from a vector path asset for clean, exact colour joins. */
 internal class HomeGooglePlayIconView(
     context: Context,
 ) : View(context) {
-    private val paint =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.FILL
-        }
-    private val separator =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            color = 0xCCFFFFFF.toInt()
-            strokeWidth = 1.7f
-            strokeJoin = Paint.Join.ROUND
-        }
+    private val playMark =
+        context.getDrawable(R.drawable.ic_google_play_mark)
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
-        val size = min(width, height).toFloat()
-        if (size <= 0f) return
+        val drawable = playMark ?: return
+        val side = min(width, height).toFloat()
+        if (side <= 0f) return
 
-        val scale = size / 100f
-        canvas.save()
-        canvas.translate((width - size) / 2f, (height - size) / 2f)
-        canvas.scale(scale, scale)
-
-        // Soft depth behind the Play mark so it reads like the large reference icon.
-        val shadow =
-            Path().apply {
-                moveTo(20f, 18f)
-                lineTo(20f, 86f)
-                lineTo(84f, 52f)
-                close()
-            }
-        paint.color = 0x66000000
-        canvas.save()
-        canvas.translate(0f, 4f)
-        canvas.drawPath(shadow, paint)
-        canvas.restore()
-
-        val leftBlue =
-            Path().apply {
-                moveTo(18f, 15f)
-                lineTo(49f, 47f)
-                lineTo(18f, 85f)
-                close()
-            }
-        paint.color = 0xFF22B7F2.toInt()
-        canvas.drawPath(leftBlue, paint)
-
-        val topGreen =
-            Path().apply {
-                moveTo(18f, 15f)
-                lineTo(56f, 38f)
-                lineTo(49f, 47f)
-                close()
-            }
-        paint.color = 0xFF34D27B.toInt()
-        canvas.drawPath(topGreen, paint)
-
-        val bottomRed =
-            Path().apply {
-                moveTo(18f, 85f)
-                lineTo(49f, 47f)
-                lineTo(57f, 62f)
-                close()
-            }
-        paint.color = 0xFFF64B4B.toInt()
-        canvas.drawPath(bottomRed, paint)
-
-        val rightYellow =
-            Path().apply {
-                moveTo(49f, 47f)
-                lineTo(56f, 38f)
-                lineTo(84f, 50f)
-                lineTo(57f, 62f)
-                close()
-            }
-        paint.color = 0xFFFFD24A.toInt()
-        canvas.drawPath(rightYellow, paint)
-
-        // Fine bright separators give the multicolor mark a polished, beveled edge.
-        canvas.drawLine(18f, 15f, 49f, 47f, separator)
-        canvas.drawLine(18f, 85f, 49f, 47f, separator)
-        canvas.drawLine(49f, 47f, 56f, 38f, separator)
-        canvas.drawLine(49f, 47f, 57f, 62f, separator)
-
-        // Small glass reflection rather than a hard white stripe.
-        val gloss =
-            Path().apply {
-                moveTo(22f, 20f)
-                lineTo(48f, 40f)
-                lineTo(43f, 44f)
-                lineTo(23f, 31f)
-                close()
-            }
-        paint.shader =
-            LinearGradient(
-                20f,
-                18f,
-                48f,
-                46f,
-                intArrayOf(
-                    0xC8FFFFFF.toInt(),
-                    0x30FFFFFF,
-                    Color.TRANSPARENT,
-                ),
-                floatArrayOf(0f, 0.58f, 1f),
-                Shader.TileMode.CLAMP,
-            )
-        canvas.drawPath(gloss, paint)
-        paint.shader = null
-
-        canvas.restore()
+        // Preserve the original prism's portrait proportions instead of stretching it
+        // into a triangle; all four colour segments come from the same vector asset.
+        val markHeight = (side * 0.92f * 0.8f).toInt().coerceAtLeast(1)
+        val markWidth = (markHeight * 38.1f / 44.1f).toInt().coerceAtLeast(1)
+        val left = (width - markWidth) / 2
+        val top = (height - markHeight) / 2
+        drawable.setBounds(left, top, left + markWidth, top + markHeight)
+        drawable.draw(canvas)
     }
 }
 
@@ -185,9 +92,9 @@ internal class HomeRatingStarsView(
                     0f,
                     centerY + radius,
                     intArrayOf(
-                        0xFFFFF08A.toInt(),
-                        0xFFFFC51E.toInt(),
-                        0xFFF28B00.toInt(),
+                        0xFFFFF7B5.toInt(),
+                        0xFFFFD957.toInt(),
+                        0xFFFFB83D.toInt(),
                     ),
                     floatArrayOf(0f, 0.54f, 1f),
                     Shader.TileMode.CLAMP,
@@ -195,7 +102,7 @@ internal class HomeRatingStarsView(
             canvas.drawPath(star, paint)
             paint.shader = null
 
-            outline.color = 0xFFD97700.toInt()
+            outline.color = 0xFFE6AD3E.toInt()
             outline.strokeWidth = (radius * 0.11f).coerceAtLeast(1f)
             canvas.drawPath(star, outline)
 

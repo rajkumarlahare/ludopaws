@@ -1,20 +1,30 @@
 package com.ludoproof.game.ui.online
 
 import android.graphics.Color
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.RelativeSizeSpan
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.drawable.Drawable
 import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.ludoproof.game.GameMode
 import com.ludoproof.game.LudoProofTheme
+import com.ludoproof.game.ModeArtView
+import com.ludoproof.game.core.ui.art.plywoodBackground
+import com.ludoproof.game.core.ui.art.playGamesSignInBackground
+import com.ludoproof.game.core.ui.art.recessedPlywoodBackground
+import com.ludoproof.game.core.ui.art.playerCountSelectionBackground
 import com.ludoproof.game.core.ui.components.AppFocusRing
+import com.ludoproof.game.core.ui.components.LaserStatusDotView
 import com.ludoproof.game.LudoPawsCharacterAvatarView
 import com.ludoproof.game.MainActivity
 import com.ludoproof.game.feature.profile.data.local.ProfileStore
@@ -23,9 +33,75 @@ import com.ludoproof.game.feature.online.beginPublicMatchmaking
 import com.ludoproof.game.feature.online.cancelPublicMatchmaking
 import com.ludoproof.game.feature.online.selectPublicPlayerCount
 
+private fun MainActivity.onlineModePanelHeader(): LinearLayout =
+    LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        gravity = Gravity.CENTER
+        val compact = isCompactOnline()
+        val isTeamUp = gameMode == GameMode.TEAM_UP
+        val iconSize = if (isTeamUp) { if (compact) 34 else 38 } else 36
+        val titleSize = if (isTeamUp) { if (compact) 20f else 23f } else { if (compact) 22f else 26f }
+        addView(
+            LinearLayout(this@onlineModePanelHeader).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER
+                addView(
+                    ModeArtView(this@onlineModePanelHeader).apply {
+                        mode = if (isTeamUp) ModeArtView.Mode.TEAM_UP else ModeArtView.Mode.ONLINE
+                        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                    },
+                    LinearLayout.LayoutParams(
+                        dp(iconSize),
+                        dp(iconSize),
+                    ).apply { marginEnd = dp(8) },
+                )
+                addView(
+                    TextView(this@onlineModePanelHeader).apply {
+                        text = if (isTeamUp) "TEAM UP" else "ONLINE"
+                        LudoProofTheme.title(this, titleSize)
+                        gravity = Gravity.CENTER_VERTICAL
+                        maxLines = 1
+                        includeFontPadding = false
+                    },
+                    LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                    ),
+                )
+            },
+        )
+        val statusRow = LinearLayout(this@onlineModePanelHeader).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            addView(
+                LaserStatusDotView(this@onlineModePanelHeader),
+                LinearLayout.LayoutParams(dp(10), dp(10)).apply { marginEnd = dp(5) },
+            )
+            val statusLabel = TextView(this@onlineModePanelHeader).apply {
+                text = "ONLINE"
+                LudoProofTheme.body(this, if (compact) 10f else 11f, centered = true, bright = true)
+                setTextColor(0xFFD4FFB2.toInt())
+                includeFontPadding = false
+                accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+                setPadding(0, 0, 0, 0)
+            }
+            this@onlineModePanelHeader.connectionTexts.add(statusLabel)
+            addView(statusLabel)
+        }
+        addView(
+            statusRow,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply { topMargin = dp(2) },
+        )
+        this@onlineModePanelHeader.updateConnectionLabel()
+    }
+
 internal fun MainActivity.onlineLobbyPanel():
     LinearLayout =
     LinearLayout(this).apply {
+        this@onlineLobbyPanel.connectionTexts.clear()
         orientation =
             LinearLayout.VERTICAL
         gravity =
@@ -103,19 +179,49 @@ internal fun MainActivity.onlineLobbyPanel():
                 clipChildren = false
                 clipToPadding = false
                 background =
-                    GradientDrawable(
-                        GradientDrawable.Orientation.TOP_BOTTOM,
-                        intArrayOf(
-                            0xF20A2856.toInt(),
-                            0xF2081B3D.toInt(),
-                        ),
-                    ).apply {
-                        cornerRadius = dp(24).toFloat()
-                        setStroke(dp(2), 0xFF40CFFF.toInt())
-                    }
+                    plywoodBackground(
+                        context = this@onlineLobbyPanel,
+                        cornerRadiusDp = 24f,
+                    )
 
                 addView(
-                    MatchmakingMedallionView(this@onlineLobbyPanel),
+                    onlineModePanelHeader(),
+                    LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                    ).apply { bottomMargin = dp(8) },
+                )
+
+                // Show the selected Ludo Paws character here as well as during matchmaking.
+                val selectionOwnAvatar =
+                    FrameLayout(this@onlineLobbyPanel).apply {
+                        background =
+                            recessedPlywoodBackground(
+                                context = this@onlineLobbyPanel,
+                                outerCornerRadiusDp = 18f,
+                            )
+                        setPadding(dp(3), dp(3), dp(3), dp(3))
+                        contentDescription = "Your selected character"
+                        addView(
+                            LudoPawsCharacterAvatarView(
+                                this@onlineLobbyPanel,
+                            ).apply {
+                                bind(
+                                    characterId =
+                                        CharacterSelectionStore(
+                                            this@onlineLobbyPanel,
+                                        ).load().characterId,
+                                    showCircularChrome = false,
+                                )
+                            },
+                            FrameLayout.LayoutParams(
+                                FrameLayout.LayoutParams.MATCH_PARENT,
+                                FrameLayout.LayoutParams.MATCH_PARENT,
+                            ),
+                        )
+                    }
+                addView(
+                    selectionOwnAvatar,
                     LinearLayout.LayoutParams(
                         dp(if (isCompactOnline()) 104 else 120),
                         dp(if (isCompactOnline()) 104 else 120),
@@ -140,8 +246,9 @@ internal fun MainActivity.onlineLobbyPanel():
                                 } else {
                                     24f
                                 },
-                                gold = true,
+                                gold = false,
                             )
+                        setTextColor(Color.WHITE)
                         gravity =
                             Gravity.CENTER
                     },
@@ -248,32 +355,52 @@ internal fun MainActivity.onlineLobbyPanel():
                 )
 
                 findMatchButton =
-                    Button(
+                    LinearLayout(
                         this@onlineLobbyPanel,
                     ).apply {
-                        text = "▶   PLAY"
-                        textSize =
-                            if (
-                                isCompactOnline()
-                            ) {
-                                16f
-                            } else {
-                                18f
-                            }
-                        setTypeface(Typeface.DEFAULT_BOLD)
-                        setTextColor(0xFF342000.toInt())
+                        orientation = LinearLayout.HORIZONTAL
+                        gravity = Gravity.CENTER
+                        isClickable = true
+                        isFocusable = true
+                        contentDescription = "Play"
+                        setPadding(dp(16), 0, dp(16), 0)
+                        // Reuse the exact Google Play sign-in fill and stroke from Profile.
                         background =
-                            GradientDrawable(
-                                GradientDrawable.Orientation.TOP_BOTTOM,
-                                intArrayOf(
-                                    0xFFFFD642.toInt(),
-                                    0xFFFF9D00.toInt(),
-                                ),
-                            ).apply {
-                                cornerRadius = dp(999).toFloat()
-                                setStroke(dp(2), 0xFFFFF0A0.toInt())
-                            }
-                        AppFocusRing.apply(this, cornerRadiusDp = 999f, strokeWidthDp = 3f)
+                            playGamesSignInBackground(
+                                this@onlineLobbyPanel,
+                            )
+
+                        addView(
+                            TextView(this@onlineLobbyPanel).apply {
+                                text = "PLAY"
+                                textSize =
+                                    if (isCompactOnline()) 16f else 18f
+                                setTypeface(Typeface.DEFAULT_BOLD)
+                                setTextColor(Color.WHITE)
+                                gravity = Gravity.CENTER
+                                includeFontPadding = false
+                                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                            },
+                            LinearLayout.LayoutParams(
+                                LinearLayout.LayoutParams.WRAP_CONTENT,
+                                LinearLayout.LayoutParams.WRAP_CONTENT,
+                            ),
+                        )
+                        addView(
+                            ImageView(this@onlineLobbyPanel).apply {
+                                setImageDrawable(
+                                    context.getDrawable(com.ludoproof.game.R.drawable.ic_play_triangle_white)?.mutate(),
+                                )
+                                scaleType = ImageView.ScaleType.FIT_CENTER
+                                contentDescription = null
+                                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                            },
+                            LinearLayout.LayoutParams(dp(18), dp(18)).apply {
+                                marginStart = dp(6)
+                            },
+                        )
+
+                        AppFocusRing.apply(this, cornerRadiusDp = 13f, strokeWidthDp = 3f)
                         setOnClickListener {
                             beginPublicMatchmaking()
                         }
@@ -331,33 +458,32 @@ internal fun MainActivity.onlineLobbyPanel():
                     ),
                     dp(18),
                 )
+                // The complete searching board keeps the same regular plywood skin as setup.
                 background =
-                    LudoProofTheme
-                        .darkPanelDrawable(
-                            this@onlineLobbyPanel,
-                            goldBorder = true,
-                        )
+                    plywoodBackground(
+                        context = this@onlineLobbyPanel,
+                        cornerRadiusDp = 24f,
+                    )
+
+                addView(
+                    onlineModePanelHeader(),
+                    LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                    ).apply { bottomMargin = dp(8) },
+                )
 
                 val ownAvatar =
                     FrameLayout(
                         this@onlineLobbyPanel,
                     ).apply {
+                        // Reuse the carved plywood pocket instead of the old blue avatar plate.
                         background =
-                            GradientDrawable(
-                                GradientDrawable.Orientation.TOP_BOTTOM,
-                                intArrayOf(
-                                    0xFF168EEA.toInt(),
-                                    0xFF083D91.toInt(),
-                                ),
-                            ).apply {
-                                cornerRadius =
-                                    dp(12)
-                                        .toFloat()
-                                setStroke(
-                                    dp(2),
-                                    0xFF5BE0FF.toInt(),
-                                )
-                            }
+                            recessedPlywoodBackground(
+                                context = this@onlineLobbyPanel,
+                                outerCornerRadiusDp = 14f,
+                            )
+                        setPadding(dp(3), dp(3), dp(3), dp(3))
                         addView(
                             LudoPawsCharacterAvatarView(
                                 this@onlineLobbyPanel,
@@ -367,8 +493,7 @@ internal fun MainActivity.onlineLobbyPanel():
                                         CharacterSelectionStore(
                                             this@onlineLobbyPanel,
                                         ).load().characterId,
-                                    ringColor = 0xFFFFD34A.toInt(),
-                                    highlighted = true,
+                                    showCircularChrome = false,
                                 )
                             },
                             FrameLayout.LayoutParams(
@@ -446,9 +571,7 @@ internal fun MainActivity.onlineLobbyPanel():
                         setTypeface(
                             Typeface.DEFAULT_BOLD,
                         )
-                        setTextColor(
-                            LudoProofTheme.GOLD,
-                        )
+                        setTextColor(Color.WHITE)
                         gravity =
                             Gravity.CENTER
                         setPadding(
@@ -460,12 +583,31 @@ internal fun MainActivity.onlineLobbyPanel():
                     },
                 )
 
+                // Only the inner opponent/searching lane uses the recessed plywood pocket.
+                val matchmakingOpponentArea =
+                    FrameLayout(this@onlineLobbyPanel).apply {
+                        background =
+                            recessedPlywoodBackground(
+                                context = this@onlineLobbyPanel,
+                                outerCornerRadiusDp = 16f,
+                            )
+                        setPadding(dp(7), dp(6), dp(7), dp(6))
+                        clipToPadding = true
+                        clipChildren = true
+                    }
                 matchmakingOpponentRail =
                     MatchmakingOpponentRailView(
                         this@onlineLobbyPanel,
                     )
-                addView(
+                matchmakingOpponentArea.addView(
                     matchmakingOpponentRail,
+                    FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                    ),
+                )
+                addView(
+                    matchmakingOpponentArea,
                     LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
                         dp(
@@ -496,8 +638,9 @@ internal fun MainActivity.onlineLobbyPanel():
                                 } else {
                                     17f
                                 },
-                                gold = true,
+                                gold = false,
                             )
+                        setTextColor(Color.WHITE)
                         gravity =
                             Gravity.CENTER
                         setPadding(
@@ -581,7 +724,10 @@ internal fun MainActivity.onlineLobbyPanel():
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
-            ),
+            ).apply {
+                // Keep the searching box aligned with the setup card's vertical position.
+                topMargin = dp(if (isCompactOnline()) 92 else 112)
+            },
         )
 
         matchmakingSlotsText =
@@ -616,13 +762,23 @@ internal fun MainActivity.stylePublicPlayerCountButton(
     selected: Boolean,
 ) {
     val isTwoPlayer = button === twoPlayerButton
-    val playerLabel = (if (isTwoPlayer) "2" else "4") + " PLAYERS"
-    button.text = playerLabel
+    val playerNumber = if (isTwoPlayer) "2" else "4"
+    val playerLabel = "$playerNumber PLAYERS"
+    button.text =
+        SpannableString("$playerNumber\nPLAYERS").apply {
+            setSpan(
+                RelativeSizeSpan(1.65f),
+                0,
+                playerNumber.length,
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+            )
+        }
     button.isSelected = selected
     button.contentDescription = if (selected) "$playerLabel, selected" else playerLabel
 
+    // Keep the label compact below the large number so icon and caption fit together.
     button.textSize =
-        if (isCompactOnline()) 14f else 16f
+        if (isCompactOnline()) 11.5f else 13f
     button.setTypeface(
         Typeface.DEFAULT_BOLD,
     )
@@ -637,12 +793,12 @@ internal fun MainActivity.stylePublicPlayerCountButton(
     )
     button.gravity = Gravity.CENTER
     button.isAllCaps = false
-    button.compoundDrawablePadding = dp(10)
+    button.compoundDrawablePadding = dp(if (isCompactOnline()) 6 else 7)
     button.setCompoundDrawables(
         null,
-        PlayerGroupDrawable(
+        HomeModePlayerCountDrawable(
+            context = button.context,
             count = if (isTwoPlayer) 2 else 4,
-            color = if (selected) 0xFFFFC52E.toInt() else 0xFF29B9FF.toInt(),
             selected = selected,
         ).apply {
             val iconWidth = dp(if (isCompactOnline()) 92 else 108)
@@ -652,282 +808,63 @@ internal fun MainActivity.stylePublicPlayerCountButton(
         null,
         null,
     )
+    // Shared recessed plywood and selected-state overlay are also used by the
+    // local 2/3/4-player setup selector.
     button.background =
-        GradientDrawable(
-            GradientDrawable.Orientation.TOP_BOTTOM,
-            if (
-                selected
-            ) {
-                intArrayOf(
-                    0xFF34250C.toInt(),
-                    0xFF151D31.toInt(),
-                )
-            } else {
-                intArrayOf(
-                    0xFF0C3564.toInt(),
-                    0xFF092344.toInt(),
-                )
-            },
-        ).apply {
-            cornerRadius = dp(20).toFloat()
-            setStroke(dp(if (selected) 3 else 1), if (selected) 0xFFFFC52E.toInt() else 0xFF1689D0.toInt())
-        }
+        playerCountSelectionBackground(
+            context = button.context,
+            selected = selected,
+            outerCornerRadiusDp = 12f,
+            checkBadgeAtTopEnd = true,
+            emphasizeSelected = true,
+            showCheckBadge = true,
+            checkMarkScale = 3f,
+        )
 }
 
-private class PlayerGroupDrawable(
-    private val count: Int,
-    private val color: Int,
-    private val selected: Boolean,
+/**
+ * Reuses the exact character illustration renderer from Home mode tiles for the
+ * 2-player and 4-player choices instead of maintaining a second, divergent drawing.
+ */
+private class HomeModePlayerCountDrawable(
+    context: android.content.Context,
+    count: Int,
+    selected: Boolean,
 ) : Drawable() {
-    private val paint =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.FILL
+    private val art =
+        ModeArtView(context).apply {
+            playerCount = count
+            playerCountSelected = selected
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
-    private val outline =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            strokeWidth = 1.5f
-        }
-    private val glint =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.FILL
-        }
-    private val shadow =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.FILL
-            color = 0x66020A18
-        }
-    private val radioPaint =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            strokeCap = Paint.Cap.ROUND
-        }
-    private val radioFill =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.FILL
-        }
-    private val neckPaint =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.FILL
-        }
+
+    override fun onBoundsChange(bounds: android.graphics.Rect) {
+        val width = bounds.width().coerceAtLeast(1)
+        val height = bounds.height().coerceAtLeast(1)
+        art.measure(
+            View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY),
+        )
+        art.layout(0, 0, width, height)
+    }
 
     override fun draw(canvas: Canvas) {
-        val bounds = bounds
-        val width = bounds.width().toFloat()
-        val height = bounds.height().toFloat()
-        if (width <= 0f || height <= 0f) return
-
-        val figures =
-            if (count == 2) {
-                listOf(
-                    Figure(0.31f, 0.06f, 0.90f),
-                    Figure(0.69f, 0.06f, 0.90f),
-                )
-            } else {
-                listOf(
-                    Figure(0.39f, 0.12f, 0.68f),
-                    Figure(0.61f, 0.12f, 0.68f),
-                    Figure(0.19f, 0.20f, 0.80f),
-                    Figure(0.81f, 0.20f, 0.80f),
-                )
-            }
-        figures.forEach { figure ->
-            drawPerson(
-                canvas = canvas,
-                x = bounds.left + width * figure.x,
-                top = bounds.top + height * figure.top,
-                width = width,
-                height = height * (0.62f - figure.top),
-                headRadius = width * (if (count == 2) 0.12f else 0.095f) * figure.scale,
-                sizeScale = figure.scale,
-            )
-        }
-
-        val radioRadius = width * 0.075f
-        val radioX = bounds.exactCenterX()
-        val radioY = bounds.top + height * 0.91f
-        radioPaint.color = if (selected) 0xFFFFE177.toInt() else 0xFFE3F0FF.toInt()
-        radioPaint.strokeWidth = width * 0.025f
-        canvas.drawCircle(radioX, radioY, radioRadius, radioPaint)
-        if (selected) {
-            radioFill.color = color
-            canvas.drawCircle(radioX, radioY, radioRadius * 0.62f, radioFill)
-            canvas.drawCircle(radioX - radioRadius * 0.22f, radioY - radioRadius * 0.28f, radioRadius * 0.18f, glint)
-        }
-    }
-
-    private data class Figure(
-        val x: Float,
-        val top: Float,
-        val scale: Float,
-    )
-
-    private fun drawPerson(
-        canvas: Canvas,
-        x: Float,
-        top: Float,
-        width: Float,
-        height: Float,
-        headRadius: Float,
-        sizeScale: Float,
-    ) {
-        val base = color
-        val light = blend(base, android.graphics.Color.WHITE, 0.32f)
-        val dark = blend(base, 0xFF071B3B.toInt(), 0.24f)
-        val headY = top + height * 0.22f
-        val headCenterX = x
-        val shoulderWidth = width * (if (count == 2) 0.15f else 0.135f) * sizeScale
-        val bodyTop = top + height * 0.48f
-        val bodyBottom = top + height * 0.91f
-        val neckWidth = headRadius * 0.62f
-        val neckBottom = bodyTop + height * 0.08f
-        val bodyPath =
-            android.graphics.Path().apply {
-                moveTo(x - shoulderWidth * 0.46f, bodyTop)
-                cubicTo(
-                    x - shoulderWidth * 1.02f,
-                    bodyTop + height * 0.08f,
-                    x - shoulderWidth * 1.28f,
-                    bodyBottom,
-                    x - shoulderWidth * 1.15f,
-                    bodyBottom,
-                )
-                lineTo(x + shoulderWidth * 1.15f, bodyBottom)
-                cubicTo(
-                    x + shoulderWidth * 1.28f,
-                    bodyBottom,
-                    x + shoulderWidth * 1.02f,
-                    bodyTop + height * 0.05f,
-                    x + shoulderWidth * 0.46f,
-                    bodyTop,
-                )
-                close()
-            }
-
-        canvas.drawOval(
-            x - shoulderWidth * 0.86f,
-            bodyBottom - height * 0.05f,
-            x + shoulderWidth * 0.86f,
-            bodyBottom + height * 0.10f,
-            shadow,
-        )
-        neckPaint.shader =
-            android.graphics.LinearGradient(
-                x - neckWidth,
-                headY,
-                x + neckWidth,
-                neckBottom,
-                light,
-                dark,
-                android.graphics.Shader.TileMode.CLAMP,
-            )
-        canvas.drawRoundRect(
-            x - neckWidth,
-            headY + headRadius * 0.62f,
-            x + neckWidth,
-            neckBottom,
-            neckWidth * 0.35f,
-            neckWidth * 0.35f,
-            neckPaint,
-        )
-        neckPaint.shader = null
-
-        val shadowPath =
-            android.graphics.Path(bodyPath).apply {
-                offset(width * 0.025f, height * 0.06f)
-            }
-        paint.color = dark
-        canvas.drawPath(shadowPath, paint)
-        paint.shader =
-            android.graphics.RadialGradient(
-                x - shoulderWidth * 0.55f,
-                bodyTop + height * 0.1f,
-                shoulderWidth * 2.2f,
-                intArrayOf(light, base, dark),
-                floatArrayOf(0f, 0.52f, 1f),
-                android.graphics.Shader.TileMode.CLAMP,
-            )
-        canvas.drawPath(bodyPath, paint)
-        paint.shader = null
+        val b = bounds
+        if (b.width() <= 0 || b.height() <= 0) return
         canvas.save()
-        canvas.clipPath(bodyPath)
-        glint.shader =
-            android.graphics.RadialGradient(
-                x - shoulderWidth * 0.28f,
-                bodyTop + height * 0.10f,
-                shoulderWidth * 1.4f,
-                intArrayOf(0x88FFFFFF.toInt(), 0x22FFFFFF, Color.TRANSPARENT),
-                null,
-                android.graphics.Shader.TileMode.CLAMP,
-            )
-        canvas.drawRect(
-            x - shoulderWidth * 1.5f,
-            bodyTop,
-            x + shoulderWidth * 1.5f,
-            bodyBottom,
-            glint,
-        )
-        glint.shader = null
+        canvas.translate(b.left.toFloat(), b.top.toFloat())
+        art.draw(canvas)
         canvas.restore()
-        outline.color = blend(base, 0xFF071327.toInt(), 0.42f)
-        outline.strokeWidth = width * 0.018f
-        canvas.drawPath(bodyPath, outline)
-
-        outline.color = blend(light, android.graphics.Color.WHITE, 0.35f)
-        outline.strokeWidth = width * 0.028f
-        canvas.drawLine(
-            x - shoulderWidth * 0.55f,
-            bodyTop + height * 0.05f,
-            x + shoulderWidth * 0.55f,
-            bodyTop + height * 0.05f,
-            outline,
-        )
-
-        paint.shader =
-            android.graphics.RadialGradient(
-                headCenterX - headRadius * 0.38f,
-                headY - headRadius * 0.42f,
-                headRadius * 1.72f,
-                intArrayOf(light, base, dark),
-                floatArrayOf(0f, 0.50f, 1f),
-                android.graphics.Shader.TileMode.CLAMP,
-            )
-        canvas.drawCircle(headCenterX, headY, headRadius, paint)
-        paint.shader = null
-        outline.color = blend(base, 0xFF071327.toInt(), 0.36f)
-        outline.strokeWidth = width * 0.018f
-        canvas.drawCircle(headCenterX, headY, headRadius, outline)
-        glint.color = 0x99FFFFFF.toInt()
-        canvas.drawOval(
-            headCenterX - headRadius * 0.58f,
-            headY - headRadius * 0.66f,
-            headCenterX - headRadius * 0.05f,
-            headY - headRadius * 0.26f,
-            glint,
-        )
-        glint.color = 0x55FFFFFF
-        canvas.drawCircle(headCenterX + headRadius * 0.38f, headY + headRadius * 0.36f, headRadius * 0.12f, glint)
-    }
-
-    private fun blend(
-        first: Int,
-        second: Int,
-        amount: Float,
-    ): Int {
-        val inverse = 1f - amount
-        return android.graphics.Color.rgb(
-            (android.graphics.Color.red(first) * inverse + android.graphics.Color.red(second) * amount).toInt(),
-            (android.graphics.Color.green(first) * inverse + android.graphics.Color.green(second) * amount).toInt(),
-            (android.graphics.Color.blue(first) * inverse + android.graphics.Color.blue(second) * amount).toInt(),
-        )
     }
 
     override fun setAlpha(alpha: Int) {
-        paint.alpha = alpha
+        art.alpha = alpha.coerceIn(0, 255) / 255f
+        invalidateSelf()
     }
 
     override fun setColorFilter(colorFilter: android.graphics.ColorFilter?) {
-        paint.colorFilter = colorFilter
+        // The Home artwork defines its own palette; don't tint it here.
+        invalidateSelf()
     }
 
     @Deprecated("Deprecated in Java")

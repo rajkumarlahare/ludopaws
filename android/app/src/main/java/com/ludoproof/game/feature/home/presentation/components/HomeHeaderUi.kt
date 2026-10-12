@@ -3,11 +3,14 @@ package com.ludoproof.game.ui.home
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
+import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.HomeActivity
+import com.ludoproof.game.LudoProofTheme
+import com.ludoproof.game.core.ui.art.plywoodBackground
 import com.ludoproof.game.LudoPawsCharacterAvatarView
 import com.ludoproof.game.feature.characters.data.local.CharacterSelectionStore
 import com.ludoproof.game.feature.leaderboard.presentation.LeaderboardActivity
@@ -19,17 +22,39 @@ import com.ludoproof.game.feature.store.presentation.StoreActivity
 internal fun HomeActivity.profileHud(): LinearLayout =
     LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
+        gravity = Gravity.CENTER_HORIZONTAL
         setPadding(
-            dp(if (isCompact()) 2 else 4),
+            dp(if (isCompact()) 2 else 3),
             dp(2),
-            dp(if (isCompact()) 2 else 4),
-            dp(4),
+            dp(if (isCompact()) 2 else 3),
+            dp(3),
         )
+
+        val hudInsetReductionDp =
+            if (isCompact()) 6 else 8
+        val hudHorizontalPaddingDp =
+            (
+                LudoProofTheme.pageHorizontalPaddingDp(this@profileHud) -
+                    hudInsetReductionDp
+                ).coerceAtLeast(6)
+        val availableHudWidthPx =
+            minOf(
+                resources.displayMetrics.widthPixels -
+                    dp(hudHorizontalPaddingDp * 2),
+                dp(
+                    LudoProofTheme.pageMaxContentWidthDp(this@profileHud) +
+                        hudInsetReductionDp * 2,
+                ),
+            )
+        // Keep the HUD aligned to the available Home content width.
+        // Only the inner controls were compacted; shrinking the row itself
+        // made Gems/Profile and the four shortcuts bunch up in the center.
+        val hudWidthPx = availableHudWidthPx
 
         addView(
             homeIdentityRow(),
             LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
+                hudWidthPx,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
             ),
         )
@@ -37,10 +62,10 @@ internal fun HomeActivity.profileHud(): LinearLayout =
         addView(
             homeShortcutRow(),
             LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
+                hudWidthPx,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
             ).apply {
-                topMargin = dp(if (isCompact()) 8 else 10)
+                topMargin = dp(if (isCompact()) 6 else 8)
             },
         )
 
@@ -58,13 +83,15 @@ private fun HomeActivity.homeIdentityRow(): LinearLayout =
     LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
-        minimumHeight = dp(if (isCompact()) 48 else 52)
+        minimumHeight = dp(if (isCompact()) 53 else 57)
+        // Keep only the Gems and Profile chips comfortably inset from the screen edges.
+        setPadding(dp(if (isCompact()) 8 else 10), 0, dp(if (isCompact()) 8 else 10), 0)
 
         addView(
             homeCurrencyPill(),
             LinearLayout.LayoutParams(
-                dp(if (isCompact()) 128 else 142),
-                dp(if (isCompact()) 46 else 50),
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                dp(if (isCompact()) 53 else 57),
             ),
         )
 
@@ -81,7 +108,7 @@ private fun HomeActivity.homeIdentityRow(): LinearLayout =
             homeProfilePill(),
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
-                dp(if (isCompact()) 46 else 50),
+                dp(if (isCompact()) 53 else 57),
             ),
         )
     }
@@ -94,16 +121,16 @@ private fun HomeActivity.homeCurrencyPill(): LinearLayout =
         isFocusable = true
         contentDescription = "Open gem store"
         background =
-            homeGlassBackground(
+            plywoodBackground(
                 context = this@homeCurrencyPill,
-                shape = HomeGlassShape.PILL,
+                cornerRadiusDp = if (isCompact()) 26.5f else 28.5f,
             )
-        elevation = dp(7).toFloat()
+        elevation = dp(5).toFloat()
         setPadding(
+            dp(6),
             dp(5),
-            dp(4),
-            dp(4),
-            dp(4),
+            dp(5),
+            dp(5),
         )
         setOnClickListener {
             startActivity(
@@ -121,7 +148,7 @@ private fun HomeActivity.homeCurrencyPill(): LinearLayout =
                     View.IMPORTANT_FOR_ACCESSIBILITY_NO
             },
             LinearLayout.LayoutParams(
-                dp(if (isCompact()) 34 else 38),
+                dp(if (isCompact()) 39 else 44),
                 LinearLayout.LayoutParams.MATCH_PARENT,
             ),
         )
@@ -133,7 +160,7 @@ private fun HomeActivity.homeCurrencyPill(): LinearLayout =
                     GemWalletStore(this@homeCurrencyPill)
                         .balance()
                         .toString()
-                textSize = if (isCompact()) 18f else 20f
+                textSize = if (isCompact()) 16f else 17.5f
                 setTypeface(Typeface.DEFAULT_BOLD)
                 setTextColor(Color.WHITE)
                 gravity = Gravity.CENTER
@@ -145,9 +172,8 @@ private fun HomeActivity.homeCurrencyPill(): LinearLayout =
                 )
             },
             LinearLayout.LayoutParams(
-                0,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                1f,
             ),
         )
 
@@ -159,16 +185,15 @@ private fun HomeActivity.homeCurrencyPill(): LinearLayout =
                 isFocusable = true
                 contentDescription = "Add currency"
                 setPadding(
-                    dp(8),
-                    dp(8),
-                    dp(8),
-                    dp(8),
+                    dp(9),
+                    dp(9),
+                    dp(9),
+                    dp(9),
                 )
                 background =
-                    homeGlassBackground(
+                    plywoodBackground(
                         context = this@homeCurrencyPill,
-                        shape = HomeGlassShape.CIRCLE,
-                        tone = HomeGlassTone.BLUE,
+                        cornerRadiusDp = if (isCompact()) 19.5f else 22f,
                     )
                 setOnClickListener {
                     startActivity(
@@ -180,8 +205,8 @@ private fun HomeActivity.homeCurrencyPill(): LinearLayout =
                 }
             },
             LinearLayout.LayoutParams(
-                dp(if (isCompact()) 34 else 38),
-                dp(if (isCompact()) 34 else 38),
+                dp(if (isCompact()) 39 else 44),
+                dp(if (isCompact()) 39 else 44),
             ),
         )
     }
@@ -194,16 +219,16 @@ private fun HomeActivity.homeProfilePill(): LinearLayout =
         isFocusable = true
         contentDescription = "Guest user profile"
         background =
-            homeGlassBackground(
+            plywoodBackground(
                 context = this@homeProfilePill,
-                shape = HomeGlassShape.PILL,
+                cornerRadiusDp = if (isCompact()) 26.5f else 28.5f,
             )
-        elevation = dp(7).toFloat()
+        elevation = dp(5).toFloat()
 
         setPadding(
-            dp(10),
+            dp(if (isCompact()) 12 else 14),
             dp(4),
-            dp(4),
+            dp(if (isCompact()) 4 else 5),
             dp(4),
         )
 
@@ -220,11 +245,13 @@ private fun HomeActivity.homeProfilePill(): LinearLayout =
             TextView(this@homeProfilePill).apply {
                 homeProfileNameText = this
                 text = homeDisplayName()
-                textSize = if (isCompact()) 14f else 16f
+                textSize = if (isCompact()) 13.5f else 15f
                 setTypeface(Typeface.DEFAULT_BOLD)
                 setTextColor(Color.WHITE)
                 gravity = Gravity.CENTER_VERTICAL
                 maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
+                maxWidth = dp(if (isCompact()) 96 else 112)
                 setShadowLayer(
                     2.4f,
                     0f,
@@ -234,7 +261,7 @@ private fun HomeActivity.homeProfilePill(): LinearLayout =
                 setPadding(
                     0,
                     0,
-                    dp(7),
+                    dp(if (isCompact()) 6 else 7),
                     0,
                 )
             },
@@ -262,17 +289,16 @@ private fun HomeActivity.homeProfilePill(): LinearLayout =
                     dp(6),
                 )
                 background =
-                    homeGlassBackground(
+                    plywoodBackground(
                         context = this@homeProfilePill,
-                        shape = HomeGlassShape.CIRCLE,
-                        tone = HomeGlassTone.PURPLE,
+                        cornerRadiusDp = if (isCompact()) 22f else 24f,
                     )
                 importantForAccessibility =
                     View.IMPORTANT_FOR_ACCESSIBILITY_NO
             },
             LinearLayout.LayoutParams(
-                dp(if (isCompact()) 38 else 42),
-                dp(if (isCompact()) 38 else 42),
+                dp(if (isCompact()) 44 else 48),
+                dp(if (isCompact()) 44 else 48),
             ),
         )
     }
@@ -309,11 +335,11 @@ private fun HomeActivity.homeShortcutRow(): LinearLayout =
                 homeShortcut(item),
                 LinearLayout.LayoutParams(
                     0,
-                    dp(if (isCompact()) 84 else 92),
+                    dp(if (isCompact()) 63 else 69),
                     1f,
                 ).apply {
-                    leftMargin = dp(2)
-                    rightMargin = dp(2)
+                    leftMargin = dp(1)
+                    rightMargin = dp(1)
                 },
             )
         }
@@ -332,16 +358,16 @@ private fun HomeActivity.homeShortcut(
             if (item.enabled) item.label else "${item.label} unavailable"
         alpha = if (item.enabled) 1f else 0.56f
         background =
-            homeGlassBackground(
+            plywoodBackground(
                 context = this@homeShortcut,
-                shape = HomeGlassShape.TILE,
+                cornerRadiusDp = 18f,
             )
-        elevation = dp(7).toFloat()
+        elevation = dp(5).toFloat()
         setPadding(
-            dp(3),
-            dp(if (isCompact()) 5 else 6),
-            dp(3),
-            dp(5),
+            dp(2),
+            dp(if (isCompact()) 4 else 5),
+            dp(2),
+            dp(4),
         )
         if (item.enabled) {
             setOnClickListener {
@@ -375,8 +401,8 @@ private fun HomeActivity.homeShortcut(
                     View.IMPORTANT_FOR_ACCESSIBILITY_NO
             },
             LinearLayout.LayoutParams(
-                dp(if (isCompact()) 48 else 54),
-                dp(if (isCompact()) 48 else 54),
+                dp(if (isCompact()) 36 else 41),
+                dp(if (isCompact()) 36 else 41),
             ),
         )
 
@@ -385,10 +411,10 @@ private fun HomeActivity.homeShortcut(
                 text = item.label
                 textSize =
                     when {
-                        isCompact() && item.label.length > 10 -> 8.5f
-                        isCompact() -> 10f
-                        item.label.length > 10 -> 9.5f
-                        else -> 11f
+                        isCompact() && item.label.length > 10 -> 8f
+                        isCompact() -> 8.5f
+                        item.label.length > 10 -> 8f
+                        else -> 9f
                     }
                 setTypeface(Typeface.DEFAULT_BOLD)
                 setTextColor(Color.WHITE)

@@ -2,12 +2,11 @@ package com.ludoproof.game.feature.profile.presentation.components
 
 import android.graphics.Color
 import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
+import com.ludoproof.game.core.ui.art.emptyPurchaseIconBackground
 import android.view.Gravity
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
-import com.ludoproof.game.LudoProofTheme
 import com.ludoproof.game.feature.profile.domain.model.ProfileSnapshot
 import com.ludoproof.game.feature.profile.presentation.ProfileActivity
 
@@ -57,11 +56,7 @@ internal fun ProfileActivity.profilePurchasesPanel(profile: ProfileSnapshot): Li
                     textSize = 32f
                     gravity = Gravity.CENTER
                     setTextColor(0xFFBDE5FF.toInt())
-                    background = GradientDrawable().apply {
-                        shape = GradientDrawable.OVAL
-                        setColor(0x1C3DBEFF)
-                        setStroke(dp(1), 0x663EABF3)
-                    }
+                    background = emptyPurchaseIconBackground(this@profilePurchasesPanel)
                 },
                 LinearLayout.LayoutParams(dp(60), dp(60)),
             )

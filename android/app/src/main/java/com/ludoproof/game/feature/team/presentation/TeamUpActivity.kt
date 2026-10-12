@@ -4,36 +4,53 @@ import android.app.Activity
 import android.content.Intent
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.RadialGradient
+import android.graphics.RectF
+import android.graphics.Shader
 import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.text.Spannable
+import android.text.SpannableString
+import android.text.TextPaint
+import android.text.style.CharacterStyle
+import android.text.style.ReplacementSpan
 import android.view.Gravity
 import android.view.View
 import android.view.WindowInsets
 import android.widget.Button
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import com.ludoproof.game.CachedMatchStore
+import com.ludoproof.game.LudoPawsCharacterAvatarView
+import com.ludoproof.game.core.ui.components.playSelectionPopAnimation
+import com.ludoproof.game.core.ui.components.LaserStatusDotView
 import com.ludoproof.game.GameMode
 import com.ludoproof.game.GameModeIntent
 import com.ludoproof.game.LudoProofTheme
 import com.ludoproof.game.core.ui.components.AppFocusRing
-import com.ludoproof.game.core.ui.icons.AppIconName
-import com.ludoproof.game.core.ui.icons.AppIconView
+import com.ludoproof.game.core.ui.art.plywoodBackground
+import com.ludoproof.game.core.ui.art.playGamesSignInBackground
+import com.ludoproof.game.core.ui.art.recessedPlywoodBackground
 import com.ludoproof.game.MainActivity
 import com.ludoproof.game.PlayerSession
 import com.ludoproof.game.SecureSessionStore
+import com.ludoproof.game.feature.friends.presentation.FriendsIcon
+import com.ludoproof.game.feature.friends.presentation.FriendsVisualKit
 import com.ludoproof.game.feature.leaderboard.data.local.LeaderboardCredential
 import com.ludoproof.game.feature.leaderboard.data.local.LeaderboardIdentityStore
 import com.ludoproof.game.feature.leaderboard.data.remote.LeaderboardApi
+import com.ludoproof.game.feature.characters.data.local.CharacterSelectionStore
+import com.ludoproof.game.feature.characters.domain.catalog.LudoPawsCharacterCatalog
 import com.ludoproof.game.feature.profile.data.local.ProfileStore
 import com.ludoproof.game.feature.team.data.local.TeamMatchmakingStore
 import com.ludoproof.game.feature.team.data.local.TeamMatchmakingTicket
@@ -49,6 +66,7 @@ class TeamUpActivity : Activity() {
     private val ticketStore by lazy { TeamMatchmakingStore(this) }
     private val identityStore by lazy { LeaderboardIdentityStore(this) }
     private val profileStore by lazy { ProfileStore(this) }
+    private var selectedCharacterId = LudoPawsCharacterCatalog.DEFAULT_CHARACTER_ID
     private val sessionStore by lazy { SecureSessionStore(this) }
     private val cachedMatchStore by lazy { CachedMatchStore(this) }
     private val executor = Executors.newSingleThreadExecutor()
@@ -57,8 +75,9 @@ class TeamUpActivity : Activity() {
     @Volatile
     private var requestInFlight = false
     private var stopped = false
+    private var validatingRestoredSearch = false
 
-    private lateinit var quickTeamButton: Button
+    private lateinit var quickTeamButton: FrameLayout
     private lateinit var cancelButton: Button
     private lateinit var setupContent: LinearLayout
     private lateinit var searchPanel: LinearLayout
@@ -72,7 +91,7 @@ class TeamUpActivity : Activity() {
             override fun run() {
                 if (!stopped && ticketStore.load() != null) {
                     pollSearch()
-                    updateTimer()
+                    if (!validatingRestoredSearch) updateTimer()
                 }
                 if (!stopped) {
                     handler.postDelayed(this, POLL_MS)
@@ -83,6 +102,10 @@ class TeamUpActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         LudoProofTheme.configureWindow(this)
+        selectedCharacterId = CharacterSelectionStore(this).load().characterId
+        // A persisted ticket may belong to an earlier app session. Keep its old
+        // elapsed time hidden until the server confirms that the search is active.
+        validatingRestoredSearch = ticketStore.load() != null
         buildUi()
         renderSearchState()
     }
@@ -128,54 +151,51 @@ class TeamUpActivity : Activity() {
                         orientation = LinearLayout.HORIZONTAL
                         gravity = Gravity.CENTER
                         addView(
-                            AppIconView(
-                                context = this@TeamUpActivity,
-                                iconName = AppIconName.PEOPLE,
-                                iconTint = LudoProofTheme.GOLD,
+                            FriendsVisualKit.iconView(
+                                this@TeamUpActivity,
+                                FriendsIcon.PEOPLE,
+                                FriendsVisualKit.TEXT,
                             ),
-                            LinearLayout.LayoutParams(dp(26), dp(26)).apply {
+                            LinearLayout.LayoutParams(dp(36), dp(36)).apply {
                                 marginEnd = dp(8)
                             },
                         )
                         addView(
                             TextView(this@TeamUpActivity).apply {
                                 text = "TEAM UP"
-                                LudoProofTheme.title(this, 19f)
+                                LudoProofTheme.title(this, 25f)
                                 gravity = Gravity.CENTER
                             },
                         )
                     },
                 )
                 addView(
-                    TextView(this@TeamUpActivity).apply {
-                        text = "● ONLINE"
-                        LudoProofTheme.body(this, 10f, centered = true, bright = true)
-                        setTextColor(0xFF62E9FF.toInt())
-                        setPadding(dp(12), dp(2), dp(12), dp(2))
-                        background =
-                            LudoProofTheme.rounded(
-                                0xCC071C49.toInt(),
-                                999f,
-                                0x6647D7FF,
-                                1f,
-                                this@TeamUpActivity,
-                            )
+                    LinearLayout(this@TeamUpActivity).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        gravity = Gravity.CENTER
+                        addView(
+                            LaserStatusDotView(this@TeamUpActivity),
+                            LinearLayout.LayoutParams(dp(10), dp(10)).apply { marginEnd = dp(5) },
+                        )
+                        addView(
+                            TextView(this@TeamUpActivity).apply {
+                                text = "ONLINE"
+                                LudoProofTheme.body(this, 10f, centered = true, bright = true)
+                                setTextColor(0xFF62E9FF.toInt())
+                                includeFontPadding = false
+                            },
+                        )
                     },
                     LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.WRAP_CONTENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT,
                     ).apply {
                         gravity = Gravity.CENTER_HORIZONTAL
+                        topMargin = dp(2)
                     },
                 )
             }
-        content.addView(
-            headerTitle,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(52),
-            ),
-        )
+
         content.addView(
             View(this),
             LinearLayout.LayoutParams(
@@ -190,27 +210,65 @@ class TeamUpActivity : Activity() {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER_HORIZONTAL
                 setPadding(dp(18), dp(18), dp(18), dp(18))
-                background = teamPanelBackground()
+                background =
+                    plywoodBackground(
+                        context = this@TeamUpActivity,
+                        cornerRadiusDp = 24f,
+                    )
             }
+        teamPanel.addView(
+            headerTitle,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(62),
+            ).apply { bottomMargin = dp(10) },
+        )
         setupContent = teamSetupPanel()
         teamPanel.addView(setupContent)
 
-        quickTeamButton = Button(this).apply {
-            text = "▶   FIND A TEAM"
-            textSize = 18f
-            setTypeface(Typeface.DEFAULT_BOLD)
-            setTextColor(0xFF342000.toInt())
-            background =
-                GradientDrawable(
-                    GradientDrawable.Orientation.TOP_BOTTOM,
-                    intArrayOf(0xFFFFD642.toInt(), 0xFFFF9D00.toInt()),
-                ).apply {
-                    cornerRadius = dp(999).toFloat()
-                    setStroke(dp(2), 0xFFFFF0A0.toInt())
-                }
+        quickTeamButton = FrameLayout(this).apply {
+            isClickable = true
+            isFocusable = true
             contentDescription = "Find a team online"
-            AppFocusRing.apply(this, cornerRadiusDp = 999f, strokeWidthDp = 3f)
-            setOnClickListener { beginSearch() }
+            background = playGamesSignInBackground(this@TeamUpActivity)
+
+            val label = TextView(this@TeamUpActivity).apply {
+                text = "FIND A TEAM"
+                textSize = 18f
+                setTypeface(Typeface.DEFAULT_BOLD)
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
+                includeFontPadding = false
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }
+            addView(
+                label,
+                FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                ),
+            )
+
+            val playIconSize = dp(36)
+            val playIcon = ImageView(this@TeamUpActivity).apply {
+                setImageDrawable(
+                    context.getDrawable(com.ludoproof.game.R.drawable.ic_play_triangle_white)?.mutate(),
+                )
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                translationX =
+                    label.paint.measureText(label.text.toString()) / 2f + dp(6) + playIconSize / 2f
+            }
+            addView(
+                playIcon,
+                FrameLayout.LayoutParams(
+                    playIconSize,
+                    playIconSize,
+                    Gravity.CENTER,
+                ),
+            )
+            AppFocusRing.apply(this, cornerRadiusDp = 13f, strokeWidthDp = 3f)
+            setOnClickListener { playSelectionPopAnimation { beginSearch() } }
         }
         setupContent.addView(
             quickTeamButton,
@@ -231,13 +289,19 @@ class TeamUpActivity : Activity() {
         searchPanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(0, dp(4), 0, 0)
+            setPadding(dp(12), dp(14), dp(12), dp(14))
+            // The search content is recessed into the outer plywood board.
+            background =
+                recessedPlywoodBackground(
+                    context = this@TeamUpActivity,
+                    outerCornerRadiusDp = 20f,
+                )
             visibility = View.GONE
 
             addView(
                 TextView(this@TeamUpActivity).apply {
                     text = "SEARCHING FOR TEAMMATES"
-                    LudoProofTheme.title(this, 18f, gold = true)
+                    LudoProofTheme.title(this, 18f)
                     gravity = Gravity.CENTER
                 },
             )
@@ -250,14 +314,128 @@ class TeamUpActivity : Activity() {
             )
             addView(
                 TextView(this@TeamUpActivity).apply {
-                    text = "RED + YELLOW   VS   GREEN + BLUE"
+                    text = SpannableString("RED + YELLOW   ⚡   GREEN + BLUE").apply {
+                        fun styleColorWord(
+                            word: String,
+                            textColor: Int,
+                            glowColor: Int,
+                        ) {
+                            val start = indexOf(word)
+                            if (start < 0) return
+                            setSpan(
+                                object : CharacterStyle() {
+                                    override fun updateDrawState(textPaint: TextPaint) {
+                                        textPaint.color = textColor
+                                        textPaint.setShadowLayer(
+                                            this@TeamUpActivity.dp(5).toFloat(),
+                                            0f,
+                                            0f,
+                                            glowColor,
+                                        )
+                                    }
+                                },
+                                start,
+                                start + word.length,
+                                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
+                            )
+                        }
+
+                        val boltStart = indexOf("⚡")
+                        if (boltStart >= 0) {
+                            setSpan(
+                                object : ReplacementSpan() {
+                                    private val density = this@TeamUpActivity.resources.displayMetrics.density
+                                    private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                                        color = Color.WHITE
+                                        style = Paint.Style.STROKE
+                                        strokeCap = Paint.Cap.ROUND
+                                        strokeJoin = Paint.Join.ROUND
+                                        strokeWidth = 3.2f * density
+                                        alpha = 115
+                                        setShadowLayer(5f * density, 0f, 0f, Color.WHITE)
+                                    }
+                                    private val boltPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                                        color = Color.WHITE
+                                        style = Paint.Style.FILL
+                                    }
+
+                                    override fun getSize(
+                                        paint: Paint,
+                                        text: CharSequence,
+                                        start: Int,
+                                        end: Int,
+                                        fm: Paint.FontMetricsInt?,
+                                    ): Int {
+                                        // Reserve line height for the enlarged bolt and its glow.
+                                        // Without updating the font metrics the lower point can be clipped.
+                                        val iconHeight =
+                                            maxOf(paint.textSize * 1.35f, 20f * density) * 1.2f
+                                        val halfHeight =
+                                            (iconHeight * 1.16f / 2f + 6f * density).toInt() + 1
+                                        fm?.let {
+                                            it.ascent = minOf(it.ascent, -halfHeight)
+                                            it.top = minOf(it.top, -halfHeight)
+                                            it.descent = maxOf(it.descent, halfHeight)
+                                            it.bottom = maxOf(it.bottom, halfHeight)
+                                        }
+                                        return maxOf(
+                                            (paint.textSize * 1.08f).toInt(),
+                                            (18f * density).toInt(),
+                                        )
+                                    }
+
+                                    override fun draw(
+                                        canvas: Canvas,
+                                        text: CharSequence,
+                                        start: Int,
+                                        end: Int,
+                                        x: Float,
+                                        top: Int,
+                                        y: Int,
+                                        bottom: Int,
+                                        paint: Paint,
+                                    ) {
+                                        val width = getSize(paint, text, start, end, null).toFloat()
+                                        // Scale both width and height by 20%, with font metrics
+                                        // above reserving room for the complete lightning shape.
+                                        val height = maxOf(paint.textSize * 1.35f, 20f * density) * 1.2f
+                                        val cx = x + width / 2f
+                                        val cy = (top + bottom) / 2f
+                                        val bolt = Path().apply {
+                                            moveTo(cx + width * 0.10f, cy - height * 0.58f)
+                                            lineTo(cx - width * 0.35f, cy + height * 0.02f)
+                                            lineTo(cx - width * 0.02f, cy + height * 0.02f)
+                                            lineTo(cx - width * 0.16f, cy + height * 0.58f)
+                                            lineTo(cx + width * 0.36f, cy - height * 0.14f)
+                                            lineTo(cx + width * 0.05f, cy - height * 0.14f)
+                                            close()
+                                        }
+                                        canvas.drawPath(bolt, glowPaint)
+                                        canvas.drawPath(bolt, boltPaint)
+                                    }
+                                },
+                                boltStart,
+                                boltStart + 1,
+                                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
+                            )
+                        }
+
+                        // Match Pass & Play's color-label colors and soft glow.
+                        styleColorWord("RED", 0xFFFF6670.toInt(), 0xFFFF263D.toInt())
+                        styleColorWord("YELLOW", 0xFFFFEB70.toInt(), 0xFFFFD324.toInt())
+                        styleColorWord("GREEN", 0xFF5BF58A.toInt(), 0xFF23E968.toInt())
+                        styleColorWord("BLUE", 0xFF64C4FF.toInt(), 0xFF35AFFF.toInt())
+                    }
                     LudoProofTheme.body(this, 9.5f, centered = true, bright = true)
                     setTextColor(0xFFBDEBFF.toInt())
+                    setTypeface(Typeface.DEFAULT_BOLD)
                     setPadding(0, dp(7), 0, 0)
                 },
             )
 
-            teamSlotProgressView = TeamSlotProgressView(this@TeamUpActivity)
+            teamSlotProgressView = TeamSlotProgressView(this@TeamUpActivity).apply {
+                setQueuedPlayers(1, listOf(selectedCharacterId))
+            }
             addView(
                 teamSlotProgressView,
                 LinearLayout.LayoutParams(
@@ -281,18 +459,43 @@ class TeamUpActivity : Activity() {
             addView(timerText)
 
             cancelButton = Button(this@TeamUpActivity).apply {
-                text = "CANCEL SEARCH"
-                LudoProofTheme.danger(this)
+                text = "CANCEL"
+                textSize = 14f
+                setTypeface(Typeface.DEFAULT_BOLD)
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
                 contentDescription = "Cancel team search"
-                AppFocusRing.apply(this, cornerRadiusDp = 12f, strokeWidthDp = 2.5f)
-                setOnClickListener { cancelSearch() }
+
+                // Keep this secondary/destructive action compact and consistently red.
+                // Clear the theme tint/ripple so it cannot flash a blue state color.
+                backgroundTintList = null
+                foreground = null
+                stateListAnimator = null
+                background = GradientDrawable(
+                    GradientDrawable.Orientation.TOP_BOTTOM,
+                    intArrayOf(
+                        0xFFD7434B.toInt(),
+                        0xFFB62D36.toInt(),
+                    ),
+                ).apply {
+                    cornerRadius = dp(10).toFloat()
+                    setStroke(dp(1), 0xFFE56A70.toInt())
+                }
+                minWidth = dp(108)
+                minHeight = dp(40)
+                setPadding(dp(22), dp(3), dp(22), dp(3))
+                AppFocusRing.apply(this, cornerRadiusDp = 10f, strokeWidthDp = 2f)
+                setOnClickListener { playSelectionPopAnimation { cancelSearch() } }
             }
             addView(
                 cancelButton,
                 LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    dp(52),
-                ).apply { topMargin = dp(12) },
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    dp(40),
+                ).apply {
+                    gravity = Gravity.CENTER_HORIZONTAL
+                    topMargin = dp(12)
+                },
             )
         }
         teamPanel.addView(
@@ -318,13 +521,6 @@ class TeamUpActivity : Activity() {
             ).apply { topMargin = dp(20) },
         )
 
-        content.addView(
-            TextView(this).apply {
-                text = "SERVER-AUTHORITATIVE  •  VERIFIED DICE  •  TEAM RULESET V1"
-                LudoProofTheme.body(this, 9.5f, centered = true)
-                setPadding(dp(8), dp(8), dp(8), 0)
-            },
-        )
         content.addView(
             View(this),
             LinearLayout.LayoutParams(
@@ -356,7 +552,16 @@ class TeamUpActivity : Activity() {
                 onSettings = {
                     com.ludoproof.game.ArcadeDialogs.showSettings(this)
                 },
-            )
+            ).apply {
+                // Match the Online page's reusable plywood skin on Back and Settings.
+                for (index in 0 until childCount) {
+                    getChildAt(index).background =
+                        plywoodBackground(
+                            context = this@TeamUpActivity,
+                            cornerRadiusDp = 999f,
+                        )
+                }
+            }
         setContentView(root)
         root.setOnApplyWindowInsetsListener { _, insets ->
             val cutoutTop =
@@ -385,18 +590,59 @@ class TeamUpActivity : Activity() {
         root.requestApplyInsets()
     }
 
+    /**
+     * Uses the same square, recessed-plywood character tiles as Online Match.
+     * The current player's chosen paw leads, followed by the other starter paws.
+     */
+    /**
+     * Shows only the character chosen in the player's profile, using Online Match's
+     * square recessed-plywood avatar treatment.
+     */
+    private fun teamCharacterTiles(): FrameLayout =
+        FrameLayout(this).apply {
+            val profileCharacterId =
+                LudoPawsCharacterCatalog.canonicalCharacterId(selectedCharacterId)
+                    ?: LudoPawsCharacterCatalog.DEFAULT_CHARACTER_ID
+            val character =
+                LudoPawsCharacterCatalog.character(profileCharacterId)
+                    ?: LudoPawsCharacterCatalog.character(LudoPawsCharacterCatalog.DEFAULT_CHARACTER_ID)
+                    ?: return@apply
+
+            background = recessedPlywoodBackground(
+                context = this@TeamUpActivity,
+                outerCornerRadiusDp = 18f,
+            )
+            setPadding(dp(3), dp(3), dp(3), dp(3))
+            contentDescription = "Your selected character: ${character.displayName}"
+            addView(
+                LudoPawsCharacterAvatarView(this@TeamUpActivity).apply {
+                    bind(
+                        characterId = character.id,
+                        showCircularChrome = false,
+                    )
+                },
+                FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                ),
+            )
+        }
+
     private fun teamSetupPanel(): LinearLayout =
         LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
             addView(
-                TeamFormationView(this@TeamUpActivity),
-                LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(116)),
+                teamCharacterTiles(),
+                LinearLayout.LayoutParams(dp(96), dp(96)).apply {
+                    gravity = Gravity.CENTER_HORIZONTAL
+                },
             )
             addView(
                 TextView(this@TeamUpActivity).apply {
                     text = "2 VS 2 ONLINE"
-                    LudoProofTheme.title(this, 26f, gold = true)
+                    LudoProofTheme.title(this, 26f, gold = false)
+                    setTextColor(Color.WHITE)
                     gravity = Gravity.CENTER
                     setPadding(0, dp(7), 0, 0)
                 },
@@ -409,91 +655,68 @@ class TeamUpActivity : Activity() {
                     setPadding(0, dp(3), 0, dp(15))
                 },
             )
-            addView(teamLabelRow("TEAM A", "RED  +  YELLOW", 0xFFFF5D63.toInt(), 0xFFFFD324.toInt()))
+            val teamCards = LinearLayout(this@TeamUpActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER
+                clipChildren = false
+                clipToPadding = false
+                addView(
+                    teamSelectionCard("TEAM A", 0xFFFF5D63.toInt(), 0xFFFFD324.toInt()),
+                    LinearLayout.LayoutParams(0, dp(106), 1f).apply {
+                        marginEnd = dp(5)
+                    },
+                )
+                addView(
+                    teamSelectionCard("TEAM B", 0xFF35C83D.toInt(), 0xFF2A8CFF.toInt()),
+                    LinearLayout.LayoutParams(0, dp(106), 1f).apply {
+                        marginStart = dp(5)
+                    },
+                )
+            }
             addView(
-                teamLabelRow("TEAM B", "GREEN  +  BLUE", 0xFF35C83D.toInt(), 0xFF2A8CFF.toInt()),
-                LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(46)).apply {
-                    topMargin = dp(8)
+                teamCards,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    dp(106),
+                ).apply {
+                    topMargin = dp(2)
                 },
             )
-            val ruleRow =
-                LinearLayout(this@TeamUpActivity).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    gravity = Gravity.CENTER
-                    setPadding(0, dp(14), 0, 0)
-                    addView(ruleChip("NO FRIENDLY CAPTURE"))
-                    addView(
-                        ruleChip("BOTH PARTNERS FINISH"),
-                        LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(34)).apply {
-                            marginStart = dp(7)
-                        },
-                    )
-                }
-            addView(ruleRow)
         }
 
-    private fun teamLabelRow(
+    private fun teamSelectionCard(
         title: String,
-        members: String,
         firstColor: Int,
         secondColor: Int,
     ): LinearLayout =
         LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(12), dp(6), dp(12), dp(6))
-            background =
-                GradientDrawable(
-                    GradientDrawable.Orientation.LEFT_RIGHT,
-                    intArrayOf(0xCC071A3A.toInt(), 0xAA0A2B58.toInt()),
-                ).apply {
-                    cornerRadius = dp(13).toFloat()
-                    setStroke(dp(1), 0x4459D9FF)
-                }
-            addView(TeamColorTokenView(this@TeamUpActivity, firstColor, secondColor), LinearLayout.LayoutParams(dp(38), dp(30)))
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            clipChildren = false
+            clipToPadding = false
+            setPadding(dp(5), dp(7), dp(5), dp(7))
+            background = recessedPlywoodBackground(
+                context = this@TeamUpActivity,
+                outerCornerRadiusDp = 16f,
+            )
+            addView(
+                TeamColorTokenView(this@TeamUpActivity, firstColor, secondColor),
+                LinearLayout.LayoutParams(dp(88), dp(42)),
+            )
             addView(
                 TextView(this@TeamUpActivity).apply {
                     text = title
-                    LudoProofTheme.title(this, 11f, gold = true)
-                    gravity = Gravity.CENTER_VERTICAL
-                    setPadding(dp(8), 0, dp(8), 0)
+                    LudoProofTheme.title(this, 13f, gold = true)
+                    setTextColor(0xFFFFD45E.toInt())
+                    gravity = Gravity.CENTER
+                    includeFontPadding = false
+                    setPadding(0, dp(4), 0, 0)
                 },
-                LinearLayout.LayoutParams(dp(74), LinearLayout.LayoutParams.WRAP_CONTENT),
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ),
             )
-            addView(
-                TextView(this@TeamUpActivity).apply {
-                    text = members
-                    LudoProofTheme.body(this, 13f, centered = true, bright = true)
-                    setTypeface(Typeface.DEFAULT_BOLD)
-                    gravity = Gravity.CENTER_VERTICAL
-                },
-                LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f),
-            )
-        }
-
-    private fun ruleChip(value: String): TextView =
-        TextView(this).apply {
-            text = value
-            LudoProofTheme.body(this, 8.5f, centered = true, bright = true)
-            setTypeface(Typeface.DEFAULT_BOLD)
-            setPadding(dp(8), dp(7), dp(8), dp(7))
-            background =
-                LudoProofTheme.rounded(
-                    0xAA071A3A.toInt(),
-                    999f,
-                    0x5569DFFF,
-                    1f,
-                    this@TeamUpActivity,
-                )
-        }
-
-    private fun teamPanelBackground(): GradientDrawable =
-        GradientDrawable(
-            GradientDrawable.Orientation.TOP_BOTTOM,
-            intArrayOf(0xF20A2856.toInt(), 0xF2081B3D.toInt()),
-        ).apply {
-            cornerRadius = dp(22).toFloat()
-            setStroke(dp(2), 0xFF40CFFF.toInt())
         }
 
     private fun beginSearch() {
@@ -503,6 +726,9 @@ class TeamUpActivity : Activity() {
             pollSearch()
             return
         }
+
+        // Refresh the persisted selection so the YOU portrait and matchmaking request agree.
+        selectedCharacterId = CharacterSelectionStore(this).load().characterId
 
         val displayName =
             profileStore.snapshot().displayName
@@ -520,6 +746,7 @@ class TeamUpActivity : Activity() {
             displayName = displayName,
             startedAt = System.currentTimeMillis(),
         )
+        validatingRestoredSearch = false
         runCatching { ticketStore.save(ticket) }
             .onFailure {
                 showStatus("Could not save Team Up search. Try again.")
@@ -535,6 +762,7 @@ class TeamUpActivity : Activity() {
                     profileToken = credential.profileToken,
                     displayName = ticket.displayName,
                     clientRequestId = ticket.requestId,
+                    characterId = selectedCharacterId,
                 )
             },
             onSuccess = ::applyMatchmakingResponse,
@@ -584,11 +812,13 @@ class TeamUpActivity : Activity() {
     }
 
     private fun applyMatchmakingResponse(response: JSONObject) {
+        validatingRestoredSearch = false
         when (response.optString("status")) {
             "MATCHED" -> openMatchedGame(response)
             "SEARCHING" -> {
                 val queued = response.optInt("queuedPlayers", 1).coerceIn(1, 4)
-                renderQueuedPlayers(queued)
+                renderQueuedPlayers(queued, queuedCharacterIds(response))
+                updateTimer()
             }
             "IDLE" -> {
                 ticketStore.clear()
@@ -596,6 +826,24 @@ class TeamUpActivity : Activity() {
                 showStatus("Search expired. Tap QUICK TEAM to search again.")
             }
             else -> showStatus("Unexpected Team Up matchmaking response.")
+        }
+    }
+
+    private fun queuedCharacterIds(response: JSONObject): List<String> {
+        val array = response.optJSONArray("queuedCharacterIds")
+            ?: return listOf(selectedCharacterId)
+        val received = buildList {
+            for (index in 0 until minOf(array.length(), 4)) {
+                val id = LudoPawsCharacterCatalog.canonicalCharacterId(array.optString(index))
+                    ?: continue
+                if (LudoPawsCharacterCatalog.character(id) != null) add(id)
+            }
+        }
+        // The server orders the current request first; use the local profile value
+        // for slot zero so YOU always matches the character used by this device.
+        return buildList {
+            add(selectedCharacterId)
+            addAll(received.drop(1).take(3))
         }
     }
 
@@ -705,15 +953,22 @@ class TeamUpActivity : Activity() {
         searchPanel.visibility = if (searching) View.VISIBLE else View.GONE
         if (searching) {
             renderQueuedPlayers(1)
-            updateTimer()
+            if (validatingRestoredSearch) {
+                timerText.text = "SEARCH  CHECKING..."
+            } else {
+                updateTimer()
+            }
         }
         updateButtons()
     }
 
-    private fun renderQueuedPlayers(queued: Int) {
+    private fun renderQueuedPlayers(
+        queued: Int,
+        characterIds: List<String> = listOf(selectedCharacterId),
+    ) {
         val safe = queued.coerceIn(1, 4)
         slotsText.text = "$safe / 4 PLAYERS"
-        teamSlotProgressView.setQueuedPlayers(safe)
+        teamSlotProgressView.setQueuedPlayers(safe, characterIds)
         if (safe >= 4) {
             showStatus("Match found • assigning opposite-color teams…")
         } else {
@@ -721,165 +976,102 @@ class TeamUpActivity : Activity() {
         }
     }
 
-    private class TeamFormationView(context: android.content.Context) : View(context) {
-        private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-        private val outline =
-            Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                style = Paint.Style.STROKE
-                strokeWidth = dp(1.5f)
-            }
-
-        override fun onDraw(canvas: Canvas) {
-            super.onDraw(canvas)
-            val centerX = width / 2f
-            val centerY = height * 0.52f
-            val radius = minOf(width * 0.36f, height * 0.47f)
-
-            paint.shader =
-                android.graphics.RadialGradient(
-                    centerX,
-                    centerY,
-                    radius,
-                    intArrayOf(0xFF168AF4.toInt(), 0xFF06275F.toInt()),
-                    null,
-                    android.graphics.Shader.TileMode.CLAMP,
-                )
-            canvas.drawCircle(centerX, centerY, radius, paint)
-            paint.shader = null
-            outline.color = 0xFFFFD34A.toInt()
-            outline.strokeWidth = dp(3f)
-            canvas.drawCircle(centerX, centerY, radius, outline)
-            outline.color = 0xAAE7F8FF.toInt()
-            outline.strokeWidth = dp(1f)
-            canvas.drawCircle(centerX, centerY, radius - dp(5f), outline)
-
-            val people =
-                listOf(
-                    Person(centerX - radius * 0.52f, centerY + radius * 0.09f, 0xFFFF5D63.toInt(), 0.72f),
-                    Person(centerX + radius * 0.52f, centerY + radius * 0.09f, 0xFFFFD324.toInt(), 0.72f),
-                    Person(centerX - radius * 0.18f, centerY - radius * 0.34f, 0xFF35C83D.toInt(), 1f),
-                    Person(centerX + radius * 0.18f, centerY - radius * 0.34f, 0xFF2A8CFF.toInt(), 1f),
-                )
-            people.forEach { person ->
-                drawPerson(canvas, person.x, person.y, radius * 0.20f * person.scale, person.color)
-            }
-            outline.color = 0xFFFFD34A.toInt()
-            outline.strokeWidth = dp(3f)
-            canvas.drawLine(
-                centerX - radius * 1.05f,
-                centerY + radius * 0.42f,
-                centerX - radius * 0.79f,
-                centerY + radius * 0.42f,
-                outline,
-            )
-            canvas.drawLine(
-                centerX + radius * 0.79f,
-                centerY + radius * 0.42f,
-                centerX + radius * 1.05f,
-                centerY + radius * 0.42f,
-                outline,
-            )
-        }
-
-        private fun drawPerson(
-            canvas: Canvas,
-            x: Float,
-            y: Float,
-            headRadius: Float,
-            color: Int,
-        ) {
-            val light = blend(color, Color.WHITE, 0.34f)
-            val dark = blend(color, 0xFF06152F.toInt(), 0.24f)
-            val shoulder = headRadius * 1.18f
-            val bodyTop = y + headRadius * 0.78f
-            val bodyBottom = y + headRadius * 2.55f
-            val body =
-                Path().apply {
-                    moveTo(x - shoulder * 0.48f, bodyTop)
-                    cubicTo(x - shoulder, bodyTop, x - shoulder * 1.02f, bodyBottom, x - shoulder * 0.80f, bodyBottom)
-                    lineTo(x + shoulder * 0.80f, bodyBottom)
-                    cubicTo(x + shoulder * 1.02f, bodyBottom, x + shoulder, bodyTop, x + shoulder * 0.48f, bodyTop)
-                    close()
-                }
-            paint.shader =
-                android.graphics.LinearGradient(
-                    x - shoulder,
-                    bodyTop,
-                    x + shoulder,
-                    bodyBottom,
-                    intArrayOf(light, color, dark),
-                    null,
-                    android.graphics.Shader.TileMode.CLAMP,
-                )
-            canvas.drawPath(body, paint)
-            paint.shader = null
-            outline.color = blend(color, 0xFF06152F.toInt(), 0.30f)
-            outline.strokeWidth = dp(1.5f)
-            canvas.drawPath(body, outline)
-            paint.shader =
-                android.graphics.RadialGradient(
-                    x - headRadius * 0.36f,
-                    y - headRadius * 0.38f,
-                    headRadius * 1.55f,
-                    intArrayOf(light, color, dark),
-                    null,
-                    android.graphics.Shader.TileMode.CLAMP,
-                )
-            canvas.drawCircle(x, y, headRadius, paint)
-            paint.shader = null
-            outline.color = blend(color, 0xFF06152F.toInt(), 0.30f)
-            canvas.drawCircle(x, y, headRadius, outline)
-        }
-
-        private fun blend(first: Int, second: Int, amount: Float): Int =
-            android.graphics.Color.rgb(
-                (android.graphics.Color.red(first) * (1f - amount) + android.graphics.Color.red(second) * amount).toInt(),
-                (android.graphics.Color.green(first) * (1f - amount) + android.graphics.Color.green(second) * amount).toInt(),
-                (android.graphics.Color.blue(first) * (1f - amount) + android.graphics.Color.blue(second) * amount).toInt(),
-            )
-
-        private fun dp(value: Float): Float = value * resources.displayMetrics.density
-
-        private data class Person(val x: Float, val y: Float, val color: Int, val scale: Float)
-    }
-
     private class TeamColorTokenView(
         context: android.content.Context,
         private val firstColor: Int,
         private val secondColor: Int,
     ) : View(context) {
-        private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+        }
+        private val shine = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = 0xA8FFFFFF.toInt()
+        }
 
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
-            val radius = minOf(width * 0.30f, height * 0.42f)
-            val firstX = width * 0.34f
-            val secondX = width * 0.68f
-            val cy = height * 0.48f
+            if (width <= 0 || height <= 0) return
+
+            // Two glossy color orbs, using the same light-to-dark shading,
+            // bright rim, soft shadow and specular shine as Pass & Play colors.
+            val radius = minOf(width * 0.25f, height * 0.42f)
+            val cy = height * 0.49f
+            val firstX = width * 0.27f
+            val secondX = width * 0.73f
             drawToken(canvas, firstX, cy, radius, firstColor)
             drawToken(canvas, secondX, cy, radius, secondColor)
         }
 
-        private fun drawToken(canvas: Canvas, x: Float, y: Float, radius: Float, color: Int) {
-            paint.color = 0x88020A18.toInt()
-            canvas.drawCircle(x + dp(1f), y + dp(2f), radius * 1.18f, paint)
-            paint.shader =
-                android.graphics.RadialGradient(
-                    x - radius * 0.35f,
-                    y - radius * 0.38f,
-                    radius * 1.6f,
-                    intArrayOf(0xFFFFFFFF.toInt(), color, 0xFF06152F.toInt()),
-                    null,
-                    android.graphics.Shader.TileMode.CLAMP,
-                )
-            canvas.drawCircle(x, y, radius, paint)
-            paint.shader = null
+        private fun drawToken(canvas: Canvas, cx: Float, cy: Float, radius: Float, baseColor: Int) {
+            fill.shader = null
+            fill.color = 0x7000183B
+            fill.setShadowLayer(dp(3f), 0f, dp(2f), 0x9900102D.toInt())
+            canvas.drawCircle(cx, cy + dp(1f), radius * 1.03f, fill)
+            fill.clearShadowLayer()
+
+            fill.shader = RadialGradient(
+                cx - radius * 0.38f,
+                cy - radius * 0.43f,
+                radius * 1.55f,
+                intArrayOf(
+                    blendWithWhite(baseColor, 0.68f),
+                    baseColor,
+                    blendWithBlack(baseColor, 0.48f),
+                ),
+                floatArrayOf(0f, 0.46f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+            canvas.drawCircle(cx, cy, radius, fill)
+            fill.shader = null
+
+            stroke.color = 0xDFFFFFFF.toInt()
+            stroke.strokeWidth = dp(1.2f)
+            canvas.drawCircle(cx, cy, radius, stroke)
+
+            shine.alpha = 200
+            canvas.drawOval(
+                RectF(
+                    cx - radius * 0.62f,
+                    cy - radius * 0.67f,
+                    cx - radius * 0.02f,
+                    cy - radius * 0.30f,
+                ),
+                shine,
+            )
+            shine.alpha = 95
+            canvas.drawCircle(
+                cx - radius * 0.48f,
+                cy - radius * 0.43f,
+                radius * 0.09f,
+                shine,
+            )
         }
+
+        private fun blendWithWhite(color: Int, amount: Float): Int =
+            Color.rgb(
+                (Color.red(color) + (255 - Color.red(color)) * amount).toInt(),
+                (Color.green(color) + (255 - Color.green(color)) * amount).toInt(),
+                (Color.blue(color) + (255 - Color.blue(color)) * amount).toInt(),
+            )
+
+        private fun blendWithBlack(color: Int, amount: Float): Int =
+            Color.rgb(
+                (Color.red(color) * (1f - amount)).toInt(),
+                (Color.green(color) * (1f - amount)).toInt(),
+                (Color.blue(color) * (1f - amount)).toInt(),
+            )
 
         private fun dp(value: Float): Float = value * resources.displayMetrics.density
     }
 
-    private class TeamSlotProgressView(context: android.content.Context) : View(context) {
+    /**
+     * Shows the server-confirmed queue as a sequential connection animation:
+     * YOU -> next open slot. The next slot's ring orbits while we wait. When the
+     * server confirms another queued player, that slot locks in and the scan
+     * extends from it toward the following slot.
+     */
+    private class TeamSlotProgressView(context: android.content.Context) : FrameLayout(context) {
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         private val playerColors =
             intArrayOf(
@@ -889,15 +1081,71 @@ class TeamUpActivity : Activity() {
                 0xFF2A8CFF.toInt(),
             )
         private var queuedPlayers = 1
+        private var queuedCharacterIds: List<String> = emptyList()
+        private var approachStartedAt = 0L
+        private val characterViews = Array(4) {
+            LudoPawsCharacterAvatarView(context).apply {
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                bind(
+                    characterId = LudoPawsCharacterCatalog.DEFAULT_CHARACTER_ID,
+                    showCircularChrome = false,
+                )
+                visibility = View.INVISIBLE
+            }
+        }
 
-        fun setQueuedPlayers(value: Int) {
-            queuedPlayers = value.coerceIn(1, 4)
+        init {
+            setWillNotDraw(false)
+            characterViews.forEach { avatar ->
+                addView(
+                    avatar,
+                    FrameLayout.LayoutParams(dp(29f).toInt(), dp(29f).toInt()),
+                )
+            }
+        }
+
+        fun setQueuedPlayers(value: Int, characterIds: List<String>) {
+            val next = value.coerceIn(1, 4)
+            val safeCharacterIds = characterIds.take(4)
+            val previousQueuedPlayers = queuedPlayers
+            val previousCharacterIds = queuedCharacterIds
+            if (
+                approachStartedAt == 0L ||
+                next != queuedPlayers ||
+                safeCharacterIds != queuedCharacterIds
+            ) {
+                approachStartedAt = SystemClock.uptimeMillis()
+            }
+            queuedPlayers = next
+            queuedCharacterIds = safeCharacterIds
+
+            characterViews.forEachIndexed { index, avatar ->
+                val characterId = safeCharacterIds.getOrNull(index)
+                if (index < next && characterId != null) {
+                    val newlyFilledSlot =
+                        index >= previousQueuedPlayers ||
+                            previousCharacterIds.getOrNull(index) != characterId
+                    avatar.visibility = View.VISIBLE
+                    avatar.bind(
+                        characterId = characterId,
+                        ringColor = 0xFF62E8FF.toInt(),
+                        showCircularChrome = false,
+                    )
+                    if (newlyFilledSlot) avatar.playSelectionPopAnimation()
+                } else {
+                    avatar.visibility = View.INVISIBLE
+                }
+            }
+            requestLayout()
             invalidate()
         }
 
         override fun onAttachedToWindow() {
             super.onAttachedToWindow()
-            if (visibility == View.VISIBLE && queuedPlayers < 4) {
+            if (queuedPlayers < 4 && visibility == View.VISIBLE) {
+                if (approachStartedAt == 0L) {
+                    approachStartedAt = SystemClock.uptimeMillis()
+                }
                 postInvalidateOnAnimation()
             }
         }
@@ -905,79 +1153,224 @@ class TeamUpActivity : Activity() {
         override fun onVisibilityChanged(changedView: View, visibility: Int) {
             super.onVisibilityChanged(changedView, visibility)
             if (visibility == View.VISIBLE && queuedPlayers < 4 && isAttachedToWindow) {
+                if (approachStartedAt == 0L) {
+                    approachStartedAt = SystemClock.uptimeMillis()
+                }
                 postInvalidateOnAnimation()
+            }
+        }
+
+        override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+            val inset = dp(5f)
+            val contentRight = width - inset
+            val spacing = (contentRight - inset) / 4f
+            val centerY = height * 0.39f
+            val avatarSize = dp(29f).toInt()
+            for (index in characterViews.indices) {
+                val centerX = inset + spacing * (index + 0.5f)
+                val childLeft = (centerX - avatarSize / 2f).toInt()
+                val childTop = (centerY - avatarSize / 2f).toInt()
+                characterViews[index].layout(
+                    childLeft,
+                    childTop,
+                    childLeft + avatarSize,
+                    childTop + avatarSize,
+                )
             }
         }
 
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
+            if (width <= 0 || height <= 0) return
+
+            val now = SystemClock.uptimeMillis()
+            if (approachStartedAt == 0L) approachStartedAt = now
+
             val inset = dp(5f)
             val left = inset
             val right = width - inset
             val spacing = (right - left) / 4f
             val radius = minOf(dp(19f), height * 0.25f)
             val cy = height * 0.39f
+            val centers = FloatArray(4) { index -> left + spacing * (index + 0.5f) }
 
+            val targetIndex = queuedPlayers
+            val sourceIndex = (queuedPlayers - 1).coerceIn(0, 3)
+            val isSearching = queuedPlayers < 4 && isAttachedToWindow && visibility == View.VISIBLE
+            val elapsed = (now - approachStartedAt).coerceAtLeast(0L)
+            val orbitRadius = radius + dp(1f)
+            val isDrawingSourceRing =
+                isSearching && queuedPlayers == 1 && elapsed < SOURCE_RING_DURATION_MS
+            val sourceRingDuration = if (queuedPlayers == 1) SOURCE_RING_DURATION_MS else 0L
+            val travelElapsed = (elapsed - sourceRingDuration).coerceAtLeast(0L)
+
+            paint.style = Paint.Style.STROKE
             paint.strokeCap = Paint.Cap.ROUND
             paint.strokeWidth = dp(3f)
             for (index in 0..2) {
-                paint.color = if (index + 1 < queuedPlayers) 0xFFFFD34A.toInt() else 0x665D87B4
+                paint.color = when {
+                    index < queuedPlayers - 1 -> 0xFFFFD34A.toInt()
+                    index == queuedPlayers - 1 && queuedPlayers < 4 -> 0x6657DFFF
+                    else -> 0x665D87B4
+                }
+                canvas.drawLine(centers[index], cy, centers[index + 1], cy, paint)
+            }
+
+            // Confirmed players get their production character portraits as child views.
+            // Empty slots retain a neutral placeholder silhouette only.
+            for (index in 0..3) {
+                val x = centers[index]
+                val isQueued = index < queuedPlayers
+                val isTarget = isSearching && index == targetIndex
+                paint.style = Paint.Style.FILL
+                paint.color = if (isQueued) playerColors[index] else 0xFF132A4A.toInt()
+                canvas.drawCircle(x, cy, radius, paint)
+
+                // Queued and currently active profiles use the cyan outer path
+                // as their outline. Avoid a second, smaller static ring underneath.
+                val hasCompletedOuterRing =
+                    index < queuedPlayers &&
+                        !(queuedPlayers == 1 && index == 0 && isDrawingSourceRing)
+                val isDrawingThisSourceRing = isDrawingSourceRing && index == sourceIndex
+                if (!isTarget && !hasCompletedOuterRing && !isDrawingThisSourceRing) {
+                    paint.style = Paint.Style.STROKE
+                    paint.strokeWidth = dp(2f)
+                    paint.color = 0xFF8CA9C7.toInt()
+                    canvas.drawCircle(x, cy, radius, paint)
+                }
+
+                if (!isQueued || queuedCharacterIds.getOrNull(index) == null) {
+                    drawPlayerPlaceholder(canvas, x, cy, radius, isQueued)
+                }
+            }
+
+            // Completed connectors stay painted edge-to-edge as more players join.
+            // This is intentionally cumulative: prior links are never cleared.
+            paint.style = Paint.Style.STROKE
+            paint.strokeCap = Paint.Cap.ROUND
+            paint.strokeWidth = dp(2.8f)
+            paint.color = 0xFF59DEFF.toInt()
+            for (index in 0 until (queuedPlayers - 1).coerceAtLeast(0)) {
                 canvas.drawLine(
-                    left + spacing * (index + 1) + radius * 0.72f,
+                    centers[index] + orbitRadius,
                     cy,
-                    left + spacing * (index + 2) - radius * 0.72f,
+                    centers[index + 1] - orbitRadius,
                     cy,
                     paint,
                 )
             }
 
-            if (queuedPlayers < 4 && isAttachedToWindow && visibility == View.VISIBLE) {
-                val phase = (SystemClock.uptimeMillis() % 1_500L) / 1_500f
-                val scanX = left + phase * (right - left)
-                paint.color = 0x5539DFFF.toInt()
-                canvas.drawCircle(scanX, cy, dp(12f), paint)
-                paint.color = 0xFFBDF7FF.toInt()
-                canvas.drawCircle(scanX, cy, dp(3.5f), paint)
+            // Keep every confirmed profile's outer ring permanently visible.
+            for (index in 0 until queuedPlayers) {
+                val isFirstRingStillDrawing =
+                    isSearching && queuedPlayers == 1 && index == 0 && isDrawingSourceRing
+                if (!isFirstRingStillDrawing) {
+                    paint.style = Paint.Style.STROKE
+                    paint.strokeCap = Paint.Cap.ROUND
+                    paint.strokeWidth = dp(2.8f)
+                    paint.color = 0xFF59DEFF.toInt()
+                    canvas.drawCircle(centers[index], cy, orbitRadius, paint)
+                }
+            }
+
+            if (isSearching) {
+                val sourceX = centers[sourceIndex]
+                val targetX = centers[targetIndex]
+                val sourceEdgeX = sourceX + orbitRadius
+                val targetEdgeX = targetX - orbitRadius
+                val sourceBounds = android.graphics.RectF(
+                    sourceX - orbitRadius,
+                    cy - orbitRadius,
+                    sourceX + orbitRadius,
+                    cy + orbitRadius,
+                )
+                val targetBounds = android.graphics.RectF(
+                    targetX - orbitRadius,
+                    cy - orbitRadius,
+                    targetX + orbitRadius,
+                    cy + orbitRadius,
+                )
+
+                val headX: Float
+                val headY: Float
+
+                if (queuedPlayers == 1 && isDrawingSourceRing) {
+                    // Start by drawing the outer ring around YOU. Its moving
+                    // white pin finishes at the right edge, where the line leaves.
+                    val progress = (elapsed / SOURCE_RING_DURATION_MS.toFloat()).coerceIn(0f, 1f)
+                    val headAngle = -360f * progress
+                    paint.style = Paint.Style.STROKE
+                    paint.strokeCap = Paint.Cap.ROUND
+                    paint.strokeWidth = dp(2.8f)
+                    paint.color = 0xFF59DEFF.toInt()
+                    if (progress > 0f) {
+                        canvas.drawArc(sourceBounds, 0f, headAngle, false, paint)
+                    }
+                    val radians = Math.toRadians(headAngle.toDouble())
+                    headX = sourceX + (kotlin.math.cos(radians) * orbitRadius).toFloat()
+                    headY = cy + (kotlin.math.sin(radians) * orbitRadius).toFloat()
+                } else if (travelElapsed < APPROACH_DURATION_MS) {
+                    val progress = (travelElapsed / APPROACH_DURATION_MS.toFloat()).coerceIn(0f, 1f)
+                    headX = sourceEdgeX + (targetEdgeX - sourceEdgeX) * progress
+                    headY = cy
+
+                    // The growing line begins exactly where the source ring ends.
+                    paint.style = Paint.Style.STROKE
+                    paint.strokeCap = Paint.Cap.ROUND
+                    paint.strokeWidth = dp(2.8f)
+                    paint.color = 0xFF59DEFF.toInt()
+                    canvas.drawLine(sourceEdgeX, cy, headX, cy, paint)
+                } else {
+                    // Once the pin reaches the next profile, keep the entire
+                    // connector and orbit the same pin around the target edge.
+                    paint.style = Paint.Style.STROKE
+                    paint.strokeCap = Paint.Cap.ROUND
+                    paint.strokeWidth = dp(2.8f)
+                    paint.color = 0xFF59DEFF.toInt()
+                    canvas.drawLine(sourceEdgeX, cy, targetEdgeX, cy, paint)
+
+                    val orbitElapsed = travelElapsed - APPROACH_DURATION_MS
+                    val orbitProgress =
+                        (orbitElapsed % ORBIT_DURATION_MS).toFloat() / ORBIT_DURATION_MS.toFloat()
+                    val headAngle = 180f + orbitProgress * 360f
+                    val sweep = 104f
+                    paint.style = Paint.Style.STROKE
+                    paint.strokeCap = Paint.Cap.ROUND
+                    paint.strokeWidth = dp(2.8f)
+                    paint.color = 0xFF59DEFF.toInt()
+                    canvas.drawArc(targetBounds, headAngle - sweep, sweep, false, paint)
+
+                    val radians = Math.toRadians(headAngle.toDouble())
+                    headX = targetX + (kotlin.math.cos(radians) * orbitRadius).toFloat()
+                    headY = cy + (kotlin.math.sin(radians) * orbitRadius).toFloat()
+                }
+
+                // One luminous pin is shared by the starting ring, connector,
+                // and target orbit—there is no detached duplicate dot.
+                paint.style = Paint.Style.FILL
+                paint.color = 0x8859DEFF.toInt()
+                canvas.drawCircle(headX, headY, dp(5f), paint)
+                paint.color = 0xFFE5FCFF.toInt()
+                canvas.drawCircle(headX, headY, dp(2.3f), paint)
             }
 
             for (index in 0..3) {
-                val x = left + spacing * (index + 0.5f)
-                val isQueued = index < queuedPlayers
-                val pulse = (SystemClock.uptimeMillis() % 1_200L) / 1_200f
-                if (!isQueued && index == queuedPlayers && isAttachedToWindow && visibility == View.VISIBLE) {
-                    paint.style = Paint.Style.STROKE
-                    paint.strokeWidth = dp(2f)
-                    paint.color = 0xAA57DFFF.toInt()
-                    canvas.drawCircle(x, cy, radius + dp(4f + pulse * 7f), paint)
-                    paint.style = Paint.Style.FILL
-                }
-                paint.color = if (isQueued) playerColors[index] else 0xFF132A4A.toInt()
-                canvas.drawCircle(x, cy, radius, paint)
-                paint.color = if (isQueued) 0xFFFFF4D1.toInt() else 0xFF8CA9C7.toInt()
-                paint.style = Paint.Style.STROKE
-                paint.strokeWidth = dp(2f)
-                canvas.drawCircle(x, cy, radius, paint)
-                paint.style = Paint.Style.FILL
-                drawPlayerIcon(canvas, x, cy, radius, isQueued)
-
-                paint.color = if (isQueued) 0xFFDDF4FF.toInt() else 0xFF8CA9C7.toInt()
+                paint.color = if (index < queuedPlayers) 0xFFDDF4FF.toInt() else 0xFF8CA9C7.toInt()
                 paint.textAlign = Paint.Align.CENTER
                 paint.textSize = dp(8.5f)
                 paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
                 canvas.drawText(
-                    if (index == 0) "YOU" else if (isQueued) "PLAYER ${index + 1}" else "OPEN",
-                    x,
+                    if (index == 0) "YOU" else if (index < queuedPlayers) "PLAYER ${index + 1}" else "OPEN",
+                    centers[index],
                     height - dp(13f),
                     paint,
                 )
             }
 
-            if (queuedPlayers < 4 && isAttachedToWindow && visibility == View.VISIBLE) {
-                postInvalidateOnAnimation()
-            }
+            if (isSearching) postInvalidateOnAnimation()
         }
 
-        private fun drawPlayerIcon(
+        private fun drawPlayerPlaceholder(
             canvas: Canvas,
             x: Float,
             y: Float,
@@ -985,6 +1378,7 @@ class TeamUpActivity : Activity() {
             isQueued: Boolean,
         ) {
             paint.color = if (isQueued) 0xFFFFF4D1.toInt() else 0xFF8CA9C7.toInt()
+            paint.style = Paint.Style.FILL
             canvas.drawCircle(x, y - radius * 0.22f, radius * 0.22f, paint)
             paint.style = Paint.Style.STROKE
             paint.strokeWidth = dp(2.5f)
@@ -1002,6 +1396,12 @@ class TeamUpActivity : Activity() {
         }
 
         private fun dp(value: Float): Float = value * resources.displayMetrics.density
+
+        private companion object {
+            const val SOURCE_RING_DURATION_MS = 420L
+            const val APPROACH_DURATION_MS = 850L
+            const val ORBIT_DURATION_MS = 1_250L
+        }
     }
 
     private fun updateTimer() {

@@ -402,6 +402,7 @@ internal fun baseDialog(
 internal fun sizeDialog(
     dialog: Dialog,
     widthFraction: Float,
+    overflowGutterDp: Int = 0,
 ) {
     dialog.setOnShowListener {
         val context =
@@ -409,11 +410,12 @@ internal fun sizeDialog(
         val metrics =
             context.resources
                 .displayMetrics
+        val extraWidth = dp(context, overflowGutterDp * 2)
         val desired =
             (
                 metrics.widthPixels *
                     widthFraction
-                ).toInt()
+                ).toInt() + extraWidth
         val maxWidth =
             dp(
                 context,
@@ -421,13 +423,14 @@ internal fun sizeDialog(
                     .pageMaxContentWidthDp(
                         context,
                     ),
-            )
+            ) + extraWidth
 
         dialog.window
             ?.setLayout(
                 minOf(
                     desired,
                     maxWidth,
+                    metrics.widthPixels,
                 ),
                 WindowManager
                     .LayoutParams

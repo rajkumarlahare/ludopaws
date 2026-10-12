@@ -11,6 +11,10 @@ import android.widget.TextView
 import android.os.Build
 import android.view.WindowInsets
 import com.ludoproof.game.*
+import com.ludoproof.game.core.ui.art.plywoodBackground
+import com.ludoproof.game.core.ui.art.playGamesSignInBackground
+import com.ludoproof.game.ui.game.addGameTopActions
+import com.ludoproof.game.ui.dialogs.showSettingsDialog
 import com.ludoproof.game.feature.offline.*
 import com.ludoproof.game.ui.offline.common.*
 import com.ludoproof.game.ui.offline.gameplay.*
@@ -57,19 +61,33 @@ internal fun OfflineGameActivity.showSetup() {
     val content =
         LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            clipChildren = false
+            clipToPadding = false
+            // Pass & Play follows the Friends/Online surface hierarchy: one
+            // plywood shell contains recessed setup sections. Computer keeps its
+            // dedicated compact selection panel.
             setPadding(
-                0,
-                dp(if (isCompactSetup()) 10 else 12),
-                0,
-                dp(24),
+                if (isComputerMode) 0 else dp(8),
+                if (isComputerMode) 0 else dp(if (isCompactSetup()) 10 else 12),
+                if (isComputerMode) 0 else dp(8),
+                if (isComputerMode) 0 else dp(24),
             )
+            // The page itself has no backing panel. Pass & Play's three setup
+            // sections are grouped inside their own shared selection surface below.
+            background = null
         }
     contentHost.addView(
         content,
         FrameLayout.LayoutParams(
             contentWidth,
             FrameLayout.LayoutParams.WRAP_CONTENT,
-            Gravity.TOP or Gravity.CENTER_HORIZONTAL,
+            if (isComputerMode) {
+                // Center the complete VS COMPUTER setup in the mobile
+                // viewport when it fits; Pass & Play keeps its existing top flow.
+                Gravity.CENTER
+            } else {
+                Gravity.TOP or Gravity.CENTER_HORIZONTAL
+            },
         ),
     )
 
@@ -81,42 +99,122 @@ internal fun OfflineGameActivity.showSetup() {
         ),
     )
 
-    content.addView(
-        backHeader(
-            if (isComputerMode) {
-                "VS COMPUTER"
-            } else {
-                "PASS & PLAY"
+    var fixedTopActionsBar: FrameLayout? = null
+    if (isComputerMode) {
+        // Back/Settings stay fixed to the screen; ROBOT now sits inside
+        // the Computer plywood selection panel, like the Friends title.
+        fixedTopActionsBar = addGameTopActions(
+            host = host,
+            context = this,
+            onBack = { requestOfflineExit() },
+            onSettings = {
+                showSettingsDialog(this) {
+                    val current = engine.snapshot()
+                    if (current != null) showGame(current) else showSetup()
+                }
             },
-        ),
-    )
+        ).apply {
+            // Use the same plywood action surfaces as the Online page.
+            for (index in 0 until childCount) {
+                getChildAt(index).background =
+                    plywoodBackground(context = this@showSetup, cornerRadiusDp = 999f)
+            }
+        }
+    } else {
+        content.addView(backHeader("PASS & PLAY"))
+    }
 
-    // Character identity is the main Ludo Paws choice, so it leads the setup.
-    // Classic rules are the only local ruleset and no longer need a form panel.
-    content.addView(
-        characterPanel(),
-        setupSectionParams(
-            if (isComputerMode) {
-                if (isCompactSetup()) 10 else 12
-            } else if (isCompactSetup()) 12 else 14,
-        ),
-    )
-
-    content.addView(
-        playersPanel(),
-        setupSectionParams(
-            if (isComputerMode) {
-                if (isCompactSetup()) 8 else 10
-            } else if (isCompactSetup()) 10 else 12,
-        ),
-    )
-
-    if (!isComputerMode) {
-        content.addView(
-            colorPanel(),
-            setupSectionParams(
-                if (isCompactSetup()) 10 else 12,
+    // Paw selection and player count share one recessed panel on the computer page.
+    // Pass & Play keeps its existing individual setup panels and color selection.
+    if (isComputerMode) {
+        val combinedSelectionPanel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            clipChildren = false
+            clipToPadding = false
+            setPadding(
+                dp(8),
+                dp(if (isCompactSetup()) 6 else 8),
+                dp(8),
+                dp(if (isCompactSetup()) 8 else 10),
+            )
+            background = plywoodBackground(
+                context = this@showSetup,
+                cornerRadiusDp = 24f,
+            )
+        }
+        combinedSelectionPanel.addView(
+            centeredSetupTitle("ROBOT"),
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply { bottomMargin = dp(8) },
+        )
+        combinedSelectionPanel.addView(
+            characterPanel(embeddedInCombinedPanel = true),
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
             ),
+        )
+        combinedSelectionPanel.addView(
+            playersPanel(embeddedInCombinedPanel = true),
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                topMargin = dp(if (isCompactSetup()) 2 else 4)
+            },
+        )
+        content.addView(
+            combinedSelectionPanel,
+            setupSectionParams(if (isCompactSetup()) 10 else 12),
+        )
+    } else {
+        // One shared plywood surface for all three Pass & Play setup sections.
+        // The children are transparent so they read as one connected panel.
+        val combinedSelectionPanel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            clipChildren = false
+            clipToPadding = false
+            setPadding(
+                dp(8),
+                dp(if (isCompactSetup()) 6 else 8),
+                dp(8),
+                dp(if (isCompactSetup()) 8 else 10),
+            )
+            background = plywoodBackground(
+                context = this@showSetup,
+                cornerRadiusDp = 24f,
+            )
+        }
+        combinedSelectionPanel.addView(
+            characterPanel(embeddedInCombinedPanel = true),
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ),
+        )
+        combinedSelectionPanel.addView(
+            playersPanel(embeddedInCombinedPanel = true),
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                topMargin = dp(if (isCompactSetup()) 2 else 4)
+            },
+        )
+        combinedSelectionPanel.addView(
+            colorPanel(embeddedInCombinedPanel = true),
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                topMargin = dp(if (isCompactSetup()) 2 else 4)
+            },
+        )
+        content.addView(
+            combinedSelectionPanel,
+            setupSectionParams(if (isCompactSetup()) 10 else 12),
         )
     }
 
@@ -124,12 +222,18 @@ internal fun OfflineGameActivity.showSetup() {
 
     content.addView(
         Button(this).apply {
-            text = if (isComputerMode) "🐾   ▶   PLAY   🐾" else "PLAY"
-            textSize = if (isCompactSetup()) 18f else 20f
+            text = "▶  PLAY"
+            textSize = if (isCompactSetup()) 21f else 24f
+            isAllCaps = false
             LudoProofTheme.primary(this)
-            if (isComputerMode) {
-                setTextColor(0xFF693900.toInt())
-                setShadowLayer(0f, 0f, 0f, Color.TRANSPARENT)
+            // Reuse Online/Team Up's approved green fill and cyan stroke for
+            // the Pass & Play action as well as Computer's existing PLAY action.
+            background = playGamesSignInBackground(this@showSetup)
+            setTextColor(Color.WHITE)
+            contentDescription = if (isComputerMode) {
+                "Start game against computer"
+            } else {
+                "Start Pass and Play game"
             }
             setOnClickListener {
                 persistActiveCharacterSetup()
@@ -143,16 +247,13 @@ internal fun OfflineGameActivity.showSetup() {
         },
         LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
-            dp(if (isCompactSetup()) 58 else 62),
+            dp(if (isCompactSetup()) 60 else 66),
         ).apply {
+            val sideMargin = if (isCompactSetup()) dp(10) else dp(34)
             setMargins(
-                if (isComputerMode) {
-                    if (isCompactSetup()) dp(22) else dp(42)
-                } else if (isCompactSetup()) dp(10) else dp(42),
-                dp(if (isCompactSetup()) 16 else 18),
-                if (isComputerMode) {
-                    if (isCompactSetup()) dp(22) else dp(42)
-                } else if (isCompactSetup()) dp(10) else dp(42),
+                sideMargin,
+                dp(if (isCompactSetup()) 14 else 18),
+                sideMargin,
                 0,
             )
         },
@@ -173,12 +274,14 @@ internal fun OfflineGameActivity.showSetup() {
                 @Suppress("DEPRECATION")
                 insets.systemWindowInsetTop
             }
+        val safeTopInset = maxOf(cutoutTop, statusTop)
         content.setPadding(
             content.paddingLeft,
-            dp(if (isCompactSetup()) 10 else 12) + maxOf(cutoutTop, statusTop),
+            if (isComputerMode) 0 else dp(if (isCompactSetup()) 10 else 12) + safeTopInset,
             content.paddingRight,
-            content.paddingBottom,
+            if (isComputerMode) 0 else content.paddingBottom,
         )
+        fixedTopActionsBar?.translationY = safeTopInset.toFloat()
         insets
     }
     root.requestApplyInsets()

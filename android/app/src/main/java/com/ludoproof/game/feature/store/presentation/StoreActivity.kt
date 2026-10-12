@@ -29,7 +29,6 @@ import com.ludoproof.game.feature.store.domain.model.StoreTab
 import com.ludoproof.game.feature.store.presentation.components.storeContent
 import com.ludoproof.game.feature.store.presentation.components.storeHeader
 import com.ludoproof.game.feature.store.presentation.components.storeTabs
-import com.ludoproof.game.feature.store.presentation.components.storefrontAwning
 import java.util.concurrent.Executors
 
 class StoreActivity :
@@ -448,6 +447,7 @@ class StoreActivity :
             LudoProofTheme
                 .arcadeRoot(
                     this,
+                    gameplayBackground = true,
                 )
 
         val scroll =
@@ -528,21 +528,14 @@ class StoreActivity :
             storeHeader(),
         )
         content.addView(
-            storefrontAwning(),
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(82),
-            ).apply {
-                topMargin =
-                    dp(8)
-            },
-        )
-        content.addView(
             storeTabs(),
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(58),
-            ),
+            ).apply {
+                // Separate category tabs from the back button and gem/plus pill above.
+                topMargin = dp(14)
+            },
         )
         content.addView(
             storeContent(),

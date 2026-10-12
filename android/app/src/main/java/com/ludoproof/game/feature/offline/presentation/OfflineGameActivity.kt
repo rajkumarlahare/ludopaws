@@ -93,7 +93,7 @@ class OfflineGameActivity : ComponentActivity() {
     internal var activeCharacterMatchId: String? = null
     internal var activeCharacterIdsBySeat: List<String> = emptyList()
 
-    internal var playerButtons: Map<Int, Button> = emptyMap()
+    internal var playerButtons: Map<Int, View> = emptyMap()
     internal var colorButtons: Map<String, View> = emptyMap()
     internal var characterSlotsRow: LinearLayout? = null
     internal var characterSlotButtons: Map<Int, Button> = emptyMap()

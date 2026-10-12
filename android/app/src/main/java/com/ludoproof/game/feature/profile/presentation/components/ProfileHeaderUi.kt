@@ -3,21 +3,23 @@ package com.ludoproof.game.feature.profile.presentation.components
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
-import android.widget.ImageButton
-import android.widget.ImageView
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.LudoProofTheme
+import com.ludoproof.game.core.ui.art.plywoodBackground
+import com.ludoproof.game.core.ui.art.recessedPlywoodBackground
+import com.ludoproof.game.core.ui.art.transparentDarkBlueStrokeBackground
+import com.ludoproof.game.core.ui.art.playGamesSignInBackground
+import com.ludoproof.game.core.ui.art.experienceProgressTrackBackground
+import com.ludoproof.game.core.ui.art.experienceProgressFillBackground
 import com.ludoproof.game.LudoPawsCharacterAvatarView
 import com.ludoproof.game.core.ui.components.AppFocusRing
 import com.ludoproof.game.core.ui.components.appIconActionButton
-import com.ludoproof.game.core.ui.icons.AppIconView
-import com.ludoproof.game.core.ui.icons.AppIconVariant
 import com.ludoproof.game.core.ui.icons.AppIconName
 import com.ludoproof.game.feature.characters.data.local.CharacterSelectionStore
 import com.ludoproof.game.feature.profile.domain.ProfileProgression
@@ -27,10 +29,24 @@ import com.ludoproof.game.feature.profile.presentation.ProfileActivity
 import com.ludoproof.game.feature.store.domain.model.StoreTab
 import com.ludoproof.game.feature.store.presentation.StoreActivity
 
-internal fun ProfileActivity.profileTopBar(): LinearLayout =
-    LinearLayout(this).apply {
-        orientation = LinearLayout.HORIZONTAL
-        gravity = Gravity.CENTER_VERTICAL
+internal fun ProfileActivity.profileTopBar(): FrameLayout =
+    FrameLayout(this).apply {
+        // Place the title at the true center of the whole top bar, independent of the Back button.
+        addView(
+            TextView(this@profileTopBar).apply {
+                text = "Profile"
+                textSize = 25f
+                setTypeface(Typeface.DEFAULT_BOLD)
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
+                includeFontPadding = false
+            },
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                dp(50),
+                Gravity.CENTER,
+            ),
+        )
 
         addView(
             appIconActionButton(
@@ -38,60 +54,11 @@ internal fun ProfileActivity.profileTopBar(): LinearLayout =
                 contentDescription = "Back",
                 iconName = AppIconName.CHEVRON_LEFT,
                 sizeDp = 50,
-            ) { finish() },
-            LinearLayout.LayoutParams(dp(50), dp(50)),
-        )
-
-        addView(
-            TextView(this@profileTopBar).apply {
-                text = "Profile"
-                textSize = 25f
-                setTypeface(Typeface.DEFAULT_BOLD)
-                setTextColor(Color.WHITE)
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding(dp(12), 0, 0, 0)
+            ) { finish() }.apply {
+                // Keep the Back button circular while using the shared plywood texture.
+                background = plywoodBackground(this@profileTopBar, cornerRadiusDp = 25f)
             },
-            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f),
-        )
-
-        addView(
-            LinearLayout(this@profileTopBar).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER
-                setPadding(dp(10), 0, dp(10), 0)
-                background = LudoProofTheme.rounded(
-                    0xFFF3F5F8.toInt(),
-                    12f,
-                    0xFFDCE4EF.toInt(),
-                    1f,
-                    this@profileTopBar,
-                )
-                addView(
-                    AppIconView(
-                        this@profileTopBar,
-                        AppIconName.SETTINGS,
-                        iconTint = 0xFF303846.toInt(),
-                        iconVariant = AppIconVariant.OUTLINE,
-                        strokeWidthDp = 2f,
-                    ),
-                    LinearLayout.LayoutParams(dp(23), dp(23)),
-                )
-                addView(
-                    TextView(this@profileTopBar).apply {
-                        text = "SETUP"
-                        textSize = 13f
-                        setTypeface(Typeface.DEFAULT_BOLD)
-                        setTextColor(0xFF303846.toInt())
-                        setPadding(dp(6), 0, 0, 0)
-                    },
-                )
-                contentDescription = "Profile and Play Games setup"
-                isEnabled = !playGamesSignInInProgress
-                alpha = if (isEnabled) 1f else 0.72f
-                setOnClickListener { beginPlayGamesSignIn() }
-                AppFocusRing.apply(this, cornerRadiusDp = 12f)
-            },
-            LinearLayout.LayoutParams(dp(104), dp(42)),
+            FrameLayout.LayoutParams(dp(50), dp(50), Gravity.START or Gravity.CENTER_VERTICAL),
         )
     }
 
@@ -100,13 +67,8 @@ internal fun ProfileActivity.profileIdentityPanel(profile: ProfileSnapshot): Lin
     LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         setPadding(dp(10), dp(10), dp(10), dp(10))
-        background = GradientDrawable(
-            GradientDrawable.Orientation.TOP_BOTTOM,
-            intArrayOf(0xFF0876E0.toInt(), 0xFF0649A8.toInt()),
-        ).apply {
-            cornerRadius = dp(20).toFloat()
-            setStroke(dp(2), 0xFF21C8FF.toInt())
-        }
+        // Match the Purchased Products plywood treatment across the Profile hero card.
+        background = plywoodBackground(this@profileIdentityPanel)
         elevation = dp(6).toFloat()
 
         val selection = CharacterSelectionStore(this@profileIdentityPanel).load()
@@ -124,37 +86,22 @@ internal fun ProfileActivity.profileIdentityPanel(profile: ProfileSnapshot): Lin
             gravity = Gravity.CENTER_HORIZONTAL
         }
         val pawFrame = FrameLayout(this@profileIdentityPanel).apply {
-            background = GradientDrawable(
-                GradientDrawable.Orientation.TOP_BOTTOM,
-                intArrayOf(0xFF149CFF.toInt(), 0xFF0751B5.toInt()),
-            ).apply {
-                cornerRadius = dp(18).toFloat()
-                setStroke(dp(1), 0xFF63DFFF.toInt())
-            }
+            // Carved plywood pocket makes the existing 3D Paw feel seated into the panel.
+            background = recessedPlywoodBackground(this@profileIdentityPanel, outerCornerRadiusDp = 18f)
+            clipChildren = false
+            clipToPadding = false
         }
-        // A subtle neon paw stage echoes the reference artwork without adding a second character.
-        pawFrame.addView(
-            View(this@profileIdentityPanel).apply {
-                background = GradientDrawable(
-                    GradientDrawable.Orientation.LEFT_RIGHT,
-                    intArrayOf(0xFF35C9FF.toInt(), 0xFF75F4FF.toInt(), 0xFF167FFF.toInt()),
-                ).apply {
-                    shape = GradientDrawable.OVAL
-                    setStroke(dp(1), 0xFFB0FFFF.toInt())
-                }
-                elevation = dp(2).toFloat()
-            },
-            FrameLayout.LayoutParams(dp(104), dp(16), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply {
-                bottomMargin = dp(7)
-            },
-        )
+        // Reuse the existing production 3D character portrait. On this screen,
+        // render it directly over the blue glow without the generic white disc,
+        // coloured selection ring, or the flat decorative oval.
         pawFrame.addView(
             LudoPawsCharacterAvatarView(this@profileIdentityPanel).apply {
-                setPadding(dp(3), dp(3), dp(3), dp(3))
+                setPadding(0, 0, 0, 0)
                 bind(
                     characterId = selection.characterId,
-                    ringColor = 0xFFFFD34A.toInt(),
-                    highlighted = true,
+                    ringColor = 0xFF5BE0FF.toInt(),
+                    highlighted = false,
+                    showCircularChrome = false,
                 )
                 contentDescription = "Selected Paw: ${character?.displayName ?: "Paw"}"
                 importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
@@ -162,41 +109,70 @@ internal fun ProfileActivity.profileIdentityPanel(profile: ProfileSnapshot): Lin
             FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT,
+                Gravity.TOP or Gravity.CENTER_HORIZONTAL,
             ),
         )
-        pawColumn.addView(
-            pawFrame,
-            LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(132)),
-        )
-        pawColumn.addView(
-            Button(this@profileIdentityPanel).apply {
-                text = "✎  Change"
-                textSize = 12f
-                setTypeface(Typeface.DEFAULT_BOLD)
-                setTextColor(Color.WHITE)
-                minWidth = 0
-                minHeight = 0
-                setPadding(dp(6), 0, dp(6), 0)
-                background = LudoProofTheme.rounded(
-                    0xFF064EAE.toInt(),
-                    999f,
-                    0xFF2ED3FF.toInt(),
-                    1.5f,
-                    this@profileIdentityPanel,
-                )
+        pawFrame.addView(
+            LinearLayout(this@profileIdentityPanel).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER
+                setPadding(0, 0, 0, 0)
+                background = plywoodBackground(this@profileIdentityPanel)
                 contentDescription = "Change selected Paw"
+                isClickable = true
+                isFocusable = true
                 setOnClickListener {
                     startActivity(
                         Intent(this@profileIdentityPanel, StoreActivity::class.java)
                             .putExtra(StoreActivity.EXTRA_INITIAL_TAB, StoreTab.PAWS.name),
                     )
                 }
+
+                // Keep the label first, with the pen immediately to its right.
+                // The parent row centers the combined label + icon as one group.
+                addView(
+                    TextView(this@profileIdentityPanel).apply {
+                        text = "Change"
+                        textSize = 12f
+                        setTypeface(Typeface.DEFAULT_BOLD)
+                        setTextColor(Color.WHITE)
+                        gravity = Gravity.CENTER_VERTICAL
+                        includeFontPadding = false
+                    },
+                    LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                    ),
+                )
+                addView(
+                    ImageView(this@profileIdentityPanel).apply {
+                        setImageDrawable(
+                            context.getDrawable(com.ludoproof.game.R.drawable.ic_profile_edit_pen)
+                                ?.mutate()
+                                ?.apply { setTint(Color.WHITE) },
+                        )
+                        scaleType = ImageView.ScaleType.FIT_CENTER
+                        contentDescription = null
+                    },
+                    LinearLayout.LayoutParams(dp(14), dp(14)).apply {
+                        marginStart = dp(3)
+                    },
+                )
                 AppFocusRing.apply(this, cornerRadiusDp = 999f)
             },
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
                 dp(36),
-            ).apply { topMargin = dp(6) },
+                Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL,
+            ).apply {
+                leftMargin = dp(4)
+                rightMargin = dp(4)
+                bottomMargin = dp(3)
+            },
+        )
+        pawColumn.addView(
+            pawFrame,
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(178)),
         )
         heroRow.addView(
             pawColumn,
@@ -222,7 +198,7 @@ internal fun ProfileActivity.profileIdentityPanel(profile: ProfileSnapshot): Lin
                 if (!playGamesSignInInProgress && !playGamesAuthenticated) {
                     val playGamesIcon = context.getDrawable(com.ludoproof.game.R.drawable.ic_google_play_games)?.mutate()
                     playGamesIcon?.setBounds(0, 0, dp(18), dp(18))
-                    setCompoundDrawables(playGamesIcon, null, null, null)
+                    setCompoundDrawablesRelative(playGamesIcon, null, null, null)
                     compoundDrawablePadding = dp(2)
                 } else {
                     setCompoundDrawablesWithIntrinsicBounds(0, 0, 0, 0)
@@ -234,20 +210,17 @@ internal fun ProfileActivity.profileIdentityPanel(profile: ProfileSnapshot): Lin
                 minWidth = 0
                 minHeight = 0
                 setPadding(dp(8), 0, dp(8), 0)
-                background = LudoProofTheme.rounded(
-                    0xFF058A69.toInt(),
-                    13f,
-                    0xFF20E1C0.toInt(),
-                    1.5f,
-                    this@profileIdentityPanel,
-                )
+                background = playGamesSignInBackground(this@profileIdentityPanel)
                 contentDescription = "Sign in to Google Play Games"
                 isEnabled = !playGamesAuthenticated && !playGamesSignInInProgress
                 alpha = if (isEnabled || playGamesAuthenticated) 1f else 0.78f
                 setOnClickListener { beginPlayGamesSignIn() }
                 AppFocusRing.apply(this, cornerRadiusDp = 13f)
             },
-            LinearLayout.LayoutParams(dp(126), dp(38)),
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                dp(38),
+            ),
         )
         details.addView(signInRow)
 
@@ -280,22 +253,20 @@ internal fun ProfileActivity.profileIdentityPanel(profile: ProfileSnapshot): Lin
             LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT),
         )
         nameRow.addView(
-            ImageButton(this@profileIdentityPanel).apply {
-                setImageResource(com.ludoproof.game.R.drawable.ic_profile_edit_pen)
-                scaleType = ImageView.ScaleType.CENTER_INSIDE
-                setPadding(dp(5), dp(5), dp(5), dp(5))
-                background = LudoProofTheme.rounded(
-                    0x3327C6F4,
-                    8f,
-                    0xAA55DFFF.toInt(),
-                    1f,
-                    this@profileIdentityPanel,
+            ImageView(this@profileIdentityPanel).apply {
+                setImageDrawable(
+                    context.getDrawable(com.ludoproof.game.R.drawable.ic_profile_edit_pen)
+                        ?.mutate()
+                        ?.apply { setTint(Color.WHITE) },
                 )
+                scaleType = ImageView.ScaleType.CENTER_INSIDE
+                isClickable = true
+                isFocusable = true
                 contentDescription = "Edit profile name"
                 setOnClickListener { showNameEditor() }
-                AppFocusRing.apply(this, cornerRadiusDp = 8f)
+                AppFocusRing.apply(this, cornerRadiusDp = 15f)
             },
-            LinearLayout.LayoutParams(dp(30), dp(30)).apply { marginStart = dp(5) },
+            LinearLayout.LayoutParams(dp(30), dp(30)).apply { marginStart = dp(3) },
         )
         details.addView(nameRow)
 
@@ -317,20 +288,11 @@ internal fun ProfileActivity.profileIdentityPanel(profile: ProfileSnapshot): Lin
         )
 
         val track = FrameLayout(this@profileIdentityPanel).apply {
-            background = LudoProofTheme.rounded(
-                0xFF052E78.toInt(),
-                999f,
-                0xFF3185D5.toInt(),
-                1f,
-                this@profileIdentityPanel,
-            )
+            background = experienceProgressTrackBackground(this@profileIdentityPanel)
             clipToOutline = true
         }
         val fill = View(this@profileIdentityPanel).apply {
-            background = GradientDrawable(
-                GradientDrawable.Orientation.LEFT_RIGHT,
-                intArrayOf(0xFFFFD83D.toInt(), 0xFFFFB812.toInt()),
-            ).apply { cornerRadius = dp(999).toFloat() }
+            background = experienceProgressFillBackground(this@profileIdentityPanel)
         }
         track.addView(
             fill,
@@ -368,13 +330,7 @@ internal fun ProfileActivity.profileIdentityPanel(profile: ProfileSnapshot): Lin
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
             setPadding(dp(2), dp(7), dp(2), dp(7))
-            background = LudoProofTheme.rounded(
-                0xC9082A69.toInt(),
-                14f,
-                0xFF176FCC.toInt(),
-                1f,
-                this@profileIdentityPanel,
-            )
+            background = transparentDarkBlueStrokeBackground(this@profileIdentityPanel)
         }
         statsStrip.addView(
             statCell("🎮", profile.totalGames.toString(), "Games"),

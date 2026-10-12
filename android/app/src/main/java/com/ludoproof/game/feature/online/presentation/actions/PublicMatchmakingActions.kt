@@ -3,6 +3,7 @@ package com.ludoproof.game.feature.online
 import android.view.View
 import com.ludoproof.game.*
 import com.ludoproof.game.feature.profile.data.local.ProfileStore
+import com.ludoproof.game.core.ui.components.playSelectionPopAnimation
 import com.ludoproof.game.ui.online.stylePublicPlayerCountButton
 import org.json.JSONObject
 import java.util.UUID
@@ -30,6 +31,14 @@ internal fun MainActivity.selectPublicPlayerCount(
     selectedPublicPlayerCount =
         playerCount
     updatePublicPlayerCountButtons()
+
+    val tappedButton =
+        if (playerCount == 2) {
+            twoPlayerButton
+        } else {
+            fourPlayerButton
+        }
+    tappedButton.playSelectionPopAnimation()
 }
 
 internal fun MainActivity.beginPublicMatchmaking() {

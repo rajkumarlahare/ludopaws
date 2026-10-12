@@ -11,11 +11,98 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.*
+import com.ludoproof.game.core.ui.art.plywoodBackground
+import com.ludoproof.game.core.ui.art.transparentDarkBlueStrokeBackground
 import com.ludoproof.game.core.ui.components.appIconActionButton
 import com.ludoproof.game.core.ui.icons.AppIconName
 import com.ludoproof.game.ui.dialogs.showSettingsDialog
 import com.ludoproof.game.ui.offline.gameplay.showGame
 import com.ludoproof.game.ui.offline.setup.showSetup
+
+internal fun OfflineGameActivity.centeredSetupTitle(label: String): View {
+    val compact = LudoProofTheme.isCompactWidth(this)
+    val badge = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER
+        setPadding(
+            dp(if (compact) 10 else 14),
+            dp(4),
+            dp(if (compact) 10 else 14),
+            dp(4),
+        )
+        // The Computer title is intentionally unboxed, with a robot icon on its left.
+        background = null
+        elevation = 0f
+        addView(
+            RobotTitleIconView(this@centeredSetupTitle),
+            LinearLayout.LayoutParams(
+                dp(36),
+                dp(36),
+            ).apply {
+                marginEnd = dp(8)
+            },
+        )
+        addView(
+            TextView(this@centeredSetupTitle).apply {
+                text = label
+                LudoProofTheme.title(this, if (compact) 22f else 26f, gold = false)
+                setPadding(0, 0, 0, 0)
+                includeFontPadding = false
+                maxLines = 1
+            },
+        )
+    }
+    return FrameLayout(this).apply {
+        clipChildren = false
+        clipToPadding = false
+        addView(
+            badge,
+            FrameLayout.LayoutParams(
+                dp(if (compact) 222 else 254),
+                dp(54),
+                Gravity.CENTER,
+            ),
+        )
+    }
+}
+
+private class RobotTitleIconView(context: Context) : View(context) {
+    private val outline = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFFFFFFFF.toInt()
+        style = Paint.Style.STROKE
+        strokeWidth = 5f
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
+    private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFFFFFFFF.toInt()
+        style = Paint.Style.FILL
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        val size = minOf(width, height).toFloat()
+        if (size <= 0f) return
+
+        canvas.save()
+        canvas.translate((width - size) / 2f, (height - size) / 2f)
+        canvas.scale(size / 100f, size / 100f)
+
+        // Antenna and side panels make the silhouette read as a small robot.
+        canvas.drawLine(50f, 14f, 50f, 23f, outline)
+        canvas.drawCircle(50f, 10f, 4f, fill)
+        canvas.drawRoundRect(RectF(9f, 38f, 20f, 59f), 4f, 4f, outline)
+        canvas.drawRoundRect(RectF(80f, 38f, 91f, 59f), 4f, 4f, outline)
+
+        // Rounded robot head with two bright eyes and a simple mouth.
+        canvas.drawRoundRect(RectF(20f, 23f, 80f, 77f), 12f, 12f, outline)
+        canvas.drawCircle(38f, 45f, 4.5f, fill)
+        canvas.drawCircle(62f, 45f, 4.5f, fill)
+        canvas.drawRoundRect(RectF(37f, 60f, 63f, 65f), 2.5f, 2.5f, fill)
+
+        canvas.restore()
+    }
+}
 
 internal fun OfflineGameActivity.backHeader(label: String?): View {
     fun openSettings() {
@@ -25,9 +112,9 @@ internal fun OfflineGameActivity.backHeader(label: String?): View {
         }
     }
 
-    if (isComputerMode) {
+    if (isComputerMode || label == "PASS & PLAY") {
         return FrameLayout(this).apply {
-            minimumHeight = dp(54)
+            minimumHeight = dp(if (LudoProofTheme.isCompactWidth(this@backHeader)) 50 else 56)
             clipChildren = false
             clipToPadding = false
 
@@ -39,6 +126,13 @@ internal fun OfflineGameActivity.backHeader(label: String?): View {
                     sizeDp = 44,
                 ) {
                     requestOfflineExit()
+                }.apply {
+                    if (isComputerMode || label == "PASS & PLAY") {
+                        background = plywoodBackground(
+                            context = this@backHeader,
+                            cornerRadiusDp = 999f,
+                        )
+                    }
                 },
                 FrameLayout.LayoutParams(
                     dp(44),
@@ -51,37 +145,55 @@ internal fun OfflineGameActivity.backHeader(label: String?): View {
                 LinearLayout(this@backHeader).apply {
                     orientation = LinearLayout.HORIZONTAL
                     gravity = Gravity.CENTER
-                    setPadding(dp(12), dp(4), dp(12), dp(4))
-                    background =
-                        GradientDrawable(
-                            GradientDrawable.Orientation.TOP_BOTTOM,
-                            intArrayOf(0xFF0C55B5.toInt(), 0xFF082963.toInt()),
-                        ).apply {
-                            cornerRadius = dp(999).toFloat()
-                            setStroke(dp(2), LudoProofTheme.GOLD)
-                        }
-                    elevation = dp(6).toFloat()
+                    setPadding(
+                        dp(if (LudoProofTheme.isCompactWidth(this@backHeader)) 10 else 14),
+                        dp(4),
+                        dp(if (LudoProofTheme.isCompactWidth(this@backHeader)) 10 else 14),
+                        dp(4),
+                    )
+                    // Match the unboxed ROBOT title style on Computer while retaining
+                    // the existing PASS & PLAY title position and surrounding actions.
+                    background = null
+                    elevation = 0f
                     addView(
-                        SetupPawMarkView(this@backHeader),
-                        LinearLayout.LayoutParams(dp(22), dp(22)),
+                        SetupPawMarkView(
+                            this@backHeader,
+                            pawColor = 0xFFFFFFFF.toInt(),
+                        ),
+                        LinearLayout.LayoutParams(
+                            dp(if (LudoProofTheme.isCompactWidth(this@backHeader)) 18 else 22),
+                            dp(if (LudoProofTheme.isCompactWidth(this@backHeader)) 18 else 22),
+                        ),
                     )
                     addView(
                         TextView(this@backHeader).apply {
                             text = label.orEmpty()
-                            LudoProofTheme.title(this, 16f)
-                            setPadding(dp(8), 0, dp(8), 0)
+                            LudoProofTheme.title(
+                                this,
+                                if (LudoProofTheme.isCompactWidth(this@backHeader)) 15f else 19f,
+                                gold = false,
+                            )
+                            setPadding(dp(7), 0, dp(7), 0)
+                            includeFontPadding = false
+                            maxLines = 1
                         },
                     )
                     addView(
-                        SetupPawMarkView(this@backHeader),
-                        LinearLayout.LayoutParams(dp(22), dp(22)),
+                        SetupPawMarkView(
+                            this@backHeader,
+                            pawColor = 0xFFFFFFFF.toInt(),
+                        ),
+                        LinearLayout.LayoutParams(
+                            dp(if (LudoProofTheme.isCompactWidth(this@backHeader)) 18 else 22),
+                            dp(if (LudoProofTheme.isCompactWidth(this@backHeader)) 18 else 22),
+                        ),
                     )
                 }
             addView(
                 badge,
                 FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.WRAP_CONTENT,
-                    dp(42),
+                    dp(if (LudoProofTheme.isCompactWidth(this@backHeader)) 222 else 254),
+                    dp(if (LudoProofTheme.isCompactWidth(this@backHeader)) 42 else 48),
                     Gravity.CENTER,
                 ),
             )
@@ -94,6 +206,13 @@ internal fun OfflineGameActivity.backHeader(label: String?): View {
                     sizeDp = 44,
                 ) {
                     openSettings()
+                }.apply {
+                    if (isComputerMode || label == "PASS & PLAY") {
+                        background = plywoodBackground(
+                            context = this@backHeader,
+                            cornerRadiusDp = 999f,
+                        )
+                    }
                 },
                 FrameLayout.LayoutParams(
                     dp(44),
@@ -174,10 +293,13 @@ internal fun OfflineGameActivity.isCompactSetup():
 internal fun OfflineGameActivity.dp(value: Int): Int =
     LudoProofTheme.dp(this, value)
 
-private class SetupPawMarkView(context: Context) : View(context) {
+private class SetupPawMarkView(
+    context: Context,
+    pawColor: Int = 0xFF55C9FF.toInt(),
+) : View(context) {
     private val pawPaint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = 0xFF55C9FF.toInt()
+            color = pawColor
             style = Paint.Style.FILL
         }
 

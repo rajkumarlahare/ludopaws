@@ -18,11 +18,15 @@ class GemClusterView(
         Paint(Paint.ANTI_ALIAS_FLAG)
     private val facetPaint =
         Paint(Paint.ANTI_ALIAS_FLAG)
-    private val outlinePaint =
+    private val highlightPaint =
+        Paint(Paint.ANTI_ALIAS_FLAG)
+    private val facetLinePaint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
-            strokeWidth = dp(1.4f)
-            color = 0xBFFFFFFF.toInt()
+            strokeWidth = dp(0.65f)
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+            color = 0x68C5FFFF
         }
 
     override fun onDraw(canvas: Canvas) {
@@ -90,6 +94,8 @@ class GemClusterView(
         val right = centerX + halfWidth
         val shoulderLeft = centerX - size * 0.31f
         val shoulderRight = centerX + size * 0.31f
+        val depthX = size * 0.025f
+        val depthY = size * 0.045f
 
         val body =
             Path().apply {
@@ -100,61 +106,224 @@ class GemClusterView(
                 lineTo(centerX, bottom)
                 close()
             }
+        val depth =
+            Path().apply {
+                moveTo(left + depthX, crownY + depthY)
+                lineTo(shoulderLeft + depthX, top + depthY)
+                lineTo(shoulderRight + depthX, top + depthY)
+                lineTo(right + depthX, crownY + depthY)
+                lineTo(centerX + depthX, bottom + depthY)
+                close()
+            }
+
+        // A darker offset edge gives each stone visible thickness.
+        fillPaint.shader =
+            LinearGradient(
+                left,
+                top,
+                right,
+                bottom + depthY,
+                intArrayOf(
+                    0xFF1687AD.toInt(),
+                    0xFF07517F.toInt(),
+                    0xFF031D50.toInt(),
+                ),
+                null,
+                Shader.TileMode.CLAMP,
+            )
+        canvas.drawPath(depth, fillPaint)
+
+        // Rich, light-facing enamel beneath the individual cut facets.
         fillPaint.shader =
             LinearGradient(
                 left,
                 top,
                 right,
                 bottom,
-                intArrayOf(0xFF9BFFF1.toInt(), 0xFF27D8CF.toInt(), 0xFF087DC4.toInt()),
-                null,
+                intArrayOf(
+                    0xFFE9FFFF.toInt(),
+                    0xFF65F4EA.toInt(),
+                    0xFF16BFD9.toInt(),
+                    0xFF07569E.toInt(),
+                ),
+                floatArrayOf(0f, 0.22f, 0.58f, 1f),
                 Shader.TileMode.CLAMP,
             )
         canvas.drawPath(body, fillPaint)
+        fillPaint.shader = null
 
-        facetPaint.shader = null
-        facetPaint.color = 0xBFFFFFFF.toInt()
-        canvas.drawPath(
+        val crown =
+            Path().apply {
+                moveTo(shoulderLeft, top)
+                lineTo(shoulderRight, top)
+                lineTo(centerX, crownY)
+                close()
+            }
+        val leftCrown =
             Path().apply {
                 moveTo(left, crownY)
                 lineTo(shoulderLeft, top)
                 lineTo(centerX, crownY)
+                close()
+            }
+        val leftPavilion =
+            Path().apply {
+                moveTo(left, crownY)
+                lineTo(centerX, crownY)
                 lineTo(centerX, bottom)
                 close()
-            },
-            facetPaint,
-        )
-        facetPaint.color = 0x5539F4E5
-        canvas.drawPath(
+            }
+        val rightCrown =
             Path().apply {
-                moveTo(shoulderLeft, top)
-                lineTo(shoulderRight, top)
+                moveTo(shoulderRight, top)
                 lineTo(right, crownY)
                 lineTo(centerX, crownY)
                 close()
-            },
-            facetPaint,
-        )
-        facetPaint.color = 0x8A0569AB.toInt()
-        canvas.drawPath(
+            }
+        val rightPavilion =
             Path().apply {
                 moveTo(centerX, crownY)
                 lineTo(right, crownY)
                 lineTo(centerX, bottom)
                 close()
-            },
-            facetPaint,
-        )
-        canvas.drawPath(body, outlinePaint)
-        fillPaint.shader = null
+            }
 
+        drawFacet(
+            canvas,
+            leftCrown,
+            left,
+            top,
+            centerX,
+            crownY,
+            0xFFD9FFFF.toInt(),
+            0xFF8DFFF6.toInt(),
+            0xFF19C6DB.toInt(),
+        )
+        drawFacet(
+            canvas,
+            rightCrown,
+            shoulderRight,
+            top,
+            right,
+            crownY,
+            0xFFD1FBFF.toInt(),
+            0xFF42DDEB.toInt(),
+            0xFF0874B8.toInt(),
+        )
+        drawFacet(
+            canvas,
+            crown,
+            centerX,
+            top,
+            centerX,
+            crownY + size * 0.04f,
+            0xFFE6FFFF.toInt(),
+            0xFF91F8F0.toInt(),
+            0xFF22B9DB.toInt(),
+        )
+        drawFacet(
+            canvas,
+            leftPavilion,
+            left,
+            crownY,
+            centerX,
+            bottom,
+            0xFF5AF3E8.toInt(),
+            0xFF19C7DD.toInt(),
+            0xFF0863A8.toInt(),
+        )
+        drawFacet(
+            canvas,
+            rightPavilion,
+            centerX,
+            crownY,
+            right,
+            bottom,
+            0xFF159CCF.toInt(),
+            0xFF075CA8.toInt(),
+            0xFF032B68.toInt(),
+        )
+
+        // Fine facet junctions mimic the crisp edges of a cut gemstone.
+        canvas.drawLine(left, crownY, centerX, crownY, facetLinePaint)
+        canvas.drawLine(shoulderLeft, top, centerX, crownY, facetLinePaint)
+        canvas.drawLine(shoulderRight, top, centerX, crownY, facetLinePaint)
+
+        // Broad, soft reflection across the upper-left crown.
+        val reflection =
+            Path().apply {
+                moveTo(left + size * 0.10f, crownY - size * 0.015f)
+                lineTo(shoulderLeft + size * 0.07f, top + size * 0.055f)
+                quadTo(
+                    shoulderLeft + size * 0.17f,
+                    top + size * 0.015f,
+                    centerX - size * 0.11f,
+                    crownY - size * 0.075f,
+                )
+                quadTo(
+                    centerX - size * 0.08f,
+                    crownY - size * 0.015f,
+                    left + size * 0.19f,
+                    crownY + size * 0.045f,
+                )
+                close()
+            }
+        highlightPaint.shader =
+            LinearGradient(
+                left,
+                top,
+                centerX,
+                crownY + size * 0.08f,
+                intArrayOf(
+                    0xD8FFFFFF.toInt(),
+                    0x78DFFFFF.toInt(),
+                    0x06FFFFFF,
+                ),
+                null,
+                Shader.TileMode.CLAMP,
+            )
+        canvas.drawPath(reflection, highlightPaint)
+        highlightPaint.shader = null
+
+        // Keep reflections on the gem surfaces; don't draw a hard outer stroke.
+        canvas.drawLine(
+            left + size * 0.09f,
+            crownY - size * 0.005f,
+            shoulderLeft + size * 0.06f,
+            top + size * 0.045f,
+            facetLinePaint,
+        )
         fillPaint.color = Color.WHITE
         canvas.drawCircle(
             centerX - size * 0.17f,
             centerY - size * 0.23f,
-            size * 0.035f,
+            size * 0.023f,
             fillPaint,
         )
+        fillPaint.color = Color.TRANSPARENT
+    }
+
+    private fun drawFacet(
+        canvas: Canvas,
+        path: Path,
+        startX: Float,
+        startY: Float,
+        endX: Float,
+        endY: Float,
+        vararg colors: Int,
+    ) {
+        facetPaint.shader =
+            LinearGradient(
+                startX,
+                startY,
+                endX,
+                endY,
+                colors,
+                null,
+                Shader.TileMode.CLAMP,
+            )
+        canvas.drawPath(path, facetPaint)
+        facetPaint.shader = null
     }
 
     private fun dp(value: Float): Float =

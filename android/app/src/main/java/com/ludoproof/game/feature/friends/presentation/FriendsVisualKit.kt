@@ -2,21 +2,29 @@ package com.ludoproof.game.feature.friends.presentation
 
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.ColorFilter
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.PixelFormat
 import android.graphics.RectF
 import android.graphics.Typeface
+import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.ludoproof.game.core.ui.art.plywoodBackground
+import com.ludoproof.game.core.ui.art.recessedPlywoodBackground
+import com.ludoproof.game.core.ui.art.transparentDarkBlueStrokeBackground
 import com.ludoproof.game.core.ui.components.AppFocusRing
 import com.ludoproof.game.core.ui.icons.AppIconName
 import com.ludoproof.game.core.ui.icons.AppIconVariant
 import com.ludoproof.game.core.ui.icons.AppIconView
+import com.ludoproof.game.ui.home.HomeIconKind
+import com.ludoproof.game.ui.home.HomeIconView
 import kotlin.math.min
 
 internal enum class FriendsIcon {
@@ -58,6 +66,7 @@ internal object FriendsVisualKit {
     fun dp(context: Context, value: Int): Int =
         (value * context.resources.displayMetrics.density).toInt()
 
+    @Suppress("UNUSED_PARAMETER")
     fun card(
         context: Context,
         accent: Int = CYAN,
@@ -72,59 +81,37 @@ internal object FriendsVisualKit {
                 dp(context, paddingDp),
                 dp(context, paddingDp),
             )
-            background = gradient(
+            background = plywoodBackground(
                 context = context,
-                top = 0xF12678D5.toInt(),
-                bottom = 0xF0062D70.toInt(),
-                stroke = accent,
-                strokeDp = 2,
-                radiusDp = radiusDp,
+                cornerRadiusDp = radiusDp.toFloat(),
             )
             clipChildren = false
             clipToPadding = false
             elevation = dp(context, 8).toFloat()
         }
 
+    @Suppress("UNUSED_PARAMETER")
     fun compactCard(
         context: Context,
         accent: Int = CYAN,
     ): LinearLayout =
-        card(
-            context = context,
-            accent = accent,
-            radiusDp = 18,
-            paddingDp = 12,
-        )
+        LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(context, 12), dp(context, 12), dp(context, 12), dp(context, 12))
+            background = recessedPlywoodBackground(context, outerCornerRadiusDp = 18f)
+            clipChildren = false
+            clipToPadding = false
+            elevation = dp(context, 8).toFloat()
+        }
 
-    fun rowSurface(context: Context): GradientDrawable =
-        gradient(
-            context = context,
-            top = 0xF51A62B5.toInt(),
-            bottom = 0xF2083477.toInt(),
-            stroke = 0xAA69DFFF.toInt(),
-            strokeDp = 1,
-            radiusDp = 15,
-        )
+    fun rowSurface(context: Context): android.graphics.drawable.Drawable =
+        transparentDarkBlueStrokeBackground(context, cornerRadiusDp = 15f)
 
     fun inputSurface(context: Context): GradientDrawable =
-        gradient(
-            context = context,
-            top = 0xFF0A2C66.toInt(),
-            bottom = 0xFF061F4E.toInt(),
-            stroke = 0xFF3C9CFF.toInt(),
-            strokeDp = 2,
-            radiusDp = 15,
-        )
+        transparentDarkBlueStrokeBackground(context, cornerRadiusDp = 15f)
 
     fun friendIdSurface(context: Context): GradientDrawable =
-        gradient(
-            context = context,
-            top = 0xFF182B7E.toInt(),
-            bottom = 0xFF101F68.toInt(),
-            stroke = 0xFF6A63FF.toInt(),
-            strokeDp = 2,
-            radiusDp = 14,
-        )
+        transparentDarkBlueStrokeBackground(context, cornerRadiusDp = 14f)
 
     fun title(
         context: Context,
@@ -200,22 +187,45 @@ internal object FriendsVisualKit {
         onClick: () -> Unit,
     ): TextView =
         TextView(context).apply {
-            text = buildString {
-                if (icon != null) {
-                    append(iconGlyph(icon))
-                    append("  ")
+            val drawnActionIcon = icon?.takeIf {
+                it == FriendsIcon.COPY || it == FriendsIcon.SHARE || it == FriendsIcon.INVITE
+            }
+            text = if (drawnActionIcon != null) {
+                label
+            } else {
+                buildString {
+                    if (icon != null) {
+                        append(iconGlyph(icon))
+                        append("  ")
+                    }
+                    append(label)
                 }
-                append(label)
+            }
+            if (drawnActionIcon != null) {
+                isSingleLine = true
+                ellipsize = android.text.TextUtils.TruncateAt.END
+                compoundDrawablePadding = dp(context, 3)
+                setCompoundDrawablesRelativeWithIntrinsicBounds(
+                    null,
+                    null,
+                    FriendsActionIconDrawable(
+                        context = context,
+                        icon = drawnActionIcon,
+                        tint = if (enabled) Color.WHITE else 0xFF9EB4D1.toInt(),
+                    ),
+                    null,
+                )
             }
             setTextColor(if (enabled) Color.WHITE else 0xFF9EB4D1.toInt())
             textSize = 14f
             typeface = Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
             includeFontPadding = false
+            val horizontalPadding = if (drawnActionIcon != null) 5 else 10
             setPadding(
-                dp(context, 10),
+                dp(context, horizontalPadding),
                 dp(context, 3),
-                dp(context, 10),
+                dp(context, horizontalPadding),
                 dp(context, 3),
             )
             background = buttonBackground(context, style, enabled)
@@ -237,6 +247,16 @@ internal object FriendsVisualKit {
         icon: FriendsIcon,
         tint: Int = TEXT,
     ): View {
+        if (icon == FriendsIcon.SHARE) {
+            return HomeIconView(context).apply {
+                kind = HomeIconKind.SHARE
+                iconColor = tint
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }
+        }
+        if (icon == FriendsIcon.COPY || icon == FriendsIcon.INVITE) {
+            return FriendsIconView(context, icon, tint)
+        }
         val sharedName = when (icon) {
             FriendsIcon.BACK -> AppIconName.BACK
             FriendsIcon.PEOPLE, FriendsIcon.INVITES -> AppIconName.PEOPLE
@@ -351,6 +371,106 @@ internal object FriendsVisualKit {
         }
 }
 
+private class FriendsActionIconDrawable(
+    context: Context,
+    private val icon: FriendsIcon,
+    tint: Int,
+) : Drawable() {
+    private val iconSize = FriendsVisualKit.dp(context, 18)
+    private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = tint
+        style = Paint.Style.STROKE
+        strokeWidth = 7f
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
+    private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = tint
+        style = Paint.Style.FILL
+    }
+    private val homeShareIcon = if (icon == FriendsIcon.SHARE) {
+        HomeIconView(context).apply {
+            kind = HomeIconKind.SHARE
+            iconColor = tint
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            val exactSize = View.MeasureSpec.makeMeasureSpec(iconSize, View.MeasureSpec.EXACTLY)
+            measure(exactSize, exactSize)
+            layout(0, 0, iconSize, iconSize)
+        }
+    } else {
+        null
+    }
+
+    override fun getIntrinsicWidth(): Int = iconSize
+
+    override fun getIntrinsicHeight(): Int = iconSize
+
+    override fun draw(canvas: Canvas) {
+        val saved = canvas.save()
+        canvas.translate(bounds.left.toFloat(), bounds.top.toFloat())
+        homeShareIcon?.let { shareIcon ->
+            shareIcon.draw(canvas)
+            canvas.restoreToCount(saved)
+            return
+        }
+
+        canvas.scale(iconSize / 100f, iconSize / 100f)
+        when (icon) {
+            FriendsIcon.COPY -> drawCopy(canvas)
+            FriendsIcon.INVITE -> drawSend(canvas)
+            else -> Unit
+        }
+        canvas.restoreToCount(saved)
+    }
+
+    override fun setAlpha(alpha: Int) {
+        stroke.alpha = alpha
+        fill.alpha = alpha
+        homeShareIcon?.alpha = alpha / 255f
+        invalidateSelf()
+    }
+
+    override fun setColorFilter(colorFilter: ColorFilter?) {
+        stroke.colorFilter = colorFilter
+        fill.colorFilter = colorFilter
+        invalidateSelf()
+    }
+
+    @Deprecated("Deprecated in Android graphics API")
+    override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
+
+    private fun drawCopy(canvas: Canvas) {
+        stroke.color = strokeColor
+        stroke.strokeWidth = 7f
+        canvas.drawRoundRect(RectF(34f, 13f, 82f, 64f), 7f, 7f, stroke)
+        canvas.drawRoundRect(RectF(18f, 35f, 66f, 86f), 7f, 7f, stroke)
+    }
+
+    private fun drawSend(canvas: Canvas) {
+        fill.color = fillColor
+        val plane = Path().apply {
+            moveTo(9f, 45f)
+            lineTo(92f, 10f)
+            lineTo(66f, 90f)
+            lineTo(47f, 62f)
+            lineTo(30f, 55f)
+            close()
+        }
+        canvas.drawPath(plane, fill)
+        stroke.color = foldColor
+        stroke.strokeWidth = 4.5f
+        canvas.drawLine(30f, 55f, 92f, 10f, stroke)
+        canvas.drawLine(47f, 62f, 66f, 90f, stroke)
+    }
+
+    private val strokeColor: Int
+        get() = stroke.color
+    private val fillColor: Int
+        get() = fill.color
+    private val foldColor: Int
+        get() = Color.argb(155, 7, 34, 65)
+}
+
 internal class FriendsIconView(
     context: Context,
     private val icon: FriendsIcon,
@@ -384,7 +504,7 @@ internal class FriendsIconView(
             FriendsIcon.COPY -> drawCopy(canvas, cx, cy, s)
             FriendsIcon.SHARE -> drawShare(canvas, cx, cy, s)
             FriendsIcon.PLAY -> drawPlay(canvas, cx, cy, s)
-            FriendsIcon.INVITE -> drawAddFriend(canvas, cx, cy, s)
+            FriendsIcon.INVITE -> drawSend(canvas, cx, cy, s)
             FriendsIcon.MESSAGE -> drawMessage(canvas, cx, cy, s)
             FriendsIcon.CLOCK -> drawClock(canvas, cx, cy, s)
             FriendsIcon.MORE -> drawMore(canvas, cx, cy, s)
@@ -490,16 +610,40 @@ internal class FriendsIconView(
 
     private fun drawCopy(canvas: Canvas, cx: Float, cy: Float, s: Float) {
         paint.style = Paint.Style.STROKE
+        paint.strokeWidth = maxOf(paint.strokeWidth, s * 0.065f)
+        // Two clearly separated overlapping paper sheets.
         canvas.drawRoundRect(
-            RectF(cx - s * 0.16f, cy - s * 0.22f, cx + s * 0.22f, cy + s * 0.22f),
-            s * 0.06f,
-            s * 0.06f,
+            RectF(cx - s * 0.02f, cy - s * 0.39f, cx + s * 0.34f, cy + s * 0.09f),
+            s * 0.055f,
+            s * 0.055f,
             paint,
         )
         canvas.drawRoundRect(
-            RectF(cx - s * 0.28f, cy - s * 0.10f, cx + s * 0.10f, cy + s * 0.32f),
-            s * 0.06f,
-            s * 0.06f,
+            RectF(cx - s * 0.34f, cy - s * 0.08f, cx + s * 0.02f, cy + s * 0.40f),
+            s * 0.055f,
+            s * 0.055f,
+            paint,
+        )
+    }
+
+    private fun drawSend(canvas: Canvas, cx: Float, cy: Float, s: Float) {
+        paint.style = Paint.Style.FILL
+        val plane = Path().apply {
+            moveTo(cx - s * 0.43f, cy - s * 0.05f)
+            lineTo(cx + s * 0.44f, cy - s * 0.42f)
+            lineTo(cx + s * 0.17f, cy + s * 0.43f)
+            lineTo(cx - s * 0.03f, cy + s * 0.12f)
+            lineTo(cx - s * 0.20f, cy + s * 0.05f)
+            close()
+        }
+        canvas.drawPath(plane, paint)
+        paint.style = Paint.Style.STROKE
+        paint.color = Color.argb(150, 7, 34, 65)
+        canvas.drawLine(
+            cx - s * 0.20f,
+            cy + s * 0.05f,
+            cx + s * 0.44f,
+            cy - s * 0.42f,
             paint,
         )
     }

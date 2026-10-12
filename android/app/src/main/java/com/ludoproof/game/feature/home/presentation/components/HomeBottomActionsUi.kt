@@ -8,6 +8,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.HomeActivity
 import com.ludoproof.game.R
+import com.ludoproof.game.core.ui.art.plywoodBackground
 import com.ludoproof.game.ui.dialogs.showSettingsDialog
 
 internal fun HomeActivity.homeBottomActions(): LinearLayout =
@@ -77,9 +78,9 @@ private fun HomeActivity.bottomActionButton(
         isFocusable = true
         contentDescription = description
         background =
-            homeGlassBackground(
+            plywoodBackground(
                 context = this@bottomActionButton,
-                shape = HomeGlassShape.PILL,
+                cornerRadiusDp = if (isCompact()) 25f else 28f,
             )
         elevation = dp(7).toFloat()
         setPadding(
@@ -115,7 +116,12 @@ private fun HomeActivity.bottomActionButton(
                 dp(if (isCompact()) 31 else 36),
                 dp(if (isCompact()) 31 else 36),
             ).apply {
-                marginEnd = dp(if (isCompact()) 3 else 5)
+                marginEnd =
+                    when (iconKind) {
+                        HomeIconKind.SHARE -> dp(0)
+                        HomeIconKind.RATING -> dp(if (isCompact()) 3 else 5)
+                        else -> dp(if (isCompact()) 3 else 5)
+                    }
             },
         )
 
@@ -192,6 +198,14 @@ private fun HomeActivity.bottomActionButton(
                             ),
                         )
                     }
+                }
+            }.apply {
+                when (iconKind) {
+                    HomeIconKind.RATING ->
+                        translationX = -dp(if (isCompact()) 2 else 3).toFloat()
+                    HomeIconKind.SHARE ->
+                        translationX = -dp(if (isCompact()) 4 else 5).toFloat()
+                    else -> Unit
                 }
             },
             LinearLayout.LayoutParams(

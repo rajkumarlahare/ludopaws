@@ -57,7 +57,7 @@ internal fun HomeActivity.modeSection(): LinearLayout =
                         ),
                         HomeModeCard(
                             mode = GameMode.COMPUTER,
-                            title = "Computer",
+                            title = "Robot",
                             subtitle = "CPU",
                             artMode = ModeArtView.Mode.COMPUTER,
                             tone = HomeModeTone.COMPUTER,

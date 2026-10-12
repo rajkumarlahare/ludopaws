@@ -14,9 +14,9 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import com.ludoproof.game.LudoProofTheme
+import com.ludoproof.game.core.ui.art.plywoodBackground
+import com.ludoproof.game.core.ui.art.recessedPlywoodBackground
 import com.ludoproof.game.core.ui.components.AppFocusRing
-import com.ludoproof.game.core.ui.icons.AppIconName
-import com.ludoproof.game.core.ui.icons.AppIconView
 
 internal fun settingsCompactPanel(
     context: Context,
@@ -24,13 +24,20 @@ internal fun settingsCompactPanel(
 ): LinearLayout =
     LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
+        // Let the close mark draw over the popup's own top-right border.
+        clipChildren = false
+        clipToPadding = false
         setPadding(
             settingsDp(context, 8),
             settingsDp(context, 8),
             settingsDp(context, 8),
             settingsDp(context, 8),
         )
-        background = SettingsSharedWebpDrawable(context)
+        background =
+            plywoodBackground(
+                context = context,
+                cornerRadiusDp = 20f,
+            )
 
         addView(
             settingsHeader(
@@ -51,6 +58,8 @@ private fun settingsHeader(
     dialog: Dialog,
 ): FrameLayout =
     FrameLayout(context).apply {
+        clipChildren = false
+        clipToPadding = false
         val title =
             TextView(context).apply {
                 text = "SETTINGS"
@@ -95,53 +104,56 @@ private fun settingsHeader(
         addView(
             close,
             FrameLayout.LayoutParams(
-                settingsDp(context, 48),
-                settingsDp(context, 48),
-                Gravity.END or Gravity.CENTER_VERTICAL,
-            ),
+                settingsDp(context, 40),
+                settingsDp(context, 40),
+                Gravity.END or Gravity.TOP,
+            ).apply {
+                // settingsCompactPanel has 8dp inset; offset the 40dp touch
+                // target so the red mark's center lands on the rounded rim.
+                rightMargin = -settingsDp(context, 20)
+                topMargin = -settingsDp(context, 20)
+            },
         )
     }
 
 private class SettingsCloseButton(
     context: Context,
     onClose: () -> Unit,
-) : FrameLayout(context) {
+) : View(context) {
+    private val crossPaint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = 0xFFD95757.toInt()
+            style = Paint.Style.STROKE
+            strokeWidth = settingsDp(context, 6f).toFloat()
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+        }
+
     init {
         contentDescription = "Close settings"
         isClickable = true
         isFocusable = true
-        minimumWidth = settingsDp(context, 48)
-        minimumHeight = settingsDp(context, 48)
-        background =
-            GradientDrawable(
-                GradientDrawable.Orientation.TOP_BOTTOM,
-                intArrayOf(
-                    0xFFFFB62C.toInt(),
-                    0xFFF37D00.toInt(),
-                    0xFFD95500.toInt(),
-                ),
-            ).apply {
-                shape = GradientDrawable.OVAL
-                setStroke(
-                    settingsDp(context, 2),
-                    0xFFFFDC65.toInt(),
-                )
-            }
-
-        addView(
-            AppIconView(
-                context = context,
-                iconName = AppIconName.CLOSE,
-                iconTint = Color.WHITE,
-            ),
-            FrameLayout.LayoutParams(
-                settingsDp(context, 18),
-                settingsDp(context, 18),
-                Gravity.CENTER,
-            ),
+        minimumWidth = settingsDp(context, 40)
+        minimumHeight = settingsDp(context, 40)
+        // Recessed plywood pocket behind the red cross. The cross is drawn
+        // in the same view bounds, so the doubled arms stay fully visible.
+        background = recessedPlywoodBackground(
+            context = context,
+            outerCornerRadiusDp = 18f,
         )
-        AppFocusRing.apply(this, cornerRadiusDp = 999f, strokeWidthDp = 2.2f)
+        elevation = 0f
         setOnClickListener { onClose() }
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        // The view's touch area is 40dp, but the mark itself is kept close
+        // to its center so it sits on the popup's curved outer rim.
+        val cx = width / 2f
+        val cy = height / 2f
+        val arm = settingsDp(context, 8.4f)
+        canvas.drawLine(cx - arm, cy - arm, cx + arm, cy + arm, crossPaint)
+        canvas.drawLine(cx + arm, cy - arm, cx - arm, cy + arm, crossPaint)
     }
 }
 
@@ -225,9 +237,9 @@ internal fun settingsDropdownField(
             }
         setTypeface(Typeface.DEFAULT_BOLD)
         setTextColor(0xFFFFE07A.toInt())
-        gravity = Gravity.CENTER_VERTICAL
+        gravity = Gravity.CENTER
         setPadding(
-            settingsDp(context, 12),
+            settingsDp(context, 10),
             0,
             settingsDp(context, 10),
             0,
@@ -275,7 +287,7 @@ internal fun settingsDropdownField(
 internal fun settingsDropdownLabel(
     value: String,
 ): String =
-    "$value        ▼"
+    "$value  ▼"
 
 internal class SettingsBooleanControl(
     context: Context,
@@ -485,7 +497,11 @@ internal fun showSettingsChoiceDialog(
                 settingsDp(context, 10),
                 settingsDp(context, 10),
             )
-            background = SettingsSharedWebpDrawable(context)
+            background =
+            plywoodBackground(
+                context = context,
+                cornerRadiusDp = 20f,
+            )
 
             addView(
                 TextView(context).apply {
