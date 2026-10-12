@@ -123,14 +123,14 @@ class GemWalletStore(context: Context) {
             .put("balance", prefs.getInt(StorePreferences.KEY_BALANCE, 0).coerceAtLeast(0))
             .put("adsRemoved", prefs.getBoolean(StorePreferences.KEY_ADS_REMOVED, false))
             .put("ownedCosmetics", org.json.JSONArray(
-                prefs.getStringSet(StorePreferences.KEY_OWNED_COSMETICS, emptySet())?.toList() ?: emptyList(),
+                prefs.getStringSet(StorePreferences.KEY_OWNED_COSMETICS, emptySet<String>())?.toList() ?: emptyList<String>(),
             ))
             .put("selectedBoard", prefs.getString(StorePreferences.KEY_SELECTED_BOARD, null))
             .put("selectedDice", prefs.getString(StorePreferences.KEY_SELECTED_DICE, null))
             .put("selectedAvatar", prefs.getString(StorePreferences.KEY_SELECTED_AVATAR, null))
             .put("selectedCharacterPack", prefs.getString(StorePreferences.KEY_SELECTED_CHARACTER_PACK, null))
             .put("eventEntitlements", org.json.JSONArray(
-                prefs.getStringSet(StorePreferences.KEY_EVENT_ENTITLEMENTS, emptySet())?.toList() ?: emptyList(),
+                prefs.getStringSet(StorePreferences.KEY_EVENT_ENTITLEMENTS, emptySet<String>())?.toList() ?: emptyList<String>(),
             ))
             .put("rewardedAdProgress", adProgress)
     }
