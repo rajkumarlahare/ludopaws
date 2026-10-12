@@ -104,20 +104,56 @@ export class PlayerAccount {
     const oldHash = await hashRefreshToken(oldToken);
     const nextToken = await deriveRotatedRefreshToken(this.env, sessionId, requestId, oldToken), nextHash = await hashRefreshToken(nextToken);
     const now = Date.now(), nextExpiry = now + SESSION_TTL_MS;
-    const accessToken = await issueAccessToken(this.env, accountId, sessionId, now);
-    const rows = [...this.ctx.storage.sql.exec("SELECT refresh_token_hash, previous_refresh_hash, last_refresh_request_id, expires_at, revoked_at FROM account_sessions WHERE session_id = ? LIMIT 1", sessionId)];
-    if (rows.length !== 1 || rows[0].revoked_at != null || Number(rows[0].expires_at) <= now) throw httpError(401, "REFRESH_TOKEN_INVALID", "account session expired or was revoked");
-    const row = rows[0]; let accepted = false, replay = false;
+    let row = null, accepted = false, replay = false;
+
+    // Re-read the session inside the synchronous transaction. A concurrent retry may have
+    // rotated the token after an earlier read; in that case accept only the exact same
+    // request ID + old token + deterministically derived next token.
     this.ctx.storage.transactionSync(() => {
+      const currentRows = [...this.ctx.storage.sql.exec(
+        "SELECT refresh_token_hash, previous_refresh_hash, last_refresh_request_id, expires_at, revoked_at FROM account_sessions WHERE session_id = ? LIMIT 1",
+        sessionId,
+      )];
+      if (
+        currentRows.length !== 1 ||
+        currentRows[0].revoked_at != null ||
+        Number(currentRows[0].expires_at) <= now
+      ) return;
+
+      row = currentRows[0];
       if (String(row.refresh_token_hash) === oldHash) {
-        const update = this.ctx.storage.sql.exec("UPDATE account_sessions SET refresh_token_hash = ?, previous_refresh_hash = ?, last_refresh_request_id = ?, expires_at = ?, last_seen_at = ? WHERE session_id = ? AND refresh_token_hash = ? AND revoked_at IS NULL AND expires_at > ?", nextHash, oldHash, requestId, nextExpiry, now, sessionId, oldHash, now);
+        const update = this.ctx.storage.sql.exec(
+          "UPDATE account_sessions SET refresh_token_hash = ?, previous_refresh_hash = ?, last_refresh_request_id = ?, expires_at = ?, last_seen_at = ? WHERE session_id = ? AND refresh_token_hash = ? AND revoked_at IS NULL AND expires_at > ?",
+          nextHash, oldHash, requestId, nextExpiry, now, sessionId, oldHash, now,
+        );
         accepted = Number(update.rowsWritten ?? 0) === 1;
-      } else if (String(row.previous_refresh_hash ?? "") === oldHash && String(row.last_refresh_request_id ?? "") === requestId && String(row.refresh_token_hash) === nextHash) {
-        accepted = true; replay = true;
+      } else if (
+        String(row.previous_refresh_hash ?? "") === oldHash &&
+        String(row.last_refresh_request_id ?? "") === requestId &&
+        String(row.refresh_token_hash) === nextHash
+      ) {
+        accepted = true;
+        replay = true;
       }
     });
-    if (!accepted) throw httpError(401, "REFRESH_TOKEN_INVALID", "account refresh token is invalid or has already been rotated");
-    return json(200, { ok: true, accountId, sessionId, billingAccountId: await billingAccountId(accountId), accessToken, refreshToken: nextToken, accessExpiresAt: Math.floor(now / 1000) + 900, sessionExpiresAt: replay ? Number(row.expires_at) : nextExpiry, profile: this.#profileSnapshot(accountId), wallet: this.#walletSnapshot(accountId), replay });
+
+    if (!accepted || !row) {
+      throw httpError(401, "REFRESH_TOKEN_INVALID", "account refresh token is invalid or has already been rotated");
+    }
+    const accessToken = await issueAccessToken(this.env, accountId, sessionId, now);
+    return json(200, {
+      ok: true,
+      accountId,
+      sessionId,
+      billingAccountId: await billingAccountId(accountId),
+      accessToken,
+      refreshToken: nextToken,
+      accessExpiresAt: Math.floor(now / 1000) + 900,
+      sessionExpiresAt: replay ? Number(row.expires_at) : nextExpiry,
+      profile: this.#profileSnapshot(accountId),
+      wallet: this.#walletSnapshot(accountId),
+      replay,
+    });
   }
 
   async #checkSession(request) {

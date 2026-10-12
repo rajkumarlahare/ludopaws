@@ -83,6 +83,31 @@ class FakeAccountSql {
       });
       return { rowsWritten: 1 };
     }
+    if (sql.startsWith("SELECT refresh_token_hash, previous_refresh_hash, last_refresh_request_id, expires_at, revoked_at FROM account_sessions WHERE session_id = ?")) {
+      const session = this.sessions.get(params[0]);
+      return session ? [{
+        refresh_token_hash: session.refresh_token_hash,
+        previous_refresh_hash: session.previous_refresh_hash,
+        last_refresh_request_id: session.last_refresh_request_id,
+        expires_at: session.expires_at,
+        revoked_at: session.revoked_at,
+      }] : [];
+    }
+    if (sql.startsWith("UPDATE account_sessions SET refresh_token_hash = ?, previous_refresh_hash = ?, last_refresh_request_id = ?, expires_at = ?, last_seen_at = ? WHERE session_id = ? AND refresh_token_hash = ?")) {
+      const session = this.sessions.get(params[5]);
+      if (
+        !session ||
+        session.refresh_token_hash !== params[6] ||
+        session.revoked_at != null ||
+        session.expires_at <= params[7]
+      ) return { rowsWritten: 0 };
+      session.refresh_token_hash = params[0];
+      session.previous_refresh_hash = params[1];
+      session.last_refresh_request_id = params[2];
+      session.expires_at = params[3];
+      session.last_seen_at = params[4];
+      return { rowsWritten: 1 };
+    }
     if (sql.startsWith("SELECT session_id FROM account_sessions WHERE session_id = ? AND revoked_at IS NULL")) {
       const session = this.sessions.get(params[0]);
       return session && session.revoked_at == null && session.expires_at > params[1] && this.accountMeta.has(params[2])
@@ -224,4 +249,29 @@ test("cosmetic wallet purchase atomically debits gems, owns/selects once, and is
   assert.equal(replay.replay, true);
   assert.equal(replay.wallet.balance, 250);
   assert.equal(sql.walletTransactions.size, 1);
+});
+
+
+test("refresh-token retries with the same request ID return the same rotated token", async () => {
+  const { account } = makeAccount();
+  const accountId = "0a2c3a83-e0fb-4abc-8ac4-581a6d994fe7";
+  const session = await (await post(account, "/session/create", { accountId, displayName: "Test Player" })).json();
+  const refreshRequest = {
+    accountId,
+    sessionId: session.sessionId,
+    refreshToken: session.refreshToken,
+    clientRequestId: "4c4e7f90-68e5-4c30-8fb8-c5a7b0f0f8aa",
+  };
+
+  const firstResponse = await post(account, "/session/refresh", refreshRequest);
+  assert.equal(firstResponse.status, 200);
+  const first = await firstResponse.json();
+  assert.equal(first.replay, false);
+
+  const retryResponse = await post(account, "/session/refresh", refreshRequest);
+  assert.equal(retryResponse.status, 200);
+  const retry = await retryResponse.json();
+  assert.equal(retry.replay, true);
+  assert.equal(retry.refreshToken, first.refreshToken);
+  assert.equal(retry.sessionExpiresAt, first.sessionExpiresAt);
 });
