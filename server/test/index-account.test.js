@@ -103,7 +103,7 @@ test("account wallet API rejects requests without a verified bearer token", asyn
     env,
   );
   assert.equal(response.status, 401);
-  assert.equal((await response.json()).error, "ACCOUNT_SESSION_REQUIRED");
+  assert.equal((await response.json()).error, "AUTH_REQUIRED");
 });
 
 
