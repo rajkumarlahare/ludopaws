@@ -10,7 +10,6 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.LudoProofTheme
 import com.ludoproof.game.core.ui.art.plywoodBackground
-import com.ludoproof.game.core.ui.art.recessedPlywoodBackground
 import com.ludoproof.game.core.ui.components.AppFocusRing
 import com.ludoproof.game.feature.store.domain.StoreCatalog
 import com.ludoproof.game.feature.store.domain.model.StoreProduct
@@ -183,19 +182,7 @@ private fun StoreActivity.featuredRemoveAdsCard(
                 cornerRadiusDp = 15f,
             )
 
-        // Place the rewarded-gem action inside the Remove Ads panel, aligned top-right.
-        addView(
-            rewardedAdCard(),
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            ).apply {
-                gravity = Gravity.END
-                topMargin = dp(6)
-                marginEnd = dp(8)
-            },
-        )
-
+        // Keep the icon, centered Remove Ads copy and rewarded action on one compact row.
         val body =
             LinearLayout(
                 this@featuredRemoveAdsCard,
@@ -205,10 +192,10 @@ private fun StoreActivity.featuredRemoveAdsCard(
                 gravity =
                     Gravity.CENTER_VERTICAL
                 setPadding(
-                    dp(16),
-                    dp(12),
-                    dp(16),
-                    dp(12),
+                    dp(8),
+                    dp(7),
+                    dp(8),
+                    dp(7),
                 )
             }
 
@@ -216,13 +203,12 @@ private fun StoreActivity.featuredRemoveAdsCard(
             FrameLayout(
                 this@featuredRemoveAdsCard,
             ).apply {
-                // Circular plywood medallion with the exact Home ADS red slash icon.
                 background =
                     plywoodBackground(
                         context = this@featuredRemoveAdsCard,
-                        cornerRadiusDp = 52f,
+                        cornerRadiusDp = 30f,
                     )
-                elevation = dp(3).toFloat()
+                elevation = dp(2).toFloat()
 
                 addView(
                     HomeIconView(this@featuredRemoveAdsCard).apply {
@@ -231,15 +217,15 @@ private fun StoreActivity.featuredRemoveAdsCard(
                             android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO
                     },
                     FrameLayout.LayoutParams(
-                        dp(88),
-                        dp(88),
+                        dp(52),
+                        dp(52),
                         Gravity.CENTER,
                     ),
                 )
             },
             LinearLayout.LayoutParams(
-                dp(104),
-                dp(104),
+                dp(60),
+                dp(60),
             ),
         )
 
@@ -250,11 +236,11 @@ private fun StoreActivity.featuredRemoveAdsCard(
                 orientation =
                     LinearLayout.VERTICAL
                 gravity =
-                    Gravity.CENTER_VERTICAL
+                    Gravity.CENTER
                 setPadding(
-                    dp(16),
+                    dp(4),
                     0,
-                    0,
+                    dp(4),
                     0,
                 )
             }
@@ -262,42 +248,50 @@ private fun StoreActivity.featuredRemoveAdsCard(
             TextView(
                 this@featuredRemoveAdsCard,
             ).apply {
-                text =
-                    "Remove Ads"
-                textSize =
-                    19f
-                setTypeface(
-                    Typeface.DEFAULT_BOLD,
-                )
-                setTextColor(
-                    Color.WHITE,
-                )
+                text = "Remove Ads"
+                textSize = 16f
+                setTypeface(Typeface.DEFAULT_BOLD)
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
+                maxLines = 1
             },
         )
-        copy.addView(
-            TextView(
+
+        val gemReward =
+            LinearLayout(
                 this@featuredRemoveAdsCard,
             ).apply {
-                text =
-                    "+" +
-                        product.gemAmount +
-                        " ◆"
-                textSize =
-                    17f
-                setTypeface(
-                    Typeface.DEFAULT_BOLD,
-                )
-                setTextColor(
-                    LudoProofTheme.GOLD,
-                )
-                setPadding(
-                    0,
-                    dp(8),
-                    0,
-                    0,
-                )
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER
+            }
+        gemReward.addView(
+            TextView(this@featuredRemoveAdsCard).apply {
+                text = "+${product.gemAmount}"
+                textSize = 14f
+                setTypeface(Typeface.DEFAULT_BOLD)
+                setTextColor(LudoProofTheme.GOLD)
+                gravity = Gravity.CENTER
             },
         )
+        gemReward.addView(
+            GemClusterView(this@featuredRemoveAdsCard).apply {
+                contentDescription = "Gems"
+            },
+            LinearLayout.LayoutParams(
+                dp(18),
+                dp(18),
+            ),
+        )
+        copy.addView(
+            gemReward,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                topMargin = dp(2)
+            },
+        )
+
         body.addView(
             copy,
             LinearLayout.LayoutParams(
@@ -305,6 +299,15 @@ private fun StoreActivity.featuredRemoveAdsCard(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 1f,
             ),
+        )
+        body.addView(
+            rewardedAdCard(),
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                marginStart = dp(4)
+            },
         )
         addView(
             body,
@@ -371,28 +374,34 @@ private fun StoreActivity.rewardedAdCard():
         gravity =
             Gravity.CENTER_VERTICAL
         setPadding(
-            dp(7),
-            dp(5),
-            dp(7),
-            dp(5),
+            dp(2),
+            dp(2),
+            dp(2),
+            dp(2),
         )
-        // Transparent container lets the Remove Ads panel's plywood show through.
+        // Transparent container lets the main plywood panel show through.
 
         addView(
             TextView(
                 this@rewardedAdCard,
             ).apply {
-                text =
-                    "5 GEMS"
-                textSize =
-                    12f
-                setTypeface(
-                    Typeface.DEFAULT_BOLD,
-                )
-                setTextColor(
-                    LudoProofTheme.GOLD,
-                )
-                setPadding(0, 0, dp(10), 0)
+                text = "5"
+                textSize = 12f
+                setTypeface(Typeface.DEFAULT_BOLD)
+                setTextColor(LudoProofTheme.GOLD)
+                gravity = Gravity.CENTER
+                setPadding(0, 0, dp(2), 0)
+            },
+        )
+        addView(
+            GemClusterView(this@rewardedAdCard).apply {
+                contentDescription = "Gems"
+            },
+            LinearLayout.LayoutParams(
+                dp(17),
+                dp(17),
+            ).apply {
+                marginEnd = dp(4)
             },
         )
 
@@ -400,37 +409,29 @@ private fun StoreActivity.rewardedAdCard():
             Button(
                 this@rewardedAdCard,
             ).apply {
-                text =
-                    "WATCH AD"
-                textSize =
-                    12f
-                setTypeface(
-                    Typeface.DEFAULT_BOLD,
-                )
-                setTextColor(
-                    Color.WHITE,
-                )
-                minWidth =
-                    0
-                minHeight =
-                    0
+                text = "WATCH AD"
+                textSize = 10f
+                setTypeface(Typeface.DEFAULT_BOLD)
+                setTextColor(Color.WHITE)
+                minWidth = 0
+                minHeight = 0
+                setPadding(dp(3), 0, dp(3), 0)
                 background =
-                    LudoProofTheme
-                        .rounded(
-                            0xFFE93434.toInt(),
-                            10f,
-                            0xFFFF7373.toInt(),
-                            1f,
-                            this@rewardedAdCard,
-                        )
+                    LudoProofTheme.rounded(
+                        0xFFE93434.toInt(),
+                        9f,
+                        0xFFFF7373.toInt(),
+                        1f,
+                        this@rewardedAdCard,
+                    )
                 setOnClickListener {
                     requestRewardedAd()
                 }
-                AppFocusRing.apply(this, cornerRadiusDp = 10f)
+                AppFocusRing.apply(this, cornerRadiusDp = 9f)
             },
             LinearLayout.LayoutParams(
-                dp(108),
-                dp(40),
+                dp(78),
+                dp(34),
             ),
         )
     }
