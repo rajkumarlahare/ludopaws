@@ -6,11 +6,10 @@ import com.ludoproof.game.core.ui.art.plywoodBackground
 import android.view.Gravity
 import com.ludoproof.game.core.ui.components.appIconActionButton
 import com.ludoproof.game.core.ui.icons.AppIconName
+import com.ludoproof.game.core.ui.icons.AppIconView
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.LudoProofTheme
-import com.ludoproof.game.core.ui.art.recessedPlywoodBackground
-import com.ludoproof.game.core.ui.components.AppFocusRing
 import com.ludoproof.game.feature.store.presentation.StoreActivity
 import com.ludoproof.game.feature.store.presentation.art.GemClusterView
 import com.ludoproof.game.feature.store.presentation.art.StoreAwningView
@@ -50,6 +49,15 @@ internal fun StoreActivity.storeHeader():
             ),
         )
 
+        val compactCurrencyPill =
+            LudoProofTheme.isCompactWidth(this@storeHeader)
+        val currencyIconSizeDp =
+            if (compactCurrencyPill) 26 else 29
+        val currencyPillWidthDp =
+            if (compactCurrencyPill) 96 else 107
+        val currencyPillHeightDp =
+            if (compactCurrencyPill) 35 else 38
+
         val gemPill =
             LinearLayout(
                 this@storeHeader,
@@ -59,26 +67,30 @@ internal fun StoreActivity.storeHeader():
                 gravity =
                     Gravity.CENTER_VERTICAL
                 background =
-                    LudoProofTheme
-                        .rounded(
-                            0xF307173C.toInt(),
-                            999f,
-                            0x44000000,
-                            1f,
-                            this@storeHeader,
-                        )
+                    plywoodBackground(
+                        context = this@storeHeader,
+                        cornerRadiusDp =
+                            if (compactCurrencyPill) 17.5f else 19f,
+                    )
+                elevation = dp(5).toFloat()
+                setPadding(
+                    dp(4),
+                    dp(3),
+                    dp(3),
+                    dp(3),
+                )
             }
 
         gemPill.addView(
             GemClusterView(
                 this@storeHeader,
             ).apply {
-                background = recessedPlywoodBackground(this@storeHeader, outerCornerRadiusDp = 12f)
+                // Let the gems sit directly on the same plywood pill used on Home.
                 contentDescription =
                     "Gems"
             },
             LinearLayout.LayoutParams(
-                dp(42),
+                dp(currencyIconSizeDp),
                 LinearLayout.LayoutParams.MATCH_PARENT,
             ),
         )
@@ -92,7 +104,7 @@ internal fun StoreActivity.storeHeader():
                         .balance()
                         .toString()
                 textSize =
-                    19f
+                    if (compactCurrencyPill) 14f else 15f
                 setTypeface(
                     Typeface.DEFAULT_BOLD,
                 )
@@ -101,6 +113,12 @@ internal fun StoreActivity.storeHeader():
                 )
                 gravity =
                     Gravity.CENTER
+                setShadowLayer(
+                    2.4f,
+                    0f,
+                    dp(1).toFloat(),
+                    0xB0000000.toInt(),
+                )
             },
             LinearLayout.LayoutParams(
                 0,
@@ -110,42 +128,30 @@ internal fun StoreActivity.storeHeader():
         )
 
         gemPill.addView(
-            TextView(
-                this@storeHeader,
+            AppIconView(
+                context = this@storeHeader,
+                iconName = AppIconName.ADD,
+                iconTint = Color.WHITE,
+                strokeWidthDp = 2.8f,
             ).apply {
-                text =
-                    "+"
-                textSize =
-                    27f
-                setTypeface(
-                    Typeface.DEFAULT_BOLD,
-                )
-                setTextColor(
-                    0xFF7B5510.toInt(),
-                )
-                gravity =
-                    Gravity.CENTER
                 background =
-                    LudoProofTheme
-                        .rounded(
-                            0xFFFFCA28.toInt(),
-                            9f,
-                            0xFFFFE37C.toInt(),
-                            1f,
-                            this@storeHeader,
-                        )
+                    plywoodBackground(
+                        context = this@storeHeader,
+                        cornerRadiusDp =
+                            if (compactCurrencyPill) 13f else 14.5f,
+                    )
             },
             LinearLayout.LayoutParams(
-                dp(42),
-                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(currencyIconSizeDp),
+                dp(currencyIconSizeDp),
             ),
         )
 
         addView(
             gemPill,
             LinearLayout.LayoutParams(
-                dp(132),
-                dp(48),
+                dp(currencyPillWidthDp),
+                dp(currencyPillHeightDp),
             ),
         )
     }
