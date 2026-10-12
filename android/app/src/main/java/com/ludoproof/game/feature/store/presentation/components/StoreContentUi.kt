@@ -9,6 +9,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.LudoProofTheme
+import com.ludoproof.game.core.ui.art.plywoodBackground
 import com.ludoproof.game.core.ui.art.recessedPlywoodBackground
 import com.ludoproof.game.core.ui.components.AppFocusRing
 import com.ludoproof.game.feature.store.domain.StoreCatalog
@@ -462,16 +463,11 @@ private fun StoreActivity.gemProductCard(
             dp(8),
             dp(10),
         )
+        // Show the plywood surface directly; avoid the coloured arcade face overlay.
         background =
-            storePlywoodCardBackground(
+            plywoodBackground(
+                context = this@gemProductCard,
                 cornerRadiusDp = 16f,
-                fillColors = intArrayOf(
-                    0xD01A65AA.toInt(),
-                    0xD0123D82.toInt(),
-                    0xD0111D55.toInt(),
-                ),
-                strokeColor = 0xFF55DFFF.toInt(),
-                insetDp = 5,
             )
         elevation = dp(3).toFloat()
 
@@ -485,17 +481,9 @@ private fun StoreActivity.gemProductCard(
                         text = badge.uppercase()
                         textSize = 9f
                         setTypeface(Typeface.DEFAULT_BOLD)
-                        setTextColor(0xFF082B57.toInt())
+                        setTextColor(Color.WHITE)
                         gravity = Gravity.CENTER
                         setPadding(dp(8), dp(4), dp(8), dp(4))
-                        background =
-                            LudoProofTheme.rounded(
-                                0xFFFFD96A.toInt(),
-                                999f,
-                                0xFFFFF0A8.toInt(),
-                                1f,
-                                this@gemProductCard,
-                            )
                     },
                 )
             }
