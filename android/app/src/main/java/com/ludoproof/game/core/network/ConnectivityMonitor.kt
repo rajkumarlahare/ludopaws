@@ -17,7 +17,9 @@ class ConnectivityMonitor(
     private val callback =
         object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
-                onChanged(true)
+                // onAvailable can arrive before Android has validated internet access.
+                // Wait for onCapabilitiesChanged rather than briefly reporting a
+                // captive, disconnected, or otherwise unvalidated network as online.
             }
 
             override fun onLost(network: Network) {
@@ -28,14 +30,7 @@ class ConnectivityMonitor(
                 network: Network,
                 networkCapabilities: NetworkCapabilities,
             ) {
-                onChanged(
-                    networkCapabilities.hasCapability(
-                        NetworkCapabilities.NET_CAPABILITY_INTERNET,
-                    ) &&
-                        networkCapabilities.hasCapability(
-                            NetworkCapabilities.NET_CAPABILITY_VALIDATED,
-                        ),
-                )
+                onChanged(hasValidatedInternet(networkCapabilities))
             }
         }
 
@@ -44,13 +39,18 @@ class ConnectivityMonitor(
         val capabilities =
             manager.getNetworkCapabilities(network)
                 ?: return false
-        return capabilities.hasCapability(
+        return hasValidatedInternet(capabilities)
+    }
+
+    private fun hasValidatedInternet(
+        capabilities: NetworkCapabilities,
+    ): Boolean =
+        capabilities.hasCapability(
             NetworkCapabilities.NET_CAPABILITY_INTERNET,
         ) &&
             capabilities.hasCapability(
                 NetworkCapabilities.NET_CAPABILITY_VALIDATED,
             )
-    }
 
     fun start() {
         if (registered) return
