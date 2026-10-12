@@ -70,7 +70,7 @@ if (!settings.includes('settingsPrivacyLink(')) {
   throw new Error('Settings UI must retain its Privacy Policy link.');
 }
 const settingsKit = read('settingsKit');
-const themedPlywoodSurfaces = settingsKit.match(/background\\s*=\\s*plywoodBackground\\(/g) || [];
+const themedPlywoodSurfaces = settingsKit.match(/background\s*=\s*plywoodBackground\(/g) || [];
 if (themedPlywoodSurfaces.length < 2) {
   throw new Error('Settings popup and option dialogs must use the shared plywood theme background.');
 }
