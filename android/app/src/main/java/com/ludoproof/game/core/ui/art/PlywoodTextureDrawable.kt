@@ -19,6 +19,7 @@ import android.graphics.drawable.Drawable
 internal class PlywoodTextureDrawable(
     private val density: Float,
     private val cornerRadiusDp: Float = 15f,
+    private val rimThicknessDp: Float = 5.5f,
 ) : Drawable() {
     // Multiplying RGB by ~0.7 keeps the wood finish about 10 percentage points
     // lighter than the previous 40%-darkened test, while preserving its warm tone.
@@ -253,7 +254,8 @@ internal class PlywoodTextureDrawable(
         val rimPaint = Paint(Paint.ANTI_ALIAS_FLAG)
         val outerRim = RectF(b).apply { inset(0.6f * density, 0.6f * density) }
         val bronzeRim = RectF(b).apply { inset(1.5f * density, 1.5f * density) }
-        val innerRim = RectF(b).apply { inset(5.5f * density, 5.5f * density) }
+        val rimInset = rimThicknessDp * density
+        val innerRim = RectF(b).apply { inset(rimInset, rimInset) }
         val glintRim = RectF(b).apply { inset(2.2f * density, 2.2f * density) }
         val innerGlintCutout = RectF(b).apply { inset(3.2f * density, 3.2f * density) }
 
@@ -277,7 +279,7 @@ internal class PlywoodTextureDrawable(
             outerRim,
             (radius - 0.6f * density).coerceAtLeast(1f),
             innerRim,
-            (radius - 5.5f * density).coerceAtLeast(1f),
+            (radius - rimInset).coerceAtLeast(1f),
             rimPaint,
         )
 
@@ -301,7 +303,7 @@ internal class PlywoodTextureDrawable(
             bronzeRim,
             (radius - 1.5f * density).coerceAtLeast(1f),
             innerRim,
-            (radius - 5.5f * density).coerceAtLeast(1f),
+            (radius - rimInset).coerceAtLeast(1f),
             rimPaint,
         )
 

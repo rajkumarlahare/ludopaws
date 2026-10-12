@@ -52,8 +52,13 @@ internal fun blueIconBackground(
 internal fun plywoodBackground(
     context: Context,
     cornerRadiusDp: Float = 15f,
+    rimThicknessDp: Float = 5.5f,
 ): android.graphics.drawable.Drawable =
-    PlywoodTextureDrawable(context.resources.displayMetrics.density, cornerRadiusDp)
+    PlywoodTextureDrawable(
+        density = context.resources.displayMetrics.density,
+        cornerRadiusDp = cornerRadiusDp,
+        rimThicknessDp = rimThicknessDp,
+    )
 
 /** Shared factory for a curved, recessed plywood pocket for 3D character/art panels. */
 internal fun recessedPlywoodBackground(

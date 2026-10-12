@@ -132,13 +132,15 @@ internal fun StoreActivity.storeHeader():
                 context = this@storeHeader,
                 iconName = AppIconName.ADD,
                 iconTint = Color.WHITE,
-                strokeWidthDp = 2.8f,
+                // Optical compensation for the smaller control keeps the plus easy to spot.
+                strokeWidthDp = 3.3f,
             ).apply {
                 background =
                     plywoodBackground(
                         context = this@storeHeader,
                         cornerRadiusDp =
                             if (compactCurrencyPill) 13f else 14.5f,
+                        rimThicknessDp = 7f,
                     )
             },
             LinearLayout.LayoutParams(
