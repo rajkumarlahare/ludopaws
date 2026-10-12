@@ -15,8 +15,8 @@ import android.widget.ScrollView
 import android.widget.TextView
 import com.ludoproof.game.LudoProofTheme
 import com.ludoproof.game.core.ui.art.plywoodBackground
-import com.ludoproof.game.core.ui.art.recessedPlywoodBackground
 import com.ludoproof.game.core.ui.components.AppFocusRing
+import com.ludoproof.game.core.ui.components.PlywoodCloseButton
 
 internal fun settingsCompactPanel(
     context: Context,
@@ -97,7 +97,7 @@ private fun settingsHeader(
         )
 
         val close =
-            SettingsCloseButton(context) {
+            PlywoodCloseButton(context, contentDescription = "Close settings") {
                 dialog.dismiss()
             }
 
@@ -115,47 +115,6 @@ private fun settingsHeader(
             },
         )
     }
-
-private class SettingsCloseButton(
-    context: Context,
-    onClose: () -> Unit,
-) : View(context) {
-    private val crossPaint =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = 0xFFD95757.toInt()
-            style = Paint.Style.STROKE
-            strokeWidth = settingsDp(context, 6f).toFloat()
-            strokeCap = Paint.Cap.ROUND
-            strokeJoin = Paint.Join.ROUND
-        }
-
-    init {
-        contentDescription = "Close settings"
-        isClickable = true
-        isFocusable = true
-        minimumWidth = settingsDp(context, 40)
-        minimumHeight = settingsDp(context, 40)
-        // Recessed plywood pocket behind the red cross. The cross is drawn
-        // in the same view bounds, so the doubled arms stay fully visible.
-        background = recessedPlywoodBackground(
-            context = context,
-            outerCornerRadiusDp = 18f,
-        )
-        elevation = 0f
-        setOnClickListener { onClose() }
-    }
-
-    override fun onDraw(canvas: Canvas) {
-        super.onDraw(canvas)
-        // The view's touch area is 40dp, but the mark itself is kept close
-        // to its center so it sits on the popup's curved outer rim.
-        val cx = width / 2f
-        val cy = height / 2f
-        val arm = settingsDp(context, 8.4f)
-        canvas.drawLine(cx - arm, cy - arm, cx + arm, cy + arm, crossPaint)
-        canvas.drawLine(cx + arm, cy - arm, cx - arm, cy + arm, crossPaint)
-    }
-}
 
 internal fun settingsCompactRow(
     context: Context,

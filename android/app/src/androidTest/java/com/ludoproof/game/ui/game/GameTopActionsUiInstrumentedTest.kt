@@ -42,6 +42,8 @@ class GameTopActionsUiInstrumentedTest {
             assertTrue(settingsButton.isFocusable)
             assertNotNull(backButton.background)
             assertNotNull(settingsButton.background)
+            assertEquals("PlywoodTextureDrawable", backButton.background.javaClass.simpleName)
+            assertEquals("PlywoodTextureDrawable", settingsButton.background.javaClass.simpleName)
             assertNotNull(backButton.foreground)
             assertNotNull(settingsButton.foreground)
             assertEquals(AppIconName.CHEVRON_LEFT, (backButton.getChildAt(0) as AppIconView).iconName)

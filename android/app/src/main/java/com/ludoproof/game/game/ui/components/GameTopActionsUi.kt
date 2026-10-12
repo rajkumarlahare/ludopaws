@@ -4,6 +4,7 @@ import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
 import com.ludoproof.game.LudoProofTheme
+import com.ludoproof.game.core.ui.art.plywoodBackground
 import com.ludoproof.game.core.ui.components.appIconActionButton
 import com.ludoproof.game.core.ui.icons.AppIconName
 
@@ -35,7 +36,12 @@ internal fun addGameTopActions(
             iconName = AppIconName.CHEVRON_LEFT,
             sizeDp = 52,
             onClick = onBack,
-        ),
+        ).apply {
+            background = plywoodBackground(
+                context = context,
+                cornerRadiusDp = 999f,
+            )
+        },
         FrameLayout.LayoutParams(
             buttonSize,
             buttonSize,
@@ -53,7 +59,12 @@ internal fun addGameTopActions(
             iconName = AppIconName.SETTINGS,
             sizeDp = 52,
             onClick = onSettings,
-        ),
+        ).apply {
+            background = plywoodBackground(
+                context = context,
+                cornerRadiusDp = 999f,
+            )
+        },
         FrameLayout.LayoutParams(
             buttonSize,
             buttonSize,
