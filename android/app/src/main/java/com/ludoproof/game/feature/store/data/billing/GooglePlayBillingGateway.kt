@@ -19,9 +19,12 @@ import java.util.concurrent.ConcurrentHashMap
 class GooglePlayBillingGateway(
     private val activity: Activity,
     private val enabled: Boolean,
-    private val accountId: String,
+    accountId: String,
     private val listener: Listener,
 ) : PurchasesUpdatedListener {
+    @Volatile
+    private var currentBillingAccountId: String = accountId
+
     private val productDetails =
         linkedMapOf<
             String,
@@ -50,6 +53,17 @@ class GooglePlayBillingGateway(
             )
             .enableAutoServiceReconnection()
             .build()
+
+    /**
+     * Refreshes purchase attribution when the active Ludo Paws account changes.
+     * The caller must pass the account binding returned by the authenticated backend.
+     */
+    fun updateAccountId(newAccountId: String) {
+        require(OBFUSCATED_ACCOUNT_ID_REGEX.matches(newAccountId)) {
+            "Google Play account binding is invalid."
+        }
+        currentBillingAccountId = newAccountId
+    }
 
     fun connect() {
         if (
@@ -198,7 +212,7 @@ class GooglePlayBillingGateway(
                     activity,
                     BillingFlowParams
                         .newBuilder()
-                        .setObfuscatedAccountId(accountId)
+                        .setObfuscatedAccountId(currentBillingAccountId)
                         .setProductDetailsParamsList(
                             listOf(
                                 productParams,
@@ -321,7 +335,7 @@ class GooglePlayBillingGateway(
                         return@forEach
                     }
                     if (
-                        purchaseAccountId != accountId &&
+                        purchaseAccountId != currentBillingAccountId &&
                         !restorableNonConsumable
                     ) {
                         listener.onBillingUnavailable(

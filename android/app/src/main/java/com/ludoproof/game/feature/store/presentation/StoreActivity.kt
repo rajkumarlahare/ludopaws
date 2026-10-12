@@ -123,9 +123,11 @@ class StoreActivity :
             var recoveredPurchases = 0
             var recoveryError: Exception? = null
             var activeAccountId: String? = null
+            var activeBillingAccountId: String? = null
             try {
                 val session = accountRepository.ensureGuestSession()
                 activeAccountId = session.accountId
+                activeBillingAccountId = session.billingAccountId
                 val status = accountRepository.storeStatus()
                 available = BuildConfig.LUDOPROOF_BILLING_ENABLED &&
                     status.optBoolean("billingAvailable", false)
@@ -158,6 +160,12 @@ class StoreActivity :
                 billingAvailable = available
                 rewardedAdsEnabledByServer = adsAvailable
                 if (BuildConfig.LUDOPROOF_BILLING_ENABLED && billingAvailable) {
+                    val binding = activeBillingAccountId
+                    if (binding.isNullOrBlank()) {
+                        showStoreMessage("The active account could not be verified for Google Play purchases.")
+                        return@runOnUiThread
+                    }
+                    billing.updateAccountId(binding)
                     billing.connect()
                 } else if (BuildConfig.LUDOPROOF_BILLING_ENABLED) {
                     val message = availabilityError?.message
