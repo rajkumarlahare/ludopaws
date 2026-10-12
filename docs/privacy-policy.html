@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Ludo Paws — Privacy Policy</title>
+  <meta name="description" content="How Ludo Paws handles account, game, social, and optional store or advertising data.">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'self';">
+  <script src="./config.js"></script>
+  <style>
+    :root { color-scheme: light; font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f6f8; color: #19212b; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 28px 16px 44px; }
+    main { max-width: 850px; margin: 0 auto; }
+    header { font-weight: 800; letter-spacing: .02em; color: #253449; margin: 4px 0 26px; }
+    article { background: #fff; border: 1px solid #d8dee7; border-radius: 18px; padding: clamp(20px, 5vw, 38px); }
+    h1 { font-size: clamp(30px, 5vw, 40px); margin: 0 0 12px; line-height: 1.15; }
+    h2 { margin: 30px 0 8px; font-size: 20px; }
+    p, li { line-height: 1.62; }
+    .muted { color: #596879; }
+    a { color: #245d92; }
+    .meta { padding-bottom: 14px; border-bottom: 1px solid #e0e5ec; color: #596879; }
+    footer { margin: 18px 4px 0; font-size: 14px; color: #657384; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>LUDO PAWS</header>
+    <article>
+      <h1>Privacy Policy</h1>
+      <p class="meta">Last updated: October 12, 2026</p>
+
+      <p>This policy describes data handling in the current Ludo Paws Android app and its online services. Some features are optional and remain disabled until the relevant service is configured and tested. Third-party services also apply their own privacy notices and terms.</p>
+
+      <h2>1. Information that may be processed</h2>
+      <ul>
+        <li><strong>Account and profile information:</strong> an internal account identifier, display name, account/session state, and links to a Google identity, Friend ID, or leaderboard profile when the player chooses to link those identities. The account service stores a hash of the Google identity subject rather than using the raw subject as its identity key.</li>
+        <li><strong>Security and session information:</strong> short-lived access credentials and refresh-session records are used to authenticate requests, rotate sessions, prevent replay, and revoke sessions. The Android app protects its account credentials with Android Keystore encryption. The service stores refresh-token hashes and associated session metadata rather than the raw refresh token.</li>
+        <li><strong>Game and integrity information:</strong> match identifiers, player identifiers, game status, moves and outcomes, dice/proof commitments, proof digests, and event history needed to operate online games and support fairness/integrity verification.</li>
+        <li><strong>Social information:</strong> Friend IDs, friendship requests and relationships, invitations, recent-player entries, and private friend messages when those features are used.</li>
+        <li><strong>Leaderboard and progression information:</strong> leaderboard profile identifiers, player display names, game results, wins and points submitted to the leaderboard, plus locally stored profile and progression statistics.</li>
+        <li><strong>Store and entitlement information:</strong> selected cosmetics, server-owned gem balance, cosmetics inventory, rewarded-ad progress, purchase product identifiers, and transaction references. These are used to apply server-verified entitlements and prevent duplicate grants.</li>
+        <li><strong>Device-local information:</strong> settings, local game state, selected appearance, and account-scoped cache data used to render the game. Account and wallet caches are not authoritative proof of paid or earned entitlements.</li>
+      </ul>
+
+      <h2>2. How information is used</h2>
+      <p>Information is used to create and restore accounts, authenticate requests, run multiplayer and social features, maintain a leaderboard, protect sessions, verify game integrity, synchronize server-owned wallet and cosmetic state, prevent abuse and duplicate rewards, investigate service errors, and respond to account or privacy requests.</p>
+
+      <h2>3. Google sign-in and account linking</h2>
+      <p>Google sign-in is optional and only works when the publisher configures its OAuth client. When used, the app obtains a Google identity token and the Ludo Paws service verifies that token, its audience, expiry, and a single-use nonce before linking or restoring an account. Ludo Paws does not need your Google password. Google processes sign-in under its own privacy policy.</p>
+
+      <h2>4. Google Play purchases and advertising</h2>
+      <p>Google Play Billing and rewarded advertising are optional integrations and should be unavailable while their service flags are disabled. If Billing is enabled, purchase details are checked with Google Play Developer APIs before the server grants gems or non-consumable entitlements. The service uses hashed purchase references and an account-bound purchase ledger to prevent a purchase from being granted twice. Google Play separately handles its own order and payment records.</p>
+      <p>If AdMob rewarded ads are enabled, Google Mobile Ads and AdMob process the ad request and signed server-side reward callback according to Google's terms and privacy policies. Ludo Paws only grants the configured reward after validating the server-side callback. This policy does not imply that production ads or rewards are currently enabled.</p>
+
+      <h2>5. Service providers and disclosures</h2>
+      <p>Online features use Cloudflare Worker and Durable Object infrastructure, plus the EntroNex service for the game's dice-proof workflow. Google services are involved when the player uses Google sign-in, Play Billing, or enabled ads. Those providers may process technical connection information, including IP address, as part of delivering and securing their services. The Ludo Paws rate limiter derives one-way hashes from incoming client IP information for request-rate controls; the game API code does not intentionally persist raw IP addresses in match or rate-limit state.</p>
+      <p>Data is shared with service providers only as needed to deliver configured features, verify transactions or proofs, secure the service, or respond to lawful requirements. The publisher must review the final provider list and contractual terms before release.</p>
+
+      <h2>6. Local storage and security</h2>
+      <p>Some settings, profile statistics and game state are stored on the device. Account credentials, the guest recovery request key, friend/leaderboard credentials, and pending Play purchase records use Android Keystore-backed encryption where implemented. Network requests to Ludo Paws account and game services require HTTPS. No client-side callback or local wallet cache alone is trusted to mint currency or grant paid entitlements.</p>
+
+      <h2>7. Retention</h2>
+      <p>Account, session, social, leaderboard, wallet and transaction data is kept while needed to operate the associated feature, enforce security, prevent duplicate purchase/reward grants, or satisfy applicable legal requirements. The final published policy must specify the publisher-approved retention periods and any lawful exception for fraud prevention, purchase disputes, or game-integrity evidence.</p>
+      <p>Match proof and receipt archives are separate from the account's wallet/profile records. The current draft account-deletion flow does not yet guarantee deletion or anonymization of every historical match receipt. Before this policy is published, the publisher must review those records, decide what should be deleted or irreversibly anonymized, set a justified retention period for any records kept for integrity or dispute resolution, and ensure the deletion-page wording and implementation match that decision.</p>
+
+      <h2>8. Account and data deletion</h2>
+      <p>A player with an active account can use <strong>Profile → Delete account and data</strong> inside the app. A Google-linked account can also start deletion from the <a href="./index.html">account-deletion page</a> by verifying the same Google account and confirming the irreversible action. The deletion implementation removes the account registry and linked identities, server-side profile/session/wallet/inventory/ad-progress/transaction records, associated Play purchase-ledger references, linked Friend data, and leaderboard profile data, subject to the match-record review described above.</p>
+      <p>If you have a guest-only account, cannot restore a Google-linked account, or have uninstalled the app, use the publisher contact below to request deletion. Support must verify ownership through a reasonable process before acting on a guest-only request. Do not email passwords, session tokens, recovery tokens, purchase tokens, or full payment details.</p>
+      <p>Deleting a Ludo Paws account does not delete your Google account or erase Google's separate Play order history.</p>
+
+      <h2>9. Children's privacy and intended audience</h2>
+      <p>The publisher must confirm the intended age groups, target-audience declaration, and any child-directed treatment before publication. Do not assume that an age rating, a family-policy exemption, or child-directed ad consent applies unless the relevant Play Console and advertising settings have been explicitly reviewed and configured.</p>
+
+      <h2>10. Your choices and contact</h2>
+      <p>You can choose whether to link a Google account and whether to use optional online/social features. You may request account deletion through the methods above. Questions about this policy or requests that cannot be completed through the app can be sent to the publisher contact below.</p>
+      <p><strong>Publisher support:</strong> <a id="support-email" href="#">support contact</a></p>
+      <p class="muted">Ludo Paws' publisher must complete the policy review and contact configuration before this page is publicly released.</p>
+    </article>
+    <footer><a href="./index.html">Account and data deletion</a></footer>
+  </main>
+  <script>
+    (function () {
+      var config = window.LUDO_ACCOUNT_CONFIG || {};
+      var email = String(config.supportEmail || "").trim();
+      var link = document.getElementById("support-email");
+      if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+        link.href = "mailto:" + email + "?subject=" + encodeURIComponent("Ludo Paws privacy request");
+        link.textContent = email;
+      } else {
+        link.removeAttribute("href");
+        link.textContent = "Publisher contact not configured";
+      }
+    })();
+  </script>
+</body>
+</html>
+<!-- POLICY_RELEASE_REVIEW_REQUIRED: Publisher/legal entity and contact; exact retention periods and match receipt deletion/anonymization; target age/children; complete third-party provider list; Play Data Safety and target audience; AdMob/UMP consent behaviour; verify all statements against final release and have policy approved before removing this marker. -->

@@ -133,6 +133,26 @@ class LeaderboardIdentityStore(
         }
     }
 
+    /**
+     * Restores a credential returned by the authenticated account-recovery API.
+     * The registration recovery secret and token are encrypted with Android Keystore.
+     */
+    @Synchronized
+    fun restoreFromAccount(credential: LeaderboardCredential) {
+        require(PROFILE_ID.matches(credential.profileId))
+        require(PROFILE_TOKEN.matches(credential.profileToken))
+        require(UUID_V4.matches(credential.registrationRequestId))
+        persistRegistrationRequestId(credential.registrationRequestId)
+        save(credential)
+    }
+
+    @Synchronized
+    fun clearAllForAccountSwitch() {
+        check(prefs.edit().clear().commit()) {
+            "Previous account's leaderboard credentials could not be cleared safely"
+        }
+    }
+
     @Synchronized
     fun load():
         LeaderboardCredential? {

@@ -1,6 +1,7 @@
 package com.ludoproof.game.feature.store.data.local
 
 import android.content.Context
+import com.ludoproof.game.feature.account.data.AccountSessionStore
 import com.ludoproof.game.feature.characters.data.local.CharacterSelectionStore
 import com.ludoproof.game.feature.characters.domain.catalog.LudoPawsCharacterCatalog
 import com.ludoproof.game.feature.store.domain.StoreCosmeticCatalog
@@ -20,16 +21,32 @@ class CosmeticInventoryStore(
             Context.MODE_PRIVATE,
         )
 
+    fun applyServerSnapshot(snapshot: org.json.JSONObject, expectedAccountId: String): Boolean {
+        if (!GemWalletStore(appContext).applyServerSnapshot(snapshot, expectedAccountId)) return false
+        val selected = snapshot.optJSONObject("selectedCosmetics") ?: org.json.JSONObject()
+        val selectedPackId = selected.optString("CHARACTER_PACK")
+        val cosmetic = StoreCosmeticCatalog.find(selectedPackId)
+        if (cosmetic != null && cosmetic.contentAvailable && cosmetic.characterPackId != null) {
+            syncCharacterPackSelection(cosmetic)
+        }
+        return true
+    }
+
+    private fun hasCurrentAccountSnapshot(): Boolean {
+        val accountId = AccountSessionStore(appContext).load()?.accountId ?: return false
+        return prefs.getString(StorePreferences.KEY_WALLET_ACCOUNT_ID, null) == accountId
+    }
+
     fun isOwned(
         cosmeticId: String,
     ): Boolean =
-        cosmeticId in
-            ownedIds()
+        hasCurrentAccountSnapshot() && cosmeticId in ownedIds()
 
     fun selectedId(
         category: CosmeticCategory,
-    ): String =
-        prefs.getString(
+    ): String {
+        if (!hasCurrentAccountSnapshot()) return StoreCosmeticCatalog.defaultId(category)
+        return prefs.getString(
             selectedKey(
                 category,
             ),
@@ -45,15 +62,18 @@ class CosmeticInventoryStore(
                             item.contentAvailable
                     } == true
             }
+            ?.takeIf { isOwned(it) }
             ?: StoreCosmeticCatalog
                 .defaultId(
                     category,
                 )
+    }
 
     fun rewardedAdProgress(
         cosmeticId: String,
-    ): Int =
-        prefs.getInt(
+    ): Int {
+        if (!hasCurrentAccountSnapshot()) return 0
+        return prefs.getInt(
             StorePreferences
                 .KEY_AD_PROGRESS_PREFIX +
                 cosmeticId,
@@ -62,12 +82,14 @@ class CosmeticInventoryStore(
             .coerceAtLeast(
                 0,
             )
+    }
 
     fun hasVerifiedEventEntitlement(
         cosmeticId: String,
-    ): Boolean =
-        cosmeticId in
-            verifiedEventEntitlements()
+    ): Boolean {
+        // Local preferences are a display cache and cannot prove an event entitlement.
+        return false
+    }
 
     @Synchronized
     fun acquireOrSelect(
@@ -75,158 +97,35 @@ class CosmeticInventoryStore(
         currentLevel: Int,
     ): CosmeticAcquireResult {
         if (!cosmetic.contentAvailable) {
-            return CosmeticAcquireResult
-                .CONTENT_UNAVAILABLE
+            return CosmeticAcquireResult.CONTENT_UNAVAILABLE
         }
-        if (!isSelectableCharacterPack(cosmetic)) {
-            return CosmeticAcquireResult
-                .INVALID
+        if (!isSelectableCharacterPack(cosmetic)) return CosmeticAcquireResult.INVALID
+        if (currentLevel < cosmetic.requiredLevel) return CosmeticAcquireResult.NEED_LEVEL
+        if (isOwned(cosmetic.id)) {
+            // Selection is performed by /api/wallet/cosmetics/select, never by local cache mutation.
+            return CosmeticAcquireResult.INVALID
         }
-        if (
-            currentLevel <
-            cosmetic.requiredLevel
-        ) {
-            return CosmeticAcquireResult
-                .NEED_LEVEL
-        }
-
-        val owned =
-            ownedIds()
-
-        if (
-            cosmetic.id in
-            owned
-        ) {
-            return if (
-                selectOwned(
-                    cosmetic,
-                )
-            ) {
-                CosmeticAcquireResult
-                    .SELECTED
-            } else {
-                CosmeticAcquireResult
-                    .INVALID
-            }
-        }
-
-        when (
-            cosmetic.unlockKind
-        ) {
-            CosmeticUnlockKind.FREE,
-            CosmeticUnlockKind.LEVEL -> {
-                return if (
-                    grantAndSelect(
-                        cosmetic = cosmetic,
-                        owned = owned,
-                    )
-                ) {
-                    CosmeticAcquireResult
-                        .ACQUIRED_AND_SELECTED
-                } else {
-                    CosmeticAcquireResult
-                        .INVALID
-                }
-            }
-
+        return when (cosmetic.unlockKind) {
             CosmeticUnlockKind.GEMS -> {
-                val balance =
-                    prefs.getInt(
-                        StorePreferences
-                            .KEY_BALANCE,
-                        0,
-                    )
-                        .coerceAtLeast(
-                            0,
-                        )
-                if (
-                    balance <
-                    cosmetic.gemPrice
-                ) {
-                    return CosmeticAcquireResult
-                        .NEED_GEMS
-                }
-
-                owned +=
-                    cosmetic.id
-                val committed =
-                    prefs.edit()
-                        .putInt(
-                            StorePreferences
-                                .KEY_BALANCE,
-                            balance -
-                                cosmetic.gemPrice,
-                        )
-                        .putStringSet(
-                            StorePreferences
-                                .KEY_OWNED_COSMETICS,
-                            owned,
-                        )
-                        .putString(
-                            selectedKey(
-                                cosmetic.category,
-                            ),
-                            cosmetic.id,
-                        )
-                        .commit()
-                if (committed) {
-                    syncCharacterPackSelection(
-                        cosmetic,
-                    )
-                    return CosmeticAcquireResult
-                        .ACQUIRED_AND_SELECTED
-                }
-                return CosmeticAcquireResult
-                    .INVALID
-            }
-
-            CosmeticUnlockKind.REWARDED_ADS -> {
-                if (
-                    rewardedAdProgress(
-                        cosmetic.id,
-                    ) <
-                    cosmetic.requiredAdViews
-                ) {
-                    return CosmeticAcquireResult
-                        .NEED_REWARDED_ADS
-                }
-
-                return if (
-                    grantAndSelect(
-                        cosmetic = cosmetic,
-                        owned = owned,
-                    )
-                ) {
-                    CosmeticAcquireResult
-                        .ACQUIRED_AND_SELECTED
+                if (GemWalletStore(appContext).balance() < cosmetic.gemPrice) {
+                    CosmeticAcquireResult.NEED_GEMS
                 } else {
-                    CosmeticAcquireResult
-                        .INVALID
+                    // The old local balance - cosmetic.gemPrice debit is intentionally disabled.
+                    // The authenticated server performs the debit and inventory grant atomically.
+                    CosmeticAcquireResult.INVALID
                 }
             }
-
-            CosmeticUnlockKind.EVENT -> {
-                if (
-                    !hasVerifiedEventEntitlement(
-                        cosmetic.id,
-                    )
-                ) {
-                    return CosmeticAcquireResult
-                        .NEED_EVENT
-                }
-                return if (
-                    grantAndSelect(
-                        cosmetic = cosmetic,
-                        owned = owned,
-                    )
-                ) {
-                    CosmeticAcquireResult
-                        .ACQUIRED_AND_SELECTED
+            CosmeticUnlockKind.REWARDED_ADS ->
+                if (rewardedAdProgress(cosmetic.id) < cosmetic.requiredAdViews) {
+                    CosmeticAcquireResult.NEED_REWARDED_ADS
                 } else {
-                    CosmeticAcquireResult
-                        .INVALID
+                    CosmeticAcquireResult.INVALID
                 }
-            }
+            CosmeticUnlockKind.EVENT ->
+                if (hasVerifiedEventEntitlement(cosmetic.id)) CosmeticAcquireResult.INVALID
+                else CosmeticAcquireResult.NEED_EVENT
+            CosmeticUnlockKind.FREE,
+            CosmeticUnlockKind.LEVEL -> CosmeticAcquireResult.INVALID
         }
     }
 
@@ -234,133 +133,14 @@ class CosmeticInventoryStore(
     fun recordVerifiedRewardedAd(
         cosmeticId: String,
     ): Int {
-        val cosmetic =
-            StoreCosmeticCatalog
-                .find(
-                    cosmeticId,
-                )
-                ?: return 0
-        if (
-            cosmetic.unlockKind !=
-            CosmeticUnlockKind
-                .REWARDED_ADS ||
-            !cosmetic.contentAvailable
-        ) {
-            return rewardedAdProgress(
-                cosmeticId,
-            )
-        }
-
-        val next =
-            (
-                rewardedAdProgress(
-                    cosmeticId,
-                ) +
-                    1
-                )
-                .coerceAtMost(
-                    cosmetic.requiredAdViews,
-                )
-
-        check(
-            prefs.edit()
-                .putInt(
-                    StorePreferences
-                        .KEY_AD_PROGRESS_PREFIX +
-                        cosmeticId,
-                    next,
-                )
-                .commit(),
-        ) {
-            "Could not safely save rewarded-ad cosmetic progress."
-        }
-
-        return next
+        // No client-side callback increments progress; only a new server snapshot may do so.
+        return rewardedAdProgress(cosmeticId)
     }
 
-    /**
-     * Called only after a trusted event/reward source has verified entitlement.
-     * This records entitlement separately from ownership; acquireOrSelect still
-     * validates that the pack content is actually available before selecting it.
-     */
     @Synchronized
     fun recordVerifiedEventEntitlement(
         cosmeticId: String,
-    ): Boolean {
-        val cosmetic =
-            StoreCosmeticCatalog
-                .find(
-                    cosmeticId,
-                )
-                ?: return false
-        if (
-            cosmetic.unlockKind !=
-            CosmeticUnlockKind.EVENT ||
-            cosmetic.eventKey.isNullOrBlank()
-        ) {
-            return false
-        }
-
-        val entitlements =
-            verifiedEventEntitlements()
-        entitlements +=
-            cosmetic.id
-        return prefs.edit()
-            .putStringSet(
-                StorePreferences
-                    .KEY_EVENT_ENTITLEMENTS,
-                entitlements,
-            )
-            .commit()
-    }
-
-    private fun grantAndSelect(
-        cosmetic: StoreCosmetic,
-        owned: MutableSet<String>,
-    ): Boolean {
-        owned +=
-            cosmetic.id
-        val committed =
-            prefs.edit()
-                .putStringSet(
-                    StorePreferences
-                        .KEY_OWNED_COSMETICS,
-                    owned,
-                )
-                .putString(
-                    selectedKey(
-                        cosmetic.category,
-                    ),
-                    cosmetic.id,
-                )
-                .commit()
-        if (committed) {
-            syncCharacterPackSelection(
-                cosmetic,
-            )
-        }
-        return committed
-    }
-
-    private fun selectOwned(
-        cosmetic: StoreCosmetic,
-    ): Boolean {
-        val committed =
-            prefs.edit()
-                .putString(
-                    selectedKey(
-                        cosmetic.category,
-                    ),
-                    cosmetic.id,
-                )
-                .commit()
-        if (committed) {
-            syncCharacterPackSelection(
-                cosmetic,
-            )
-        }
-        return committed
-    }
+    ): Boolean = false
 
     private fun isSelectableCharacterPack(
         cosmetic: StoreCosmetic,
@@ -420,33 +200,16 @@ class CosmeticInventoryStore(
         )
     }
 
-    private fun ownedIds():
-        MutableSet<String> =
-        prefs.getStringSet(
-            StorePreferences
-                .KEY_OWNED_COSMETICS,
-            emptySet(),
-        )
-            ?.toMutableSet()
-            ?.apply {
-                addAll(
-                    StoreCosmeticCatalog
-                        .defaultOwnedIds,
-                )
-            }
-            ?: StoreCosmeticCatalog
-                .defaultOwnedIds
-                .toMutableSet()
+    private fun ownedIds(): MutableSet<String> =
+        if (!hasCurrentAccountSnapshot()) {
+            mutableSetOf()
+        } else {
+            prefs.getStringSet(
+                StorePreferences.KEY_OWNED_COSMETICS,
+                emptySet(),
+            )?.toMutableSet() ?: mutableSetOf()
+        }
 
-    private fun verifiedEventEntitlements():
-        MutableSet<String> =
-        prefs.getStringSet(
-            StorePreferences
-                .KEY_EVENT_ENTITLEMENTS,
-            emptySet(),
-        )
-            ?.toMutableSet()
-            ?: mutableSetOf()
 
     private fun selectedKey(
         category: CosmeticCategory,

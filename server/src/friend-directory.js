@@ -114,6 +114,16 @@ export class FriendDirectory {
             created_at DESC
           )
         `);
+        sql.exec(`CREATE TABLE IF NOT EXISTS friend_conversation_index (
+          friend_id TEXT NOT NULL, other_friend_id TEXT NOT NULL, last_message_at INTEGER NOT NULL,
+          PRIMARY KEY(friend_id, other_friend_id)
+        )`);
+        sql.exec(`CREATE TABLE IF NOT EXISTS friend_recent_index (
+          owner_friend_id TEXT NOT NULL, opponent_friend_id TEXT NOT NULL, played_at INTEGER NOT NULL,
+          PRIMARY KEY(owner_friend_id, opponent_friend_id)
+        )`);
+        sql.exec("CREATE INDEX IF NOT EXISTS idx_friend_conversation_index_other ON friend_conversation_index(other_friend_id, friend_id)");
+        sql.exec("CREATE INDEX IF NOT EXISTS idx_friend_recent_index_opponent ON friend_recent_index(opponent_friend_id, owner_friend_id)");
       },
     );
   }
@@ -146,6 +156,19 @@ export class FriendDirectory {
           request,
         );
       }
+
+      // Internal-only recovery endpoint. The public Worker exposes it only after
+      // the caller's account session and existing account-to-friend link are verified.
+      if (
+        request.method === "POST" &&
+        url.pathname === "/account/recover"
+      ) {
+        return await this.#recoverAccountIdentity(request);
+      }
+      if (request.method === "POST" && url.pathname === "/conversation/register") return await this.#registerConversation(request);
+      if (request.method === "POST" && url.pathname === "/recent/register") return await this.#registerRecent(request);
+      if (request.method === "POST" && url.pathname === "/account/delete-preview") return await this.#previewAccountDeletion(request);
+      if (request.method === "POST" && url.pathname === "/account/delete") return await this.#deleteAccount(request);
 
       if (
         request.method ===
@@ -402,6 +425,107 @@ export class FriendDirectory {
           me.displayName,
       },
     );
+  }
+
+  async #recoverAccountIdentity(request) {
+    const body = await readJson(request);
+    const friendId = normalizeFriendId(body?.friendId);
+    const rows = [
+      ...this.ctx.storage.sql.exec(
+        "SELECT friend_id, registration_request_id, display_name FROM friend_profiles WHERE friend_id = ? LIMIT 1",
+        friendId,
+      ),
+    ];
+    if (rows.length !== 1) {
+      throw httpError(404, "FRIEND_IDENTITY_NOT_FOUND", "linked friend identity could not be recovered");
+    }
+    const row = rows[0];
+    const registrationRequestId = String(row.registration_request_id);
+    const identity = await deriveFriendIdentity(this.env, registrationRequestId);
+    if (identity.friendId !== friendId) {
+      throw httpError(409, "FRIEND_IDENTITY_RECOVERY_CONFLICT", "linked friend identity did not match its recovery record");
+    }
+    const tokenHash = await friendTokenHash(identity.friendToken);
+    this.ctx.storage.sql.exec(
+      "UPDATE friend_profiles SET token_hash = ?, last_seen_at = ? WHERE friend_id = ?",
+      tokenHash,
+      Date.now(),
+      friendId,
+    );
+    return json(200, {
+      ok: true,
+      friendId,
+      friendToken: identity.friendToken,
+      registrationRequestId,
+      displayName: String(row.display_name),
+    });
+  }
+
+  async #registerConversation(request) {
+    const body = await readJson(request);
+    const friendId = normalizeFriendId(body?.friendId), otherFriendId = normalizeFriendId(body?.otherFriendId);
+    if (friendId === otherFriendId) throw httpError(400, "INVALID_CONVERSATION", "cannot index a conversation with yourself");
+    const profiles = [...this.ctx.storage.sql.exec("SELECT friend_id FROM friend_profiles WHERE friend_id IN (?, ?)", friendId, otherFriendId)];
+    if (profiles.length !== 2) throw httpError(404, "FRIEND_PROFILE_NOT_FOUND", "conversation participant was not found");
+    const now = Date.now();
+    for (const [owner, other] of [[friendId, otherFriendId], [otherFriendId, friendId]]) this.ctx.storage.sql.exec(
+      "INSERT INTO friend_conversation_index (friend_id, other_friend_id, last_message_at) VALUES (?, ?, ?) ON CONFLICT(friend_id, other_friend_id) DO UPDATE SET last_message_at = excluded.last_message_at", owner, other, now,
+    );
+    return json(200, { ok: true, registered: true });
+  }
+
+  async #registerRecent(request) {
+    const body = await readJson(request);
+    const owner = normalizeFriendId(body?.ownerFriendId), opponent = normalizeFriendId(body?.opponentFriendId);
+    if (owner === opponent) throw httpError(400, "INVALID_RECENT_PLAYER", "recent opponent must be another player");
+    this.ctx.storage.sql.exec("INSERT INTO friend_recent_index (owner_friend_id, opponent_friend_id, played_at) VALUES (?, ?, ?) ON CONFLICT(owner_friend_id, opponent_friend_id) DO UPDATE SET played_at = excluded.played_at", owner, opponent, Date.now());
+    return json(200, { ok: true, registered: true });
+  }
+
+  async #previewAccountDeletion(request) {
+    const body = await readJson(request), friendId = normalizeFriendId(body?.friendId);
+    const profile = [...this.ctx.storage.sql.exec("SELECT friend_id FROM friend_profiles WHERE friend_id = ? LIMIT 1", friendId)];
+    if (!profile.length) return json(200, { ok: true, found: false, friendId, relatedFriendIds: [] });
+    const related = new Set();
+    const add = (a, b) => { const first = String(a ?? "").toUpperCase(), second = String(b ?? "").toUpperCase(); if (first === friendId && second && second !== friendId) related.add(second); if (second === friendId && first && first !== friendId) related.add(first); };
+    for (const row of this.ctx.storage.sql.exec("SELECT friend_a, friend_b FROM friendships WHERE friend_a = ? OR friend_b = ?", friendId, friendId)) add(row.friend_a, row.friend_b);
+    for (const row of this.ctx.storage.sql.exec("SELECT sender_id, receiver_id FROM friend_requests WHERE sender_id = ? OR receiver_id = ?", friendId, friendId)) add(row.sender_id, row.receiver_id);
+    for (const row of this.ctx.storage.sql.exec("SELECT sender_id, receiver_id FROM friend_invites WHERE sender_id = ? OR receiver_id = ?", friendId, friendId)) add(row.sender_id, row.receiver_id);
+    for (const row of this.ctx.storage.sql.exec("SELECT other_friend_id FROM friend_conversation_index WHERE friend_id = ?", friendId)) add(friendId, row.other_friend_id);
+    for (const row of this.ctx.storage.sql.exec("SELECT owner_friend_id FROM friend_recent_index WHERE opponent_friend_id = ?", friendId)) add(row.owner_friend_id, friendId);
+    return json(200, { ok: true, found: true, friendId, relatedFriendIds: [...related].sort() });
+  }
+
+  async #deleteAccount(request) {
+    const body = await readJson(request), friendId = normalizeFriendId(body?.friendId);
+    const requireInternalOk = async (response, code) => {
+      let value; try { value = await response.json(); } catch { throw httpError(503, code, "internal social storage returned an invalid response"); }
+      if (!response.ok) throw httpError(response.status, value?.error ?? code, value?.message ?? "internal social cleanup failed");
+      return value;
+    };
+    const preview = await this.#previewAccountDeletion(new Request("https://friends/account/delete-preview", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ friendId }) })).then((response) => response.json());
+    const related = Array.isArray(preview.relatedFriendIds) ? preview.relatedFriendIds : [];
+    if (preview.found) {
+      if (!this.env?.LUDOPROOF_FRIEND_CONVERSATIONS || !this.env?.LUDOPROOF_FRIEND_RECENT) throw httpError(503, "FRIEND_DATA_DELETE_NOT_CONFIGURED", "friend conversation and recent-player stores are required for account deletion");
+      for (const otherId of related) {
+        const pair = [friendId, otherId].sort().join(":");
+        const conversation = this.env.LUDOPROOF_FRIEND_CONVERSATIONS.get(this.env.LUDOPROOF_FRIEND_CONVERSATIONS.idFromName(pair));
+        await requireInternalOk(await conversation.fetch(new Request("https://conversation/delete-for-friend", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ friendId }) })), "FRIEND_CONVERSATION_DELETE_FAILED");
+        const recent = this.env.LUDOPROOF_FRIEND_RECENT.get(this.env.LUDOPROOF_FRIEND_RECENT.idFromName(otherId));
+        await requireInternalOk(await recent.fetch(new Request("https://recent/purge-opponent", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ownerFriendId: otherId, opponentFriendId: friendId }) })), "FRIEND_RECENT_DELETE_FAILED");
+      }
+      const ownRecent = this.env.LUDOPROOF_FRIEND_RECENT.get(this.env.LUDOPROOF_FRIEND_RECENT.idFromName(friendId));
+      await requireInternalOk(await ownRecent.fetch(new Request("https://recent/delete-owner", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ownerFriendId: friendId }) })), "FRIEND_RECENT_DELETE_FAILED");
+    }
+    this.ctx.storage.transactionSync(() => {
+      this.ctx.storage.sql.exec("DELETE FROM friend_requests WHERE sender_id = ? OR receiver_id = ?", friendId, friendId);
+      this.ctx.storage.sql.exec("DELETE FROM friend_invites WHERE sender_id = ? OR receiver_id = ?", friendId, friendId);
+      this.ctx.storage.sql.exec("DELETE FROM friendships WHERE friend_a = ? OR friend_b = ?", friendId, friendId);
+      this.ctx.storage.sql.exec("DELETE FROM friend_conversation_index WHERE friend_id = ? OR other_friend_id = ?", friendId, friendId);
+      this.ctx.storage.sql.exec("DELETE FROM friend_recent_index WHERE owner_friend_id = ? OR opponent_friend_id = ?", friendId, friendId);
+      this.ctx.storage.sql.exec("DELETE FROM friend_profiles WHERE friend_id = ?", friendId);
+    });
+    return json(200, { ok: true, deleted: preview.found === true, replay: preview.found !== true });
   }
 
   async #snapshot(

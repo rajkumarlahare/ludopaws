@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Ludo Paws — Account and Data Deletion</title>
+  <meta name="description" content="Delete a Google-linked Ludo Paws account or contact publisher support about deleting account data.">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://accounts.google.com 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://ludoproof-game-api.ai-8f3.workers.dev https://accounts.google.com; frame-src https://accounts.google.com; img-src 'self' data: https://*.googleusercontent.com; object-src 'none'; base-uri 'self';">
+  <script src="./config.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <style>
+    :root { color-scheme: light; font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f6f8; color: #19212b; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 28px 16px 44px; }
+    main { max-width: 760px; margin: 0 auto; }
+    header { font-weight: 800; letter-spacing: .02em; color: #253449; margin: 4px 0 26px; }
+    .panel { background: #fff; border: 1px solid #d8dee7; border-radius: 18px; padding: clamp(20px, 5vw, 34px); box-shadow: 0 8px 26px rgba(20, 35, 55, .05); }
+    h1 { margin: 0 0 14px; font-size: clamp(27px, 5vw, 36px); line-height: 1.1; }
+    h2 { font-size: 19px; margin: 28px 0 8px; }
+    p, li { line-height: 1.55; }
+    .muted { color: #596879; }
+    .status { margin: 18px 0; padding: 12px 14px; border-radius: 10px; background: #f2f5f8; line-height: 1.45; overflow-wrap: anywhere; }
+    .status.error { background: #fff1ef; color: #7d2117; }
+    .status.success { background: #eaf8ef; color: #155a30; }
+    .button-row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 18px; align-items: center; }
+    button, .link-button { border: 0; border-radius: 10px; padding: 12px 16px; font: inherit; font-weight: 700; cursor: pointer; }
+    button.primary { background: #243b55; color: #fff; }
+    button.danger { background: #a52a20; color: #fff; }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    a { color: #245d92; }
+    .check { display: flex; gap: 10px; align-items: flex-start; margin-top: 18px; }
+    .check input { margin-top: 5px; width: 18px; height: 18px; flex: 0 0 auto; }
+    .fine-print { font-size: 14px; color: #596879; }
+    #account-actions[hidden], #google-signin[hidden], #support-missing[hidden], #support-link[hidden] { display: none; }
+    footer { margin: 18px 4px 0; font-size: 13px; color: #657384; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>LUDO PAWS</header>
+    <section class="panel">
+      <h1>Account and data deletion</h1>
+      <p>Use the Google account that you previously linked to Ludo Paws to request deletion of that Ludo Paws account. This does not delete your Google account or your Google Play account.</p>
+      <p class="muted">For security, this page only asks the Ludo Paws server to delete an account after Google identity verification and an additional explicit confirmation. Session tokens are kept in page memory only and are not saved to browser storage.</p>
+
+      <h2>1. Find your account</h2>
+      <p id="setup-note" class="muted">Preparing secure Google sign-in…</p>
+      <div id="google-signin"></div>
+      <div id="status" class="status" role="status" aria-live="polite">Preparing secure Google sign-in…</div>
+
+      <div id="account-actions" hidden>
+        <p>Signed in to a Google-linked Ludo Paws account: <strong id="account-name">Google account</strong>.</p>
+        <h2>2. Confirm deletion</h2>
+        <p>Deletion removes the account profile, server wallet and gems, cosmetic inventory/progress, active sessions, linked Friend ID/social data, linked leaderboard profile, and account-linked Play purchase-verification records managed by Ludo Paws.</p>
+        <label class="check">
+          <input type="checkbox" id="confirm-delete">
+          <span>I understand that deleting this Ludo Paws account is permanent and cannot be undone.</span>
+        </label>
+        <div class="button-row">
+          <button id="delete-button" class="danger" type="button" disabled>Delete my Ludo Paws account</button>
+        </div>
+      </div>
+
+      <h2>Guest-only accounts or sign-in problems</h2>
+      <p>If you still have the app and did not link your guest account to Google, open <strong>Profile → Delete account and data</strong> in the app. If you have uninstalled the app or cannot restore the account, contact publisher support using the contact link below. Do not send passwords, session tokens, purchase tokens, or full payment details.</p>
+      <p id="support-missing" class="fine-print">Publisher support contact has not been configured on this page yet. This site is not ready for public launch until the publisher adds and verifies a monitored support address.</p>
+      <p id="support-link" hidden><a id="support-email" href="#">Contact publisher support for a deletion request</a></p>
+
+      <p class="fine-print">Read the <a href="./privacy-policy.html">Privacy Policy</a> for details of data use and retention. Match proof/receipt retention must be governed by the reviewed published policy before public launch; this page does not claim that all separate integrity records are deleted.</p>
+    </section>
+    <footer>Never share your Google password or verification code. Ludo Paws will not ask for either.</footer>
+  </main>
+<script>
+(function () {
+  "use strict";
+  const config = window.LUDO_ACCOUNT_CONFIG || {};
+  const apiBase = String(config.apiBaseUrl || "https://ludoproof-game-api.ai-8f3.workers.dev").replace(/\/+$/, "");
+  const clientId = String(config.googleWebClientId || "").trim();
+  const statusBox = document.getElementById("status");
+  const setupNote = document.getElementById("setup-note");
+  const googleSignIn = document.getElementById("google-signin");
+  const accountActions = document.getElementById("account-actions");
+  const deleteButton = document.getElementById("delete-button");
+  const confirmDelete = document.getElementById("confirm-delete");
+  let signInNonce = null;
+  let accessToken = null;
+  let callbackBusy = false;
+
+  function setStatus(message, kind) {
+    statusBox.textContent = message;
+    statusBox.className = "status" + (kind ? " " + kind : "");
+  }
+
+  async function post(path, body, token) {
+    const headers = { "Content-Type": "application/json" };
+    if (token) headers.Authorization = "Bearer " + token;
+    const response = await fetch(apiBase + path, {
+      method: "POST",
+      mode: "cors",
+      credentials: "omit",
+      cache: "no-store",
+      headers: headers,
+      body: JSON.stringify(body || {})
+    });
+    let value = {};
+    try { value = await response.json(); } catch (_) {}
+    if (!response.ok) {
+      const error = new Error(String(value.message || ("Request failed (HTTP " + response.status + ")")));
+      error.code = String(value.error || "HTTP_" + response.status);
+      error.status = response.status;
+      throw error;
+    }
+    return value;
+  }
+
+  function showSupportContact() {
+    const email = String(config.supportEmail || "").trim();
+    if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      const link = document.getElementById("support-email");
+      link.href = "mailto:" + email + "?subject=" + encodeURIComponent("Ludo Paws account deletion request");
+      document.getElementById("support-link").hidden = false;
+      document.getElementById("support-missing").hidden = true;
+    }
+  }
+
+  async function prepareGoogleButton() {
+    if (!clientId) {
+      setupNote.textContent = "Google sign-in is not configured for this site yet.";
+      setStatus("The publisher must configure the public Google Web Client ID before this deletion flow can be used.", "error");
+      return;
+    }
+    try {
+      const challenge = await post("/api/account/google/challenge", {});
+      signInNonce = String(challenge.nonce || "");
+      if (!/^[a-f0-9]{64}$/.test(signInNonce)) throw new Error("The account service returned an invalid sign-in challenge.");
+      if (!window.google || !window.google.accounts || !window.google.accounts.id) {
+        throw new Error("Google sign-in could not be loaded. Check your connection and refresh this page.");
+      }
+      window.google.accounts.id.initialize({
+        client_id: clientId,
+        nonce: signInNonce,
+        auto_select: false,
+        ux_mode: "popup",
+        callback: handleGoogleCredential
+      });
+      googleSignIn.replaceChildren();
+      window.google.accounts.id.renderButton(googleSignIn, {
+        type: "standard",
+        theme: "outline",
+        size: "large",
+        text: "continue_with",
+        shape: "pill",
+        width: 300
+      });
+      setupNote.textContent = "Choose the same Google account that you linked to Ludo Paws.";
+      setStatus("Secure sign-in is ready.");
+    } catch (error) {
+      setupNote.textContent = "Google sign-in could not be prepared.";
+      setStatus(error.message || "The account service is unavailable. Please refresh and try again.", "error");
+    }
+  }
+
+  async function handleGoogleCredential(credentialResponse) {
+    if (callbackBusy) return;
+    callbackBusy = true;
+    googleSignIn.hidden = true;
+    setStatus("Verifying your Google-linked account…");
+    try {
+      if (!credentialResponse || !credentialResponse.credential || !signInNonce) {
+        throw new Error("Google did not return the required sign-in credential.");
+      }
+      const session = await post("/api/account/google/login", {
+        idToken: credentialResponse.credential,
+        nonce: signInNonce
+      });
+      signInNonce = null;
+      accessToken = String(session.accessToken || "");
+      if (accessToken.split(".").length !== 3) throw new Error("The account service returned an invalid session.");
+      document.getElementById("account-name").textContent = String((session.profile && session.profile.displayName) || "Google-linked account");
+      accountActions.hidden = false;
+      setStatus("Account verified. Review the deletion details below before confirming.", "success");
+    } catch (error) {
+      signInNonce = null;
+      googleSignIn.hidden = false;
+      if (error.code === "GOOGLE_IDENTITY_NOT_LINKED") {
+        setStatus("This Google account is not linked to a Ludo Paws account. Try the exact Google account previously linked, or use the guest-account support route below.", "error");
+      } else {
+        setStatus(error.message || "The account could not be verified. Refresh this page and try again.", "error");
+      }
+      setupNote.textContent = "You can refresh this page to start a new secure sign-in challenge.";
+    } finally {
+      callbackBusy = false;
+    }
+  }
+
+  confirmDelete.addEventListener("change", function () {
+    deleteButton.disabled = !confirmDelete.checked || !accessToken;
+  });
+
+  deleteButton.addEventListener("click", async function () {
+    if (!confirmDelete.checked || !accessToken) return;
+    if (!window.confirm("Permanently delete this Ludo Paws account and its server-managed account data? This cannot be undone.")) return;
+    deleteButton.disabled = true;
+    setStatus("Submitting the deletion request…");
+    try {
+      const result = await post("/api/account/delete", { confirmation: "DELETE_MY_ACCOUNT" }, accessToken);
+      if (result.deleted !== true) throw new Error("The account service did not confirm deletion. Contact support before retrying.");
+      accessToken = null;
+      signInNonce = null;
+      accountActions.hidden = true;
+      googleSignIn.hidden = true;
+      setStatus("Your Ludo Paws account deletion request was completed by the account service.", "success");
+      setupNote.textContent = "You can close this page. This action does not delete your Google account or Google Play order history.";
+    } catch (error) {
+      setStatus(error.message || "The service could not confirm deletion. Please retry or contact support.", "error");
+      deleteButton.disabled = false;
+    }
+  });
+
+  showSupportContact();
+  window.addEventListener("load", prepareGoogleButton);
+})();
+</script>
+</body>
+</html>

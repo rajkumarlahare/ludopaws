@@ -1,0 +1,427 @@
+import { httpError, readJsonObject, requireClientRequestId } from "./crypto.js";
+import {
+  billingAccountId, deriveRotatedRefreshToken, hashRefreshToken, isAccountId, isSessionId,
+  issueAccessToken, newRefreshToken, SESSION_TTL_MS, validRefreshToken, sha256Hex,
+} from "./account-security.js";
+import { GOOGLE_PLAY_PRODUCTS } from "./google-play-billing.js";
+
+const MAX_BALANCE = 2_000_000_000;
+const NAME_LENGTH = 24;
+const DEFAULT_COSMETICS = [
+  ["board_classic", "BOARD"], ["dice_classic", "DICE"], ["dice_pumpkin", "DICE"],
+  ["avatar_9", "AVATAR"], ["avatar_4", "AVATAR"], ["avatar_3", "AVATAR"],
+  ["avatar_5", "AVATAR"], ["avatar_6", "AVATAR"], ["avatar_7", "AVATAR"],
+  ["avatar_1", "AVATAR"], ["avatar_8", "AVATAR"], ["character_pack_starter_paws", "CHARACTER_PACK"],
+];
+const DEFAULT_SELECTIONS = { BOARD: "board_classic", DICE: "dice_classic", AVATAR: "avatar_4", CHARACTER_PACK: "character_pack_starter_paws" };
+const COSMETICS = Object.freeze({
+  board_classic: { category: "BOARD", kind: "FREE", available: true, gemPrice: 0, level: 0, ads: 0 },
+  board_checkers: { category: "BOARD", kind: "FREE", available: false, gemPrice: 0, level: 0, ads: 0 },
+  board_chess: { category: "BOARD", kind: "REWARDED_ADS", available: false, gemPrice: 0, level: 0, ads: 5 },
+  board_diwali: { category: "BOARD", kind: "REWARDED_ADS", available: false, gemPrice: 0, level: 0, ads: 10 },
+  board_denim: { category: "BOARD", kind: "REWARDED_ADS", available: false, gemPrice: 0, level: 0, ads: 10 },
+  board_neon: { category: "BOARD", kind: "REWARDED_ADS", available: false, gemPrice: 0, level: 10, ads: 20 },
+  board_pirate: { category: "BOARD", kind: "GEMS", available: false, gemPrice: 200, level: 16, ads: 0 },
+  board_alien: { category: "BOARD", kind: "GEMS", available: false, gemPrice: 250, level: 22, ads: 0 },
+  board_penguin: { category: "BOARD", kind: "GEMS", available: false, gemPrice: 250, level: 0, ads: 0 },
+  dice_classic: { category: "DICE", kind: "FREE", available: true, gemPrice: 0, level: 0, ads: 0 },
+  dice_pumpkin: { category: "DICE", kind: "FREE", available: true, gemPrice: 0, level: 0, ads: 0 },
+  dice_diwali: { category: "DICE", kind: "REWARDED_ADS", available: true, gemPrice: 0, level: 0, ads: 5 },
+  dice_football: { category: "DICE", kind: "REWARDED_ADS", available: true, gemPrice: 0, level: 18, ads: 10 },
+  dice_cricket: { category: "DICE", kind: "REWARDED_ADS", available: true, gemPrice: 0, level: 0, ads: 20 },
+  dice_summers: { category: "DICE", kind: "REWARDED_ADS", available: true, gemPrice: 0, level: 12, ads: 30 },
+  dice_colors: { category: "DICE", kind: "GEMS", available: true, gemPrice: 200, level: 24, ads: 0 },
+  dice_heart: { category: "DICE", kind: "GEMS", available: true, gemPrice: 250, level: 0, ads: 0 },
+  avatar_9: { category: "AVATAR", kind: "FREE", available: true, gemPrice: 0, level: 0, ads: 0 },
+  avatar_4: { category: "AVATAR", kind: "FREE", available: true, gemPrice: 0, level: 0, ads: 0 },
+  avatar_3: { category: "AVATAR", kind: "FREE", available: true, gemPrice: 0, level: 0, ads: 0 },
+  avatar_5: { category: "AVATAR", kind: "FREE", available: true, gemPrice: 0, level: 0, ads: 0 },
+  avatar_6: { category: "AVATAR", kind: "FREE", available: true, gemPrice: 0, level: 0, ads: 0 },
+  avatar_7: { category: "AVATAR", kind: "FREE", available: true, gemPrice: 0, level: 0, ads: 0 },
+  avatar_1: { category: "AVATAR", kind: "FREE", available: true, gemPrice: 0, level: 0, ads: 0 },
+  avatar_8: { category: "AVATAR", kind: "FREE", available: true, gemPrice: 0, level: 0, ads: 0 },
+  avatar_2: { category: "AVATAR", kind: "GEMS", available: true, gemPrice: 500, level: 30, ads: 0 },
+  avatar_10: { category: "AVATAR", kind: "GEMS", available: true, gemPrice: 500, level: 30, ads: 0 },
+  character_pack_starter_paws: { category: "CHARACTER_PACK", kind: "FREE", available: true, gemPrice: 0, level: 0, ads: 0 },
+  character_pack_safari_paws: { category: "CHARACTER_PACK", kind: "LEVEL", available: false, gemPrice: 0, level: 8, ads: 0 },
+  character_pack_farm_paws: { category: "CHARACTER_PACK", kind: "GEMS", available: false, gemPrice: 300, level: 0, ads: 0 },
+  character_pack_cozy_paws: { category: "CHARACTER_PACK", kind: "REWARDED_ADS", available: false, gemPrice: 0, level: 0, ads: 10 },
+  character_pack_wild_paws: { category: "CHARACTER_PACK", kind: "EVENT", available: false, gemPrice: 0, level: 0, ads: 0 },
+  character_pack_pet_paws: { category: "CHARACTER_PACK", kind: "GEMS", available: false, gemPrice: 450, level: 0, ads: 0 },
+  character_pack_jungle_paws: { category: "CHARACTER_PACK", kind: "GEMS", available: false, gemPrice: 550, level: 0, ads: 0 },
+});
+
+export class PlayerAccount {
+  constructor(ctx, env) {
+    this.ctx = ctx; this.env = env;
+    ctx.blockConcurrencyWhile(async () => {
+      const sql = ctx.storage.sql;
+      sql.exec("CREATE TABLE IF NOT EXISTS account_meta (account_id TEXT PRIMARY KEY, display_name TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)");
+      sql.exec("CREATE TABLE IF NOT EXISTS account_deletions (account_id TEXT PRIMARY KEY, deleted_at INTEGER NOT NULL)");
+      sql.exec("CREATE TABLE IF NOT EXISTS account_sessions (session_id TEXT PRIMARY KEY, refresh_token_hash TEXT NOT NULL, previous_refresh_hash TEXT, last_refresh_request_id TEXT, created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, revoked_at INTEGER, last_seen_at INTEGER NOT NULL)");
+      sql.exec("CREATE TABLE IF NOT EXISTS wallet (account_id TEXT PRIMARY KEY, balance INTEGER NOT NULL DEFAULT 0 CHECK(balance >= 0), ads_removed INTEGER NOT NULL DEFAULT 0 CHECK(ads_removed IN (0, 1)), updated_at INTEGER NOT NULL)");
+      sql.exec("CREATE TABLE IF NOT EXISTS wallet_transactions (transaction_id TEXT PRIMARY KEY, idempotency_key TEXT NOT NULL UNIQUE, payload_hash TEXT NOT NULL, kind TEXT NOT NULL, delta INTEGER NOT NULL, balance_after INTEGER NOT NULL, source_ref_hash TEXT, created_at INTEGER NOT NULL)");
+      sql.exec("CREATE TABLE IF NOT EXISTS owned_cosmetics (cosmetic_id TEXT PRIMARY KEY, category TEXT NOT NULL, source TEXT NOT NULL, acquired_at INTEGER NOT NULL, source_ref_hash TEXT)");
+      sql.exec("CREATE TABLE IF NOT EXISTS selected_cosmetics (category TEXT PRIMARY KEY, cosmetic_id TEXT NOT NULL, updated_at INTEGER NOT NULL)");
+      sql.exec("CREATE TABLE IF NOT EXISTS cosmetic_ad_progress (cosmetic_id TEXT PRIMARY KEY, progress INTEGER NOT NULL DEFAULT 0 CHECK(progress >= 0), updated_at INTEGER NOT NULL)");
+      sql.exec("CREATE INDEX IF NOT EXISTS idx_wallet_tx_created ON wallet_transactions(created_at DESC)");
+    });
+  }
+
+  async fetch(request) {
+    try {
+      const url = new URL(request.url);
+      if (request.method === "POST" && url.pathname === "/account/delete-preview") return await this.#deletePreview(request);
+      if (request.method === "POST" && url.pathname === "/account/delete") return await this.#deleteAccount(request);
+      if (request.method === "POST" && url.pathname === "/session/create") return await this.#createSession(request);
+      if (request.method === "POST" && url.pathname === "/session/refresh") return await this.#refreshSession(request);
+      if (request.method === "POST" && url.pathname === "/session/check") return await this.#checkSession(request);
+      if (request.method === "POST" && url.pathname === "/session/logout") return await this.#logout(request);
+      if (request.method === "POST" && url.pathname === "/profile/get") return await this.#getProfile(request);
+      if (request.method === "POST" && url.pathname === "/profile/update") return await this.#updateProfile(request);
+      if (request.method === "POST" && url.pathname === "/wallet/get") return await this.#getWallet(request);
+      if (request.method === "POST" && url.pathname === "/wallet/play-purchase") return await this.#grantPlayPurchase(request);
+      if (request.method === "POST" && url.pathname === "/wallet/reward-ad") return await this.#grantAdReward(request);
+      if (request.method === "POST" && url.pathname === "/wallet/cosmetic/purchase") return await this.#purchaseCosmetic(request);
+      if (request.method === "POST" && url.pathname === "/wallet/cosmetic/select") return await this.#selectCosmetic(request);
+      return json(404, { error: "NOT_FOUND", message: "route not found" });
+    } catch (error) { return errorResponse(error); }
+  }
+
+  async #deletePreview(request) {
+    const body = await readJson(request), accountId = requireAccountId(body?.accountId);
+    if ([...this.ctx.storage.sql.exec("SELECT account_id FROM account_deletions WHERE account_id = ? LIMIT 1", accountId)].length) {
+      return json(200, { ok: true, deleted: true, purchaseLedgerIds: [] });
+    }
+    const sessionId = requireSessionId(body?.sessionId);
+    this.#requireActiveSession(accountId, sessionId);
+    this.#profileSnapshot(accountId);
+    const purchaseLedgerIds = [...this.ctx.storage.sql.exec(
+      "SELECT source_ref_hash FROM wallet_transactions WHERE kind IN ('PLAY_GEM_PURCHASE', 'PLAY_REMOVE_ADS') AND source_ref_hash IS NOT NULL",
+    )].map((row) => String(row.source_ref_hash)).filter((value) => /^[a-f0-9]{64}$/.test(value));
+    return json(200, { ok: true, deleted: false, purchaseLedgerIds: [...new Set(purchaseLedgerIds)] });
+  }
+
+  async #deleteAccount(request) {
+    const body = await readJson(request), accountId = requireAccountId(body?.accountId);
+    if ([...this.ctx.storage.sql.exec("SELECT account_id FROM account_deletions WHERE account_id = ? LIMIT 1", accountId)].length) {
+      return json(200, { ok: true, accountId, deleted: true, replay: true });
+    }
+    const sessionId = requireSessionId(body?.sessionId);
+    this.#requireActiveSession(accountId, sessionId);
+    if (body?.confirmation !== "DELETE_MY_ACCOUNT") throw httpError(400, "ACCOUNT_DELETE_CONFIRMATION_REQUIRED", "account deletion confirmation is required");
+    this.#profileSnapshot(accountId);
+    const deletedAt = Date.now();
+    this.ctx.storage.transactionSync(() => {
+      this.ctx.storage.sql.exec("DELETE FROM account_sessions");
+      this.ctx.storage.sql.exec("DELETE FROM wallet_transactions");
+      this.ctx.storage.sql.exec("DELETE FROM cosmetic_ad_progress");
+      this.ctx.storage.sql.exec("DELETE FROM selected_cosmetics");
+      this.ctx.storage.sql.exec("DELETE FROM owned_cosmetics");
+      this.ctx.storage.sql.exec("DELETE FROM wallet");
+      this.ctx.storage.sql.exec("DELETE FROM account_meta WHERE account_id = ?", accountId);
+      this.ctx.storage.sql.exec("INSERT INTO account_deletions (account_id, deleted_at) VALUES (?, ?)", accountId, deletedAt);
+    });
+    return json(200, { ok: true, accountId, deleted: true, replay: false });
+  }
+
+  async #createSession(request) {
+    const body = await readJson(request), accountId = requireAccountId(body?.accountId);
+    this.#ensureAccount(accountId, body?.displayName);
+    const sessionId = crypto.randomUUID().toLowerCase();
+    const refreshToken = await newRefreshToken(), refreshHash = await hashRefreshToken(refreshToken);
+    const now = Date.now(), expiresAt = now + SESSION_TTL_MS;
+    const accessToken = await issueAccessToken(this.env, accountId, sessionId, now);
+    const billingId = await billingAccountId(accountId);
+    this.ctx.storage.sql.exec("INSERT INTO account_sessions (session_id, refresh_token_hash, previous_refresh_hash, last_refresh_request_id, created_at, expires_at, revoked_at, last_seen_at) VALUES (?, ?, NULL, NULL, ?, ?, NULL, ?)", sessionId, refreshHash, now, expiresAt, now);
+    return json(200, { ok: true, accountId, sessionId, billingAccountId: billingId, accessToken, refreshToken, accessExpiresAt: Math.floor(now / 1000) + 900, sessionExpiresAt: expiresAt, profile: this.#profileSnapshot(accountId), wallet: this.#walletSnapshot(accountId) });
+  }
+
+  async #refreshSession(request) {
+    const body = await readJson(request), accountId = requireAccountId(body?.accountId), sessionId = requireSessionId(body?.sessionId);
+    if (!validRefreshToken(body?.refreshToken)) throw httpError(401, "REFRESH_TOKEN_INVALID", "account refresh token is invalid");
+    const requestId = requireClientRequestId(body?.clientRequestId), oldToken = body.refreshToken;
+    const oldHash = await hashRefreshToken(oldToken);
+    const nextToken = await deriveRotatedRefreshToken(this.env, sessionId, requestId, oldToken), nextHash = await hashRefreshToken(nextToken);
+    const now = Date.now(), nextExpiry = now + SESSION_TTL_MS;
+    let row = null, accepted = false, replay = false;
+
+    // Re-read the session inside the synchronous transaction. A concurrent retry may have
+    // rotated the token after an earlier read; in that case accept only the exact same
+    // request ID + old token + deterministically derived next token.
+    this.ctx.storage.transactionSync(() => {
+      const currentRows = [...this.ctx.storage.sql.exec(
+        "SELECT refresh_token_hash, previous_refresh_hash, last_refresh_request_id, expires_at, revoked_at FROM account_sessions WHERE session_id = ? LIMIT 1",
+        sessionId,
+      )];
+      if (
+        currentRows.length !== 1 ||
+        currentRows[0].revoked_at != null ||
+        Number(currentRows[0].expires_at) <= now
+      ) return;
+
+      row = currentRows[0];
+      if (String(row.refresh_token_hash) === oldHash) {
+        const update = this.ctx.storage.sql.exec(
+          "UPDATE account_sessions SET refresh_token_hash = ?, previous_refresh_hash = ?, last_refresh_request_id = ?, expires_at = ?, last_seen_at = ? WHERE session_id = ? AND refresh_token_hash = ? AND revoked_at IS NULL AND expires_at > ?",
+          nextHash, oldHash, requestId, nextExpiry, now, sessionId, oldHash, now,
+        );
+        accepted = Number(update.rowsWritten ?? 0) === 1;
+      } else if (
+        String(row.previous_refresh_hash ?? "") === oldHash &&
+        String(row.last_refresh_request_id ?? "") === requestId &&
+        String(row.refresh_token_hash) === nextHash
+      ) {
+        accepted = true;
+        replay = true;
+      }
+    });
+
+    if (!accepted || !row) {
+      throw httpError(401, "REFRESH_TOKEN_INVALID", "account refresh token is invalid or has already been rotated");
+    }
+    const accessToken = await issueAccessToken(this.env, accountId, sessionId, now);
+    return json(200, {
+      ok: true,
+      accountId,
+      sessionId,
+      billingAccountId: await billingAccountId(accountId),
+      accessToken,
+      refreshToken: nextToken,
+      accessExpiresAt: Math.floor(now / 1000) + 900,
+      sessionExpiresAt: replay ? Number(row.expires_at) : nextExpiry,
+      profile: this.#profileSnapshot(accountId),
+      wallet: this.#walletSnapshot(accountId),
+      replay,
+    });
+  }
+
+  async #checkSession(request) {
+    const body = await readJson(request), accountId = requireAccountId(body?.accountId), sessionId = requireSessionId(body?.sessionId);
+    this.#requireActiveSession(accountId, sessionId);
+    return json(200, { ok: true, accountId, profile: this.#profileSnapshot(accountId) });
+  }
+  async #logout(request) {
+    const body = await readJson(request), accountId = requireAccountId(body?.accountId), sessionId = requireSessionId(body?.sessionId);
+    const rows = [...this.ctx.storage.sql.exec("SELECT session_id FROM account_sessions WHERE session_id = ? AND EXISTS (SELECT 1 FROM account_meta WHERE account_id = ?) LIMIT 1", sessionId, accountId)];
+    if (!rows.length) throw httpError(401, "ACCOUNT_SESSION_INVALID", "account session was not found");
+    this.ctx.storage.sql.exec("UPDATE account_sessions SET revoked_at = COALESCE(revoked_at, ?) WHERE session_id = ?", Date.now(), sessionId);
+    return json(200, { ok: true });
+  }
+  async #getProfile(request) {
+    const body = await readJson(request), accountId = requireAccountId(body?.accountId), sessionId = requireSessionId(body?.sessionId);
+    this.#requireActiveSession(accountId, sessionId);
+    return json(200, { ok: true, profile: this.#profileSnapshot(accountId), wallet: this.#walletSnapshot(accountId) });
+  }
+  async #updateProfile(request) {
+    const body = await readJson(request), accountId = requireAccountId(body?.accountId), sessionId = requireSessionId(body?.sessionId);
+    this.#requireActiveSession(accountId, sessionId);
+    this.ctx.storage.sql.exec("UPDATE account_meta SET display_name = ?, updated_at = ? WHERE account_id = ?", normalizeDisplayName(body?.displayName), Date.now(), accountId);
+    return json(200, { ok: true, profile: this.#profileSnapshot(accountId) });
+  }
+  async #getWallet(request) {
+    const body = await readJson(request), accountId = requireAccountId(body?.accountId), sessionId = requireSessionId(body?.sessionId);
+    this.#requireActiveSession(accountId, sessionId);
+    return json(200, { ok: true, wallet: this.#walletSnapshot(accountId) });
+  }
+
+  async #grantPlayPurchase(request) {
+    const body = await readJson(request), accountId = requireAccountId(body?.accountId), sessionId = requireSessionId(body?.sessionId);
+    this.#requireActiveSession(accountId, sessionId);
+    const productId = String(body?.productId ?? ""), tokenHash = requireHash(body?.purchaseTokenHash, "purchaseTokenHash");
+    const purchaseLedgerId = requireHash(body?.purchaseLedgerId, "purchaseLedgerId");
+    const product = GOOGLE_PLAY_PRODUCTS[productId];
+    if (!product) throw httpError(400, "UNKNOWN_STORE_PRODUCT", "store product is not recognized");
+    const payloadHash = await sha256Hex(JSON.stringify({ productId, gems: product.gemAmount, removeAds: product.removeAds }));
+    const result = this.#applyWalletTransaction({ accountId, idempotencyKey: "play-purchase:" + tokenHash, payloadHash, kind: product.removeAds ? "PLAY_REMOVE_ADS" : "PLAY_GEM_PURCHASE", delta: product.gemAmount, sourceRefHash: purchaseLedgerId, removeAds: product.removeAds });
+    return json(200, { ok: true, ...result, productId, gemAmount: product.gemAmount, removeAds: product.removeAds, wallet: this.#walletSnapshot(accountId) });
+  }
+
+  async #grantAdReward(request) {
+    const body = await readJson(request), accountId = requireAccountId(body?.accountId);
+    this.#profileSnapshot(accountId);
+    const transactionId = String(body?.transactionId ?? ""), kind = String(body?.kind ?? "");
+    const cosmeticId = body?.cosmeticId == null ? null : String(body.cosmeticId);
+    if (!/^[A-Fa-f0-9]{16,128}$/.test(transactionId)) throw httpError(400, "AD_REWARD_INVALID", "reward transaction is invalid");
+    const transactionHash = await sha256Hex("ludoproof:admob-transaction:v1:" + transactionId);
+    const payloadHash = await sha256Hex(JSON.stringify({ kind, cosmeticId, transactionId }));
+    const idempotencyKey = "admob:" + transactionHash;
+    if (kind === "gems") {
+      const result = this.#applyWalletTransaction({ accountId, idempotencyKey, payloadHash, kind: "REWARDED_AD_GEMS", delta: 5, sourceRefHash: transactionHash, removeAds: false });
+      return json(200, { ok: true, ...result, wallet: this.#walletSnapshot(accountId) });
+    }
+    if (kind === "cosmetic") {
+      const cosmetic = COSMETICS[cosmeticId];
+      if (!cosmetic || cosmetic.kind !== "REWARDED_ADS" || !cosmetic.available || cosmetic.ads < 1) throw httpError(400, "COSMETIC_REWARD_INVALID", "cosmetic does not support rewarded ads");
+      if (cosmetic.level > 0) throw httpError(409, "PROFILE_PROGRESSION_NOT_SERVER_AUTHORITATIVE", "this cosmetic requires server-verified progression before it can be unlocked");
+      let replay = false;
+      this.ctx.storage.transactionSync(() => {
+        const prior = [...this.ctx.storage.sql.exec("SELECT payload_hash FROM wallet_transactions WHERE idempotency_key = ? LIMIT 1", idempotencyKey)];
+        if (prior.length) {
+          if (String(prior[0].payload_hash) !== payloadHash) throw httpError(409, "AD_REWARD_IDEMPOTENCY_CONFLICT", "reward transaction was reused for a different reward");
+          replay = true; return;
+        }
+        const walletRows = [...this.ctx.storage.sql.exec("SELECT balance FROM wallet WHERE account_id = ? LIMIT 1", accountId)];
+        if (!walletRows.length) throw httpError(404, "WALLET_NOT_FOUND", "wallet was not found");
+        const balance = Number(walletRows[0].balance);
+        const current = Number([...this.ctx.storage.sql.exec("SELECT progress FROM cosmetic_ad_progress WHERE cosmetic_id = ? LIMIT 1", cosmeticId)][0]?.progress ?? 0);
+        const next = Math.min(cosmetic.ads, current + 1), now = Date.now();
+        this.ctx.storage.sql.exec("INSERT INTO cosmetic_ad_progress (cosmetic_id, progress, updated_at) VALUES (?, ?, ?) ON CONFLICT(cosmetic_id) DO UPDATE SET progress = excluded.progress, updated_at = excluded.updated_at", cosmeticId, next, now);
+        this.ctx.storage.sql.exec("INSERT INTO wallet_transactions (transaction_id, idempotency_key, payload_hash, kind, delta, balance_after, source_ref_hash, created_at) VALUES (?, ?, ?, 'REWARDED_AD_COSMETIC_PROGRESS', 0, ?, ?, ?)", crypto.randomUUID().toLowerCase(), idempotencyKey, payloadHash, balance, transactionHash, now);
+      });
+      return json(200, { ok: true, replay, wallet: this.#walletSnapshot(accountId) });
+    }
+    throw httpError(400, "AD_REWARD_INVALID", "reward type is not supported");
+  }
+
+  async #purchaseCosmetic(request) {
+    const body = await readJson(request), accountId = requireAccountId(body?.accountId), sessionId = requireSessionId(body?.sessionId);
+    this.#requireActiveSession(accountId, sessionId);
+    const cosmeticId = String(body?.cosmeticId ?? ""), requestId = requireClientRequestId(body?.clientRequestId);
+    const cosmetic = COSMETICS[cosmeticId];
+    if (!cosmetic || !cosmetic.available) throw httpError(400, "COSMETIC_UNAVAILABLE", "this cosmetic is not available for purchase");
+    if (cosmetic.level > 0) throw httpError(409, "PROFILE_PROGRESSION_NOT_SERVER_AUTHORITATIVE", "this cosmetic requires server-verified progression before it can be unlocked");
+    if (cosmetic.kind === "FREE") {
+      let alreadyOwned = false;
+      this.ctx.storage.transactionSync(() => {
+        const now = Date.now();
+        const inserted = this.ctx.storage.sql.exec("INSERT OR IGNORE INTO owned_cosmetics (cosmetic_id, category, source, acquired_at, source_ref_hash) VALUES (?, ?, 'DEFAULT', ?, NULL)", cosmeticId, cosmetic.category, now);
+        alreadyOwned = Number(inserted.rowsWritten ?? 0) === 0;
+        this.ctx.storage.sql.exec("INSERT INTO selected_cosmetics (category, cosmetic_id, updated_at) VALUES (?, ?, ?) ON CONFLICT(category) DO UPDATE SET cosmetic_id = excluded.cosmetic_id, updated_at = excluded.updated_at", cosmetic.category, cosmeticId, now);
+      });
+      return json(200, { ok: true, alreadyOwned, wallet: this.#walletSnapshot(accountId) });
+    }
+    if (cosmetic.kind === "GEMS") {
+      if (!Number.isSafeInteger(cosmetic.gemPrice) || cosmetic.gemPrice < 1) throw httpError(400, "COSMETIC_PRICE_INVALID", "cosmetic price is invalid");
+      const idem = "cosmetic-purchase:" + requestId;
+      const payloadHash = await sha256Hex(JSON.stringify({ cosmeticId, gemPrice: cosmetic.gemPrice }));
+      const sourceRefHash = await sha256Hex("ludoproof:cosmetic-purchase:v1:" + requestId);
+      let result;
+      this.ctx.storage.transactionSync(() => {
+        const prior = [...this.ctx.storage.sql.exec("SELECT payload_hash, balance_after FROM wallet_transactions WHERE idempotency_key = ? LIMIT 1", idem)];
+        if (prior.length) {
+          if (String(prior[0].payload_hash) !== payloadHash) throw httpError(409, "WALLET_IDEMPOTENCY_CONFLICT", "purchase request ID was reused for a different operation");
+          result = { replay: true, balance: Number(prior[0].balance_after) }; return;
+        }
+        const balance = Number([...this.ctx.storage.sql.exec("SELECT balance FROM wallet WHERE account_id = ? LIMIT 1", accountId)][0]?.balance ?? 0);
+        const owned = [...this.ctx.storage.sql.exec("SELECT cosmetic_id FROM owned_cosmetics WHERE cosmetic_id = ? LIMIT 1", cosmeticId)];
+        if (owned.length) {
+          const now = Date.now();
+          this.ctx.storage.sql.exec("INSERT INTO selected_cosmetics (category, cosmetic_id, updated_at) VALUES (?, ?, ?) ON CONFLICT(category) DO UPDATE SET cosmetic_id = excluded.cosmetic_id, updated_at = excluded.updated_at", cosmetic.category, cosmeticId, now);
+          result = { alreadyOwned: true, replay: false, balance }; return;
+        }
+        if (balance < cosmetic.gemPrice) throw httpError(409, "INSUFFICIENT_GEMS", "not enough gems to purchase this cosmetic");
+        const next = balance - cosmetic.gemPrice, now = Date.now();
+        this.ctx.storage.sql.exec("UPDATE wallet SET balance = ?, updated_at = ? WHERE account_id = ?", next, now, accountId);
+        this.ctx.storage.sql.exec("INSERT INTO wallet_transactions (transaction_id, idempotency_key, payload_hash, kind, delta, balance_after, source_ref_hash, created_at) VALUES (?, ?, ?, 'COSMETIC_PURCHASE', ?, ?, ?, ?)", crypto.randomUUID().toLowerCase(), idem, payloadHash, -cosmetic.gemPrice, next, sourceRefHash, now);
+        this.ctx.storage.sql.exec("INSERT INTO owned_cosmetics (cosmetic_id, category, source, acquired_at, source_ref_hash) VALUES (?, ?, 'GEMS', ?, ?)", cosmeticId, cosmetic.category, now, sourceRefHash);
+        this.ctx.storage.sql.exec("INSERT INTO selected_cosmetics (category, cosmetic_id, updated_at) VALUES (?, ?, ?) ON CONFLICT(category) DO UPDATE SET cosmetic_id = excluded.cosmetic_id, updated_at = excluded.updated_at", cosmetic.category, cosmeticId, now);
+        result = { replay: false, balance: next };
+      });
+      return json(200, { ok: true, ...result, cosmeticId, wallet: this.#walletSnapshot(accountId) });
+    }
+    if (cosmetic.kind === "REWARDED_ADS") {
+      const progress = Number([...this.ctx.storage.sql.exec("SELECT progress FROM cosmetic_ad_progress WHERE cosmetic_id = ? LIMIT 1", cosmeticId)][0]?.progress ?? 0);
+      if (progress < cosmetic.ads) throw httpError(409, "NEED_REWARDED_ADS", "this cosmetic needs more verified rewarded ads");
+      let alreadyOwned = false;
+      this.ctx.storage.transactionSync(() => {
+        const now = Date.now();
+        const inserted = this.ctx.storage.sql.exec("INSERT OR IGNORE INTO owned_cosmetics (cosmetic_id, category, source, acquired_at, source_ref_hash) VALUES (?, ?, 'REWARDED_ADS', ?, NULL)", cosmeticId, cosmetic.category, now);
+        alreadyOwned = Number(inserted.rowsWritten ?? 0) === 0;
+        this.ctx.storage.sql.exec("INSERT INTO selected_cosmetics (category, cosmetic_id, updated_at) VALUES (?, ?, ?) ON CONFLICT(category) DO UPDATE SET cosmetic_id = excluded.cosmetic_id, updated_at = excluded.updated_at", cosmetic.category, cosmeticId, now);
+      });
+      return json(200, { ok: true, replay: false, alreadyOwned, cosmeticId, wallet: this.#walletSnapshot(accountId) });
+    }
+    throw httpError(409, "COSMETIC_UNLOCK_UNAVAILABLE", "this cosmetic unlock method is not available yet");
+  }
+
+  async #selectCosmetic(request) {
+    const body = await readJson(request), accountId = requireAccountId(body?.accountId), sessionId = requireSessionId(body?.sessionId);
+    this.#requireActiveSession(accountId, sessionId);
+    const cosmeticId = String(body?.cosmeticId ?? ""), cosmetic = COSMETICS[cosmeticId];
+    if (!cosmetic || !cosmetic.available) throw httpError(400, "COSMETIC_UNAVAILABLE", "this cosmetic is not available");
+    if ([...this.ctx.storage.sql.exec("SELECT cosmetic_id FROM owned_cosmetics WHERE cosmetic_id = ? LIMIT 1", cosmeticId)].length !== 1) throw httpError(403, "COSMETIC_NOT_OWNED", "this cosmetic is not owned by this account");
+    this.ctx.storage.sql.exec("INSERT INTO selected_cosmetics (category, cosmetic_id, updated_at) VALUES (?, ?, ?) ON CONFLICT(category) DO UPDATE SET cosmetic_id = excluded.cosmetic_id, updated_at = excluded.updated_at", cosmetic.category, cosmeticId, Date.now());
+    return json(200, { ok: true, cosmeticId, wallet: this.#walletSnapshot(accountId) });
+  }
+
+  #applyWalletTransaction({ accountId, idempotencyKey, payloadHash, kind, delta, sourceRefHash, removeAds }) {
+    let result;
+    this.ctx.storage.transactionSync(() => {
+      const prior = [...this.ctx.storage.sql.exec("SELECT payload_hash, balance_after FROM wallet_transactions WHERE idempotency_key = ? LIMIT 1", idempotencyKey)];
+      if (prior.length) {
+        if (String(prior[0].payload_hash) !== payloadHash) throw httpError(409, "WALLET_IDEMPOTENCY_CONFLICT", "wallet transaction key was reused with different details");
+        result = { replay: true, balance: Number(prior[0].balance_after) }; return;
+      }
+      const rows = [...this.ctx.storage.sql.exec("SELECT balance FROM wallet WHERE account_id = ? LIMIT 1", accountId)];
+      if (!rows.length) throw httpError(404, "WALLET_NOT_FOUND", "wallet was not found");
+      const next = Number(rows[0].balance) + delta;
+      if (!Number.isSafeInteger(next) || next < 0 || next > MAX_BALANCE) throw httpError(409, "WALLET_BALANCE_LIMIT", "wallet balance cannot safely be updated");
+      const now = Date.now();
+      this.ctx.storage.sql.exec("UPDATE wallet SET balance = ?, ads_removed = CASE WHEN ? = 1 THEN 1 ELSE ads_removed END, updated_at = ? WHERE account_id = ?", next, removeAds ? 1 : 0, now, accountId);
+      this.ctx.storage.sql.exec("INSERT INTO wallet_transactions (transaction_id, idempotency_key, payload_hash, kind, delta, balance_after, source_ref_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", crypto.randomUUID().toLowerCase(), idempotencyKey, payloadHash, kind, delta, next, sourceRefHash, now);
+      result = { replay: false, balance: next };
+    });
+    return result;
+  }
+
+  #ensureAccount(accountId, displayName) {
+    if ([...this.ctx.storage.sql.exec("SELECT account_id FROM account_deletions WHERE account_id = ? LIMIT 1", accountId)].length) {
+      throw httpError(410, "ACCOUNT_DELETED", "this account has been deleted");
+    }
+    const now = Date.now();
+    this.ctx.storage.transactionSync(() => {
+      if ([...this.ctx.storage.sql.exec("SELECT account_id FROM account_deletions WHERE account_id = ? LIMIT 1", accountId)].length) throw httpError(410, "ACCOUNT_DELETED", "this account has been deleted");
+      const exists = [...this.ctx.storage.sql.exec("SELECT account_id FROM account_meta WHERE account_id = ? LIMIT 1", accountId)];
+      if (!exists.length) this.ctx.storage.sql.exec("INSERT INTO account_meta (account_id, display_name, created_at, updated_at) VALUES (?, ?, ?, ?)", accountId, normalizeDisplayName(displayName), now, now);
+      this.ctx.storage.sql.exec("INSERT OR IGNORE INTO wallet (account_id, balance, ads_removed, updated_at) VALUES (?, 0, 0, ?)", accountId, now);
+      for (const [id, category] of DEFAULT_COSMETICS) this.ctx.storage.sql.exec("INSERT OR IGNORE INTO owned_cosmetics (cosmetic_id, category, source, acquired_at, source_ref_hash) VALUES (?, ?, 'DEFAULT', ?, NULL)", id, category, now);
+      for (const [category, id] of Object.entries(DEFAULT_SELECTIONS)) this.ctx.storage.sql.exec("INSERT OR IGNORE INTO selected_cosmetics (category, cosmetic_id, updated_at) VALUES (?, ?, ?)", category, id, now);
+    });
+  }
+  #requireActiveSession(accountId, sessionId) {
+    const rows = [...this.ctx.storage.sql.exec("SELECT session_id FROM account_sessions WHERE session_id = ? AND revoked_at IS NULL AND expires_at > ? AND EXISTS (SELECT 1 FROM account_meta WHERE account_id = ?) LIMIT 1", sessionId, Date.now(), accountId)];
+    if (!rows.length) throw httpError(401, "ACCOUNT_SESSION_INVALID", "account session is invalid, expired or revoked");
+  }
+  #profileSnapshot(accountId) {
+    const rows = [...this.ctx.storage.sql.exec("SELECT account_id, display_name, created_at, updated_at FROM account_meta WHERE account_id = ? LIMIT 1", accountId)];
+    if (!rows.length) throw httpError(404, "ACCOUNT_NOT_FOUND", "account was not found");
+    return { accountId: String(rows[0].account_id), displayName: String(rows[0].display_name), createdAt: Number(rows[0].created_at), updatedAt: Number(rows[0].updated_at) };
+  }
+  #walletSnapshot(accountId) {
+    const rows = [...this.ctx.storage.sql.exec("SELECT balance, ads_removed, updated_at FROM wallet WHERE account_id = ? LIMIT 1", accountId)];
+    if (!rows.length) throw httpError(404, "WALLET_NOT_FOUND", "wallet was not found");
+    const ownedCosmetics = [...this.ctx.storage.sql.exec("SELECT cosmetic_id FROM owned_cosmetics ORDER BY cosmetic_id")].map((row) => String(row.cosmetic_id));
+    const selectedCosmetics = {};
+    for (const row of this.ctx.storage.sql.exec("SELECT category, cosmetic_id FROM selected_cosmetics ORDER BY category")) selectedCosmetics[String(row.category)] = String(row.cosmetic_id);
+    const rewardedAdProgress = {};
+    for (const row of this.ctx.storage.sql.exec("SELECT cosmetic_id, progress FROM cosmetic_ad_progress ORDER BY cosmetic_id")) rewardedAdProgress[String(row.cosmetic_id)] = Number(row.progress);
+    return { accountId, balance: Number(rows[0].balance), adsRemoved: Number(rows[0].ads_removed) === 1, updatedAt: Number(rows[0].updated_at), ownedCosmetics, selectedCosmetics, rewardedAdProgress };
+  }
+}
+
+function requireAccountId(value) {
+  if (!isAccountId(value)) throw httpError(400, "INVALID_ACCOUNT_ID", "account identity is invalid");
+  return value.toLowerCase();
+}
+function requireSessionId(value) {
+  if (!isSessionId(value)) throw httpError(400, "INVALID_SESSION_ID", "account session is invalid");
+  return value.toLowerCase();
+}
+function requireHash(value, name) {
+  if (typeof value !== "string" || !/^[a-f0-9]{64}$/.test(value)) throw httpError(400, "INVALID_" + name.toUpperCase(), name + " is invalid");
+  return value;
+}
+function normalizeDisplayName(value) {
+  return String(value ?? "").replace(/[\u0000-\u001f\u007f]/g, "").trim().replace(/\s+/g, " ").slice(0, NAME_LENGTH) || "Guest User";
+}
+async function readJson(request) {
+  return readJsonObject(request, 8 * 1024);
+}
+function errorResponse(error) {
+  return json(Number.isInteger(error?.status) && error.status >= 400 && error.status <= 599 ? error.status : 500, {
+    error: error?.code ?? "INTERNAL_ERROR",
+    message: Number.isInteger(error?.status) ? String(error?.message ?? "request failed") : "internal server error",
+  });
+}
+function json(status, body) { return Response.json(body, { status, headers: { "cache-control": "no-store", "content-type": "application/json; charset=utf-8" } }); }

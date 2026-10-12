@@ -127,6 +127,26 @@ class FriendIdentityStore(
         }
     }
 
+    /**
+     * Restores a credential returned by the authenticated account-recovery API.
+     * The registration recovery secret and token are encrypted with Android Keystore.
+     */
+    @Synchronized
+    fun restoreFromAccount(credential: FriendCredential) {
+        require(FRIEND_ID.matches(credential.friendId))
+        require(FRIEND_TOKEN.matches(credential.friendToken))
+        require(UUID_V4.matches(credential.registrationRequestId))
+        persistRegistrationRequestId(credential.registrationRequestId)
+        save(credential)
+    }
+
+    @Synchronized
+    fun clearAllForAccountSwitch() {
+        check(prefs.edit().clear().commit()) {
+            "Previous account's friend credentials could not be cleared safely"
+        }
+    }
+
     @Synchronized
     fun load():
         FriendCredential? {

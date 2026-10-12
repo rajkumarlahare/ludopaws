@@ -19,6 +19,9 @@ A release must not be promoted unless all of these are true:
 11. The game Worker remains isolated from Rekixo/AR3D routes.
 12. A real-device multiplayer smoke test covers create, join, start, commit, reveal, move, reconnect, timeout recovery, win, and proof/history display.
 13. The final store/upload-signed Android artifact is signed outside the repository with the controlled release key.
+14. A fresh-install real-device test verifies guest creation/recovery, Google link/restore, account switching, server wallet/inventory, and a two-device multiplayer reconnect/proof flow.
+15. The current draft adds an authenticated in-app account-deletion API/UI and cleanup for account directory links, player wallet/session/inventory/transactions, linked Friend data, leaderboard profile data, and associated Play purchase-ledger records. This remains a release gate until latest CI/CodeQL passes, full deletion and retry behavior is tested end-to-end, a public web deletion-request resource is hosted and tested for users who uninstalled the app, and account-associated match receipt/history retention is reviewed.
+16. Verify the privacy policy, Data safety declarations, consent/child-directed treatment where applicable, content rating, store listing, internal test track, and support contact.
 
 ## Cloudflare
 
@@ -33,6 +36,16 @@ Durable Objects:
 ```text
 LUDOPROOF_MATCHES -> MatchRoom
 LUDOPROOF_API_GATE -> ApiGate
+LUDOPROOF_LEADERBOARD -> LeaderboardRoom
+LUDOPROOF_MATCHMAKER -> MatchmakerQueue
+LUDOPROOF_FRIENDS -> FriendDirectory
+LUDOPROOF_RECEIPTS -> MatchReceiptArchive
+LUDOPROOF_TEAM_MATCHMAKER -> TeamMatchmakerQueue
+LUDOPROOF_FRIEND_CONVERSATIONS -> FriendConversation
+LUDOPROOF_FRIEND_RECENT -> FriendRecentRoom
+LUDOPROOF_STORE_PURCHASES -> StorePurchaseLedger
+LUDOPROOF_ACCOUNT_DIRECTORY -> AccountDirectory
+LUDOPROOF_PLAYER_ACCOUNTS -> PlayerAccount
 ```
 
 Internal Worker service binding:
@@ -53,6 +66,7 @@ ENTRONEX_SIGNING_KEY_ID=cf-v4-eval-sign-1
 ENTRONEX_TENANT_ID=cloudflare_v4_eval
 ENTRONEX_SIGNING_KEY_FINGERPRINT=1fe248e8ee9129fcd13c1ee96c1cd7d162a610e9b1df3037a4ec48935f2d43c4
 ENTRONEX_SIGNING_PUBLIC_KEY_PEM_B64=<pinned in server/wrangler.json>
+GOOGLE_SIGN_IN_WEB_CLIENT_ID=<configured in Cloudflare Worker; not a secret>
 ```
 
 The public pin comes from the EntroNex live public-trust export workflow, which recomputes SHA-256 over the Ed25519 SPKI bytes before publishing the bundle.
@@ -72,7 +86,21 @@ Readiness endpoint:
 GET /ready
 ```
 
-The endpoint fails closed with HTTP 503 until the match-storage and rate-gate bindings, retry-safe session HMAC key, EntroNex server credential, pinned EntroNex signing identity, and upstream EntroNex health check are all ready.
+The endpoint fails closed with HTTP 503 until the match-storage and rate-gate bindings, account directory and player-account Durable Objects, the shared Google OAuth Web client ID variable (`GOOGLE_SIGN_IN_WEB_CLIENT_ID`), retry-safe session HMAC key, EntroNex server credential, pinned EntroNex signing identity, and upstream EntroNex health check are all ready. Billing and AdMob rewards are separately gated and should remain disabled until their own end-to-end tests pass.
+
+## Pre-launch account and store notes
+
+The operator confirms there are no production users and no real purchase transactions today. A historic customer/purchase migration is therefore not a blocker for initial launch. New accounts should begin with server-authoritative empty wallet state. Old device-local gem balances, cosmetics progress, and Remove Ads flags remain unverified test/cache data and must not be automatically imported as paid currency or entitlements.
+
+The current draft adds an authenticated `POST /api/account/delete` API and Profile UI confirmation. A public account-deletion page is now authored at `docs/account-deletion.html` with a GitHub Pages workflow (`.github/workflows/account-deletion-pages.yml`) for Google-linked accounts plus a publisher-support route for guest-only cases. The workflow has not been published from this Draft branch. The API derives the account from a valid bearer session instead of accepting a caller-supplied account ID. Server-side cleanup covers the account directory, wallet/session/inventory/transaction rows, purchase-ledger references, linked Friend/social records, and leaderboard profile; deletion tombstones prevent account/recovery IDs from being silently recreated. After server confirmation the app clears account-scoped local profile, wallet, identity, and pending Play-purchase caches.
+
+This is **implemented in the draft but not yet release-verified**. Latest CI/CodeQL must pass; multi-service deletion/retry needs end-to-end tests; a public web deletion-request resource still needs to be hosted and tested for users who uninstalled the app; and account-associated match receipt/history retention still needs an explicit review. Keep [issue #232](https://github.com/rajkumarlahare/ludoproof/issues/232) open until these gates are complete.
+
+Google sign-in requires the same public Web OAuth Client ID in the Android Gradle property and Cloudflare Worker variable `GOOGLE_SIGN_IN_WEB_CLIENT_ID`; do not put an OAuth client secret in Android. The Android package is `com.ludoproof.game`.
+
+The public deletion page source is `docs/account-deletion.html`; the public privacy policy draft is `docs/privacy-policy.html`; and `.github/workflows/account-deletion-pages.yml` publishes both through GitHub Pages only from `main`. The workflow refuses to publish while the policy contains `POLICY_RELEASE_REVIEW_REQUIRED`, before `LUDOPROOF_POLICY_RELEASE_APPROVED=true`, or when the OAuth Client ID, monitored support email, or web origin is missing/invalid. CORS is fail-closed until Cloudflare variable `LUDOPROOF_ACCOUNT_WEB_ORIGIN` is explicitly set to `https://rajkumarlahare.github.io`; there is no fallback origin. The guest-only/uninstalled-app support route is not considered usable until the publisher verifies the support process and the deployed page.
+
+Billing and rewarded ads remain opt-in integrations. Keep billing/ads build flags and server enablement off until the exact Play product catalog/service account and AdMob production unit/SSV callback have passed internal end-to-end tests.
 
 ## Android release security
 

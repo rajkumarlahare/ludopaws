@@ -3,77 +3,55 @@ package com.ludoproof.game.feature.store.presentation.actions
 import com.ludoproof.game.feature.profile.data.local.ProfileStore
 import com.ludoproof.game.feature.profile.domain.ProfileProgression
 import com.ludoproof.game.feature.store.domain.model.CosmeticAcquireResult
+import com.ludoproof.game.feature.store.domain.model.CosmeticUnlockKind
 import com.ludoproof.game.feature.store.domain.model.StoreCosmetic
 import com.ludoproof.game.feature.store.presentation.StoreActivity
 
-internal fun StoreActivity.handleCosmeticTap(
-    cosmetic: StoreCosmetic,
-) {
-    val level =
-        ProfileProgression
-            .levelProgress(
-                ProfileStore(this)
-                    .snapshot()
-                    .totalXp,
-            )
-            .level
-
-    when (
-        cosmetics.acquireOrSelect(
-            cosmetic =
-                cosmetic,
-            currentLevel =
-                level,
+internal fun StoreActivity.handleCosmeticTap(cosmetic: StoreCosmetic) {
+    // CONTENT_UNAVAILABLE is handled before any server request or value-bearing action.
+    if (!cosmetic.contentAvailable) {
+        showStoreMessage(
+            cosmetic.title +
+                " is reserved for a future complete animal-pack drop. No gems, ad progress, or event entitlement was spent.",
         )
-    ) {
-        CosmeticAcquireResult.SELECTED,
-        CosmeticAcquireResult.ACQUIRED_AND_SELECTED -> {
-            renderStore()
-        }
+        return
+    }
 
-        CosmeticAcquireResult.NEED_LEVEL -> {
-            showStoreMessage(
-                "Reach level " +
-                    cosmetic.requiredLevel +
-                    " to unlock " +
+    val level = ProfileProgression
+        .levelProgress(ProfileStore(this).snapshot().totalXp)
+        .level
+    if (!cosmetics.isOwned(cosmetic.id) && level < cosmetic.requiredLevel) {
+        showStoreMessage("Reach level ${cosmetic.requiredLevel} to unlock ${cosmetic.title}.")
+        return
+    }
+
+    if (cosmetics.isOwned(cosmetic.id)) {
+        purchaseOrSelectCosmetic(cosmetic)
+        return
+    }
+
+    when (cosmetic.unlockKind) {
+        CosmeticUnlockKind.REWARDED_ADS -> {
+            if (cosmetics.rewardedAdProgress(cosmetic.id) < cosmetic.requiredAdViews) {
+                requestRewardedAd(cosmetic.id)
+            } else {
+                purchaseOrSelectCosmetic(cosmetic)
+            }
+        }
+        CosmeticUnlockKind.EVENT -> {
+            when (cosmetics.acquireOrSelect(cosmetic, level)) {
+                CosmeticAcquireResult.NEED_EVENT -> showStoreMessage(
                     cosmetic.title +
-                    ".",
-            )
+                        " is an event item. It can only be unlocked after the server confirms the event entitlement.",
+                )
+                else -> showStoreMessage(
+                    cosmetic.title +
+                        " cannot be unlocked until its event entitlement is confirmed by the server.",
+                )
+            }
         }
-
-        CosmeticAcquireResult.NEED_GEMS -> {
-            showStoreMessage(
-                cosmetic.title +
-                    " costs " +
-                    cosmetic.gemPrice +
-                    " gems. Your balance is " +
-                    wallet.balance() +
-                    ".",
-            )
-        }
-
-        CosmeticAcquireResult.NEED_REWARDED_ADS -> {
-            requestRewardedAd(cosmetic.id)
-        }
-
-        CosmeticAcquireResult.NEED_EVENT -> {
-            showStoreMessage(
-                cosmetic.title +
-                    " is an event pack. It unlocks only after a verified Ludo Paws event entitlement is received.",
-            )
-        }
-
-        CosmeticAcquireResult.CONTENT_UNAVAILABLE -> {
-            showStoreMessage(
-                cosmetic.title +
-                    " is reserved for a future complete animal-pack drop. No gems, ad progress, or event entitlement was spent.",
-            )
-        }
-
-        CosmeticAcquireResult.INVALID -> {
-            showStoreMessage(
-                "This cosmetic could not be updated. Please try again.",
-            )
-        }
+        CosmeticUnlockKind.FREE,
+        CosmeticUnlockKind.LEVEL,
+        CosmeticUnlockKind.GEMS -> purchaseOrSelectCosmetic(cosmetic)
     }
 }

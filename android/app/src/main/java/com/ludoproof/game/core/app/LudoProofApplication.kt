@@ -5,6 +5,8 @@ import android.app.Application
 import android.os.Bundle
 import com.google.android.gms.games.PlayGamesSdk
 import com.ludoproof.game.feature.characters.data.local.CharacterSelectionStore
+import com.ludoproof.game.feature.account.data.AccountRepository
+import java.util.concurrent.Executors
 import com.ludoproof.game.feature.friends.data.FriendPresenceController
 import com.ludoproof.game.feature.settings.data.local.GameMusicController
 
@@ -13,7 +15,13 @@ class LudoProofApplication :
     Application.ActivityLifecycleCallbacks {
     private lateinit var friendPresence:
         FriendPresenceController
+    val accountRepository: AccountRepository by lazy { AccountRepository(this) }
+    private val accountBootstrapExecutor = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "LudoPawsAccountBootstrap")
+    }
     private var resumedActivities = 0
+    @Volatile
+    private var friendPresencePausedForAccountSwitch = false
 
     override fun onCreate() {
         super.onCreate()
@@ -23,6 +31,11 @@ class LudoProofApplication :
         CharacterSelectionStore(this).load()
         friendPresence =
             FriendPresenceController(this)
+        // Create/restore the guest session off the UI thread. If the network is
+        // unavailable, gameplay remains usable; monetized store actions fail closed.
+        accountBootstrapExecutor.execute {
+            runCatching { accountRepository.ensureGuestSession() }
+        }
         registerActivityLifecycleCallbacks(this)
     }
 
@@ -35,7 +48,12 @@ class LudoProofApplication :
 
         resumedActivities += 1
         if (resumedActivities == 1) {
-            friendPresence.start()
+            if (
+                !friendPresencePausedForAccountSwitch &&
+                accountRepository.canStartFriendPresence()
+            ) {
+                friendPresence.start()
+            }
             GameMusicController
                 .onAppForeground(this)
         }
@@ -48,9 +66,21 @@ class LudoProofApplication :
             (resumedActivities - 1)
                 .coerceAtLeast(0)
         if (resumedActivities == 0) {
-            friendPresence.stop()
+            if (!friendPresencePausedForAccountSwitch) friendPresence.stop()
             GameMusicController
                 .onAppBackground()
+        }
+    }
+
+    fun pauseFriendPresenceForAccountSwitch() {
+        friendPresencePausedForAccountSwitch = true
+        friendPresence.stop()
+    }
+
+    fun resumeFriendPresenceAfterAccountSwitch() {
+        friendPresencePausedForAccountSwitch = false
+        if (resumedActivities > 0 && !accountRepository.requiresIdentityRecovery()) {
+            friendPresence.start()
         }
     }
 

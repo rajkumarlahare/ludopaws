@@ -1,0 +1,99 @@
+name: Ludo Paws Account Deletion and Privacy Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/account-deletion.html"
+      - "docs/privacy-policy.html"
+      - ".github/workflows/account-deletion-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ludopaws-account-deletion-pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+      actions: read
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Validate public website release gates
+        env:
+          GOOGLE_SIGN_IN_WEB_CLIENT_ID: ${{ vars.GOOGLE_SIGN_IN_WEB_CLIENT_ID }}
+          LUDOPROOF_SUPPORT_EMAIL: ${{ vars.LUDOPROOF_SUPPORT_EMAIL }}
+          LUDOPROOF_POLICY_RELEASE_APPROVED: ${{ vars.LUDOPROOF_POLICY_RELEASE_APPROVED }}
+          LUDOPROOF_ACCOUNT_WEB_ORIGIN: ${{ vars.LUDOPROOF_ACCOUNT_WEB_ORIGIN }}
+        run: |
+          set -euo pipefail
+          test -f docs/account-deletion.html
+          test -f docs/privacy-policy.html
+          if grep -q "POLICY_RELEASE_REVIEW_REQUIRED" docs/privacy-policy.html; then
+            echo "Privacy policy still contains the mandatory release-review marker." >&2
+            exit 2
+          fi
+          if [ "$LUDOPROOF_POLICY_RELEASE_APPROVED" != "true" ]; then
+            echo "Set repository variable LUDOPROOF_POLICY_RELEASE_APPROVED=true only after publisher review." >&2
+            exit 2
+          fi
+          if ! printf '%s' "$GOOGLE_SIGN_IN_WEB_CLIENT_ID" | grep -Eq '^[0-9]+-[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$'; then
+            echo "A valid public Google OAuth Web Client ID is required." >&2
+            exit 2
+          fi
+          if ! printf '%s' "$LUDOPROOF_SUPPORT_EMAIL" | grep -Eq '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$'; then
+            echo "A monitored publisher support email is required." >&2
+            exit 2
+          fi
+          if [ "$LUDOPROOF_ACCOUNT_WEB_ORIGIN" != "https://rajkumarlahare.github.io" ]; then
+            echo "LUDOPROOF_ACCOUNT_WEB_ORIGIN must match the GitHub Pages origin: https://rajkumarlahare.github.io" >&2
+            exit 2
+          fi
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b
+
+      - name: Build the deletion and privacy site
+        env:
+          GOOGLE_SIGN_IN_WEB_CLIENT_ID: ${{ vars.GOOGLE_SIGN_IN_WEB_CLIENT_ID }}
+          LUDOPROOF_SUPPORT_EMAIL: ${{ vars.LUDOPROOF_SUPPORT_EMAIL }}
+        run: |
+          set -euo pipefail
+          mkdir -p site
+          cp docs/account-deletion.html site/index.html
+          cp docs/privacy-policy.html site/privacy-policy.html
+          node <<'NODE'
+          const fs = require("node:fs");
+          const config = {
+            apiBaseUrl: "https://ludoproof-game-api.ai-8f3.workers.dev",
+            googleWebClientId: process.env.GOOGLE_SIGN_IN_WEB_CLIENT_ID,
+            supportEmail: process.env.LUDOPROOF_SUPPORT_EMAIL
+          };
+          fs.writeFileSync(
+            "site/config.js",
+            "window.LUDO_ACCOUNT_CONFIG = " + JSON.stringify(config) + ";\n",
+            { encoding: "utf8", mode: 0o644 }
+          );
+          NODE
+
+      - name: Upload static site
+        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b
+        with:
+          path: site/
+
+      - name: Publish GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e

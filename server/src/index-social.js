@@ -77,6 +77,7 @@ export default {
 
       const otherId = normalizeFriendId(body?.friendId);
       assertFriendship(snapshot, otherId);
+      if (socialAction === "messages/send") await registerConversationIndex(env, meId, otherId);
       const target = conversation(env, meId, otherId);
       const upstreamBody =
         socialAction === "messages/send"
@@ -144,6 +145,15 @@ function assertFriendship(snapshot, otherId) {
   if (!friends.some((friend) => String(friend?.friendId ?? "").toUpperCase() === otherId)) {
     throw httpError(403, "MESSAGE_REQUIRES_FRIEND", "messages can only be exchanged with friends");
   }
+}
+
+async function registerConversationIndex(env, friendId, otherFriendId) {
+  if (!env?.LUDOPROOF_FRIENDS) throw httpError(503, "FRIENDS_NOT_CONFIGURED", "friend directory is not configured");
+  const namespace = env.LUDOPROOF_FRIENDS, target = namespace.get(namespace.idFromName("GLOBAL:V1"));
+  const response = await target.fetch(new Request("https://friends/conversation/register", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ friendId, otherFriendId }) }));
+  let value; try { value = await response.json(); } catch { throw httpError(503, "FRIEND_CONVERSATION_INDEX_UNAVAILABLE", "friend conversation index returned an invalid response"); }
+  if (!response.ok) throw httpError(response.status, value?.error ?? "FRIEND_CONVERSATION_INDEX_FAILED", value?.message ?? "friend conversation could not be indexed");
+  return value;
 }
 
 function conversation(env, firstId, secondId) {

@@ -51,6 +51,18 @@ if (ludoProofAdsEnabled && !ludoProofAdsUseTestIds) {
         "Set your real AdMob IDs or enable LUDOPROOF_ADS_USE_TEST_IDS for debug testing."
     }
 }
+val googleSignInWebClientId =
+    providers.gradleProperty("GOOGLE_SIGN_IN_WEB_CLIENT_ID")
+        .orElse("")
+        .get()
+        .trim()
+if (googleSignInWebClientId.isNotBlank()) {
+    require(googleSignInWebClientId.endsWith(".apps.googleusercontent.com")) {
+        "GOOGLE_SIGN_IN_WEB_CLIENT_ID must be a Google web OAuth client ID."
+    }
+}
+val escapedGoogleSignInWebClientId =
+    googleSignInWebClientId.replace("\\", "\\\\").replace("\"", "\\\"")
 val playGamesProjectId =
     providers.gradleProperty("PLAY_GAMES_PROJECT_ID")
         .orElse("0")
@@ -138,6 +150,11 @@ android {
         manifestPlaceholders["ADMOB_APP_ID"] = admobAppId
         buildConfigField(
             "String",
+            "GOOGLE_SIGN_IN_WEB_CLIENT_ID",
+            "\"$escapedGoogleSignInWebClientId\"",
+        )
+        buildConfigField(
+            "String",
             "PLAY_GAMES_PROJECT_ID",
             "\"$playGamesProjectId\"",
         )
@@ -211,6 +228,9 @@ tasks.named("preBuild").configure {
 
 dependencies {
     implementation("androidx.activity:activity:1.13.0")
+    implementation("androidx.credentials:credentials:1.6.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.6.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
     implementation("com.android.billingclient:billing:9.1.0")
     implementation("com.google.android.gms:play-services-ads:25.5.0")
     implementation("com.google.android.ump:user-messaging-platform:4.0.0")

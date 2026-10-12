@@ -87,6 +87,15 @@ export class LeaderboardRoom {
         );
       }
 
+      // Internal-only recovery; only the authenticated account Worker route can call this.
+      if (
+        request.method === "POST" &&
+        url.pathname === "/profile/recover"
+      ) {
+        return await this.#recoverProfileIdentity(request);
+      }
+      if (request.method === "POST" && url.pathname === "/profile/delete") return await this.#deleteProfile(request);
+
       if (
         request.method === "POST" &&
         url.pathname === "/record"
@@ -256,6 +265,49 @@ export class LeaderboardRoom {
           profile.profileId,
       },
     );
+  }
+
+  async #recoverProfileIdentity(request) {
+    const body = await readJson(request);
+    const profileId = normalizeLeaderboardProfileId(body?.profileId);
+    if (!profileId) throw badRequest("INVALID_PROFILE_ID", "leaderboard profile ID is invalid");
+    const rows = [
+      ...this.ctx.storage.sql.exec(
+        "SELECT profile_id, registration_request_id FROM leaderboard_profiles_v2 WHERE profile_id = ? LIMIT 1",
+        profileId,
+      ),
+    ];
+    if (rows.length !== 1) {
+      throw httpError(404, "LEADERBOARD_IDENTITY_NOT_FOUND", "linked leaderboard identity could not be recovered");
+    }
+    const registrationRequestId = String(rows[0].registration_request_id);
+    const identity = await deriveLeaderboardIdentity(this.env, registrationRequestId);
+    if (identity.profileId !== profileId) {
+      throw httpError(409, "LEADERBOARD_IDENTITY_RECOVERY_CONFLICT", "linked leaderboard identity did not match its recovery record");
+    }
+    const tokenHash = await profileTokenHash(identity.profileToken);
+    this.ctx.storage.sql.exec(
+      "UPDATE leaderboard_profiles_v2 SET token_hash = ?, last_seen_at = ? WHERE profile_id = ?",
+      tokenHash,
+      Date.now(),
+      profileId,
+    );
+    return json(200, {
+      ok: true,
+      profileId,
+      profileToken: identity.profileToken,
+      registrationRequestId,
+    });
+  }
+
+  async #deleteProfile(request) {
+    const body = await readJson(request), profileId = normalizeLeaderboardProfileId(body?.profileId);
+    if (!profileId) throw badRequest("INVALID_PROFILE_ID", "leaderboard profile ID is invalid");
+    this.ctx.storage.transactionSync(() => {
+      this.ctx.storage.sql.exec("DELETE FROM leaderboard_entries_v2 WHERE profile_id = ?", profileId);
+      this.ctx.storage.sql.exec("DELETE FROM leaderboard_profiles_v2 WHERE profile_id = ?", profileId);
+    });
+    return json(200, { ok: true, deleted: true });
   }
 
   async #record(request) {

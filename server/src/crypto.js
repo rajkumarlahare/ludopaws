@@ -617,6 +617,65 @@ export function bearerToken(request) {
   return match[1];
 }
 
+export async function readJsonObject(request, maxBytes = 8 * 1024) {
+  const type = request.headers.get("content-type") ?? "";
+  if (!type.toLowerCase().startsWith("application/json")) {
+    throw httpError(415, "UNSUPPORTED_MEDIA_TYPE", "content-type must be application/json");
+  }
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1 || maxBytes > 1024 * 1024) {
+    throw new TypeError("JSON body limit is invalid");
+  }
+  const declaredLength = request.headers.get("content-length");
+  if (declaredLength !== null) {
+    if (!/^\d+$/.test(declaredLength)) {
+      throw httpError(400, "INVALID_CONTENT_LENGTH", "request content length is invalid");
+    }
+    if (Number(declaredLength) > maxBytes) {
+      throw httpError(413, "REQUEST_TOO_LARGE", "request body is too large");
+    }
+  }
+
+  const chunks = [];
+  let totalBytes = 0;
+  const reader = request.body?.getReader();
+  if (reader) {
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        totalBytes += value.byteLength;
+        if (totalBytes > maxBytes) {
+          try { await reader.cancel(); } catch {}
+          throw httpError(413, "REQUEST_TOO_LARGE", "request body is too large");
+        }
+        chunks.push(value);
+      }
+    } finally {
+      try { reader.releaseLock(); } catch {}
+    }
+  }
+  const bytes = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+
+  let text;
+  try {
+    text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    throw httpError(400, "INVALID_JSON", "request body must be valid UTF-8 JSON");
+  }
+  try {
+    const value = text.length ? JSON.parse(text) : {};
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("object required");
+    return value;
+  } catch {
+    throw httpError(400, "INVALID_JSON", "request body must be a JSON object");
+  }
+}
+
 export function httpError(status, code, message) {
   const error = new Error(message);
   error.status = status;

@@ -7,15 +7,34 @@ import android.os.Build
 import android.util.Log
 import android.view.Gravity
 import android.view.View
+import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.Toast
+import androidx.credentials.CredentialManager
+import androidx.credentials.CredentialManagerCallback
+import androidx.credentials.CustomCredential
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.GetCredentialResponse
+import androidx.credentials.exceptions.GetCredentialException
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.ludoproof.game.LudoProofTheme
+import com.ludoproof.game.LudoProofApplication
+import com.ludoproof.game.feature.account.data.AccountApiException
+import com.ludoproof.game.feature.friends.data.local.FriendCredential
+import com.ludoproof.game.feature.friends.data.local.FriendIdentityStore
+import com.ludoproof.game.feature.leaderboard.data.local.LeaderboardCredential
+import com.ludoproof.game.feature.leaderboard.data.local.LeaderboardIdentityStore
 import com.ludoproof.game.BuildConfig
 import com.ludoproof.game.R
 import com.google.android.gms.games.PlayGames
 import com.ludoproof.game.feature.profile.data.local.ProfileStore
+import com.ludoproof.game.feature.store.data.local.GemWalletStore
+import com.ludoproof.game.feature.store.data.billing.PendingStorePurchaseStore
+import java.util.concurrent.Executor
+import java.util.concurrent.Executors
 import com.ludoproof.game.feature.profile.presentation.components.profileBadgesPanel
 import com.ludoproof.game.feature.profile.presentation.components.profileIdentityPanel
 import com.ludoproof.game.feature.profile.presentation.components.profileModeStatsPanel
@@ -38,6 +57,27 @@ class ProfileActivity : Activity() {
         ProfileStore(this)
     }
 
+    internal val accountRepository by lazy {
+        (application as LudoProofApplication).accountRepository
+    }
+    internal var accountAuthInProgress = false
+        private set
+    internal var accountGoogleLinked = false
+        private set
+    internal var accountStatus = "Guest account"
+        private set
+    private val accountAuthExecutor = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "LudoPawsAccountAuth")
+    }
+    private val accountMainExecutor = Executor { command ->
+        runOnUiThread { command.run() }
+    }
+    private var accountSwitchFromId: String? = null
+    private var friendPresencePausedForAccountSwitch = false
+    private var accountIdentityRecoveryPending = false
+    internal val isAccountSignInConfigured: Boolean
+        get() = BuildConfig.GOOGLE_SIGN_IN_WEB_CLIENT_ID.isNotBlank()
+
     override fun onCreate(
         savedInstanceState: Bundle?,
     ) {
@@ -55,6 +95,7 @@ class ProfileActivity : Activity() {
     override fun onResume() {
         super.onResume()
         refreshPlayGamesSignIn()
+        refreshAccountStatus()
     }
 
     override fun onRestart() {
@@ -168,6 +209,14 @@ class ProfileActivity : Activity() {
             profilePurchasesPanel(profile),
             sectionParams(12),
         )
+        content.addView(
+            Button(this).apply {
+                text = "Delete account and data"
+                isAllCaps = false
+                setOnClickListener { confirmAccountDeletion() }
+            },
+            sectionParams(12),
+        )
 
         // This screen uses immersive full-screen layout. Respect the physical camera cutout
         // so both the centered title and Back button (and all content below) start in the safe area.
@@ -200,6 +249,353 @@ class ProfileActivity : Activity() {
             root,
         )
         root.requestApplyInsets()
+    }
+
+    internal fun openAccountActions() {
+        if (accountAuthInProgress) return
+        AlertDialog.Builder(this)
+            .setTitle("Ludo Paws Account")
+            .setMessage(
+                if (accountGoogleLinked) {
+                    "This account is saved to Google. You can restore it on another device, or choose another Google account only after confirming the switch."
+                } else {
+                    "Your guest account is currently tied to this installation. Save it to Google so your progress and eligible store items can follow you to another device."
+                },
+            )
+            .setItems(arrayOf("Save this account to Google", "Restore an account saved to Google")) { _, which ->
+                if (which == 0) {
+                    startGoogleAccountFlow(linkCurrentAccount = true)
+                } else {
+                    confirmAccountRestore()
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun confirmAccountDeletion() {
+        if (accountAuthInProgress) return
+        AlertDialog.Builder(this)
+            .setTitle("Delete account and data?")
+            .setMessage(
+                "This permanently deletes your Ludo Paws account, server wallet, cosmetics, linked Friend ID and leaderboard profile. This cannot be undone. Your local profile and wallet cache for this account will also be cleared.",
+            )
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Delete permanently") { _, _ ->
+                performAccountDeletion()
+            }
+            .show()
+    }
+
+    private fun performAccountDeletion() {
+        if (accountAuthInProgress) return
+        accountAuthInProgress = true
+        accountStatus = "Deleting account…"
+        renderProfile()
+        accountAuthExecutor.execute {
+            try {
+                val session = accountRepository.requireSession()
+                accountRepository.deleteCurrentAccount()
+                val cleanupErrors = mutableListOf<String>()
+                runCatching { profileStore.clearForAccountDeletion(session.accountId) }
+                    .onFailure { cleanupErrors += "profile" }
+                runCatching { GemWalletStore(this@ProfileActivity).clearAccountData(session.accountId) }
+                    .onFailure { cleanupErrors += "wallet cache" }
+                runCatching { PendingStorePurchaseStore(this@ProfileActivity).removeForAccount(session.billingAccountId) }
+                    .onFailure { cleanupErrors += "pending Play purchase cache" }
+                runCatching { FriendIdentityStore(this@ProfileActivity).clearAllForAccountSwitch() }
+                    .onFailure { cleanupErrors += "Friend ID cache" }
+                runCatching { LeaderboardIdentityStore(this@ProfileActivity).clearAllForAccountSwitch() }
+                    .onFailure { cleanupErrors += "leaderboard cache" }
+                runOnUiThread {
+                    if (isFinishing || isDestroyed) return@runOnUiThread
+                    accountAuthInProgress = false
+                    accountGoogleLinked = false
+                    accountIdentityRecoveryPending = false
+                    accountSwitchFromId = null
+                    accountStatus = if (cleanupErrors.isEmpty()) "Account deleted" else "Account deleted; local cleanup needs attention"
+                    renderProfile()
+                    AlertDialog.Builder(this)
+                        .setTitle("Account deleted")
+                        .setMessage(
+                            if (cleanupErrors.isEmpty()) {
+                                "Your Ludo Paws account and its server-owned data have been deleted."
+                            } else {
+                                "The server account was deleted, but this device could not clear: ${cleanupErrors.joinToString()}. Clear the app's local storage before sharing or handing over this device."
+                            },
+                        )
+                        .setPositiveButton("OK", null)
+                        .show()
+                }
+            } catch (error: Exception) {
+                runOnUiThread {
+                    if (isFinishing || isDestroyed) return@runOnUiThread
+                    accountAuthInProgress = false
+                    accountStatus = "Account deletion not completed"
+                    renderProfile()
+                    AlertDialog.Builder(this)
+                        .setTitle("Account not deleted")
+                        .setMessage(error.message ?: "The account service could not complete deletion. Your account session has been kept so you can try again.")
+                        .setPositiveButton("OK", null)
+                        .show()
+                }
+            }
+        }
+    }
+
+    private fun confirmAccountRestore() {
+        AlertDialog.Builder(this)
+            .setTitle("Restore another account?")
+            .setMessage(
+                "This will switch the active account on this device. The current guest profile, its Friend ID, leaderboard identity and inventory will not be merged into the restored account. If you have not saved the current guest to Google, cancel and save it first.",
+            )
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Continue") { _, _ ->
+                startGoogleAccountFlow(linkCurrentAccount = false)
+            }
+            .show()
+    }
+
+    private fun refreshAccountStatus() {
+        if (accountAuthInProgress) return
+        accountAuthExecutor.execute {
+            try {
+                val session = accountRepository.ensureGuestSession()
+                val links = accountRepository.linkedIdentities()
+                val linked = links.optBoolean("googleLinked")
+                runOnUiThread {
+                    if (isFinishing || isDestroyed || accountAuthInProgress) return@runOnUiThread
+                    accountGoogleLinked = linked
+                    accountStatus = when {
+                        accountRepository.requiresIdentityRecovery() ->
+                            "Account restore needs retry"
+                        linked -> "Saved to Google · ${session.displayName}"
+                        else -> "Guest · save to keep progress"
+                    }
+                    renderProfile()
+                }
+            } catch (error: Exception) {
+                runOnUiThread {
+                    if (isFinishing || isDestroyed || accountAuthInProgress) return@runOnUiThread
+                    accountStatus = "Account needs a connection"
+                    renderProfile()
+                }
+            }
+        }
+    }
+
+    private fun startGoogleAccountFlow(linkCurrentAccount: Boolean) {
+        if (accountAuthInProgress) return
+        if (!isAccountSignInConfigured) {
+            AlertDialog.Builder(this)
+                .setTitle("Google account setup required")
+                .setMessage("Google account sign-in has not been configured for this build. The game can still be played as a guest, but account linking is not available yet.")
+                .setPositiveButton("OK", null)
+                .show()
+            return
+        }
+        accountAuthInProgress = true
+        if (!linkCurrentAccount) {
+            accountSwitchFromId = accountRepository.currentSession()?.accountId
+            (application as LudoProofApplication).pauseFriendPresenceForAccountSwitch()
+            friendPresencePausedForAccountSwitch = true
+        }
+        accountStatus = "Preparing secure sign-in…"
+        renderProfile()
+        accountAuthExecutor.execute {
+            try {
+                // A restore must not depend on the old access/refresh token still being valid.
+                // Create a guest first only when this install has no encrypted session at all.
+                if (linkCurrentAccount || accountRepository.currentSession() == null) {
+                    accountRepository.ensureGuestSession()
+                }
+                if (!linkCurrentAccount && accountSwitchFromId == null) {
+                    accountSwitchFromId = accountRepository.currentSession()?.accountId
+                }
+                val nonce = accountRepository.googleChallenge()
+                runOnUiThread {
+                    if (isFinishing || isDestroyed) return@runOnUiThread
+                    launchGoogleCredentialPicker(nonce, linkCurrentAccount)
+                }
+            } catch (error: Exception) {
+                finishAccountFlow(
+                    success = false,
+                    message = error.message ?: "The account service is not available right now.",
+                )
+            }
+        }
+    }
+
+    private fun launchGoogleCredentialPicker(nonce: String, linkCurrentAccount: Boolean) {
+        val option = GetGoogleIdOption.Builder()
+            .setServerClientId(BuildConfig.GOOGLE_SIGN_IN_WEB_CLIENT_ID)
+            .setNonce(nonce)
+            .setFilterByAuthorizedAccounts(false)
+            .setAutoSelectEnabled(false)
+            .build()
+        val request = GetCredentialRequest.Builder()
+            .addCredentialOption(option)
+            .build()
+        CredentialManager.create(this).getCredentialAsync(
+            this,
+            request,
+            null,
+            accountMainExecutor,
+            object : CredentialManagerCallback<GetCredentialResponse, GetCredentialException> {
+                override fun onResult(result: GetCredentialResponse) {
+                    val credential = result.credential
+                    if (
+                        credential !is CustomCredential ||
+                        credential.type != GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
+                    ) {
+                        finishAccountFlow(false, "Google did not return a supported sign-in credential.")
+                        return
+                    }
+                    val idToken = try {
+                        GoogleIdTokenCredential.createFrom(credential.data).idToken
+                    } catch (error: Exception) {
+                        finishAccountFlow(false, "Google sign-in returned an invalid credential. Please try again.")
+                        return
+                    }
+                    accountAuthExecutor.execute {
+                        var restoreSessionChanged = false
+                        var identityRecoveryCompleted = false
+                        try {
+                            if (linkCurrentAccount) {
+                                accountRepository.linkGoogleIdentity(idToken, nonce)
+                                // Keep existing social identities with the guest account only after
+                                // each legacy credential has been independently validated by its service.
+                                FriendIdentityStore(this@ProfileActivity)
+                                    .load()?.let { accountRepository.linkFriendIdentity(it.friendToken) }
+                                LeaderboardIdentityStore(this@ProfileActivity)
+                                    .load()?.let { accountRepository.linkLeaderboardIdentity(it.profileToken) }
+                            } else {
+                                // Scope the existing local profile to the guest account before the
+                                // active session is replaced; another account must not inherit its stats.
+                                profileStore.prepareForAccountRestore()
+                                accountRepository.restoreGoogleAccount(idToken, nonce)
+                                restoreSessionChanged = true
+                                val recovered = accountRepository.recoverLinkedIdentities()
+                                val friendStore = FriendIdentityStore(this@ProfileActivity)
+                                val friend = recovered.optJSONObject("friend")
+                                if (friend != null) {
+                                    friendStore.restoreFromAccount(
+                                        FriendCredential(
+                                            friendId = friend.getString("friendId"),
+                                            friendToken = friend.getString("friendToken"),
+                                            registrationRequestId = friend.getString("registrationRequestId"),
+                                        ),
+                                    )
+                                } else {
+                                    friendStore.clearAllForAccountSwitch()
+                                }
+                                val leaderboardStore = LeaderboardIdentityStore(this@ProfileActivity)
+                                val leaderboard = recovered.optJSONObject("leaderboard")
+                                if (leaderboard != null) {
+                                    leaderboardStore.restoreFromAccount(
+                                        LeaderboardCredential(
+                                            profileId = leaderboard.getString("profileId"),
+                                            profileToken = leaderboard.getString("profileToken"),
+                                            registrationRequestId = leaderboard.getString("registrationRequestId"),
+                                        ),
+                                    )
+                                } else {
+                                    leaderboardStore.clearAllForAccountSwitch()
+                                }
+                                accountRepository.completeIdentityRecovery()
+                                accountIdentityRecoveryPending = false
+                                identityRecoveryCompleted = true
+                            }
+                            val session = accountRepository.currentSession()
+                            val links = accountRepository.linkedIdentities()
+                            runOnUiThread {
+                                if (isFinishing || isDestroyed) return@runOnUiThread
+                                accountAuthInProgress = false
+                                if (friendPresencePausedForAccountSwitch && !accountIdentityRecoveryPending) {
+                                    (application as LudoProofApplication).resumeFriendPresenceAfterAccountSwitch()
+                                    friendPresencePausedForAccountSwitch = false
+                                }
+                                if (!accountIdentityRecoveryPending) accountSwitchFromId = null
+                                accountGoogleLinked = links.optBoolean("googleLinked")
+                                accountStatus = if (linkCurrentAccount) {
+                                    "Saved to Google · ${session?.displayName ?: "Player"}"
+                                } else {
+                                    "Account restored · ${session?.displayName ?: "Player"}"
+                                }
+                                renderProfile()
+                                AlertDialog.Builder(this@ProfileActivity)
+                                    .setTitle(if (linkCurrentAccount) "Account saved" else "Account restored")
+                                    .setMessage(
+                                        if (linkCurrentAccount) {
+                                            "Your current guest account is now linked to Google. Its identity was kept; another existing account was not merged."
+                                        } else {
+                                            "Your saved account is active on this device. If this device had a different guest account, its data has not been merged automatically."
+                                        },
+                                    )
+                                    .setPositiveButton("OK", null)
+                                    .show()
+                            }
+                        } catch (error: Exception) {
+                            if (!linkCurrentAccount && !identityRecoveryCompleted &&
+                                (restoreSessionChanged || accountRepository.currentSession()?.accountId != accountSwitchFromId)
+                            ) {
+                                // The server session changed but identity recovery did not complete.
+                                // Clear old credentials and keep friend presence paused to prevent a
+                                // freshly registered identity from replacing the linked one.
+                                accountIdentityRecoveryPending = true
+                                FriendIdentityStore(this@ProfileActivity).clearAllForAccountSwitch()
+                                LeaderboardIdentityStore(this@ProfileActivity).clearAllForAccountSwitch()
+                            }
+                            val message = when (error) {
+                                is AccountApiException -> when (error.code) {
+                                    "GOOGLE_IDENTITY_ALREADY_LINKED" ->
+                                        "This Google account is already linked to a different Ludo Paws account. Choose Restore instead; the accounts will not be merged automatically."
+                                    "GOOGLE_IDENTITY_NOT_LINKED" ->
+                                        "No saved Ludo Paws account is linked to that Google account yet. Choose Save this account to Google to secure the current guest."
+                                    "ACCOUNT_IDENTITY_CONFLICT" ->
+                                        "This account has a different Friend or leaderboard identity. To protect both profiles, they were not merged."
+                                    else -> error.message
+                                }
+                                else -> error.message
+                            } ?: "Account operation could not be completed."
+                            finishAccountFlow(false, message)
+                        }
+                    }
+                }
+
+                override fun onError(e: GetCredentialException) {
+                    finishAccountFlow(
+                        false,
+                        if (e.type.contains("cancel", ignoreCase = true)) {
+                            "Google sign-in was cancelled. No account data was changed."
+                        } else {
+                            "Google sign-in could not be completed. Please try again."
+                        },
+                    )
+                }
+            },
+        )
+    }
+
+    private fun finishAccountFlow(success: Boolean, message: String) {
+        runOnUiThread {
+            if (isFinishing || isDestroyed) return@runOnUiThread
+            accountAuthInProgress = false
+            if (friendPresencePausedForAccountSwitch && !accountIdentityRecoveryPending) {
+                (application as LudoProofApplication).resumeFriendPresenceAfterAccountSwitch()
+                friendPresencePausedForAccountSwitch = false
+            }
+            if (!accountIdentityRecoveryPending) accountSwitchFromId = null
+            accountStatus = message.take(100)
+            renderProfile()
+            if (!success) {
+                AlertDialog.Builder(this)
+                    .setTitle("Ludo Paws Account")
+                    .setMessage(message)
+                    .setPositiveButton("OK", null)
+                    .show()
+            }
+        }
     }
 
     internal fun beginPlayGamesSignIn() {

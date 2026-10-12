@@ -101,7 +101,7 @@ export async function verifyAndRedeemGooglePlayPurchase(
   if (priorPurchase) {
     assertSamePurchase(priorPurchase, productId, accountId, product);
     if (priorPurchase.state === "FULFILLED") {
-      return fulfillment(productId, product, true);
+      return fulfillment(productId, product, true, tokenDigest);
     }
   }
 
@@ -114,7 +114,6 @@ export async function verifyAndRedeemGooglePlayPurchase(
   if (
     purchase?.productId !== productId ||
     (
-      !product.removeAds &&
       purchase?.obfuscatedExternalAccountId !== accountId
     ) ||
     purchase?.purchaseState !== 0 ||
@@ -150,7 +149,7 @@ export async function verifyAndRedeemGooglePlayPurchase(
   const reservedPurchase = reservation.purchase;
   assertSamePurchase(reservedPurchase, productId, accountId, product);
   if (reservedPurchase.state === "FULFILLED") {
-    return fulfillment(productId, product, true);
+    return fulfillment(productId, product, true, tokenDigest);
   }
   if (
     product.consumable &&
@@ -180,7 +179,7 @@ export async function verifyAndRedeemGooglePlayPurchase(
     productId,
     accountId,
   });
-  return fulfillment(productId, product, reservation.created === false);
+  return fulfillment(productId, product, reservation.created === false, tokenDigest);
 }
 
 async function getPlayPurchase(env, productId, purchaseToken, fetchImpl) {
@@ -445,10 +444,7 @@ async function ledgerRequest(ledger, path, method, body = null) {
 function assertSamePurchase(purchase, productId, accountId, product) {
   if (
     purchase?.productId !== productId ||
-    (
-      purchase?.accountId !== accountId &&
-      !product.removeAds
-    )
+    purchase?.accountId !== accountId
   ) {
     throw httpError(
       409,
@@ -458,12 +454,6 @@ function assertSamePurchase(purchase, productId, accountId, product) {
   }
 }
 
-function fulfillment(productId, product, replay) {
-  return {
-    verified: true,
-    productId,
-    gemAmount: product.gemAmount,
-    removeAds: product.removeAds,
-    replay,
-  };
+function fulfillment(productId, product, replay, purchaseLedgerId) {
+  return { verified: true, productId, gemAmount: product.gemAmount, removeAds: product.removeAds, replay, purchaseLedgerId };
 }

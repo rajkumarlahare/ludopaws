@@ -6,6 +6,7 @@ import {
   verifyAndRedeemGooglePlayPurchase,
 } from "../src/google-play-billing.js";
 import worker from "../src/index.js";
+import { sha256Hex } from "../src/crypto.js";
 
 class FakeStorage {
   constructor() {
@@ -19,6 +20,10 @@ class FakeStorage {
 
   async put(key, value) {
     this.values.set(key, structuredClone(value));
+  }
+
+  async delete(key) {
+    return this.values.delete(key);
   }
 }
 
@@ -111,6 +116,43 @@ async function makeEnv() {
   };
 }
 
+test("purchase ledger deletion is owner-bound and idempotent", async () => {
+  const storage = new FakeStorage();
+  const ledger = new StorePurchaseLedger({ storage });
+  const owner = "a".repeat(64);
+  const other = "b".repeat(64);
+  const reserve = await ledger.fetch(new Request("https://ledger/reserve", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ accountId: owner, productId: "gems_300", gemAmount: 300, removeAds: false }),
+  }));
+  assert.equal(reserve.status, 200);
+
+  const denied = await ledger.fetch(new Request("https://ledger/delete", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ accountId: other }),
+  }));
+  assert.equal(denied.status, 409);
+
+  const deleted = await ledger.fetch(new Request("https://ledger/delete", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ accountId: owner }),
+  }));
+  assert.equal(deleted.status, 200);
+  assert.equal((await deleted.json()).deleted, true);
+
+  const status = await ledger.fetch(new Request("https://ledger/status"));
+  assert.equal((await status.json()).purchase, null);
+  const replay = await ledger.fetch(new Request("https://ledger/delete", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ accountId: owner }),
+  }));
+  assert.equal(replay.status, 200);
+});
+
 test("server product grants match the Android product definitions", () => {
   assert.deepEqual(
     Object.fromEntries(
@@ -149,6 +191,7 @@ test("verified purchases are consumed, redeemed once, and recover idempotently",
     gemAmount: 300,
     removeAds: false,
     replay: false,
+    purchaseLedgerId: await sha256Hex("ludoproof:google-play-purchase:v1:" + purchaseToken),
   });
   assert.equal(calls.filter(({ url }) => url.endsWith(":consume")).length, 1);
 
@@ -262,18 +305,22 @@ test("non-consumable purchase is acknowledged after Play verification", async ()
   assert.equal(calls.filter(({ url }) => url.endsWith(":acknowledge")).length, 1);
   assert.equal(calls.filter(({ url }) => url.endsWith(":consume")).length, 0);
 
-  const restored = await verifyAndRedeemGooglePlayPurchase(
-    env,
-    {
-      productId: "remove_ads",
-      purchaseToken: "remove-ads-test-token",
-      accountId: "9".repeat(64),
-    },
-    fetchImpl,
+  await assert.rejects(
+    verifyAndRedeemGooglePlayPurchase(
+      env,
+      {
+        productId: "remove_ads",
+        purchaseToken: "remove-ads-test-token",
+        accountId: "9".repeat(64),
+      },
+      fetchImpl,
+    ),
+    (error) => error.status === 409 && error.code === "PURCHASE_ALREADY_REDEEMED",
   );
-  assert.equal(restored.removeAds, true);
-  assert.equal(restored.replay, true);
-  assert.equal(calls.filter(({ url }) => url.includes("/purchases/products/")).length, 2);
+  assert.equal(
+    calls.filter(({ url, init }) => url.includes("/purchases/products/") && init.method === "GET").length,
+    1,
+  );
 });
 
 test("store purchase ledger rejects token reuse by another installation", async () => {

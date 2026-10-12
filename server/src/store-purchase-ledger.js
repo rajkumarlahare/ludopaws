@@ -31,6 +31,9 @@ export class StorePurchaseLedger {
       return json(400, { error: "INVALID_JSON" });
     }
 
+    if (url.pathname === "/delete") {
+      return this.#delete(body);
+    }
     if (url.pathname === "/reserve") {
       return this.#reserve(body);
     }
@@ -38,6 +41,15 @@ export class StorePurchaseLedger {
       return this.#complete(body);
     }
     return json(404, { error: "NOT_FOUND" });
+  }
+
+  async #delete(body) {
+    if (!isAccountId(body?.accountId)) return json(400, { error: "INVALID_PURCHASE" });
+    const existing = await this.ctx.storage.get("purchase:v1");
+    if (!existing) return json(200, { ok: true, deleted: false });
+    if (existing.accountId !== body.accountId) return json(409, { error: "PURCHASE_ACCOUNT_MISMATCH" });
+    await this.ctx.storage.delete("purchase:v1");
+    return json(200, { ok: true, deleted: true });
   }
 
   async #reserve(body) {
@@ -55,10 +67,7 @@ export class StorePurchaseLedger {
     if (existing) {
       if (
         existing.productId !== body.productId ||
-        (
-          existing.accountId !== body.accountId &&
-          !(existing.removeAds && body.removeAds)
-        )
+        existing.accountId !== body.accountId
       ) {
         return json(409, { error: "PURCHASE_ALREADY_REDEEMED" });
       }
@@ -88,10 +97,7 @@ export class StorePurchaseLedger {
     if (
       !existing ||
       existing.productId !== body.productId ||
-      (
-        existing.accountId !== body.accountId &&
-        !existing.removeAds
-      )
+      existing.accountId !== body.accountId
     ) {
       return json(409, { error: "PURCHASE_RESERVATION_NOT_FOUND" });
     }
