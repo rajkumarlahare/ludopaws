@@ -103,6 +103,26 @@ class GemWalletStore(context: Context) {
         return true
     }
 
+    @Synchronized
+    fun clearAccountData(accountId: String) {
+        if (prefs.getString(StorePreferences.KEY_WALLET_ACCOUNT_ID, null) != accountId) return
+        val editor = prefs.edit()
+            .remove(StorePreferences.KEY_WALLET_ACCOUNT_ID)
+            .remove(StorePreferences.KEY_BALANCE)
+            .remove(StorePreferences.KEY_ADS_REMOVED)
+            .remove(StorePreferences.KEY_APPLIED_TOKENS)
+            .remove(StorePreferences.KEY_OWNED_COSMETICS)
+            .remove(StorePreferences.KEY_EVENT_ENTITLEMENTS)
+            .remove(StorePreferences.KEY_SELECTED_BOARD)
+            .remove(StorePreferences.KEY_SELECTED_DICE)
+            .remove(StorePreferences.KEY_SELECTED_AVATAR)
+            .remove(StorePreferences.KEY_SELECTED_CHARACTER_PACK)
+            .remove(StorePreferences.KEY_LEGACY_WALLET_ARCHIVE)
+            .remove(StorePreferences.KEY_LEGACY_WALLET_NOTICE_SHOWN)
+        prefs.all.keys.filter { it.startsWith(StorePreferences.KEY_AD_PROGRESS_PREFIX) }.forEach(editor::remove)
+        check(editor.commit()) { "Local wallet data could not be cleared after account deletion." }
+    }
+
     fun hasLegacyUnverifiedSnapshot(): Boolean =
         prefs.contains(StorePreferences.KEY_LEGACY_WALLET_ARCHIVE)
 
