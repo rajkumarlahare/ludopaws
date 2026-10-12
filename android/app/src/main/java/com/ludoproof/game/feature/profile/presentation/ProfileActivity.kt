@@ -7,6 +7,7 @@ import android.os.Build
 import android.util.Log
 import android.view.Gravity
 import android.view.View
+import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -30,6 +31,8 @@ import com.ludoproof.game.BuildConfig
 import com.ludoproof.game.R
 import com.google.android.gms.games.PlayGames
 import com.ludoproof.game.feature.profile.data.local.ProfileStore
+import com.ludoproof.game.feature.store.data.local.GemWalletStore
+import com.ludoproof.game.feature.store.data.billing.PendingStorePurchaseStore
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 import com.ludoproof.game.feature.profile.presentation.components.profileBadgesPanel
@@ -206,6 +209,14 @@ class ProfileActivity : Activity() {
             profilePurchasesPanel(profile),
             sectionParams(12),
         )
+        content.addView(
+            Button(this).apply {
+                text = "Delete account and data"
+                isAllCaps = false
+                setOnClickListener { confirmAccountDeletion() }
+            },
+            sectionParams(12),
+        )
 
         // This screen uses immersive full-screen layout. Respect the physical camera cutout
         // so both the centered title and Back button (and all content below) start in the safe area.
@@ -260,6 +271,76 @@ class ProfileActivity : Activity() {
             }
             .setNegativeButton("Cancel", null)
             .show()
+    }
+
+    private fun confirmAccountDeletion() {
+        if (accountAuthInProgress) return
+        AlertDialog.Builder(this)
+            .setTitle("Delete account and data?")
+            .setMessage(
+                "This permanently deletes your Ludo Paws account, server wallet, cosmetics, linked Friend ID and leaderboard profile. This cannot be undone. Your local profile and wallet cache for this account will also be cleared.",
+            )
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Delete permanently") { _, _ ->
+                performAccountDeletion()
+            }
+            .show()
+    }
+
+    private fun performAccountDeletion() {
+        if (accountAuthInProgress) return
+        accountAuthInProgress = true
+        accountStatus = "Deleting account…"
+        renderProfile()
+        accountAuthExecutor.execute {
+            try {
+                val session = accountRepository.requireSession()
+                accountRepository.deleteCurrentAccount()
+                val cleanupErrors = mutableListOf<String>()
+                runCatching { profileStore.clearForAccountDeletion(session.accountId) }
+                    .onFailure { cleanupErrors += "profile" }
+                runCatching { GemWalletStore(this@ProfileActivity).clearAccountData(session.accountId) }
+                    .onFailure { cleanupErrors += "wallet cache" }
+                runCatching { PendingStorePurchaseStore(this@ProfileActivity).removeForAccount(session.billingAccountId) }
+                    .onFailure { cleanupErrors += "pending Play purchase cache" }
+                runCatching { FriendIdentityStore(this@ProfileActivity).clearAllForAccountSwitch() }
+                    .onFailure { cleanupErrors += "Friend ID cache" }
+                runCatching { LeaderboardIdentityStore(this@ProfileActivity).clearAllForAccountSwitch() }
+                    .onFailure { cleanupErrors += "leaderboard cache" }
+                runOnUiThread {
+                    if (isFinishing || isDestroyed) return@runOnUiThread
+                    accountAuthInProgress = false
+                    accountGoogleLinked = false
+                    accountIdentityRecoveryPending = false
+                    accountSwitchFromId = null
+                    accountStatus = if (cleanupErrors.isEmpty()) "Account deleted" else "Account deleted; local cleanup needs attention"
+                    renderProfile()
+                    AlertDialog.Builder(this)
+                        .setTitle("Account deleted")
+                        .setMessage(
+                            if (cleanupErrors.isEmpty()) {
+                                "Your Ludo Paws account and its server-owned data have been deleted."
+                            } else {
+                                "The server account was deleted, but this device could not clear: ${cleanupErrors.joinToString()}. Clear the app's local storage before sharing or handing over this device."
+                            },
+                        )
+                        .setPositiveButton("OK", null)
+                        .show()
+                }
+            } catch (error: Exception) {
+                runOnUiThread {
+                    if (isFinishing || isDestroyed) return@runOnUiThread
+                    accountAuthInProgress = false
+                    accountStatus = "Account deletion not completed"
+                    renderProfile()
+                    AlertDialog.Builder(this)
+                        .setTitle("Account not deleted")
+                        .setMessage(error.message ?: "The account service could not complete deletion. Your account session has been kept so you can try again.")
+                        .setPositiveButton("OK", null)
+                        .show()
+                }
+            }
+        }
     }
 
     private fun confirmAccountRestore() {
