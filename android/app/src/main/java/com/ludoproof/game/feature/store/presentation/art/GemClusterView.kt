@@ -20,26 +20,13 @@ class GemClusterView(
         Paint(Paint.ANTI_ALIAS_FLAG)
     private val highlightPaint =
         Paint(Paint.ANTI_ALIAS_FLAG)
-    private val rimShadowPaint =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            strokeWidth = dp(2.4f)
-            strokeJoin = Paint.Join.ROUND
-            color = 0xFF064876.toInt()
-        }
-    private val outlinePaint =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            strokeWidth = dp(1.05f)
-            strokeJoin = Paint.Join.ROUND
-            color = 0xDDEBFFFF.toInt()
-        }
     private val facetLinePaint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
-            strokeWidth = dp(0.8f)
+            strokeWidth = dp(0.65f)
             strokeCap = Paint.Cap.ROUND
-            color = 0x9CF4FFFF.toInt()
+            strokeJoin = Paint.Join.ROUND
+            color = 0x68C5FFFF
         }
 
     override fun onDraw(canvas: Canvas) {
@@ -208,7 +195,7 @@ class GemClusterView(
             top,
             centerX,
             crownY,
-            0xFFFFFFFF.toInt(),
+            0xFFD9FFFF.toInt(),
             0xFF8DFFF6.toInt(),
             0xFF19C6DB.toInt(),
         )
@@ -219,7 +206,7 @@ class GemClusterView(
             top,
             right,
             crownY,
-            0xFFBFFFFF.toInt(),
+            0xFFD1FBFF.toInt(),
             0xFF42DDEB.toInt(),
             0xFF0874B8.toInt(),
         )
@@ -230,8 +217,8 @@ class GemClusterView(
             top,
             centerX,
             crownY + size * 0.04f,
-            0xFFFFFEFF.toInt(),
-            0xFFA3FFF8.toInt(),
+            0xFFE6FFFF.toInt(),
+            0xFF91F8F0.toInt(),
             0xFF22B9DB.toInt(),
         )
         drawFacet(
@@ -288,9 +275,9 @@ class GemClusterView(
                 centerX,
                 crownY + size * 0.08f,
                 intArrayOf(
-                    0xEFFFFFFF.toInt(),
-                    0x8BE9FFFF.toInt(),
-                    0x08FFFFFF,
+                    0xD8FFFFFF.toInt(),
+                    0x78DFFFFF.toInt(),
+                    0x06FFFFFF,
                 ),
                 null,
                 Shader.TileMode.CLAMP,
@@ -298,9 +285,7 @@ class GemClusterView(
         canvas.drawPath(reflection, highlightPaint)
         highlightPaint.shader = null
 
-        // Bright polished rim and a small specular light catch.
-        canvas.drawPath(body, rimShadowPaint)
-        canvas.drawPath(body, outlinePaint)
+        // Keep reflections on the gem surfaces; don't draw a hard outer stroke.
         canvas.drawLine(
             left + size * 0.09f,
             crownY - size * 0.005f,
@@ -312,7 +297,7 @@ class GemClusterView(
         canvas.drawCircle(
             centerX - size * 0.17f,
             centerY - size * 0.23f,
-            size * 0.035f,
+            size * 0.023f,
             fillPaint,
         )
         fillPaint.color = Color.TRANSPARENT
