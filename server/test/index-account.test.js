@@ -199,3 +199,74 @@ test("AdMob SSV rate limiting runs before signature/key verification", async () 
   assert.equal((await response.json()).error, "RATE_LIMITED");
   assert.equal(response.headers.get("retry-after"), "60");
 });
+
+
+function makeDeletionReplayEnv(deleted) {
+  const calls = [];
+  const player = {
+    calls,
+    idFromName(name) { return name; },
+    get(accountId) {
+      return {
+        async fetch(request) {
+          const url = new URL(request.url);
+          const body = await request.json();
+          calls.push({ accountId, path: url.pathname, body });
+          if (url.pathname === "/session/check") {
+            return Response.json({ error: "ACCOUNT_SESSION_INVALID" }, { status: 401 });
+          }
+          if (url.pathname === "/account/delete-preview") {
+            return Response.json({ ok: true, deleted, purchaseLedgerIds: [] });
+          }
+          return Response.json({ error: "NOT_FOUND" }, { status: 404 });
+        },
+      };
+    },
+  };
+  return {
+    player,
+    env: {
+      LUDOPROOF_SESSION_HMAC_KEY: SECRET,
+      LUDOPROOF_API_GATE: makeRateGate(),
+      LUDOPROOF_PLAYER_ACCOUNTS: player,
+    },
+  };
+}
+
+test("expired signed access token can only confirm an already-deleted account", async () => {
+  const { env, player } = makeDeletionReplayEnv(true);
+  const expiredToken = await issueAccessToken(env, ACCOUNT_A, SESSION_A, Date.now() - 20 * 60 * 1000);
+  const response = await accountWorker.fetch(
+    new Request("https://api.example.test/api/account/delete", {
+      method: "POST",
+      headers: { authorization: "Bearer " + expiredToken, "content-type": "application/json" },
+      body: JSON.stringify({}),
+    }),
+    env,
+  );
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { ok: true, deleted: true, replay: true });
+  assert.equal(player.calls.length, 1);
+  assert.equal(player.calls[0].path, "/account/delete-preview");
+  assert.equal(player.calls[0].accountId, ACCOUNT_A);
+  assert.equal(player.calls[0].body.sessionId, SESSION_A);
+});
+
+test("expired signed access token cannot authorize a deletion when no deletion tombstone exists", async () => {
+  const { env, player } = makeDeletionReplayEnv(false);
+  const expiredToken = await issueAccessToken(env, ACCOUNT_A, SESSION_A, Date.now() - 20 * 60 * 1000);
+  const response = await accountWorker.fetch(
+    new Request("https://api.example.test/api/account/delete", {
+      method: "POST",
+      headers: { authorization: "Bearer " + expiredToken, "content-type": "application/json" },
+      body: JSON.stringify({ confirmation: "DELETE_MY_ACCOUNT" }),
+    }),
+    env,
+  );
+
+  assert.equal(response.status, 401);
+  assert.equal((await response.json()).error, "ACCOUNT_SESSION_INVALID");
+  assert.equal(player.calls.length, 1);
+  assert.equal(player.calls[0].path, "/account/delete-preview");
+});
