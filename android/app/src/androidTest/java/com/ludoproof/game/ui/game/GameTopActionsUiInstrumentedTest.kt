@@ -1,6 +1,10 @@
 package com.ludoproof.game.ui.game
 
+import android.content.ComponentName
 import android.content.Context
+import android.content.pm.ActivityInfo
+import com.ludoproof.game.MainActivity
+import com.ludoproof.game.OfflineGameActivity
 import android.widget.FrameLayout
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -55,4 +59,23 @@ class GameTopActionsUiInstrumentedTest {
             assertEquals(1, settingsClicks)
         }
     }
+    @Suppress("DEPRECATION")
+    @Test
+    fun gameplayActivitiesStayPortraitToPreventRotationResettingTheMatch() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val packageManager = context.packageManager
+
+        val offlineInfo = packageManager.getActivityInfo(
+            ComponentName(context, OfflineGameActivity::class.java),
+            0,
+        )
+        val onlineInfo = packageManager.getActivityInfo(
+            ComponentName(context, MainActivity::class.java),
+            0,
+        )
+
+        assertEquals(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT, offlineInfo.screenOrientation)
+        assertEquals(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT, onlineInfo.screenOrientation)
+    }
+
 }

@@ -23,6 +23,7 @@ internal fun dialogPanel(
     dialog: Dialog,
     usePlywoodSurface: Boolean = false,
     usePlywoodCloseButton: Boolean = false,
+    showBrandBadge: Boolean = true,
 ): LinearLayout =
     LinearLayout(
         context,
@@ -90,36 +91,38 @@ internal fun dialogPanel(
                     Gravity.CENTER_VERTICAL
             }
 
-        header.addView(
-            TextView(
-                context,
-            ).apply {
-                text =
-                    "LP"
-                LudoProofTheme.title(
-                    this,
-                    13f,
-                    gold = true,
-                )
-                gravity =
-                    Gravity.CENTER
-                background =
-                    LudoProofTheme
-                        .brandBadgeDrawable(
-                            context,
-                        )
-            },
-            LinearLayout.LayoutParams(
-                dp(
+        if (showBrandBadge) {
+            header.addView(
+                TextView(
                     context,
-                    44,
+                ).apply {
+                    text =
+                        "LP"
+                    LudoProofTheme.title(
+                        this,
+                        13f,
+                        gold = true,
+                    )
+                    gravity =
+                        Gravity.CENTER
+                    background =
+                        LudoProofTheme
+                            .brandBadgeDrawable(
+                                context,
+                            )
+                },
+                LinearLayout.LayoutParams(
+                    dp(
+                        context,
+                        44,
+                    ),
+                    dp(
+                        context,
+                        44,
+                    ),
                 ),
-                dp(
-                    context,
-                    44,
-                ),
-            ),
-        )
+            )
+        }
 
         header.addView(
             LinearLayout(
@@ -189,7 +192,7 @@ internal fun dialogPanel(
                 marginStart =
                     dp(
                         context,
-                        10,
+                        if (showBrandBadge) 10 else 0,
                     )
             },
         )

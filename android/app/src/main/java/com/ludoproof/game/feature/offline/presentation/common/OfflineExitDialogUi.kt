@@ -66,6 +66,7 @@ internal fun OfflineGameActivity.requestOfflineExit() {
             dialog = dialog,
             usePlywoodSurface = true,
             usePlywoodCloseButton = true,
+            showBrandBadge = false,
         )
 
     panel.addView(
