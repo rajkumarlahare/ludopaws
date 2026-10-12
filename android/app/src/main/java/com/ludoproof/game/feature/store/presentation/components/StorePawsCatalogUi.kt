@@ -155,7 +155,7 @@ private fun StoreActivity.pawsCharacterCard(
                 gravity = Gravity.CENTER
                 includeFontPadding = false
                 maxLines = 1
-                setShadowLayer(0.8f, 0f, dp(0.5f), 0x44FFFFFF)
+                setShadowLayer(0.8f, 0f, dp(1).toFloat(), 0x44FFFFFF)
                 setPadding(0, dp(6), 0, dp(3))
             },
             LinearLayout.LayoutParams(
