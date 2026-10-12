@@ -82,8 +82,14 @@ internal fun playerCountSelectionBackground(
     emphasizeSelected: Boolean = false,
     showCheckBadge: Boolean = true,
     checkMarkScale: Float = 1f,
+    useRecessedPlywood: Boolean = true,
 ): android.graphics.drawable.Drawable {
-    val baseBackground = recessedPlywoodBackground(context, outerCornerRadiusDp)
+    val baseBackground =
+        if (useRecessedPlywood) {
+            recessedPlywoodBackground(context, outerCornerRadiusDp)
+        } else {
+            plywoodBackground(context, outerCornerRadiusDp)
+        }
     if (!selected) return baseBackground
     return android.graphics.drawable.LayerDrawable(
         arrayOf(

@@ -122,6 +122,7 @@ private fun StoreActivity.pawsCharacterCard(
                 emphasizeSelected = true,
                 showCheckBadge = true,
                 checkMarkScale = 2.7f,
+                useRecessedPlywood = false,
             )
         elevation = dp(if (selected) 5 else 3).toFloat()
         isClickable = true
