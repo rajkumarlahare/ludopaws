@@ -18,7 +18,9 @@ concurrency:
 
 jobs:
   deploy:
-    if: ${{ github.ref == 'refs/heads/main' && vars.LUDOPROOF_POLICY_RELEASE_APPROVED == 'true' }}
+    # Before publisher approval, ordinary pushes must not create a permanently red Pages run.
+    # A deliberate workflow_dispatch still runs the validation and fails closed if any gate is unmet.
+    if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || vars.LUDOPROOF_POLICY_RELEASE_APPROVED == 'true') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
