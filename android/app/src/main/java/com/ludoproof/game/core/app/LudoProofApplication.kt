@@ -48,7 +48,12 @@ class LudoProofApplication :
 
         resumedActivities += 1
         if (resumedActivities == 1) {
-            if (!friendPresencePausedForAccountSwitch) friendPresence.start()
+            if (
+                !friendPresencePausedForAccountSwitch &&
+                !accountRepository.requiresIdentityRecovery()
+            ) {
+                friendPresence.start()
+            }
             GameMusicController
                 .onAppForeground(this)
         }
@@ -74,7 +79,9 @@ class LudoProofApplication :
 
     fun resumeFriendPresenceAfterAccountSwitch() {
         friendPresencePausedForAccountSwitch = false
-        if (resumedActivities > 0) friendPresence.start()
+        if (resumedActivities > 0 && !accountRepository.requiresIdentityRecovery()) {
+            friendPresence.start()
+        }
     }
 
     override fun onActivityCreated(

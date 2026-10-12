@@ -22,6 +22,7 @@ data class AccountSession(
     val sessionExpiresAt: Long,
     val displayName: String,
     val guestRecoveryEligible: Boolean = false,
+    val identityRecoveryPending: Boolean = false,
 )
 
 class AccountSessionStore(context: Context) {
@@ -54,6 +55,10 @@ class AccountSessionStore(context: Context) {
                 displayName = json.optString("displayName", "Guest User"),
                 // Missing flags from a pre-release session are treated as non-guest for safety.
                 guestRecoveryEligible = json.optBoolean("guestRecoveryEligible", false),
+                identityRecoveryPending = json.optBoolean(
+                    "identityRecoveryPending",
+                    prefs.getString(KEY_IDENTITY_RECOVERY_PENDING_ACCOUNT_ID, null) == json.optString("accountId"),
+                ),
             )
             require(ACCOUNT_ID.matches(value.accountId))
             require(ACCOUNT_ID.matches(value.sessionId))
@@ -99,6 +104,11 @@ class AccountSessionStore(context: Context) {
             // A Google-restored account must never fall back to this installation's previous guest.
             editor.remove(KEY_GUEST_REQUEST_IV).remove(KEY_GUEST_REQUEST_CIPHERTEXT)
         }
+        if (session.identityRecoveryPending) {
+            editor.putString(KEY_IDENTITY_RECOVERY_PENDING_ACCOUNT_ID, session.accountId)
+        } else if (prefs.getString(KEY_IDENTITY_RECOVERY_PENDING_ACCOUNT_ID, null) == session.accountId) {
+            editor.remove(KEY_IDENTITY_RECOVERY_PENDING_ACCOUNT_ID)
+        }
         check(editor.commit()) { "Account session could not be durably encrypted and saved" }
     }
 
@@ -112,6 +122,25 @@ class AccountSessionStore(context: Context) {
                 .remove(KEY_PENDING_REFRESH_REQUEST_ID)
                 .commit(),
         ) { "Account session could not be cleared safely" }
+    }
+
+    fun hasPendingIdentityRecovery(): Boolean =
+        prefs.getString(KEY_IDENTITY_RECOVERY_PENDING_ACCOUNT_ID, null)
+            ?.let(ACCOUNT_ID::matches) == true
+
+    @Synchronized
+    fun completeIdentityRecovery(accountId: String) {
+        require(ACCOUNT_ID.matches(accountId))
+        val current = load()
+        if (current?.accountId == accountId) {
+            save(current.copy(identityRecoveryPending = false))
+        } else {
+            check(
+                prefs.edit()
+                    .remove(KEY_IDENTITY_RECOVERY_PENDING_ACCOUNT_ID)
+                    .commit(),
+            ) { "Account identity recovery marker could not be cleared safely" }
+        }
     }
 
     fun lastAccountMode(): String? =
@@ -215,6 +244,7 @@ class AccountSessionStore(context: Context) {
         const val TRANSFORMATION = "AES/GCM/NoPadding"
         const val KEY_VERSION = "version"
         const val KEY_ACCOUNT_MODE = "account_mode"
+        const val KEY_IDENTITY_RECOVERY_PENDING_ACCOUNT_ID = "identity_recovery_pending_account_id"
         const val MODE_GUEST = "GUEST"
         const val MODE_GOOGLE = "GOOGLE"
         const val KEY_IV = "session_iv"

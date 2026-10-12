@@ -74,7 +74,11 @@ class AccountRepository(context: Context) {
                 .put("refreshToken", current.refreshToken)
                 .put("clientRequestId", requestId),
         )
-        return parseAndSaveSession(response, guestRecoveryEligible = current.guestRecoveryEligible)
+        return parseAndSaveSession(
+            response,
+            guestRecoveryEligible = current.guestRecoveryEligible,
+            identityRecoveryPending = current.identityRecoveryPending,
+        )
     }
 
     fun googleChallenge(): String {
@@ -102,7 +106,11 @@ class AccountRepository(context: Context) {
                 .put("idToken", idToken)
                 .put("nonce", nonce),
         )
-        return parseAndSaveSession(response, guestRecoveryEligible = false)
+        return parseAndSaveSession(
+            response,
+            guestRecoveryEligible = false,
+            identityRecoveryPending = true,
+        )
     }
 
     fun wallet(): JSONObject {
@@ -206,9 +214,18 @@ class AccountRepository(context: Context) {
 
     fun clearLocalSession() = sessions.clearSession()
 
+    fun requiresIdentityRecovery(): Boolean = sessions.hasPendingIdentityRecovery()
+
+    fun completeIdentityRecovery() {
+        val session = sessions.load()
+            ?: throw AccountApiException(401, "ACCOUNT_SESSION_REQUIRED", "Restore your saved account to recover linked identities.")
+        sessions.completeIdentityRecovery(session.accountId)
+    }
+
     private fun parseAndSaveSession(
         response: JSONObject,
         guestRecoveryEligible: Boolean,
+        identityRecoveryPending: Boolean = false,
     ): AccountSession {
         val profile = response.optJSONObject("profile") ?: JSONObject()
         val session = AccountSession(
@@ -221,6 +238,7 @@ class AccountRepository(context: Context) {
             sessionExpiresAt = response.getLong("sessionExpiresAt"),
             displayName = profile.optString("displayName", "Guest User").take(24),
             guestRecoveryEligible = guestRecoveryEligible,
+            identityRecoveryPending = identityRecoveryPending,
         )
         sessions.save(session)
         return session

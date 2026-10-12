@@ -285,10 +285,11 @@ class ProfileActivity : Activity() {
                 runOnUiThread {
                     if (isFinishing || isDestroyed || accountAuthInProgress) return@runOnUiThread
                     accountGoogleLinked = linked
-                    accountStatus = if (linked) {
-                        "Saved to Google · ${session.displayName}"
-                    } else {
-                        "Guest · save to keep progress"
+                    accountStatus = when {
+                        accountRepository.requiresIdentityRecovery() ->
+                            "Account restore needs retry"
+                        linked -> "Saved to Google · ${session.displayName}"
+                        else -> "Guest · save to keep progress"
                     }
                     renderProfile()
                 }
@@ -420,6 +421,7 @@ class ProfileActivity : Activity() {
                                 } else {
                                     leaderboardStore.clearAllForAccountSwitch()
                                 }
+                                accountRepository.completeIdentityRecovery()
                                 accountIdentityRecoveryPending = false
                                 identityRecoveryCompleted = true
                             }
