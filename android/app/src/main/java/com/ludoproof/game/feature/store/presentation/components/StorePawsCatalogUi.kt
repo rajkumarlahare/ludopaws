@@ -128,7 +128,7 @@ private fun StoreActivity.pawsCharacterCard(
         isClickable = true
         isFocusable = true
         contentDescription =
-            "${character.displayName}, ${if (selected) "selected" else "unlocked"}"
+            "${character.displayName}, unlocked${if (selected) ", selected" else ""}"
 
         addView(
             LudoPawsCharacterAvatarView(this@pawsCharacterCard).apply {
@@ -168,7 +168,7 @@ private fun StoreActivity.pawsCharacterCard(
 
         addView(
             TextView(this@pawsCharacterCard).apply {
-                text = if (selected) "✓ SELECTED" else "🔓 UNLOCKED"
+                text = "🔓 UNLOCKED"
                 textSize = 10f
                 setTypeface(Typeface.DEFAULT_BOLD)
                 setTextColor(
@@ -294,7 +294,7 @@ private fun StoreActivity.pawsComingSoonCard(
 
         addView(
             TextView(this@pawsComingSoonCard).apply {
-                text = "🔒 COMING SOON"
+                text = "🔒 LOCKED"
                 textSize = 8.5f
                 setTypeface(Typeface.DEFAULT_BOLD)
                 setTextColor(0xFF65421E.toInt())
@@ -302,7 +302,7 @@ private fun StoreActivity.pawsComingSoonCard(
                 includeFontPadding = false
                 maxLines = 1
                 letterSpacing = 0.015f
-                setPadding(dp(5), dp(4), dp(5), dp(4))
+                setPadding(dp(7), dp(4), dp(7), dp(4))
                 background =
                     GradientDrawable(
                         GradientDrawable.Orientation.TOP_BOTTOM,
@@ -311,6 +311,19 @@ private fun StoreActivity.pawsComingSoonCard(
                         cornerRadius = dp(999).toFloat()
                         setStroke(dp(1), 0xFF987044.toInt())
                     }
+            },
+        )
+        addView(
+            TextView(this@pawsComingSoonCard).apply {
+                text = "COMING SOON"
+                textSize = 7.5f
+                setTypeface(Typeface.DEFAULT_BOLD)
+                setTextColor(0xFF65421E.toInt())
+                gravity = Gravity.CENTER
+                includeFontPadding = false
+                maxLines = 1
+                letterSpacing = 0.02f
+                setPadding(0, dp(3), 0, 0)
             },
         )
     }

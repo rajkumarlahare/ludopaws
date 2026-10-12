@@ -59,6 +59,18 @@ class StoreCosmeticCatalogTest {
     }
 
     @Test
+    fun starterPawsHasSixReservedFuturePacksThatRemainLocked() {
+        val futurePacks =
+            StoreCosmeticCatalog.characterPacks.filter {
+                it.id != StoreCosmeticCatalog.DEFAULT_CHARACTER_PACK
+            }
+
+        assertEquals(6, futurePacks.size)
+        assertTrue(futurePacks.all { !it.contentAvailable })
+        assertTrue(futurePacks.any { it.id == "character_pack_jungle_paws" })
+    }
+
+    @Test
     fun paidCosmeticsHavePositiveGemPrices() {
         val gemItems =
             StoreCosmeticCatalog

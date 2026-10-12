@@ -131,6 +131,18 @@ object StoreCosmeticCatalog {
                 characterPackId = "pet_paws",
                 contentAvailable = false,
             ),
+            cosmetic(
+                id = "character_pack_jungle_paws",
+                title = "JUNGLE PAWS",
+                category = CosmeticCategory.CHARACTER_PACK,
+                unlockKind = CosmeticUnlockKind.GEMS,
+                previewSymbol = "JU",
+                previewPrimary = 0xFF5A9E3B.toInt(),
+                previewSecondary = 0xFF234D30.toInt(),
+                gems = 550,
+                characterPackId = "jungle_paws",
+                contentAvailable = false,
+            ),
         )
 
     val all =
