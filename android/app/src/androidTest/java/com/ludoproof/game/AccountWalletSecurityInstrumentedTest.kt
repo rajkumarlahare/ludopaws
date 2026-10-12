@@ -7,6 +7,7 @@ import com.ludoproof.game.feature.account.data.AccountSession
 import com.ludoproof.game.feature.account.data.AccountSessionStore
 import com.ludoproof.game.feature.store.data.billing.PendingStorePurchase
 import com.ludoproof.game.feature.store.data.billing.PendingStorePurchaseStore
+import com.ludoproof.game.feature.store.data.local.CosmeticInventoryStore
 import com.ludoproof.game.feature.store.data.local.GemWalletStore
 import org.json.JSONObject
 import org.junit.After
@@ -142,7 +143,7 @@ class AccountWalletSecurityInstrumentedTest {
         assertTrue(archive.getJSONArray("ownedCosmetics").toString().contains("dice_heart"))
         assertEquals(0, store.balance())
         assertFalse(store.adsRemoved())
-        assertFalse(store.isOwnedForTest("dice_heart"))
+        assertFalse(CosmeticInventoryStore(context).isOwned("dice_heart"))
         assertTrue(store.hasLegacyUnverifiedSnapshot())
     }
 
@@ -167,9 +168,6 @@ class AccountWalletSecurityInstrumentedTest {
             ),
         )
     }
-
-    private fun GemWalletStore.isOwnedForTest(cosmeticId: String): Boolean =
-        walletPreferences.getStringSet("owned_cosmetics", emptySet())?.contains(cosmeticId) == true
 
     private companion object {
         const val ACCOUNT_ID = "0a2c3a83-e0fb-4abc-8ac4-581a6d994fe7"
