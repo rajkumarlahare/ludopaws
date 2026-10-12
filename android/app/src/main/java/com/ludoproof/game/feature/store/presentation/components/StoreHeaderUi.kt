@@ -55,8 +55,8 @@ internal fun StoreActivity.storeHeader():
             if (compactCurrencyPill) 26 else 29
         val currencyPillWidthDp =
             if (compactCurrencyPill) 96 else 107
-        val currencyPillHeightDp =
-            if (compactCurrencyPill) 35 else 38
+        // Match the full-height 50dp Store back button; keep the gem and plus artwork compact inside.
+        val currencyPillHeightDp = 50
 
         val gemPill =
             LinearLayout(
@@ -69,8 +69,7 @@ internal fun StoreActivity.storeHeader():
                 background =
                     plywoodBackground(
                         context = this@storeHeader,
-                        cornerRadiusDp =
-                            if (compactCurrencyPill) 17.5f else 19f,
+                        cornerRadiusDp = currencyPillHeightDp / 2f,
                     )
                 elevation = dp(5).toFloat()
                 setPadding(
