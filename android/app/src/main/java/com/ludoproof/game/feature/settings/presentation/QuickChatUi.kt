@@ -18,6 +18,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.TextView
+import com.ludoproof.game.core.ui.art.plywoodBackground
 import kotlin.math.min
 import kotlin.math.roundToInt
 
@@ -149,14 +150,13 @@ internal fun showQuickChatPopup(
 
     val panel = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
+        clipChildren = false
+        clipToPadding = false
         setPadding(dp(9), dp(8), dp(9), dp(9))
-        background = GradientDrawable(
-            GradientDrawable.Orientation.TOP_BOTTOM,
-            intArrayOf(0xF52870CB.toInt(), 0xF1174DAB.toInt(), 0xF00B347C.toInt()),
-        ).apply {
-            cornerRadius = dp(14).toFloat()
-            setStroke(dp(3), 0xFFFFCD38.toInt())
-        }
+        background = plywoodBackground(
+            context = context,
+            cornerRadiusDp = 20f,
+        )
         elevation = dp(10).toFloat()
     }
 
@@ -182,6 +182,8 @@ internal fun showQuickChatPopup(
         val row = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
+            clipChildren = false
+            clipToPadding = false
         }
         rowEmojis.forEach { emoji ->
             val cell = TextView(context).apply {
@@ -192,11 +194,8 @@ internal fun showQuickChatPopup(
                 isClickable = true
                 isFocusable = true
                 contentDescription = "Send $emoji"
-                background = GradientDrawable().apply {
-                    shape = GradientDrawable.OVAL
-                    setColor(0x1CFFFFFF)
-                }
-                setOnClickListener(null)
+                // Keep the emoji glyphs clean: no circular chip behind each one.
+                background = null
             }
             row.addView(
                 cell,
@@ -278,16 +277,43 @@ internal fun showQuickChatPopup(
     )
     val measuredHeight = wrapper.measuredHeight
     popup.setOnDismissListener { anchor.isPressed = false }
+    var selectionInProgress = false
     for (row in (panel.childCount - 4) until panel.childCount) {
-        // Keep rows reachable for TalkBack; click handlers dismiss via the shared listener below.
+        // Each picked emoji gets a short pop-and-settle animation before it is sent.
         val rowView = panel.getChildAt(row)
         if (rowView is ViewGroup) {
             for (i in 0 until rowView.childCount) {
                 val cell = rowView.getChildAt(i)
                 cell.setOnClickListener {
+                    if (selectionInProgress) return@setOnClickListener
                     val emoji = (cell as? TextView)?.text?.toString() ?: return@setOnClickListener
-                    popup.dismiss()
-                    onEmojiSelected(emoji)
+                    selectionInProgress = true
+                    cell.pivotX = cell.width / 2f
+                    cell.pivotY = cell.height / 2f
+                    cell.animate().cancel()
+                    cell.animate()
+                        .scaleX(1.26f)
+                        .scaleY(1.26f)
+                        .setDuration(85L)
+                        .withEndAction {
+                            cell.animate()
+                                .scaleX(0.92f)
+                                .scaleY(0.92f)
+                                .setDuration(65L)
+                                .withEndAction {
+                                    cell.animate()
+                                        .scaleX(1f)
+                                        .scaleY(1f)
+                                        .setDuration(55L)
+                                        .withEndAction {
+                                            popup.dismiss()
+                                            onEmojiSelected(emoji)
+                                        }
+                                        .start()
+                                }
+                                .start()
+                        }
+                        .start()
                 }
             }
         }
