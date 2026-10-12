@@ -390,7 +390,7 @@ class ProfileActivity : Activity() {
                             } else {
                                 // Scope the existing local profile to the guest account before the
                                 // active session is replaced; another account must not inherit its stats.
-                                profileStore.ensureCurrentAccountScope()
+                                profileStore.prepareForAccountRestore()
                                 accountRepository.restoreGoogleAccount(idToken, nonce)
                                 restoreSessionChanged = true
                                 val recovered = accountRepository.recoverLinkedIdentities()

@@ -39,6 +39,31 @@ class ProfileStore(
         return true
     }
 
+    /**
+     * Stops a legacy unscoped profile from being adopted by a Google account restored on a fresh
+     * device/session. If an old account is still active, pin its local profile to that account;
+     * otherwise preserve the old profile in quarantine and mark migration complete.
+     */
+    @Synchronized
+    fun prepareForAccountRestore(): Boolean {
+        val accountId = AccountSessionStore(appContext).load()?.accountId
+        val migrated = prefs.getBoolean(KEY_LEGACY_PROFILE_MIGRATED, false)
+        val legacy = prefs.getString(KEY_PROFILE_JSON, null)
+        val editor = prefs.edit()
+        if (!migrated && legacy != null) {
+            if (accountId != null) {
+                val accountKey = PROFILE_JSON_PREFIX + accountId
+                if (!prefs.contains(accountKey)) editor.putString(accountKey, legacy)
+            } else if (!prefs.contains(KEY_QUARANTINED_PROFILE_JSON)) {
+                editor.putString(KEY_QUARANTINED_PROFILE_JSON, legacy)
+            }
+        }
+        editor.putBoolean(KEY_LEGACY_PROFILE_MIGRATED, true)
+            .remove(KEY_PROFILE_JSON)
+        check(editor.commit()) { "Legacy profile could not be isolated before account restore" }
+        return true
+    }
+
     private fun profileStorageKey(): String {
         val accountId = AccountSessionStore(appContext).load()?.accountId
         return accountId?.let { PROFILE_JSON_PREFIX + it } ?: KEY_PROFILE_JSON
@@ -586,6 +611,8 @@ class ProfileStore(
             "profile_json_v2_account_"
         const val KEY_LEGACY_PROFILE_MIGRATED =
             "profile_legacy_scope_migrated"
+        const val KEY_QUARANTINED_PROFILE_JSON =
+            "profile_json_legacy_quarantine"
         const val MAX_RECORDED_MATCHES =
             250
         const val MAX_NAME_LENGTH =
