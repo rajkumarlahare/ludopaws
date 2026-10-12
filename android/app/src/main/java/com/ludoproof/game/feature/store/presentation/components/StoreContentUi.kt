@@ -71,6 +71,21 @@ private fun StoreActivity.gemsContent():
                             .REMOVE_ADS,
                     ),
             )
+
+        // Feature Remove Ads before the six gem price cards.
+        addView(
+            featuredRemoveAdsCard(
+                removeAds,
+            ),
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                topMargin = dp(4)
+                bottomMargin = dp(6)
+            },
+        )
+
         val packs =
             StoreCatalog
                 .products
@@ -141,18 +156,6 @@ private fun StoreActivity.gemsContent():
             )
         }
 
-        addView(
-            featuredRemoveAdsCard(
-                removeAds,
-            ),
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            ).apply {
-                topMargin = dp(18)
-            },
-        )
-
         if (adsEnabledForBuild) {
             addView(
                 TextView(this@gemsContent).apply {
@@ -193,13 +196,11 @@ private fun StoreActivity.featuredRemoveAdsCard(
     LinearLayout(this).apply {
         orientation =
             LinearLayout.VERTICAL
+        // Keep the wood surface visible without a purple colour overlay.
         background =
-            storePlywoodCardBackground(
+            plywoodBackground(
+                context = this@featuredRemoveAdsCard,
                 cornerRadiusDp = 15f,
-                fillColors = intArrayOf(0xD94A156F.toInt(), 0xD92A0C54.toInt()),
-                strokeColor = 0xFF8939A8.toInt(),
-                strokeWidthDp = 2,
-                insetDp = 5,
             )
 
         val body =
