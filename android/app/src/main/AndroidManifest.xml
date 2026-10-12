@@ -33,28 +33,36 @@
             android:screenOrientation="portrait" />
         <activity
             android:name=".feature.mode.presentation.RemoteModeEntryActivity"
-            android:exported="false" />
+            android:exported="false" /
+            android:screenOrientation="portrait">
         <activity
             android:name=".feature.team.presentation.TeamUpActivity"
-            android:exported="false" />
+            android:exported="false" /
+            android:screenOrientation="portrait">
         <activity
             android:name=".feature.friends.presentation.FriendsActivity"
-            android:exported="false" />
+            android:exported="false" /
+            android:screenOrientation="portrait">
         <activity
             android:name=".feature.leaderboard.presentation.LeaderboardActivity"
-            android:exported="false" />
+            android:exported="false" /
+            android:screenOrientation="portrait">
         <activity
             android:name=".feature.profile.presentation.ProfileActivity"
-            android:exported="false" />
+            android:exported="false" /
+            android:screenOrientation="portrait">
         <activity
             android:name=".feature.profile.presentation.BadgesActivity"
-            android:exported="false" />
+            android:exported="false" /
+            android:screenOrientation="portrait">
         <activity
             android:name=".feature.store.presentation.StoreActivity"
-            android:exported="false" />
+            android:exported="false" /
+            android:screenOrientation="portrait">
         <activity
             android:name=".HomeActivity"
-            android:exported="true">
+            android:exported="true"
+            android:screenOrientation="portrait">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
