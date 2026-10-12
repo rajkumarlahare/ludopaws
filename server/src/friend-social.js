@@ -32,10 +32,19 @@ export class FriendConversation {
       const body = await readJson(request);
       if (url.pathname === "/send") return await this.#send(body);
       if (url.pathname === "/list") return await this.#list(body);
+      if (url.pathname === "/delete-for-friend") return await this.#deleteForFriend(body);
       return json(404, { error: "NOT_FOUND", message: "route not found" });
     } catch (error) {
       return errorResponse(error);
     }
+  }
+
+  async #deleteForFriend(body) {
+    const friendId = normalizeFriendId(body?.friendId), existing = await this.ctx.storage.get(CONVERSATION_KEY);
+    if (!existing) return json(200, { ok: true, deleted: false });
+    if (!Array.isArray(existing.pair) || !existing.pair.includes(friendId)) throw failure(403, "CONVERSATION_OWNER_MISMATCH", "deletion target is not part of this conversation");
+    await this.ctx.storage.delete(CONVERSATION_KEY);
+    return json(200, { ok: true, deleted: true });
   }
 
   async #send(body) {
@@ -132,10 +141,33 @@ export class FriendRecentRoom {
       const body = await readJson(request);
       if (url.pathname === "/record") return await this.#record(body);
       if (url.pathname === "/list") return await this.#list(body);
+      if (url.pathname === "/delete-owner") return await this.#deleteOwner(body);
+      if (url.pathname === "/purge-opponent") return await this.#purgeOpponent(body);
       return json(404, { error: "NOT_FOUND", message: "route not found" });
     } catch (error) {
       return errorResponse(error);
     }
+  }
+
+  async #deleteOwner(body) {
+    const ownerFriendId = normalizeFriendId(body?.ownerFriendId), existing = await this.ctx.storage.get(RECENT_KEY);
+    if (!existing) return json(200, { ok: true, deleted: false });
+    if (existing.ownerFriendId !== ownerFriendId) throw failure(409, "RECENT_OWNER_CONFLICT", "recent-player storage is bound to another Friend ID");
+    await this.ctx.storage.delete(RECENT_KEY);
+    return json(200, { ok: true, deleted: true });
+  }
+
+  async #purgeOpponent(body) {
+    const ownerFriendId = normalizeFriendId(body?.ownerFriendId), opponentFriendId = normalizeFriendId(body?.opponentFriendId);
+    const existing = await this.ctx.storage.get(RECENT_KEY);
+    if (!existing) return json(200, { ok: true, removed: 0 });
+    if (existing.ownerFriendId !== ownerFriendId) throw failure(409, "RECENT_OWNER_CONFLICT", "recent-player storage is bound to another Friend ID");
+    const before = Array.isArray(existing.entries) ? existing.entries.length : 0;
+    existing.entries = (Array.isArray(existing.entries) ? existing.entries : []).filter((entry) => String(entry?.opponentFriendId ?? "").toUpperCase() !== opponentFriendId);
+    const removed = before - existing.entries.length;
+    if (!existing.entries.length) await this.ctx.storage.delete(RECENT_KEY);
+    else if (removed) await this.ctx.storage.put(RECENT_KEY, existing);
+    return json(200, { ok: true, removed });
   }
 
   async #record(body) {
@@ -197,18 +229,15 @@ export async function syncRecentFriends(env, state) {
       tasks.push(
         target.fetch(
           new Request("https://recent/record", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({
-              ownerFriendId: owner.friendId,
-              opponentFriendId: opponent.friendId,
-              displayName: opponent.displayName,
-              matchId: state.matchId,
-              playedAt,
-            }),
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ ownerFriendId: owner.friendId, opponentFriendId: opponent.friendId, displayName: opponent.displayName, matchId: state.matchId, playedAt }),
           }),
         ),
       );
+      if (env.LUDOPROOF_FRIENDS) {
+        const friends = env.LUDOPROOF_FRIENDS, directory = friends.get(friends.idFromName("GLOBAL:V1"));
+        tasks.push(directory.fetch(new Request("https://friends/recent/register", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ownerFriendId: owner.friendId, opponentFriendId: opponent.friendId }) })));
+      }
     }
   }
   await Promise.all(tasks);
