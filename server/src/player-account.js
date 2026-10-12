@@ -57,6 +57,7 @@ export class PlayerAccount {
     ctx.blockConcurrencyWhile(async () => {
       const sql = ctx.storage.sql;
       sql.exec("CREATE TABLE IF NOT EXISTS account_meta (account_id TEXT PRIMARY KEY, display_name TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)");
+      sql.exec("CREATE TABLE IF NOT EXISTS account_deletions (account_id TEXT PRIMARY KEY, deleted_at INTEGER NOT NULL)");
       sql.exec("CREATE TABLE IF NOT EXISTS account_sessions (session_id TEXT PRIMARY KEY, refresh_token_hash TEXT NOT NULL, previous_refresh_hash TEXT, last_refresh_request_id TEXT, created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, revoked_at INTEGER, last_seen_at INTEGER NOT NULL)");
       sql.exec("CREATE TABLE IF NOT EXISTS wallet (account_id TEXT PRIMARY KEY, balance INTEGER NOT NULL DEFAULT 0 CHECK(balance >= 0), ads_removed INTEGER NOT NULL DEFAULT 0 CHECK(ads_removed IN (0, 1)), updated_at INTEGER NOT NULL)");
       sql.exec("CREATE TABLE IF NOT EXISTS wallet_transactions (transaction_id TEXT PRIMARY KEY, idempotency_key TEXT NOT NULL UNIQUE, payload_hash TEXT NOT NULL, kind TEXT NOT NULL, delta INTEGER NOT NULL, balance_after INTEGER NOT NULL, source_ref_hash TEXT, created_at INTEGER NOT NULL)");
@@ -70,6 +71,8 @@ export class PlayerAccount {
   async fetch(request) {
     try {
       const url = new URL(request.url);
+      if (request.method === "POST" && url.pathname === "/account/delete-preview") return await this.#deletePreview(request);
+      if (request.method === "POST" && url.pathname === "/account/delete") return await this.#deleteAccount(request);
       if (request.method === "POST" && url.pathname === "/session/create") return await this.#createSession(request);
       if (request.method === "POST" && url.pathname === "/session/refresh") return await this.#refreshSession(request);
       if (request.method === "POST" && url.pathname === "/session/check") return await this.#checkSession(request);
@@ -83,6 +86,43 @@ export class PlayerAccount {
       if (request.method === "POST" && url.pathname === "/wallet/cosmetic/select") return await this.#selectCosmetic(request);
       return json(404, { error: "NOT_FOUND", message: "route not found" });
     } catch (error) { return errorResponse(error); }
+  }
+
+  async #deletePreview(request) {
+    const body = await readJson(request), accountId = requireAccountId(body?.accountId);
+    if ([...this.ctx.storage.sql.exec("SELECT account_id FROM account_deletions WHERE account_id = ? LIMIT 1", accountId)].length) {
+      return json(200, { ok: true, deleted: true, purchaseLedgerIds: [] });
+    }
+    const sessionId = requireSessionId(body?.sessionId);
+    this.#requireActiveSession(accountId, sessionId);
+    this.#profileSnapshot(accountId);
+    const purchaseLedgerIds = [...this.ctx.storage.sql.exec(
+      "SELECT source_ref_hash FROM wallet_transactions WHERE kind IN ('PLAY_GEM_PURCHASE', 'PLAY_REMOVE_ADS') AND source_ref_hash IS NOT NULL",
+    )].map((row) => String(row.source_ref_hash)).filter((value) => /^[a-f0-9]{64}$/.test(value));
+    return json(200, { ok: true, deleted: false, purchaseLedgerIds: [...new Set(purchaseLedgerIds)] });
+  }
+
+  async #deleteAccount(request) {
+    const body = await readJson(request), accountId = requireAccountId(body?.accountId);
+    if ([...this.ctx.storage.sql.exec("SELECT account_id FROM account_deletions WHERE account_id = ? LIMIT 1", accountId)].length) {
+      return json(200, { ok: true, accountId, deleted: true, replay: true });
+    }
+    const sessionId = requireSessionId(body?.sessionId);
+    this.#requireActiveSession(accountId, sessionId);
+    if (body?.confirmation !== "DELETE_MY_ACCOUNT") throw httpError(400, "ACCOUNT_DELETE_CONFIRMATION_REQUIRED", "account deletion confirmation is required");
+    this.#profileSnapshot(accountId);
+    const deletedAt = Date.now();
+    this.ctx.storage.transactionSync(() => {
+      this.ctx.storage.sql.exec("DELETE FROM account_sessions");
+      this.ctx.storage.sql.exec("DELETE FROM wallet_transactions");
+      this.ctx.storage.sql.exec("DELETE FROM cosmetic_ad_progress");
+      this.ctx.storage.sql.exec("DELETE FROM selected_cosmetics");
+      this.ctx.storage.sql.exec("DELETE FROM owned_cosmetics");
+      this.ctx.storage.sql.exec("DELETE FROM wallet");
+      this.ctx.storage.sql.exec("DELETE FROM account_meta WHERE account_id = ?", accountId);
+      this.ctx.storage.sql.exec("INSERT INTO account_deletions (account_id, deleted_at) VALUES (?, ?)", accountId, deletedAt);
+    });
+    return json(200, { ok: true, accountId, deleted: true, replay: false });
   }
 
   async #createSession(request) {
@@ -189,10 +229,11 @@ export class PlayerAccount {
     const body = await readJson(request), accountId = requireAccountId(body?.accountId), sessionId = requireSessionId(body?.sessionId);
     this.#requireActiveSession(accountId, sessionId);
     const productId = String(body?.productId ?? ""), tokenHash = requireHash(body?.purchaseTokenHash, "purchaseTokenHash");
+    const purchaseLedgerId = requireHash(body?.purchaseLedgerId, "purchaseLedgerId");
     const product = GOOGLE_PLAY_PRODUCTS[productId];
     if (!product) throw httpError(400, "UNKNOWN_STORE_PRODUCT", "store product is not recognized");
     const payloadHash = await sha256Hex(JSON.stringify({ productId, gems: product.gemAmount, removeAds: product.removeAds }));
-    const result = this.#applyWalletTransaction({ accountId, idempotencyKey: "play-purchase:" + tokenHash, payloadHash, kind: product.removeAds ? "PLAY_REMOVE_ADS" : "PLAY_GEM_PURCHASE", delta: product.gemAmount, sourceRefHash: tokenHash, removeAds: product.removeAds });
+    const result = this.#applyWalletTransaction({ accountId, idempotencyKey: "play-purchase:" + tokenHash, payloadHash, kind: product.removeAds ? "PLAY_REMOVE_ADS" : "PLAY_GEM_PURCHASE", delta: product.gemAmount, sourceRefHash: purchaseLedgerId, removeAds: product.removeAds });
     return json(200, { ok: true, ...result, productId, gemAmount: product.gemAmount, removeAds: product.removeAds, wallet: this.#walletSnapshot(accountId) });
   }
 
@@ -325,8 +366,12 @@ export class PlayerAccount {
   }
 
   #ensureAccount(accountId, displayName) {
+    if ([...this.ctx.storage.sql.exec("SELECT account_id FROM account_deletions WHERE account_id = ? LIMIT 1", accountId)].length) {
+      throw httpError(410, "ACCOUNT_DELETED", "this account has been deleted");
+    }
     const now = Date.now();
     this.ctx.storage.transactionSync(() => {
+      if ([...this.ctx.storage.sql.exec("SELECT account_id FROM account_deletions WHERE account_id = ? LIMIT 1", accountId)].length) throw httpError(410, "ACCOUNT_DELETED", "this account has been deleted");
       const exists = [...this.ctx.storage.sql.exec("SELECT account_id FROM account_meta WHERE account_id = ? LIMIT 1", accountId)];
       if (!exists.length) this.ctx.storage.sql.exec("INSERT INTO account_meta (account_id, display_name, created_at, updated_at) VALUES (?, ?, ?, ?)", accountId, normalizeDisplayName(displayName), now, now);
       this.ctx.storage.sql.exec("INSERT OR IGNORE INTO wallet (account_id, balance, ads_removed, updated_at) VALUES (?, 0, 0, ?)", accountId, now);
