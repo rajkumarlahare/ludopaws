@@ -69,7 +69,7 @@ internal fun StoreActivity.storeTabs():
                                 checkBadgeAtTopEnd = true,
                                 emphasizeSelected = true,
                                 showCheckBadge = true,
-                                checkMarkScale = 1.1f,
+                                checkMarkScale = 2.2f,
                             )
                         elevation = dp(if (selected) 3 else 1).toFloat()
                         setOnClickListener { clicked ->
