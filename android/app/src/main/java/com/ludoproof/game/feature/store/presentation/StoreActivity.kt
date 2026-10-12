@@ -182,7 +182,7 @@ class StoreActivity :
                     wallet.markLegacyUnverifiedNoticeShown()
                 ) {
                     showStoreMessage(
-                        "Previous device-only store data was preserved for recovery, but it is not used as gems or an entitlement until verified. Your current balance and items come from the secure account wallet.",
+                        "Previous device-only store data was saved separately for review, but it has not been migrated. It is not usable as gems or an entitlement; your current balance and items come from the secure account wallet.",
                     )
                 }
             }
