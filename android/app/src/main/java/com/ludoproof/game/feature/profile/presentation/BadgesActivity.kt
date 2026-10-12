@@ -3,6 +3,7 @@ package com.ludoproof.game.feature.profile.presentation
 import android.app.Activity
 import android.graphics.Color
 import android.graphics.Typeface
+import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
@@ -210,6 +211,32 @@ class BadgesActivity : Activity() {
                 ).apply { bottomMargin = dp(9) },
             )
         }
+
+        root.setOnApplyWindowInsetsListener { _, insets ->
+            val systemTopInset = insets.systemWindowInsetTop
+            val cutoutTopInset =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    val cutout = insets.displayCutout
+                    maxOf(
+                        cutout?.safeInsetTop ?: 0,
+                        cutout?.boundingRects
+                            ?.filter { it.top == 0 }
+                            ?.maxOfOrNull { it.bottom }
+                            ?: 0,
+                    )
+                } else {
+                    0
+                }
+            content.setPadding(
+                0,
+                maxOf(dp(12), maxOf(systemTopInset, cutoutTopInset) + dp(8)),
+                0,
+                dp(26),
+            )
+            insets
+        }
+        setContentView(root)
+        root.requestApplyInsets()
     }
 
     private fun badgeRow(badge: ProfileBadge, compact: Boolean): LinearLayout =
