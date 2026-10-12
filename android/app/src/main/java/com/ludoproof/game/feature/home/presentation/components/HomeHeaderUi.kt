@@ -16,6 +16,7 @@ import com.ludoproof.game.feature.characters.data.local.CharacterSelectionStore
 import com.ludoproof.game.feature.leaderboard.presentation.LeaderboardActivity
 import com.ludoproof.game.feature.profile.data.local.ProfileStore
 import com.ludoproof.game.feature.profile.presentation.ProfileActivity
+import com.ludoproof.game.feature.profile.presentation.BadgesActivity
 import com.ludoproof.game.feature.store.data.local.GemWalletStore
 import com.ludoproof.game.feature.store.presentation.StoreActivity
 
@@ -318,6 +319,7 @@ private fun HomeActivity.homeShortcutRow(): LinearLayout =
                 label = "Badge",
                 tint = 0xFFFFC928.toInt(),
                 iconKind = HomeIconKind.BADGE,
+                enabled = true,
             ),
             HeaderShortcut(
                 label = "Leaderboard",
@@ -387,7 +389,15 @@ private fun HomeActivity.homeShortcut(
                                 LeaderboardActivity::class.java,
                             ),
                         )
-                    
+
+                    HomeIconKind.BADGE ->
+                        startActivity(
+                            Intent(
+                                this@homeShortcut,
+                                BadgesActivity::class.java,
+                            ),
+                        )
+
                     else -> Unit
                 }
             }

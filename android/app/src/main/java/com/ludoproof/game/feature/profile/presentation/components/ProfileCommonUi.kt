@@ -2,6 +2,7 @@ package com.ludoproof.game.feature.profile.presentation.components
 
 import android.app.AlertDialog
 import android.app.Dialog
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
 import android.text.InputFilter
@@ -18,6 +19,7 @@ import com.ludoproof.game.core.ui.art.transparentDarkBlueStrokeBackground
 import com.ludoproof.game.ui.dialogs.baseDialog
 import com.ludoproof.game.ui.dialogs.sizeDialog
 import com.ludoproof.game.feature.profile.presentation.ProfileActivity
+import com.ludoproof.game.feature.profile.presentation.BadgesActivity
 
 internal fun ProfileActivity.profilePanel():
     LinearLayout =
@@ -255,22 +257,13 @@ internal fun ProfileActivity.showNameEditor() {
     dialog.show()
     input.requestFocus()
 }
-internal fun ProfileActivity.viewAllBadges(
-    body: String,
-) {
-    AlertDialog
-        .Builder(this)
-        .setTitle(
-            "Badges",
-        )
-        .setMessage(
-            body,
-        )
-        .setPositiveButton(
-            "CLOSE",
-            null,
-        )
-        .show()
+internal fun ProfileActivity.viewAllBadges() {
+    startActivity(
+        Intent(
+            this,
+            BadgesActivity::class.java,
+        ),
+    )
 }
 
 internal fun ProfileActivity.viewPurchases(
