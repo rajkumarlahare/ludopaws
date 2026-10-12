@@ -415,9 +415,8 @@ async function handleAccountRequest(request, env) {
 }
 
 function accountWebOrigin(env) {
-  const configured = String(
-    env?.LUDOPROOF_ACCOUNT_WEB_ORIGIN ?? "https://rajkumarlahare.github.io",
-  ).trim();
+  const configured = String(env?.LUDOPROOF_ACCOUNT_WEB_ORIGIN ?? "").trim();
+  if (!configured) return null;
   try {
     const url = new URL(configured);
     if (url.protocol !== "https:" || url.username || url.password || url.pathname !== "/" || url.search || url.hash) {
