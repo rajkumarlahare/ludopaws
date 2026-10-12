@@ -107,6 +107,26 @@ test("account wallet API rejects requests without a verified bearer token", asyn
 });
 
 
+test("account deletion cannot be authorized by a caller-supplied account ID", async () => {
+  const env = {
+    LUDOPROOF_API_GATE: makeRateGate(),
+    LUDOPROOF_PLAYER_ACCOUNTS: makePlayerNamespace(),
+  };
+  const response = await accountWorker.fetch(
+    new Request("https://api.example.test/api/account/delete", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        accountId: ACCOUNT_A,
+        confirmation: "DELETE_MY_ACCOUNT",
+      }),
+    }),
+    env,
+  );
+  assert.equal(response.status, 401);
+  assert.equal((await response.json()).error, "AUTH_REQUIRED");
+});
+
 test("AdMob SSV rate limiting runs before signature/key verification", async () => {
   const env = {
     LUDOPROOF_API_GATE: makeRateGate(false),
