@@ -1010,7 +1010,7 @@ class LeaderboardActivity :
 
                 val card =
                     LinearLayout(
-                        this@topThreePodium,
+                        this@LeaderboardActivity,
                     ).apply {
                         orientation =
                             LinearLayout.VERTICAL
@@ -1045,7 +1045,7 @@ class LeaderboardActivity :
 
                         addView(
                             TextView(
-                                this@topThreePodium,
+                                this@LeaderboardActivity,
                             ).apply {
                                 text =
                                     when (entry.rank) {
@@ -1066,7 +1066,7 @@ class LeaderboardActivity :
 
                         addView(
                             TextView(
-                                this@topThreePodium,
+                                this@LeaderboardActivity,
                             ).apply {
                                 text =
                                     initials(
@@ -1104,7 +1104,7 @@ class LeaderboardActivity :
 
                         addView(
                             TextView(
-                                this@topThreePodium,
+                                this@LeaderboardActivity,
                             ).apply {
                                 text =
                                     entry.displayName
@@ -1129,7 +1129,7 @@ class LeaderboardActivity :
 
                         addView(
                             TextView(
-                                this@topThreePodium,
+                                this@LeaderboardActivity,
                             ).apply {
                                 text =
                                     number(entry.points)
@@ -1149,7 +1149,7 @@ class LeaderboardActivity :
 
                         addView(
                             TextView(
-                                this@topThreePodium,
+                                this@LeaderboardActivity,
                             ).apply {
                                 text = "POINTS"
                                 textSize = 8f
@@ -1164,7 +1164,7 @@ class LeaderboardActivity :
 
                         addView(
                             TextView(
-                                this@topThreePodium,
+                                this@LeaderboardActivity,
                             ).apply {
                                 text =
                                     "${entry.wins} W  •  ${entry.games} G"
