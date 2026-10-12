@@ -43,28 +43,6 @@ private fun StoreActivity.gemsContent():
         orientation =
             LinearLayout.VERTICAL
 
-        val adActionRow =
-            LinearLayout(this@gemsContent).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.END
-                addView(
-                    rewardedAdCard(),
-                    LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.WRAP_CONTENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT,
-                    ),
-                )
-            }
-        addView(
-            adActionRow,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            ).apply {
-                bottomMargin = dp(8)
-            },
-        )
-
         val removeAds =
             requireNotNull(
                 StoreCatalog
@@ -204,6 +182,19 @@ private fun StoreActivity.featuredRemoveAdsCard(
                 context = this@featuredRemoveAdsCard,
                 cornerRadiusDp = 15f,
             )
+
+        // Place the rewarded-gem action inside the Remove Ads panel, aligned top-right.
+        addView(
+            rewardedAdCard(),
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                gravity = Gravity.END
+                topMargin = dp(6)
+                marginEnd = dp(8)
+            },
+        )
 
         val body =
             LinearLayout(
@@ -385,21 +376,14 @@ private fun StoreActivity.rewardedAdCard():
             dp(7),
             dp(5),
         )
-        background =
-            storeRecessedSurfaceBackground(
-                cornerRadiusDp = 13f,
-                fillColors = intArrayOf(0xD9144C9D.toInt(), 0xD90C2E66.toInt()),
-                strokeColor = 0xFFA7429B.toInt(),
-                strokeWidthDp = 2,
-                insetDp = 6,
-            )
+        // Transparent container lets the Remove Ads panel's plywood show through.
 
         addView(
             TextView(
                 this@rewardedAdCard,
             ).apply {
                 text =
-                    "5 GEMS  •  BEST"
+                    "5 GEMS"
                 textSize =
                     12f
                 setTypeface(
