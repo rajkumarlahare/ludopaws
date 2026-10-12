@@ -471,29 +471,33 @@ private fun StoreActivity.gemProductCard(
             )
         elevation = dp(3).toFloat()
 
-        product.title
-            .substringAfter("·", "")
-            .trim()
-            .takeIf(String::isNotBlank)
-            ?.let { badge ->
-                addView(
-                    TextView(this@gemProductCard).apply {
-                        text = badge.uppercase()
-                        textSize = 9f
-                        setTypeface(Typeface.DEFAULT_BOLD)
-                        setTextColor(Color.WHITE)
-                        gravity = Gravity.CENTER
-                        setPadding(dp(8), dp(4), dp(8), dp(4))
-                    },
-                )
-            }
+        val badge =
+            product.title
+                .substringAfter("·", "")
+                .trim()
+                .takeIf(String::isNotBlank)
+                ?: when (product.productId) {
+                    StoreCatalog.GEMS_20000 -> "Mega"
+                    StoreCatalog.GEMS_40000 -> "Ultra"
+                    else -> "Gems"
+                }
+        addView(
+            TextView(this@gemProductCard).apply {
+                text = badge.uppercase()
+                textSize = 9f
+                setTypeface(Typeface.DEFAULT_BOLD)
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
+                setPadding(dp(8), dp(4), dp(8), dp(4))
+            },
+        )
 
         addView(
             GemClusterView(
                 this@gemProductCard,
                 gemCount = gemClusterSize(product.gemAmount),
             ).apply {
-                background = recessedPlywoodBackground(this@gemProductCard, outerCornerRadiusDp = 12f)
+                // Keep the gem art on a transparent canvas; no recessed pocket behind it.
                 contentDescription = "${product.gemAmount} gems"
             },
             LinearLayout.LayoutParams(
