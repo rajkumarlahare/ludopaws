@@ -247,16 +247,6 @@ internal object FriendsVisualKit {
         icon: FriendsIcon,
         tint: Int = TEXT,
     ): View {
-        if (icon == FriendsIcon.SHARE) {
-            return HomeIconView(context).apply {
-                kind = HomeIconKind.SHARE
-                iconColor = tint
-                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-            }
-        }
-        if (icon == FriendsIcon.COPY || icon == FriendsIcon.INVITE) {
-            return FriendsIconView(context, icon, tint)
-        }
         val sharedName = when (icon) {
             FriendsIcon.BACK -> AppIconName.BACK
             FriendsIcon.PEOPLE, FriendsIcon.INVITES -> AppIconName.PEOPLE

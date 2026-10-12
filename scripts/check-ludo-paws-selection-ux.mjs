@@ -63,7 +63,9 @@ for (const required of [
 for (const required of [
   '"CHOOSE YOUR PAW"',
   "charactersForPack(",
-  "fallbackDrawableName",
+  // Character selection now uses production 3D portraits instead of fallback drawable names.
+  "LudoPawsCharacterAvatarView",
+  "showCircularChrome = false",
   "selectCharacterForActiveSlot(",
   "rebuildCharacterSlotButtons()",
   "characterSelectionStore.select(",
