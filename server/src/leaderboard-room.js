@@ -34,6 +34,9 @@ export class LeaderboardRoom {
         )
       `);
 
+      sql.exec("CREATE TABLE IF NOT EXISTS deleted_leaderboard_profiles (profile_id TEXT PRIMARY KEY, deleted_at INTEGER NOT NULL)");
+      sql.exec("CREATE TABLE IF NOT EXISTS deleted_leaderboard_registration_requests (request_hash TEXT PRIMARY KEY, deleted_at INTEGER NOT NULL)");
+
       sql.exec(`
         CREATE TABLE IF NOT EXISTS leaderboard_entries_v2 (
           profile_id TEXT PRIMARY KEY,
@@ -160,6 +163,20 @@ export class LeaderboardRoom {
       await profileTokenHash(
         identity.profileToken,
       );
+    const registrationRequestHash = await sha256Hex(
+      "ludoproof:leaderboard-registration:v1:" + clientRequestId,
+    );
+    const deletedProfileRows = [...this.ctx.storage.sql.exec(
+      "SELECT profile_id FROM deleted_leaderboard_profiles WHERE profile_id = ? LIMIT 1",
+      identity.profileId,
+    )];
+    const deletedRequestRows = [...this.ctx.storage.sql.exec(
+      "SELECT request_hash FROM deleted_leaderboard_registration_requests WHERE request_hash = ? LIMIT 1",
+      registrationRequestHash,
+    )];
+    if (deletedProfileRows.length || deletedRequestRows.length) {
+      throw httpError(410, "LEADERBOARD_PROFILE_DELETED", "this leaderboard profile has been deleted");
+    }
     const now =
       Date.now();
 
@@ -303,7 +320,27 @@ export class LeaderboardRoom {
   async #deleteProfile(request) {
     const body = await readJson(request), profileId = normalizeLeaderboardProfileId(body?.profileId);
     if (!profileId) throw badRequest("INVALID_PROFILE_ID", "leaderboard profile ID is invalid");
+    const profileRows = [...this.ctx.storage.sql.exec(
+      "SELECT registration_request_id FROM leaderboard_profiles_v2 WHERE profile_id = ? LIMIT 1",
+      profileId,
+    )];
+    const registrationRequestHash = profileRows.length
+      ? await sha256Hex("ludoproof:leaderboard-registration:v1:" + String(profileRows[0].registration_request_id))
+      : null;
+    const deletedAt = Date.now();
     this.ctx.storage.transactionSync(() => {
+      this.ctx.storage.sql.exec(
+        "INSERT OR IGNORE INTO deleted_leaderboard_profiles (profile_id, deleted_at) VALUES (?, ?)",
+        profileId,
+        deletedAt,
+      );
+      if (registrationRequestHash) {
+        this.ctx.storage.sql.exec(
+          "INSERT OR IGNORE INTO deleted_leaderboard_registration_requests (request_hash, deleted_at) VALUES (?, ?)",
+          registrationRequestHash,
+          deletedAt,
+        );
+      }
       this.ctx.storage.sql.exec("DELETE FROM leaderboard_entries_v2 WHERE profile_id = ?", profileId);
       this.ctx.storage.sql.exec("DELETE FROM leaderboard_profiles_v2 WHERE profile_id = ?", profileId);
     });
