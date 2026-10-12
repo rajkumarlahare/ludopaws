@@ -1,6 +1,9 @@
 package com.ludoproof.game.feature.store.presentation.components
 
-import com.ludoproof.game.LudoBoardView
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.RectF
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -143,19 +146,14 @@ private fun StoreActivity.boardPanel(
                 ),
             )
         } else {
-            // Reuse the exact production renderer from gameplay for the Classic store preview.
-            // This is a miniature board only; it has no match state and draws no player tokens.
+            // A passive Classic-only miniature mirrors the production board geometry and colors.
+            // It deliberately has no touch handling, so taps continue to reach the whole panel.
             addView(
-                LudoBoardView(this@boardPanel).apply {
-                    bind(state = null, playerId = null)
+                ClassicBoardIconView(this@boardPanel).apply {
+                    isClickable = false
                     isFocusable = false
                     importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
                     contentDescription = "Classic Ludo board preview"
-                    setOnClickListener {
-                        this@boardPanel.playSelectionPopAnimation {
-                            handleCosmeticTap(board)
-                        }
-                    }
                 },
                 LinearLayout.LayoutParams(
                     dp(62),
@@ -242,3 +240,217 @@ private fun StoreActivity.boardStatusBadge(
                 )
             }
     }
+
+
+/**
+ * Small, passive rendering of the production Classic board for the store card.
+ *
+ * Geometry and colors mirror LudoBoardView, but this view intentionally has no dependency on
+ * the selected cosmetic theme and no touch handling. Keep TRACK/HOME_LANES in sync with the
+ * production board's locked layout if that layout is ever deliberately changed.
+ */
+private class ClassicBoardIconView(context: android.content.Context) : View(context) {
+    private val surfacePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        color = Color.rgb(248, 248, 248)
+    }
+    private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+    }
+    private val cellStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = dp(0.55f)
+        color = Color.rgb(70, 70, 70)
+    }
+    private val yardStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = dp(0.8f)
+        color = Color.argb(230, 22, 33, 52)
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        val size = minOf(width, height).toFloat()
+        if (size <= 0f) return
+        val cell = size / 15f
+        val outer = RectF(0f, 0f, size, size)
+        val clip = Path().apply {
+            addRoundRect(outer, dp(3f), dp(3f), Path.Direction.CW)
+        }
+
+        canvas.save()
+        canvas.clipPath(clip)
+        canvas.drawRoundRect(outer, dp(3f), dp(3f), surfacePaint)
+        drawYards(canvas, cell)
+        drawTrack(canvas, cell)
+        drawHomeLanes(canvas, cell)
+        drawCenter(canvas, cell)
+        canvas.restore()
+    }
+
+    private fun drawYards(canvas: Canvas, cell: Float) {
+        yard(canvas, cell, 0, 0, RED)
+        yard(canvas, cell, 0, 9, GREEN)
+        yard(canvas, cell, 9, 9, YELLOW)
+        yard(canvas, cell, 9, 0, BLUE)
+    }
+
+    private fun yard(canvas: Canvas, cell: Float, row: Int, col: Int, color: Int) {
+        val yard = RectF(
+            boundary(col, cell),
+            boundary(row, cell),
+            boundary(col + 6, cell),
+            boundary(row + 6, cell),
+        )
+        fillPaint.color = color
+        canvas.drawRect(yard, fillPaint)
+
+        val inset = cell * 0.5f
+        val home = RectF(
+            yard.left + inset,
+            yard.top + inset,
+            yard.right - inset,
+            yard.bottom - inset,
+        )
+        fillPaint.color = Color.WHITE
+        canvas.drawRoundRect(home, cell * 0.35f, cell * 0.35f, fillPaint)
+        canvas.drawRoundRect(home, cell * 0.35f, cell * 0.35f, yardStrokePaint)
+    }
+
+    private fun drawTrack(canvas: Canvas, cell: Float) {
+        TRACK.forEachIndexed { index, coord ->
+            val color = when (index) {
+                0 -> RED
+                13 -> GREEN
+                26 -> YELLOW
+                39 -> BLUE
+                else -> Color.WHITE
+            }
+            drawCell(canvas, cell, coord.first, coord.second, color)
+            if (index in SAFE_GLOBAL_CELLS) {
+                val starColor = when (index) {
+                    0 -> RED
+                    13 -> GREEN
+                    26 -> YELLOW
+                    39 -> BLUE
+                    else -> Color.rgb(45, 138, 204)
+                }
+                drawStar(
+                    canvas,
+                    (boundary(coord.second, cell) + boundary(coord.second + 1, cell)) / 2f,
+                    (boundary(coord.first, cell) + boundary(coord.first + 1, cell)) / 2f,
+                    cell * 0.27f,
+                    starColor,
+                )
+            }
+        }
+    }
+
+    private fun drawHomeLanes(canvas: Canvas, cell: Float) {
+        HOME_LANES.forEach { (color, lane) ->
+            lane.forEach { (row, col) ->
+                drawCell(canvas, cell, row, col, color)
+            }
+        }
+    }
+
+    private fun drawCenter(canvas: Canvas, cell: Float) {
+        val left = boundary(6, cell)
+        val top = boundary(6, cell)
+        val right = boundary(9, cell)
+        val bottom = boundary(9, cell)
+        val cx = (left + right) / 2f
+        val cy = (top + bottom) / 2f
+        drawTriangle(canvas, RED, left, top, left, bottom, cx, cy)
+        drawTriangle(canvas, GREEN, left, top, right, top, cx, cy)
+        drawTriangle(canvas, YELLOW, right, top, right, bottom, cx, cy)
+        drawTriangle(canvas, BLUE, left, bottom, right, bottom, cx, cy)
+    }
+
+    private fun drawCell(canvas: Canvas, cell: Float, row: Int, col: Int, color: Int) {
+        fillPaint.color = color
+        val rect = RectF(
+            boundary(col, cell),
+            boundary(row, cell),
+            boundary(col + 1, cell),
+            boundary(row + 1, cell),
+        )
+        canvas.drawRect(rect, fillPaint)
+        canvas.drawRect(rect, cellStrokePaint)
+    }
+
+    private fun drawTriangle(
+        canvas: Canvas,
+        color: Int,
+        x1: Float,
+        y1: Float,
+        x2: Float,
+        y2: Float,
+        x3: Float,
+        y3: Float,
+    ) {
+        fillPaint.color = color
+        val path = Path().apply {
+            moveTo(x1, y1)
+            lineTo(x2, y2)
+            lineTo(x3, y3)
+            close()
+        }
+        canvas.drawPath(path, fillPaint)
+        canvas.drawPath(path, cellStrokePaint)
+    }
+
+    private fun drawStar(canvas: Canvas, cx: Float, cy: Float, radius: Float, color: Int) {
+        val path = Path()
+        for (i in 0 until 10) {
+            val angle = Math.toRadians(-90.0 + i * 36.0)
+            val r = if (i % 2 == 0) radius else radius * 0.45f
+            val x = cx + (kotlin.math.cos(angle) * r).toFloat()
+            val y = cy + (kotlin.math.sin(angle) * r).toFloat()
+            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        }
+        path.close()
+        fillPaint.color = color
+        canvas.drawPath(path, fillPaint)
+    }
+
+    private fun boundary(index: Int, cell: Float): Float {
+        val yardSpan = cell * 5f
+        val roadSpan = cell * 5f
+        val yardStep = yardSpan / 6f
+        val roadStep = roadSpan / 3f
+        return when {
+            index <= 6 -> index * yardStep
+            index <= 9 -> yardSpan + (index - 6) * roadStep
+            else -> yardSpan + roadSpan + (index - 9) * yardStep
+        }
+    }
+
+    private fun dp(value: Float): Float = value * resources.displayMetrics.density
+
+    private companion object {
+        val RED = Color.rgb(241, 37, 47)
+        val GREEN = Color.rgb(0, 169, 80)
+        val YELLOW = Color.rgb(255, 216, 27)
+        val BLUE = Color.rgb(48, 151, 215)
+        val SAFE_GLOBAL_CELLS = setOf(0, 8, 13, 21, 26, 34, 39, 47)
+        val TRACK = listOf(
+            6 to 1, 6 to 2, 6 to 3, 6 to 4, 6 to 5,
+            5 to 6, 4 to 6, 3 to 6, 2 to 6, 1 to 6, 0 to 6,
+            0 to 7, 0 to 8, 1 to 8, 2 to 8, 3 to 8, 4 to 8, 5 to 8,
+            6 to 9, 6 to 10, 6 to 11, 6 to 12, 6 to 13, 6 to 14,
+            7 to 14, 8 to 14, 8 to 13, 8 to 12, 8 to 11, 8 to 10,
+            8 to 9, 9 to 8, 10 to 8, 11 to 8, 12 to 8, 13 to 8,
+            14 to 8, 14 to 7, 14 to 6, 13 to 6, 12 to 6, 11 to 6,
+            10 to 6, 9 to 6, 8 to 5, 8 to 4, 8 to 3, 8 to 2,
+            8 to 1, 8 to 0, 7 to 0, 6 to 0,
+        )
+        val HOME_LANES = mapOf(
+            RED to listOf(7 to 1, 7 to 2, 7 to 3, 7 to 4, 7 to 5),
+            GREEN to listOf(1 to 7, 2 to 7, 3 to 7, 4 to 7, 5 to 7),
+            YELLOW to listOf(7 to 13, 7 to 12, 7 to 11, 7 to 10, 7 to 9),
+            BLUE to listOf(13 to 7, 12 to 7, 11 to 7, 10 to 7, 9 to 7),
+        )
+    }
+}
+
