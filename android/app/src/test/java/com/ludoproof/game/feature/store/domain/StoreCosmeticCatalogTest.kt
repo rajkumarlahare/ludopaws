@@ -59,6 +59,30 @@ class StoreCosmeticCatalogTest {
     }
 
     @Test
+    fun onlyClassicBoardIsAvailableAndOtherEightRemainLocked() {
+        val boards = StoreCosmeticCatalog.boards
+        assertEquals(9, boards.size)
+
+        val classic =
+            requireNotNull(
+                StoreCosmeticCatalog.find(StoreCosmeticCatalog.DEFAULT_BOARD),
+            )
+        assertEquals("CLASSIC", classic.title)
+        assertTrue(classic.contentAvailable)
+
+        val lockedBoards =
+            boards.filter {
+                it.id != StoreCosmeticCatalog.DEFAULT_BOARD
+            }
+        assertEquals(8, lockedBoards.size)
+        assertTrue(
+            lockedBoards.all {
+                !it.contentAvailable && it.title == "LOCKED BOARD"
+            },
+        )
+    }
+
+    @Test
     fun starterPawsHasSixReservedFuturePacksThatRemainLocked() {
         val futurePacks =
             StoreCosmeticCatalog.characterPacks.filter {
