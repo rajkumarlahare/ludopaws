@@ -88,8 +88,12 @@ test("access tokens are signed, session-bound, short-lived and reject tampering"
   const claims = await verifyAccessToken(env, token, now + 1000);
   assert.equal(claims.accountId, accountId);
   assert.equal(claims.sessionId, sessionId);
+  const parts = token.split(".");
+  const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
+  payload.sub = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  parts[1] = Buffer.from(JSON.stringify(payload)).toString("base64url");
   await assert.rejects(
-    verifyAccessToken(env, token.slice(0, -1) + (token.endsWith("a") ? "b" : "a"), now + 1000),
+    verifyAccessToken(env, parts.join("."), now + 1000),
     (error) => error.code === "ACCOUNT_SESSION_INVALID",
   );
   await assert.rejects(

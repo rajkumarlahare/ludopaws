@@ -274,7 +274,10 @@ test("non-consumable purchase is acknowledged after Play verification", async ()
     ),
     (error) => error.status === 409 && error.code === "PURCHASE_ALREADY_REDEEMED",
   );
-  assert.equal(calls.filter(({ url }) => url.includes("/purchases/products/")).length, 1);
+  assert.equal(
+    calls.filter(({ url, init }) => url.includes("/purchases/products/") && init.method === "GET").length,
+    1,
+  );
 });
 
 test("store purchase ledger rejects token reuse by another installation", async () => {
