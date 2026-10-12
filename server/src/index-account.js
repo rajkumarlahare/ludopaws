@@ -105,26 +105,10 @@ export default {
         const google = await verifyGoogleIdToken(env, body.idToken, body.nonce);
         await directoryRequest(env, "/nonce/consume", { nonce: body.nonce });
         const subjectHash = await hashGoogleSubject(google.subject);
-        let accountId;
-        try {
-          const existing = await directoryRequest(env, "/google/lookup", { subjectHash });
-          accountId = requireText(existing.accountId, "accountId");
-        } catch (error) {
-          if (error.status !== 404 || error.code !== "GOOGLE_IDENTITY_NOT_LINKED") throw error;
-          const guest = await directoryRequest(env, "/guest", {
-            clientRequestId: body.clientRequestId,
-            displayName: google.displayName,
-          });
-          accountId = requireText(guest.accountId, "accountId");
-          try {
-            await directoryRequest(env, "/google/link", { accountId, subjectHash });
-          } catch (linkError) {
-            // If another first-login request linked this Google identity first, use that canonical account.
-            if (linkError.status !== 409) throw linkError;
-            const canonical = await directoryRequest(env, "/google/lookup", { subjectHash });
-            accountId = requireText(canonical.accountId, "accountId");
-          }
-        }
+        // Login restores only an already-linked account. Creating a fresh guest here would
+        // silently switch identities and orphan the current guest's inventory/social state.
+        const existing = await directoryRequest(env, "/google/lookup", { subjectHash });
+        const accountId = requireAccountId(existing.accountId);
         return await playerRequest(env, accountId, "/session/create", {
           accountId,
           displayName: google.displayName,

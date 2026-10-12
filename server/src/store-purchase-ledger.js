@@ -55,10 +55,7 @@ export class StorePurchaseLedger {
     if (existing) {
       if (
         existing.productId !== body.productId ||
-        (
-          existing.accountId !== body.accountId &&
-          !(existing.removeAds && body.removeAds)
-        )
+        existing.accountId !== body.accountId
       ) {
         return json(409, { error: "PURCHASE_ALREADY_REDEEMED" });
       }
@@ -88,10 +85,7 @@ export class StorePurchaseLedger {
     if (
       !existing ||
       existing.productId !== body.productId ||
-      (
-        existing.accountId !== body.accountId &&
-        !existing.removeAds
-      )
+      existing.accountId !== body.accountId
     ) {
       return json(409, { error: "PURCHASE_RESERVATION_NOT_FOUND" });
     }

@@ -444,10 +444,7 @@ async function ledgerRequest(ledger, path, method, body = null) {
 function assertSamePurchase(purchase, productId, accountId, product) {
   if (
     purchase?.productId !== productId ||
-    (
-      purchase?.accountId !== accountId &&
-      !product.removeAds
-    )
+    purchase?.accountId !== accountId
   ) {
     throw httpError(
       409,
