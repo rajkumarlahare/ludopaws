@@ -89,7 +89,7 @@ internal fun ProfileActivity.showNameEditor() {
 
     panel.addView(
         TextView(this).apply {
-            text = "EDIT PROFILE NAME"
+            text = "EDIT NICKNAME"
             textSize = if (compact) 19f else 22f
             setTypeface(Typeface.DEFAULT, Typeface.BOLD)
             setTextColor(0xFFFFD45E.toInt())
@@ -105,7 +105,7 @@ internal fun ProfileActivity.showNameEditor() {
 
     panel.addView(
         TextView(this).apply {
-            text = "Choose the name shown on your profile."
+            text = "Use 6–7 characters for your nickname."
             textSize = if (compact) 12f else 13f
             setTextColor(0xFFD9EEFF.toInt())
             gravity = Gravity.CENTER
@@ -126,7 +126,7 @@ internal fun ProfileActivity.showNameEditor() {
             textSize = 16f
             setTextColor(Color.WHITE)
             setHintTextColor(0xFF9ACBEA.toInt())
-            hint = "Enter your name"
+            hint = "6–7 character nickname"
             setTypeface(Typeface.DEFAULT, Typeface.BOLD)
             gravity = Gravity.CENTER_VERTICAL
             includeFontPadding = false
