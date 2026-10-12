@@ -70,8 +70,9 @@ if (!settings.includes('settingsPrivacyLink(')) {
   throw new Error('Settings UI must retain its Privacy Policy link.');
 }
 const settingsKit = read('settingsKit');
-if (!settingsKit.includes('background =\n            plywoodBackground(')) {
-  throw new Error('Settings popup must use the shared plywood theme background.');
+const themedPlywoodSurfaces = settingsKit.match(/background\\s*=\\s*plywoodBackground\\(/g) || [];
+if (themedPlywoodSurfaces.length < 2) {
+  throw new Error('Settings popup and option dialogs must use the shared plywood theme background.');
 }
 if (!read('offlineRail').includes('isComputerMode') || !read('offlineRail').includes('hasComputerOpponent')) {
   throw new Error('Offline Quick Chat must be reserved for the human in Computer mode, never Pass & Play.');
@@ -89,9 +90,6 @@ if (!realtime.includes('QUICK_CHAT_SEND') || !realtime.includes('type == "QUICK_
 const serverRoom = fs.readFileSync('server/src/match-room.js', 'utf8');
 for (const marker of ['QUICK_CHAT_SEND', 'QUICK_CHAT', 'getTags(socket)', 'QUICK_CHAT_COOLDOWN_MS']) {
   if (!serverRoom.includes(marker)) throw new Error(`Server Quick Chat handler is missing ${marker}`);
-}
-if (!settings.includes('background =\n            plywoodBackground(')) {
-  throw new Error('Settings option dialogs must use the shared plywood theme background.');
 }
 if (!read('settingsEntry').includes('onChanged: (() -> Unit)? = null')) {
   throw new Error('Settings changes must notify the online UI so Quick Chat visibility refreshes.');
