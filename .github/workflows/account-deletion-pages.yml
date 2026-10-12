@@ -1,0 +1,65 @@
+name: Ludo Paws Account Deletion Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/account-deletion.html"
+      - ".github/workflows/account-deletion-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ludopaws-account-deletion-pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+      actions: read
+    environment:
+      name: github-pages
+      url: \${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b
+
+      - name: Build the deletion site
+        env:
+          GOOGLE_SIGN_IN_WEB_CLIENT_ID: \${{ vars.GOOGLE_SIGN_IN_WEB_CLIENT_ID }}
+          LUDOPROOF_SUPPORT_EMAIL: \${{ vars.LUDOPROOF_SUPPORT_EMAIL }}
+        run: |
+          set -euo pipefail
+          mkdir -p site
+          cp docs/account-deletion.html site/index.html
+          node <<'NODE'
+          const fs = require("node:fs");
+          const config = {
+            apiBaseUrl: "https://ludoproof-game-api.ai-8f3.workers.dev",
+            googleWebClientId: process.env.GOOGLE_SIGN_IN_WEB_CLIENT_ID || "",
+            supportEmail: process.env.LUDOPROOF_SUPPORT_EMAIL || ""
+          };
+          fs.writeFileSync(
+            "site/config.js",
+            "window.LUDO_ACCOUNT_CONFIG = " + JSON.stringify(config) + ";\n",
+            { encoding: "utf8", mode: 0o644 }
+          );
+          NODE
+
+      - name: Upload static site
+        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b
+        with:
+          path: site/
+
+      - name: Publish GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e

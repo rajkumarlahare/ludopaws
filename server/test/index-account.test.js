@@ -127,6 +127,94 @@ test("account deletion cannot be authorized by a caller-supplied account ID", as
   assert.equal((await response.json()).error, "AUTH_REQUIRED");
 });
 
+test("account deletion web CORS is limited to the configured static-site origin and required headers", async () => {
+  const allowed = await accountWorker.fetch(
+    new Request("https://api.example.test/api/account/delete", {
+      method: "OPTIONS",
+      headers: {
+        origin: "https://rajkumarlahare.github.io",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "authorization,content-type",
+      },
+    }),
+    {},
+  );
+  assert.equal(allowed.status, 204);
+  assert.equal(allowed.headers.get("access-control-allow-origin"), "https://rajkumarlahare.github.io");
+  assert.equal(allowed.headers.get("access-control-allow-methods"), "POST, OPTIONS");
+
+  const denied = await accountWorker.fetch(
+    new Request("https://api.example.test/api/account/delete", {
+      method: "OPTIONS",
+      headers: {
+        origin: "https://attacker.example",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "authorization,content-type",
+      },
+    }),
+    {},
+  );
+  assert.equal(denied.status, 403);
+  assert.equal(denied.headers.get("access-control-allow-origin"), null);
+
+  const unexpectedHeader = await accountWorker.fetch(
+    new Request("https://api.example.test/api/account/delete", {
+      method: "OPTIONS",
+      headers: {
+        origin: "https://rajkumarlahare.github.io",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "authorization,x-not-allowed",
+      },
+    }),
+    {},
+  );
+  assert.equal(unexpectedHeader.status, 403);
+});
+
+test("account deletion web CORS allows only the configured static-site origin and expected headers", async () => {
+  const allowed = await accountWorker.fetch(
+    new Request("https://api.example.test/api/account/delete", {
+      method: "OPTIONS",
+      headers: {
+        origin: "https://rajkumarlahare.github.io",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "authorization,content-type",
+      },
+    }),
+    {},
+  );
+  assert.equal(allowed.status, 204);
+  assert.equal(allowed.headers.get("access-control-allow-origin"), "https://rajkumarlahare.github.io");
+  assert.equal(allowed.headers.get("access-control-allow-methods"), "POST, OPTIONS");
+
+  const denied = await accountWorker.fetch(
+    new Request("https://api.example.test/api/account/delete", {
+      method: "OPTIONS",
+      headers: {
+        origin: "https://attacker.example",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "authorization,content-type",
+      },
+    }),
+    {},
+  );
+  assert.equal(denied.status, 403);
+  assert.equal(denied.headers.get("access-control-allow-origin"), null);
+
+  const unexpectedHeader = await accountWorker.fetch(
+    new Request("https://api.example.test/api/account/delete", {
+      method: "OPTIONS",
+      headers: {
+        origin: "https://rajkumarlahare.github.io",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "authorization,x-not-allowed",
+      },
+    }),
+    {},
+  );
+  assert.equal(unexpectedHeader.status, 403);
+});
+
 test("AdMob SSV rate limiting runs before signature/key verification", async () => {
   const env = {
     LUDOPROOF_API_GATE: makeRateGate(false),

@@ -36,8 +36,41 @@ const ACCOUNT_RATE_LIMITS = Object.freeze({
   storePurchase: 10,
 });
 
+const ACCOUNT_WEB_CORS_PATHS = new Set([
+  "/api/account/google/challenge",
+  "/api/account/google/login",
+  "/api/account/delete",
+]);
+
 export default {
   async fetch(request, env) {
+    const url = new URL(request.url);
+    if (request.method === "OPTIONS" && ACCOUNT_WEB_CORS_PATHS.has(url.pathname)) {
+      const expectedOrigin = accountWebOrigin(env);
+      const origin = request.headers.get("origin");
+      const requestedMethod = String(request.headers.get("access-control-request-method") ?? "").toUpperCase();
+      const requestedHeaders = String(request.headers.get("access-control-request-headers") ?? "")
+        .split(",").map((header) => header.trim().toLowerCase()).filter(Boolean);
+      if (
+        !expectedOrigin ||
+        origin !== expectedOrigin ||
+        requestedMethod !== "POST" ||
+        requestedHeaders.some((header) => !["authorization", "content-type"].includes(header))
+      ) {
+        return new Response(null, { status: 403, headers: { "cache-control": "no-store" } });
+      }
+      return withAccountWebCors(
+        request,
+        new Response(null, { status: 204, headers: { "cache-control": "no-store" } }),
+        env,
+      );
+    }
+    const response = await handleAccountRequest(request, env);
+    return withAccountWebCors(request, response, env);
+  },
+};
+
+async function handleAccountRequest(request, env) {
     const url = new URL(request.url);
     try {
       if (url.pathname === "/ready" && request.method === "GET") {
@@ -379,8 +412,44 @@ export default {
     } catch (error) {
       return errorResponse(error);
     }
-  },
-};
+}
+
+function accountWebOrigin(env) {
+  const configured = String(
+    env?.LUDOPROOF_ACCOUNT_WEB_ORIGIN ?? "https://rajkumarlahare.github.io",
+  ).trim();
+  try {
+    const url = new URL(configured);
+    if (url.protocol !== "https:" || url.username || url.password || url.pathname !== "/" || url.search || url.hash) {
+      return null;
+    }
+    return url.origin;
+  } catch {
+    return null;
+  }
+}
+
+function withAccountWebCors(request, response, env) {
+  const origin = request.headers.get("origin");
+  const path = new URL(request.url).pathname;
+  const expectedOrigin = accountWebOrigin(env);
+  if (!origin || origin !== expectedOrigin || !ACCOUNT_WEB_CORS_PATHS.has(path)) return response;
+  const headers = new Headers(response.headers);
+  headers.set("access-control-allow-origin", origin);
+  headers.set("access-control-allow-methods", "POST, OPTIONS");
+  headers.set("access-control-allow-headers", "Authorization, Content-Type");
+  headers.set("access-control-max-age", "600");
+  const vary = headers.get("vary");
+  if (!vary) headers.set("vary", "Origin");
+  else if (!vary.split(",").some((value) => value.trim().toLowerCase() === "origin")) {
+    headers.set("vary", vary + ", Origin");
+  }
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
 
 async function authenticate(request, env) {
   const token = bearerToken(request);
