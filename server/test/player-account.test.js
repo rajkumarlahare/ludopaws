@@ -42,7 +42,7 @@ class FakeAccountSql {
       const accountId = params[0];
       if (this.wallet.has(accountId)) return { rowsWritten: 0 };
       this.wallet.set(accountId, {
-        account_id: accountId, balance: Number(params[1]), ads_removed: 0, updated_at: Number(params[1]),
+        account_id: accountId, balance: 0, ads_removed: 0, updated_at: Number(params[1]),
       });
       return { rowsWritten: 1 };
     }
