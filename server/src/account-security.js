@@ -79,6 +79,18 @@ export async function issueAccessToken(env, accountId, sessionId, nowMs = Date.n
   return unsigned + "." + encodeBase64UrlBytes(await hmacSha256(secret, unsigned));
 }
 export async function verifyAccessToken(env, token, nowMs = Date.now()) {
+  return verifyAccessTokenClaims(env, token, nowMs, false);
+}
+
+// Account deletion may commit server-side while its HTTP response is lost. This
+// verifier is only for the deletion endpoint's replay path; its caller must
+// confirm the PlayerAccount deletion tombstone before returning success. Never
+// use this function to authorize any state-changing or data-reading operation.
+export async function verifyAccessTokenForDeletionReplay(env, token, nowMs = Date.now()) {
+  return verifyAccessTokenClaims(env, token, nowMs, true);
+}
+
+async function verifyAccessTokenClaims(env, token, nowMs, allowExpiredForDeletionReplay) {
   const secret = requireSessionSecret(env);
   if (typeof token !== "string" || token.length > 4096) throw httpError(401, "ACCOUNT_SESSION_REQUIRED", "Please sign in to your Ludo Paws account");
   const parts = token.split(".");
@@ -93,7 +105,9 @@ export async function verifyAccessToken(env, token, nowMs = Date.now()) {
   if (claims?.iss !== "https://ludoproof" || claims?.aud !== "ludoproof-android" || claims?.typ !== "access" ||
       !isAccountId(claims?.sub) || !isSessionId(claims?.sid) ||
       !Number.isSafeInteger(claims?.iat) || !Number.isSafeInteger(claims?.exp) ||
-      claims.iat > now + CLOCK_SKEW_SECONDS || claims.exp <= now || claims.exp <= claims.iat ||
+      claims.iat > now + CLOCK_SKEW_SECONDS ||
+      (!allowExpiredForDeletionReplay && claims.exp <= now) ||
+      claims.exp <= claims.iat ||
       claims.exp - claims.iat > ACCESS_TOKEN_TTL_SECONDS) {
     throw httpError(401, "ACCOUNT_SESSION_INVALID", "Account session is invalid or expired");
   }

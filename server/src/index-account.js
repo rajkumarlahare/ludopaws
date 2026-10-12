@@ -16,6 +16,7 @@ import {
   billingAccountId,
   hashGoogleSubject,
   verifyAccessToken,
+  verifyAccessTokenForDeletionReplay,
   verifyGoogleIdToken,
 } from "./account-security.js";
 import { GOOGLE_PLAY_PRODUCTS, googlePlayBillingEnabled, verifyAndRedeemGooglePlayPurchase } from "./google-play-billing.js";
@@ -194,9 +195,17 @@ async function handleAccountRequest(request, env) {
         try {
           session = await authenticate(request, env);
         } catch (error) {
-          const claims = await verifyAccessToken(env, bearerToken(request));
+          // A deletion can commit before the client receives its response. Permit
+          // signature-valid expired access tokens only to check the deletion
+          // tombstone; never treat the token as an active session.
+          const claims = await verifyAccessTokenForDeletionReplay(env, bearerToken(request));
           const status = await playerRequest(env, claims.accountId, "/account/delete-preview", { accountId: claims.accountId, sessionId: claims.sessionId });
-          if (status.deleted === true) return json(200, { ok: true, deleted: true, replay: true });
+          if (status.deleted === true) {
+            // PlayerAccount is the durable deletion tombstone. Only acknowledge
+            // replay after the directory's linked identity cleanup also completes.
+            await directoryRequest(env, "/account/delete", { accountId: claims.accountId });
+            return json(200, { ok: true, deleted: true, replay: true });
+          }
           throw error;
         }
         const body = await readJson(request);
@@ -227,8 +236,11 @@ async function handleAccountRequest(request, env) {
             method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ profileId: links.leaderboardProfileId }),
           })), "LEADERBOARD_ACCOUNT_DELETE_FAILED");
         }
-        await directoryRequest(env, "/account/delete", { accountId: session.accountId });
+        // Keep identity links/recovery tombstones available until PlayerAccount
+        // commits its deletion tombstone. If directory cleanup fails afterwards,
+        // a retry can prove the PlayerAccount tombstone and finish this final step.
         const result = await playerRequest(env, session.accountId, "/account/delete", { accountId: session.accountId, sessionId: session.sessionId, confirmation: "DELETE_MY_ACCOUNT" });
+        await directoryRequest(env, "/account/delete", { accountId: session.accountId });
         return json(200, { ok: true, deleted: result.deleted === true, replay: result.replay === true });
       }
 

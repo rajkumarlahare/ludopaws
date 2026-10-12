@@ -199,3 +199,263 @@ test("AdMob SSV rate limiting runs before signature/key verification", async () 
   assert.equal((await response.json()).error, "RATE_LIMITED");
   assert.equal(response.headers.get("retry-after"), "60");
 });
+
+
+function makeDeletionReplayEnv(deleted) {
+  const calls = [];
+  const directoryCalls = [];
+  const directory = {
+    idFromName(name) { return name; },
+    get(name) {
+      return {
+        async fetch(request) {
+          const path = new URL(request.url).pathname;
+          const body = await request.json();
+          directoryCalls.push({ name, path, body });
+          if (path === "/account/delete") return Response.json({ ok: true, deleted: true });
+          return Response.json({ error: "NOT_FOUND" }, { status: 404 });
+        },
+      };
+    },
+  };
+  const player = {
+    calls,
+    idFromName(name) { return name; },
+    get(accountId) {
+      return {
+        async fetch(request) {
+          const url = new URL(request.url);
+          const body = await request.json();
+          calls.push({ accountId, path: url.pathname, body });
+          if (url.pathname === "/session/check") {
+            return Response.json({ error: "ACCOUNT_SESSION_INVALID" }, { status: 401 });
+          }
+          if (url.pathname === "/account/delete-preview") {
+            return Response.json({ ok: true, deleted, purchaseLedgerIds: [] });
+          }
+          return Response.json({ error: "NOT_FOUND" }, { status: 404 });
+        },
+      };
+    },
+  };
+  return {
+    player,
+    directoryCalls,
+    env: {
+      LUDOPROOF_SESSION_HMAC_KEY: SECRET,
+      LUDOPROOF_API_GATE: makeRateGate(),
+      LUDOPROOF_PLAYER_ACCOUNTS: player,
+      LUDOPROOF_ACCOUNT_DIRECTORY: directory,
+    },
+  };
+}
+
+test("expired signed access token can only confirm an already-deleted account", async () => {
+  const { env, player, directoryCalls } = makeDeletionReplayEnv(true);
+  const expiredToken = await issueAccessToken(env, ACCOUNT_A, SESSION_A, Date.now() - 20 * 60 * 1000);
+  const response = await accountWorker.fetch(
+    new Request("https://api.example.test/api/account/delete", {
+      method: "POST",
+      headers: { authorization: "Bearer " + expiredToken, "content-type": "application/json" },
+      body: JSON.stringify({}),
+    }),
+    env,
+  );
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { ok: true, deleted: true, replay: true });
+  assert.equal(player.calls.length, 1);
+  assert.equal(player.calls[0].path, "/account/delete-preview");
+  assert.equal(player.calls[0].accountId, ACCOUNT_A);
+  assert.equal(player.calls[0].body.sessionId, SESSION_A);
+  assert.deepEqual(directoryCalls.map(call => call.path), ["/account/delete"]);
+});
+
+test("expired signed access token cannot authorize a deletion when no deletion tombstone exists", async () => {
+  const { env, player } = makeDeletionReplayEnv(false);
+  const expiredToken = await issueAccessToken(env, ACCOUNT_A, SESSION_A, Date.now() - 20 * 60 * 1000);
+  const response = await accountWorker.fetch(
+    new Request("https://api.example.test/api/account/delete", {
+      method: "POST",
+      headers: { authorization: "Bearer " + expiredToken, "content-type": "application/json" },
+      body: JSON.stringify({ confirmation: "DELETE_MY_ACCOUNT" }),
+    }),
+    env,
+  );
+
+  assert.equal(response.status, 401);
+  assert.equal((await response.json()).error, "ACCOUNT_SESSION_INVALID");
+  assert.equal(player.calls.length, 1);
+  assert.equal(player.calls[0].path, "/account/delete-preview");
+});
+
+
+test("expired token replay still rejects a forged signature before checking the tombstone", async () => {
+  const { env, player, directoryCalls } = makeDeletionReplayEnv(true);
+  const token = await issueAccessToken(env, ACCOUNT_A, SESSION_A, Date.now() - 20 * 60 * 1000);
+  const parts = token.split(".");
+  parts[2] = (parts[2][0] === "A" ? "B" : "A") + parts[2].slice(1);
+  const tamperedToken = parts.join(".");
+
+  const response = await accountWorker.fetch(
+    new Request("https://api.example.test/api/account/delete", {
+      method: "POST",
+      headers: { authorization: "Bearer " + tamperedToken, "content-type": "application/json" },
+      body: JSON.stringify({}),
+    }),
+    env,
+  );
+
+  assert.equal(response.status, 401);
+  assert.equal((await response.json()).error, "ACCOUNT_SESSION_INVALID");
+  assert.equal(player.calls.length, 0);
+  assert.equal(directoryCalls.length, 0);
+});
+
+
+function makeDeletionSagaEnv({ directoryDeleteFailures = 0 } = {}) {
+  const calls = [];
+  let playerDeleted = false;
+  let directoryDeleted = false;
+  let remainingDirectoryDeleteFailures = directoryDeleteFailures;
+
+  const player = {
+    idFromName(name) { return name; },
+    get(accountId) {
+      return {
+        async fetch(request) {
+          const path = new URL(request.url).pathname;
+          const body = await request.json();
+          calls.push("player:" + path);
+          if (path === "/session/check") {
+            return Response.json({
+              ok: true,
+              accountId,
+              profile: { accountId, displayName: "Delete Me" },
+            });
+          }
+          if (path === "/account/delete-preview") {
+            return Response.json({ ok: true, deleted: playerDeleted, purchaseLedgerIds: [] });
+          }
+          if (path === "/account/delete") {
+            assert.equal(body.confirmation, "DELETE_MY_ACCOUNT");
+            playerDeleted = true;
+            return Response.json({ ok: true, deleted: true, replay: false });
+          }
+          return Response.json({ error: "NOT_FOUND" }, { status: 404 });
+        },
+      };
+    },
+  };
+
+  const directory = {
+    idFromName(name) { return name; },
+    get(name) {
+      return {
+        async fetch(request) {
+          const path = new URL(request.url).pathname;
+          calls.push("directory:" + path);
+          if (path === "/identity/list") {
+            return Response.json({
+              ok: true,
+              accountId: ACCOUNT_A,
+              googleLinked: false,
+              friendId: null,
+              leaderboardProfileId: null,
+            });
+          }
+          if (path === "/account/delete") {
+            if (remainingDirectoryDeleteFailures > 0) {
+              remainingDirectoryDeleteFailures -= 1;
+              return Response.json(
+                { error: "ACCOUNT_DIRECTORY_UNAVAILABLE", message: "injected directory failure" },
+                { status: 503 },
+              );
+            }
+            directoryDeleted = true;
+            return Response.json({ ok: true, deleted: true });
+          }
+          return Response.json({ error: "NOT_FOUND" }, { status: 404 });
+        },
+      };
+    },
+  };
+
+  const env = {
+    LUDOPROOF_SESSION_HMAC_KEY: SECRET,
+    LUDOPROOF_API_GATE: makeRateGate(),
+    LUDOPROOF_PLAYER_ACCOUNTS: player,
+    LUDOPROOF_ACCOUNT_DIRECTORY: directory,
+  };
+
+  return {
+    env,
+    calls,
+    state: () => ({ playerDeleted, directoryDeleted, remainingDirectoryDeleteFailures }),
+  };
+}
+
+test("account deletion commits the PlayerAccount tombstone before removing account-directory identities", async () => {
+  const fixture = makeDeletionSagaEnv();
+  const token = await issueAccessToken(fixture.env, ACCOUNT_A, SESSION_A, Date.now());
+  const response = await accountWorker.fetch(
+    new Request("https://api.example.test/api/account/delete", {
+      method: "POST",
+      headers: { authorization: "Bearer " + token, "content-type": "application/json" },
+      body: JSON.stringify({ confirmation: "DELETE_MY_ACCOUNT" }),
+    }),
+    fixture.env,
+  );
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { ok: true, deleted: true, replay: false });
+  const state = fixture.state();
+  assert.equal(state.playerDeleted, true);
+  assert.equal(state.directoryDeleted, true);
+  assert.ok(fixture.calls.indexOf("player:/account/delete") >= 0);
+  assert.ok(fixture.calls.indexOf("directory:/account/delete") > fixture.calls.indexOf("player:/account/delete"));
+});
+
+test("a directory cleanup failure after wallet tombstoning is not reported as success and retry finishes cleanup", async () => {
+  const fixture = makeDeletionSagaEnv({ directoryDeleteFailures: 1 });
+  const activeToken = await issueAccessToken(fixture.env, ACCOUNT_A, SESSION_A, Date.now());
+  const first = await accountWorker.fetch(
+    new Request("https://api.example.test/api/account/delete", {
+      method: "POST",
+      headers: { authorization: "Bearer " + activeToken, "content-type": "application/json" },
+      body: JSON.stringify({ confirmation: "DELETE_MY_ACCOUNT" }),
+    }),
+    fixture.env,
+  );
+
+  assert.equal(first.status, 503);
+  assert.equal((await first.json()).error, "ACCOUNT_DIRECTORY_UNAVAILABLE");
+  assert.deepEqual(fixture.state(), {
+    playerDeleted: true,
+    directoryDeleted: false,
+    remainingDirectoryDeleteFailures: 0,
+  });
+
+  const expiredButSignedToken = await issueAccessToken(
+    fixture.env,
+    ACCOUNT_A,
+    SESSION_A,
+    Date.now() - 20 * 60 * 1000,
+  );
+  const retry = await accountWorker.fetch(
+    new Request("https://api.example.test/api/account/delete", {
+      method: "POST",
+      headers: { authorization: "Bearer " + expiredButSignedToken, "content-type": "application/json" },
+      body: JSON.stringify({}),
+    }),
+    fixture.env,
+  );
+
+  assert.equal(retry.status, 200);
+  assert.deepEqual(await retry.json(), { ok: true, deleted: true, replay: true });
+  assert.deepEqual(fixture.state(), {
+    playerDeleted: true,
+    directoryDeleted: true,
+    remainingDirectoryDeleteFailures: 0,
+  });
+});

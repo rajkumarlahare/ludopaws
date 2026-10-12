@@ -20,8 +20,9 @@ boot_emulator() {
   sleep 2
   rm -f "$AVD_HOME/$AVD_NAME.avd"/*.lock
 
-  # Match the initial boot configuration: software rendering with Vulkan disabled.
-  # This avoids the SwiftShader/Vulkan emulator segfault observed on hosted Linux runners.
+  # Pin the SwiftShader backend rather than the generic software selector.
+  # Emulator 37.2.12 selected swangle/lavapipe with -gpu software and
+  # segfaulted mid-suite on the hosted Linux runner.
   local args=(
     -avd "$AVD_NAME"
     -no-window
@@ -30,7 +31,7 @@ boot_emulator() {
     -no-snapshot
     -camera-back none
     -camera-front none
-    -gpu software
+    -gpu swiftshader
     -feature -Vulkan
   )
   if [[ "$wipe_data" == "true" ]]; then
