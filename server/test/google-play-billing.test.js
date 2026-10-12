@@ -21,6 +21,10 @@ class FakeStorage {
   async put(key, value) {
     this.values.set(key, structuredClone(value));
   }
+
+  async delete(key) {
+    return this.values.delete(key);
+  }
 }
 
 function makeLedgerNamespace() {
@@ -111,6 +115,43 @@ async function makeEnv() {
     LUDOPROOF_STORE_PURCHASES: makeLedgerNamespace(),
   };
 }
+
+test("purchase ledger deletion is owner-bound and idempotent", async () => {
+  const storage = new FakeStorage();
+  const ledger = new StorePurchaseLedger({ storage });
+  const owner = "a".repeat(64);
+  const other = "b".repeat(64);
+  const reserve = await ledger.fetch(new Request("https://ledger/reserve", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ accountId: owner, productId: "gems_300", gemAmount: 300, removeAds: false }),
+  }));
+  assert.equal(reserve.status, 200);
+
+  const denied = await ledger.fetch(new Request("https://ledger/delete", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ accountId: other }),
+  }));
+  assert.equal(denied.status, 409);
+
+  const deleted = await ledger.fetch(new Request("https://ledger/delete", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ accountId: owner }),
+  }));
+  assert.equal(deleted.status, 200);
+  assert.equal((await deleted.json()).deleted, true);
+
+  const status = await ledger.fetch(new Request("https://ledger/status"));
+  assert.equal((await status.json()).purchase, null);
+  const replay = await ledger.fetch(new Request("https://ledger/delete", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ accountId: owner }),
+  }));
+  assert.equal(replay.status, 200);
+});
 
 test("server product grants match the Android product definitions", () => {
   assert.deepEqual(
