@@ -49,8 +49,10 @@ export default {
         const playerAccountsConfigured = Boolean(env?.LUDOPROOF_PLAYER_ACCOUNTS);
         const googleSignInClientIdConfigured = typeof env?.GOOGLE_SIGN_IN_WEB_CLIENT_ID === "string" &&
           env.GOOGLE_SIGN_IN_WEB_CLIENT_ID.trim().length > 0;
+        const sessionHmacConfigured = typeof env?.LUDOPROOF_SESSION_HMAC_KEY === "string" &&
+          new TextEncoder().encode(env.LUDOPROOF_SESSION_HMAC_KEY).byteLength >= 32;
         const ready = base.ok && body?.ready === true && accountDirectoryConfigured &&
-          playerAccountsConfigured && googleSignInClientIdConfigured;
+          playerAccountsConfigured && googleSignInClientIdConfigured && sessionHmacConfigured;
         return json(ready ? 200 : 503, {
           ...body,
           ok: ready,
@@ -61,6 +63,7 @@ export default {
             accountDirectoryConfigured,
             playerAccountsConfigured,
             googleSignInClientIdConfigured,
+            sessionHmacConfigured,
             playBillingEnabled: googlePlayBillingEnabled(env),
             admobSsvEnabled: env?.LUDOPROOF_ADMOB_SSV_ENABLED === "true" &&
               Boolean(env?.LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID),
@@ -133,6 +136,7 @@ export default {
       }
 
       if (url.pathname === "/api/account/me" && request.method === "GET") {
+        await rateLimit(env, request, "account:profile:read", ACCOUNT_RATE_LIMITS.profile);
         const session = await authenticate(request, env);
         return await playerRequest(env, session.accountId, "/profile/get", {
           accountId: session.accountId,
@@ -152,6 +156,7 @@ export default {
       }
 
       if (url.pathname === "/api/account/links" && request.method === "GET") {
+        await rateLimit(env, request, "account:links:read", ACCOUNT_RATE_LIMITS.profile);
         const session = await authenticate(request, env);
         return await directoryRequest(env, "/identity/list", { accountId: session.accountId });
       }
@@ -216,6 +221,7 @@ export default {
       }
 
       if (url.pathname === "/api/wallet" && request.method === "GET") {
+        await rateLimit(env, request, "wallet:read", ACCOUNT_RATE_LIMITS.wallet);
         const session = await authenticate(request, env);
         return await playerRequest(env, session.accountId, "/wallet/get", {
           accountId: session.accountId,
