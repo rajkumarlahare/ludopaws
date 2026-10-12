@@ -11,25 +11,22 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.Toast
 import com.ludoproof.game.BuildConfig
+import com.ludoproof.game.LudoProofApplication
 import com.ludoproof.game.LudoProofTheme
 import com.ludoproof.game.feature.store.data.ads.RewardedAdsController
 import com.ludoproof.game.feature.store.data.billing.GooglePlayBillingGateway
-import com.ludoproof.game.feature.store.data.billing.StoreInstallAccountId
 import com.ludoproof.game.feature.store.data.billing.PendingStorePurchase
 import com.ludoproof.game.feature.store.data.billing.PendingStorePurchaseStore
-import com.ludoproof.game.feature.store.data.billing.StorePurchaseVerifier
 import com.ludoproof.game.feature.store.data.local.CosmeticInventoryStore
 import com.ludoproof.game.feature.store.data.local.GemWalletStore
-import com.ludoproof.game.feature.store.domain.StoreCatalog
 import com.ludoproof.game.feature.store.domain.StoreCosmeticCatalog
-import com.ludoproof.game.feature.store.domain.StorePurchaseFulfillment
-import com.ludoproof.game.feature.store.domain.model.VerifiedStorePurchase
 import com.ludoproof.game.feature.store.domain.model.StoreBillingProduct
 import com.ludoproof.game.feature.store.domain.model.StoreTab
 import com.ludoproof.game.feature.store.presentation.components.storeContent
 import com.ludoproof.game.feature.store.presentation.components.storeHeader
 import com.ludoproof.game.feature.store.presentation.components.storeTabs
 import java.util.concurrent.Executors
+import org.json.JSONObject
 
 class StoreActivity :
     Activity(),
@@ -50,27 +47,32 @@ class StoreActivity :
             > =
         emptyMap()
     private var billingAvailable = false
+    private var rewardedAdsEnabledByServer = false
+    private var billingWasCreated = false
+    private var rewardedAdsWasCreated = false
+    private val accountRepository by lazy {
+        (application as LudoProofApplication).accountRepository
+    }
     private val billingExecutor =
         Executors.newSingleThreadExecutor { runnable ->
             Thread(runnable, "LudoPawsStoreBilling")
         }
-    private val purchaseVerifier by lazy {
-        StorePurchaseVerifier()
-    }
     private val pendingPurchases by lazy {
         PendingStorePurchaseStore(this)
     }
     private val installAccountId by lazy {
-        StoreInstallAccountId(this).value
+        accountRepository.requireSession().billingAccountId
     }
     internal val adsEnabledForBuild: Boolean
         get() =
             BuildConfig.LUDOPROOF_ADS_ENABLED &&
+                rewardedAdsEnabledByServer &&
                 (
                     !BuildConfig.LUDOPROOF_ADS_USE_TEST_IDS ||
                         BuildConfig.DEBUG
                     )
     private val rewardedAds by lazy {
+        rewardedAdsWasCreated = true
         RewardedAdsController(
             activity = this,
             enabled = adsEnabledForBuild,
@@ -80,6 +82,7 @@ class StoreActivity :
     }
 
     private val billing by lazy {
+        billingWasCreated = true
         GooglePlayBillingGateway(
             activity =
                 this,
@@ -111,28 +114,28 @@ class StoreActivity :
 
     override fun onStart() {
         super.onStart()
-        rewardedAds.prepare()
-        if (!BuildConfig.LUDOPROOF_BILLING_ENABLED) {
-            val hasPending =
-                try {
-                    pendingPurchases.all().isNotEmpty()
-                } catch (error: Exception) {
-                    Log.e(TAG, "Could not read pending Play purchases", error)
-                    showStoreMessage(
-                        "A pending Play purchase could not be recovered from this device. No items were granted.",
-                    )
-                    return
-                }
-            if (!hasPending) return
-        }
         billingAvailable = false
         billingExecutor.execute {
             var available = false
+            var adsAvailable = false
             var availabilityError: Exception? = null
             var recoveredPurchases = 0
             var recoveryError: Exception? = null
+            var activeAccountId: String? = null
             try {
-                available = purchaseVerifier.isBillingAvailable()
+                val session = accountRepository.ensureGuestSession()
+                activeAccountId = session.accountId
+                val status = accountRepository.storeStatus()
+                available = BuildConfig.LUDOPROOF_BILLING_ENABLED &&
+                    status.optBoolean("billingAvailable", false)
+                adsAvailable = BuildConfig.LUDOPROOF_ADS_ENABLED &&
+                    status.optBoolean("rewardedAdsAvailable", false)
+                val serverWallet = accountRepository.wallet()
+                wallet.applyServerSnapshot(serverWallet, session.accountId)
+                cosmetics.applyServerSnapshot(serverWallet, session.accountId)
+
+                // A purchase that belongs to another account is intentionally left pending.
+                // It can only be recovered after that same Google-linked account is restored.
                 if (available) {
                     pendingPurchases.all().forEach { pending ->
                         try {
@@ -147,28 +150,28 @@ class StoreActivity :
                 }
             } catch (error: Exception) {
                 availabilityError = error
-                Log.w(TAG, "Play billing verification service is unavailable", error)
+                Log.w(TAG, "Account/store bootstrap is unavailable", error)
             }
             runOnUiThread {
                 if (!canRenderStoreUi()) return@runOnUiThread
                 billingAvailable = available
-                if (
-                    BuildConfig.LUDOPROOF_BILLING_ENABLED &&
-                    billingAvailable
-                ) {
+                rewardedAdsEnabledByServer = adsAvailable
+                if (BuildConfig.LUDOPROOF_BILLING_ENABLED && billingAvailable) {
                     billing.connect()
                 } else if (BuildConfig.LUDOPROOF_BILLING_ENABLED) {
                     val message = availabilityError?.message
                         ?: "Google Play payments are not configured yet."
                     showStoreMessage(message)
                 }
+                if (adsEnabledForBuild) rewardedAds.prepare()
+                renderStore()
                 if (recoveredPurchases > 0) {
                     showStoreMessage(
-                        "Recovered $recoveredPurchases verified Play purchase${if (recoveredPurchases == 1) "" else "s"} from this device.",
+                        "Recovered $recoveredPurchases verified Play purchase${if (recoveredPurchases == 1) "" else "s"} from this account.",
                     )
                 } else if (recoveryError != null) {
                     showStoreMessage(
-                        "A previous Play payment could not be fully finalized on this device. Any saved grant is protected from duplication; we will retry when you open the store again.",
+                        "A previous Play payment could not yet be verified for the currently signed-in account. It remains pending; restore the account that made the purchase and try again.",
                     )
                 }
             }
@@ -176,8 +179,8 @@ class StoreActivity :
     }
 
     override fun onDestroy() {
-        billing.close()
-        rewardedAds.close()
+        if (billingWasCreated) billing.close()
+        if (rewardedAdsWasCreated) rewardedAds.close()
         billingExecutor.shutdownNow()
         super.onDestroy()
     }
@@ -223,40 +226,34 @@ class StoreActivity :
     internal fun requestRewardedAd(
         cosmeticId: String? = null,
     ) {
-        rewardedAds.showRewardedAd {
-            try {
-                if (cosmeticId == null) {
-                    val balance =
-                        wallet.applyRewardedAdGems(
-                            REWARDED_AD_GEMS,
-                        )
-                    renderStore()
-                    showStoreMessage(
-                        "$REWARDED_AD_GEMS gems added. Your balance is $balance.",
-                    )
-                } else {
-                    val progress =
-                        cosmetics.recordVerifiedRewardedAd(
-                            cosmeticId,
-                        )
-                    val cosmetic =
-                        requireNotNull(
-                            StoreCosmeticCatalog.find(cosmeticId),
-                        )
-                    renderStore()
-                    showStoreMessage(
-                        cosmetic.title +
-                            " ad progress: $progress/" +
-                            cosmetic.requiredAdViews +
-                            ".",
-                    )
-                }
-            } catch (error: Exception) {
-                Log.e(TAG, "Could not save rewarded-ad reward", error)
-                showStoreMessage(
-                    "The ad reward could not be saved on this device. Please keep the app installed and contact support before watching another ad.",
-                )
+        if (!adsEnabledForBuild) {
+            showStoreMessage("Server-verified rewarded ads are not configured for this build. No reward was requested.")
+            return
+        }
+        val session = try {
+            accountRepository.requireSession()
+        } catch (error: Exception) {
+            showStoreMessage(error.message ?: "Connect to the account service before requesting a reward.")
+            return
+        }
+        val customData = JSONObject()
+            .put("kind", if (cosmeticId == null) "gems" else "cosmetic")
+            .apply {
+                if (cosmeticId != null) put("cosmeticId", cosmeticId)
             }
+            .toString()
+        val initialBalance = wallet.balance()
+        val initialProgress = cosmeticId?.let(cosmetics::rewardedAdProgress) ?: 0
+        rewardedAds.showRewardedAd(
+            userId = session.accountId,
+            customData = customData,
+        ) {
+            refreshWalletAfterRewardedAd(
+                accountId = session.accountId,
+                initialBalance = initialBalance,
+                cosmeticId = cosmeticId,
+                initialProgress = initialProgress,
+            )
         }
     }
 
@@ -344,22 +341,125 @@ class StoreActivity :
     private fun verifyPurchaseAndFulfill(
         pending: PendingStorePurchase,
     ): Boolean {
-        val verified =
-            purchaseVerifier.verifyPurchase(
-                productId = pending.productId,
-                purchaseToken = pending.purchaseToken,
-                accountId = pending.accountId,
-            )
-        check(verified) {
-            "Google Play did not confirm the purchase."
+        val session = accountRepository.requireSession()
+        check(session.billingAccountId == pending.accountId) {
+            "This Play purchase belongs to another account. Restore that account before recovering it."
         }
-        return StorePurchaseFulfillment(this)
-            .applyVerifiedPurchase(
-                VerifiedStorePurchase(
-                    productId = pending.productId,
-                    purchaseToken = pending.purchaseToken,
-                ),
-            )
+        val response = accountRepository.verifyPlayPurchase(
+            productId = pending.productId,
+            purchaseToken = pending.purchaseToken,
+        )
+        check(
+            response.optBoolean("ok") &&
+                response.optBoolean("verified") &&
+                response.optString("productId") == pending.productId,
+        ) {
+            "Google Play did not confirm the purchase for the signed-in account."
+        }
+        val serverWallet = response.optJSONObject("wallet")
+            ?: throw IllegalStateException("Verified purchase did not return the authoritative wallet.")
+        check(wallet.applyServerSnapshot(serverWallet, session.accountId)) {
+            "Verified wallet snapshot did not match the signed-in account."
+        }
+        cosmetics.applyServerSnapshot(serverWallet, session.accountId)
+        ProfileStore(this).addPurchase(pending.productId) // UI cache only; server remains authoritative.
+        return !response.optBoolean("replay", false)
+    }
+
+    internal fun purchaseOrSelectCosmetic(cosmetic: com.ludoproof.game.feature.store.domain.model.StoreCosmetic) {
+        billingExecutor.execute {
+            try {
+                val session = accountRepository.requireSession()
+                val response = if (cosmetics.isOwned(cosmetic.id)) {
+                    accountRepository.selectCosmetic(cosmetic.id)
+                } else {
+                    accountRepository.purchaseCosmetic(cosmetic.id)
+                }
+                val serverWallet = response.optJSONObject("wallet") ?: accountRepository.wallet()
+                check(wallet.applyServerSnapshot(serverWallet, session.accountId)) {
+                    "Server returned a wallet for a different account."
+                }
+                cosmetics.applyServerSnapshot(serverWallet, session.accountId)
+                runOnUiThread {
+                    if (!canRenderStoreUi()) return@runOnUiThread
+                    renderStore()
+                    showStoreMessage(
+                        if (response.optBoolean("alreadyOwned", false)) {
+                            "${cosmetic.title} is already owned."
+                        } else {
+                            "${cosmetic.title} was saved to your account."
+                        },
+                    )
+                }
+            } catch (error: Exception) {
+                Log.e(TAG, "Server cosmetic purchase/select failed", error)
+                val apiError = error as? com.ludoproof.game.feature.account.data.AccountApiException
+                val message = when (apiError?.code) {
+                    "INSUFFICIENT_GEMS" -> "You do not have enough gems to buy ${cosmetic.title}."
+                    "COSMETIC_NOT_OWNED" -> "This item is not owned by the signed-in account."
+                    "COSMETIC_UNAVAILABLE" -> "This item is not available yet."
+                    "PROFILE_PROGRESSION_NOT_SERVER_AUTHORITATIVE" ->
+                        "This unlock needs server-verified profile progression before it can be purchased."
+                    else -> error.message ?: "The store could not update your account. Try again when connected."
+                }
+                runOnUiThread {
+                    if (!canRenderStoreUi()) return@runOnUiThread
+                    showStoreMessage(message)
+                }
+            }
+        }
+    }
+
+    private fun refreshWalletAfterRewardedAd(
+        accountId: String,
+        initialBalance: Int,
+        cosmeticId: String?,
+        initialProgress: Int,
+    ) {
+        billingExecutor.execute {
+            var latest: JSONObject? = null
+            var changed = false
+            for (attempt in 0 until 5) {
+                try {
+                    val session = accountRepository.requireSession()
+                    if (session.accountId != accountId) break
+                    val candidate = accountRepository.wallet()
+                    latest = candidate
+                    val currentBalance = candidate.optInt("balance", 0)
+                    val progress = candidate.optJSONObject("rewardedAdProgress")
+                        ?.optInt(cosmeticId ?: "", 0) ?: 0
+                    changed = if (cosmeticId == null) {
+                        currentBalance > initialBalance
+                    } else {
+                        progress > initialProgress
+                    }
+                    if (changed) break
+                } catch (error: Exception) {
+                    Log.w(TAG, "Waiting for server-verified ad reward", error)
+                }
+                if (attempt < 4) Thread.sleep(1500)
+            }
+            val snapshot = latest
+            runOnUiThread {
+                if (!canRenderStoreUi()) return@runOnUiThread
+                if (snapshot != null) {
+                    val session = accountRepository.currentSession()
+                    if (session != null && session.accountId == accountId) {
+                        wallet.applyServerSnapshot(snapshot, accountId)
+                        cosmetics.applyServerSnapshot(snapshot, accountId)
+                    }
+                }
+                renderStore()
+                showStoreMessage(
+                    if (changed) {
+                        if (cosmeticId == null) "Your rewarded-ad gems were verified by the server."
+                        else "The rewarded-ad progress for this item was verified by the server."
+                    } else {
+                        "The ad finished, but the server reward has not arrived yet. No local reward was granted; the store will update when verification completes."
+                    },
+                )
+            }
+        }
     }
 
     override fun onPurchasePending(
@@ -580,7 +680,6 @@ class StoreActivity :
     companion object {
         const val EXTRA_INITIAL_TAB =
             "ludo_paws_store_initial_tab"
-        private const val REWARDED_AD_GEMS = 5
         private const val TAG = "StoreBilling"
     }
 }

@@ -9,6 +9,7 @@ import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.MobileAds
 import com.google.android.gms.ads.rewarded.RewardedAd
 import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
+import com.google.android.gms.ads.rewarded.ServerSideVerificationOptions
 import com.google.android.ump.ConsentInformation
 import com.google.android.ump.ConsentRequestParameters
 import com.google.android.ump.UserMessagingPlatform
@@ -60,10 +61,20 @@ internal class RewardedAdsController(
     }
 
     fun showRewardedAd(
+        userId: String,
+        customData: String,
         onRewardEarned: () -> Unit,
     ): Boolean {
         if (!enabled || closed) {
             onMessage("Rewarded ads are not enabled in this build.")
+            return false
+        }
+        if (
+            !userId.matches(Regex("^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")) ||
+            customData.isBlank() ||
+            customData.toByteArray(Charsets.UTF_8).size > 1024
+        ) {
+            onMessage("The account reward request is invalid. No ad reward was requested.")
             return false
         }
         val ad = rewardedAd
@@ -82,6 +93,12 @@ internal class RewardedAdsController(
         }
 
         rewardedAd = null
+        ad.setServerSideVerificationOptions(
+            ServerSideVerificationOptions.Builder()
+                .setUserId(userId)
+                .setCustomData(customData)
+                .build(),
+        )
         var rewardEarned = false
         var rewardDelivered = false
         ad.fullScreenContentCallback =

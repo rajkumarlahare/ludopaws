@@ -404,7 +404,7 @@ class ProfileActivity : Activity() {
                         if (e.type.contains("cancel", ignoreCase = true)) {
                             "Google sign-in was cancelled. No account data was changed."
                         } else {
-                            "Google sign-in could not be completed. Please try again.",
+                            "Google sign-in could not be completed. Please try again."
                         },
                     )
                 }
