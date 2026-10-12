@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { FriendDirectory } from "../src/friend-directory.js";
 import { LeaderboardRoom } from "../src/leaderboard-room.js";
+import { FriendConversation, FriendRecentRoom } from "../src/friend-social.js";
 
 const SECRET = "lp_test_session_hmac_key_1234567890abcdef";
 const REQUEST_ID = "00000000-0000-4000-8000-000000000001";
@@ -241,4 +242,142 @@ test("a deleted leaderboard profile and its registration key cannot recreate the
   const replay = await leaderboard.fetch(request("/profile/register", { clientRequestId: REQUEST_ID }));
   assert.equal(replay.status, 410);
   assert.equal((await replay.json()).error, "LEADERBOARD_PROFILE_DELETED");
+});
+
+
+class MemoryObjectStorage {
+  constructor() { this.values = new Map(); }
+  async get(key) {
+    const value = this.values.get(key);
+    return value == null ? value : structuredClone(value);
+  }
+  async put(key, value) { this.values.set(key, structuredClone(value)); }
+  async delete(key) { return this.values.delete(key); }
+}
+
+function statefulNamespace(factory, failPath = null) {
+  const instances = new Map();
+  const calls = [];
+  let failureInjected = false;
+  return {
+    calls,
+    idFromName(name) { return name; },
+    get(name) {
+      if (!instances.has(name)) instances.set(name, factory());
+      const instance = instances.get(name);
+      return {
+        async fetch(req) {
+          const path = new URL(req.url).pathname;
+          calls.push({ id: name, path });
+          if (path === failPath && !failureInjected) {
+            failureInjected = true;
+            return Response.json({ error: "INJECTED_SOCIAL_DELETE_FAILURE" }, { status: 503 });
+          }
+          return instance.fetch(req);
+        },
+      };
+    },
+  };
+}
+
+test("FriendDirectory deletion retries safely after conversation or recent-player Durable Object failures", async () => {
+  const failureCases = [
+    { stage: "conversation", route: "/delete-for-friend" },
+    { stage: "peer recent history", route: "/purge-opponent" },
+    { stage: "owner recent history", route: "/delete-owner" },
+  ];
+  const peerId = "LPF-MNPQ-RSTU-VWXY";
+
+  for (const failureCase of failureCases) {
+    const sql = new FriendSql();
+    const conversations = statefulNamespace(
+      () => new FriendConversation({ storage: new MemoryObjectStorage() }),
+      failureCase.stage === "conversation" ? failureCase.route : null,
+    );
+    const recent = statefulNamespace(
+      () => new FriendRecentRoom({ storage: new MemoryObjectStorage() }),
+      failureCase.stage === "peer recent history" || failureCase.stage === "owner recent history"
+        ? failureCase.route
+        : null,
+    );
+    const env = {
+      LUDOPROOF_SESSION_HMAC_KEY: SECRET,
+      LUDOPROOF_FRIEND_CONVERSATIONS: conversations,
+      LUDOPROOF_FRIEND_RECENT: recent,
+    };
+    const directory = new FriendDirectory(makeContext(sql), env);
+    const registered = await directory.fetch(request("/register", {
+      clientRequestId: REQUEST_ID,
+      displayName: "Player One",
+    }));
+    assert.equal(registered.status, 200);
+    const profile = await registered.json();
+    const friendId = profile.friendId;
+    const pairId = [friendId, peerId].sort().join(":");
+
+    sql.friendships.set("friendship-1", { friend_a: friendId, friend_b: peerId });
+    sql.conversationIndex.set("conversation-1", { friend_id: friendId, other_friend_id: peerId });
+    sql.conversationIndex.set("conversation-2", { friend_id: peerId, other_friend_id: friendId });
+    sql.recentIndex.set("recent-peer", { owner_friend_id: peerId, opponent_friend_id: friendId });
+    sql.recentIndex.set("recent-owner", { owner_friend_id: friendId, opponent_friend_id: peerId });
+
+    const conversation = conversations.get(pairId);
+    const message = await conversation.fetch(request("/send", {
+      senderId: friendId,
+      receiverId: peerId,
+      text: "Deletion retry fixture",
+      clientRequestId: REQUEST_ID,
+    }));
+    assert.equal(message.status, 201, "conversation fixture should be persisted");
+
+    for (const ownerFriendId of [friendId, peerId]) {
+      const opponentFriendId = ownerFriendId === friendId ? peerId : friendId;
+      const saved = await recent.get(ownerFriendId).fetch(request("/record", {
+        ownerFriendId,
+        opponentFriendId,
+        displayName: "Player One",
+        matchId: "LPA2B3C4D5",
+        playedAt: Date.now(),
+      }));
+      assert.equal(saved.status, 200, "recent-player fixture should be persisted");
+    }
+
+    const first = await directory.fetch(request("/account/delete", { friendId }));
+    assert.equal(first.status, 503, failureCase.stage + " failure must be returned, not hidden");
+    assert.equal(sql.profiles.has(friendId), true, "profile should remain until all external cleanup succeeds");
+    assert.equal(sql.deletedProfiles.has(friendId), false, "profile tombstone must not commit before external cleanup finishes");
+    assert.equal(sql.friendships.size, 1, "relationship index should remain available to drive a retry");
+
+    const retry = await directory.fetch(request("/account/delete", { friendId }));
+    assert.equal(retry.status, 200, failureCase.stage + " retry should finish deletion");
+    assert.equal((await retry.json()).deleted, true);
+    assert.equal(sql.profiles.has(friendId), false);
+    assert.equal(sql.deletedProfiles.has(friendId), true);
+    assert.equal(sql.requests.size, 0);
+    assert.equal(sql.invites.size, 0);
+    assert.equal(sql.friendships.size, 0);
+    assert.equal(sql.conversationIndex.size, 0);
+    assert.equal(sql.recentIndex.size, 0);
+    assert.equal(
+      (failureCase.stage === "conversation" ? conversations.calls : recent.calls)
+        .filter(call => call.path === failureCase.route).length >= 2,
+      true,
+      failureCase.stage + " downstream route should be retried",
+    );
+
+    const deletedRegistrationReplay = await directory.fetch(request("/register", {
+      clientRequestId: REQUEST_ID,
+      displayName: "Player One",
+    }));
+    assert.equal(deletedRegistrationReplay.status, 410, "deleted identity must stay tombstoned after retry");
+
+    for (const ownerFriendId of [friendId, peerId]) {
+      const listed = await recent.get(ownerFriendId).fetch(request("/list", { ownerFriendId }));
+      assert.equal(listed.status, 200);
+      assert.deepEqual((await listed.json()).recent, [], "deleted player must be absent from all recent-player histories");
+    }
+    const emptyConversation = await conversation.fetch(request("/list", { meId: friendId, otherId: peerId }));
+    assert.equal(emptyConversation.status, 200);
+    assert.deepEqual((await emptyConversation.json()).messages, [], "conversation contents should be gone after retry");
+  }
 });
