@@ -233,17 +233,9 @@ private fun StoreActivity.featuredRemoveAdsCard(
             LinearLayout(
                 this@featuredRemoveAdsCard,
             ).apply {
-                // Keep the gem reward immediately to the left of the title.
-                orientation =
-                    LinearLayout.HORIZONTAL
-                gravity =
-                    Gravity.CENTER
-                setPadding(
-                    dp(2),
-                    0,
-                    dp(2),
-                    0,
-                )
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER
+                setPadding(dp(2), 0, dp(2), 0)
             }
 
         val gemReward =
@@ -253,6 +245,7 @@ private fun StoreActivity.featuredRemoveAdsCard(
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER
                 setPadding(0, 0, dp(2), 0)
+                contentDescription = "One-time bonus of 5 gems with Remove Ads"
             }
         gemReward.addView(
             TextView(this@featuredRemoveAdsCard).apply {
@@ -279,21 +272,44 @@ private fun StoreActivity.featuredRemoveAdsCard(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
             ),
         )
-        copy.addView(
-            TextView(
+
+        val titleCopy =
+            LinearLayout(
                 this@featuredRemoveAdsCard,
             ).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                setPadding(dp(2), 0, dp(2), 0)
+            }
+        titleCopy.addView(
+            TextView(this@featuredRemoveAdsCard).apply {
                 text = "Remove Ads"
-                textSize = 16f
+                textSize = 15f
                 setTypeface(Typeface.DEFAULT_BOLD)
                 setTextColor(Color.WHITE)
                 gravity = Gravity.CENTER
                 maxLines = 1
             },
+        )
+        titleCopy.addView(
+            TextView(this@featuredRemoveAdsCard).apply {
+                text = "ONE-TIME BONUS"
+                textSize = 8f
+                setTypeface(Typeface.DEFAULT_BOLD)
+                setTextColor(0xFFEED9B7.toInt())
+                gravity = Gravity.CENTER
+                maxLines = 1
+                letterSpacing = 0.02f
+            },
+        )
+        copy.addView(
+            titleCopy,
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
-            ),
+            ).apply {
+                marginStart = dp(2)
+            },
         )
 
         body.addView(
@@ -307,8 +323,8 @@ private fun StoreActivity.featuredRemoveAdsCard(
         body.addView(
             rewardedAdCard(),
             LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
+                dp(122),
+                dp(42),
             ).apply {
                 marginStart = dp(4)
             },
@@ -373,28 +389,32 @@ private fun StoreActivity.featuredRemoveAdsCard(
 private fun StoreActivity.rewardedAdCard():
     LinearLayout =
     LinearLayout(this).apply {
-        orientation =
-            LinearLayout.HORIZONTAL
-        gravity =
-            Gravity.CENTER_VERTICAL
-        setPadding(
-            dp(2),
-            dp(2),
-            dp(2),
-            dp(2),
-        )
-        // Transparent container lets the main plywood panel show through.
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER
+        isClickable = true
+        isFocusable = true
+        contentDescription = "Watch ad to earn 5 gems"
+        setPadding(dp(7), 0, dp(7), 0)
+        background =
+            LudoProofTheme.rounded(
+                0xFFE93434.toInt(),
+                9f,
+                0xFFFF7373.toInt(),
+                1f,
+                this@rewardedAdCard,
+            )
+        setOnClickListener {
+            requestRewardedAd()
+        }
+        AppFocusRing.apply(this, cornerRadiusDp = 9f)
 
         addView(
-            TextView(
-                this@rewardedAdCard,
-            ).apply {
+            TextView(this@rewardedAdCard).apply {
                 text = "5"
                 textSize = 12f
                 setTypeface(Typeface.DEFAULT_BOLD)
-                setTextColor(LudoProofTheme.GOLD)
+                setTextColor(Color.WHITE)
                 gravity = Gravity.CENTER
-                setPadding(0, 0, dp(2), 0)
             },
         )
         addView(
@@ -402,41 +422,22 @@ private fun StoreActivity.rewardedAdCard():
                 contentDescription = "Gems"
             },
             LinearLayout.LayoutParams(
-                dp(17),
-                dp(17),
+                dp(18),
+                dp(18),
             ).apply {
-                marginEnd = dp(4)
+                marginStart = dp(2)
+                marginEnd = dp(5)
             },
         )
-
         addView(
-            Button(
-                this@rewardedAdCard,
-            ).apply {
+            TextView(this@rewardedAdCard).apply {
                 text = "WATCH AD"
-                textSize = 10f
+                textSize = 10.5f
                 setTypeface(Typeface.DEFAULT_BOLD)
                 setTextColor(Color.WHITE)
-                minWidth = 0
-                minHeight = 0
-                setPadding(dp(3), 0, dp(3), 0)
-                background =
-                    LudoProofTheme.rounded(
-                        0xFFE93434.toInt(),
-                        9f,
-                        0xFFFF7373.toInt(),
-                        1f,
-                        this@rewardedAdCard,
-                    )
-                setOnClickListener {
-                    requestRewardedAd()
-                }
-                AppFocusRing.apply(this, cornerRadiusDp = 9f)
+                gravity = Gravity.CENTER
+                maxLines = 1
             },
-            LinearLayout.LayoutParams(
-                dp(78),
-                dp(34),
-            ),
         )
     }
 
