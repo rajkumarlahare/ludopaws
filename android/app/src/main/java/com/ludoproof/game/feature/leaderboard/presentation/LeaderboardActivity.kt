@@ -636,8 +636,8 @@ class LeaderboardActivity :
                     addView(
                         leaderboardCharacterPortrait(),
                         LinearLayout.LayoutParams(
-                            dp(68),
-                            dp(68),
+                            dp(84),
+                            dp(84),
                         ),
                     )
 
@@ -683,7 +683,7 @@ class LeaderboardActivity :
                                             "YOUR RANK  #" +
                                                 viewer.rank
                                         } else {
-                                            "UNRANKED • COMPLETE A VERIFIED ONLINE MATCH"
+                                            "UNRANKED • FINISH ONLINE MATCH"
                                         }
                                     textSize =
                                         11f
