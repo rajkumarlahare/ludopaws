@@ -246,6 +246,16 @@ class AccountRepository(context: Context) {
 
     fun requiresIdentityRecovery(): Boolean = sessions.hasPendingIdentityRecovery()
 
+    /**
+     * A previously Google-linked account must be restored before local social presence can
+     * start if its encrypted session is missing or corrupt.
+     */
+    fun canStartFriendPresence(): Boolean {
+        if (sessions.hasPendingIdentityRecovery()) return false
+        if (sessions.load() != null) return true
+        return sessions.lastAccountMode() != "GOOGLE"
+    }
+
     fun completeIdentityRecovery() {
         val session = sessions.load()
             ?: throw AccountApiException(401, "ACCOUNT_SESSION_REQUIRED", "Restore your saved account to recover linked identities.")
