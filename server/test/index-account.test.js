@@ -270,3 +270,25 @@ test("expired signed access token cannot authorize a deletion when no deletion t
   assert.equal(player.calls.length, 1);
   assert.equal(player.calls[0].path, "/account/delete-preview");
 });
+
+
+test("expired token replay still rejects a forged signature before checking the tombstone", async () => {
+  const { env, player } = makeDeletionReplayEnv(true);
+  const token = await issueAccessToken(env, ACCOUNT_A, SESSION_A, Date.now() - 20 * 60 * 1000);
+  const parts = token.split(".");
+  parts[1] = (parts[1][0] === "A" ? "B" : "A") + parts[1].slice(1);
+  const tamperedToken = parts.join(".");
+
+  const response = await accountWorker.fetch(
+    new Request("https://api.example.test/api/account/delete", {
+      method: "POST",
+      headers: { authorization: "Bearer " + tamperedToken, "content-type": "application/json" },
+      body: JSON.stringify({}),
+    }),
+    env,
+  );
+
+  assert.equal(response.status, 401);
+  assert.equal((await response.json()).error, "ACCOUNT_SESSION_INVALID");
+  assert.equal(player.calls.length, 0);
+});
