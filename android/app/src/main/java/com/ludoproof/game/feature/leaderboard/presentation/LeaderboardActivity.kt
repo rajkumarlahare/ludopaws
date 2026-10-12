@@ -23,7 +23,6 @@ import com.ludoproof.game.core.ui.art.playerCountSelectionBackground
 import com.ludoproof.game.core.ui.art.plywoodBackground
 import com.ludoproof.game.core.ui.components.AppFocusRing
 import com.ludoproof.game.feature.characters.data.local.CharacterSelectionStore
-import com.ludoproof.game.core.ui.art.recessedPlywoodBackground
 import com.ludoproof.game.feature.leaderboard.data.local.LeaderboardCacheStore
 import com.ludoproof.game.feature.leaderboard.data.local.LeaderboardCredential
 import com.ludoproof.game.feature.leaderboard.data.local.LeaderboardIdentityStore
@@ -1551,10 +1550,12 @@ class LeaderboardActivity :
         FrameLayout(this).apply {
             clipChildren = false
             clipToPadding = false
+            // Use one circular plywood surface only; the recessed pocket
+            // adds a second square-looking layer around this small portrait.
             background =
-                recessedPlywoodBackground(
-                    this@LeaderboardActivity,
-                    outerCornerRadiusDp = 999f,
+                plywoodBackground(
+                    context = this@LeaderboardActivity,
+                    cornerRadiusDp = 999f,
                 )
             setPadding(
                 dp(2),
