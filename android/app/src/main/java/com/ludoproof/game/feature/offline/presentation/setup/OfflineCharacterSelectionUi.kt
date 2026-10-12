@@ -170,19 +170,17 @@ internal fun OfflineGameActivity.characterPanel(
         scroll.addView(cardsRow)
         addView(scroll)
 
-        // On Pass & Play entry, briefly reveal the far-right character and
-        // smoothly return to the starting position. Computer setup is unchanged.
-        if (!isComputerMode) {
-            scroll.post {
-                val maxScrollX = (cardsRow.width - scroll.width).coerceAtLeast(0)
-                if (maxScrollX > 0 && scroll.isAttachedToWindow) {
-                    scroll.animateCharacterRowTo(maxScrollX) {
-                        scroll.postDelayed({
-                            if (scroll.isAttachedToWindow) {
-                                scroll.animateCharacterRowTo(0)
-                            }
-                        }, 180L)
-                    }
+        // On both Pass & Play and Computer/Robot entry, briefly reveal the
+        // far-right character and smoothly return to the starting position.
+        scroll.post {
+            val maxScrollX = (cardsRow.width - scroll.width).coerceAtLeast(0)
+            if (maxScrollX > 0 && scroll.isAttachedToWindow) {
+                scroll.animateCharacterRowTo(maxScrollX) {
+                    scroll.postDelayed({
+                        if (scroll.isAttachedToWindow) {
+                            scroll.animateCharacterRowTo(0)
+                        }
+                    }, 180L)
                 }
             }
         }
