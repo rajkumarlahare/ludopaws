@@ -110,7 +110,7 @@ private fun StoreActivity.boardPanel(
                     checkBadgeAtTopEnd = true,
                     emphasizeSelected = true,
                     showCheckBadge = selected,
-                    checkMarkScale = 1.7f,
+                    checkMarkScale = 2.0f,
                     useRecessedPlywood = false,
                 )
             }
@@ -134,6 +134,7 @@ private fun StoreActivity.boardPanel(
                 includeFontPadding = false
                 maxLines = 1
                 setShadowLayer(2f, 0f, dp(1).toFloat(), 0xAA3B2414.toInt())
+                setPadding(0, 0, 0, dp(8))
             },
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -177,7 +178,9 @@ private fun StoreActivity.boardPanel(
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
-            ),
+            ).apply {
+                topMargin = dp(8)
+            },
         )
 
         if (locked) {
