@@ -90,12 +90,13 @@ class AccountRepository(context: Context) {
 
     fun linkGoogleIdentity(idToken: String, nonce: String) {
         val session = requireSession()
-        request(
+        val response = request(
             "POST",
             "/api/account/google/link",
             JSONObject().put("idToken", idToken).put("nonce", nonce),
             session.accessToken,
         )
+        response.optJSONObject("profile")?.let(::updateCachedDisplayName)
     }
 
     fun restoreGoogleAccount(idToken: String, nonce: String): AccountSession {
@@ -127,12 +128,22 @@ class AccountRepository(context: Context) {
 
     fun updateDisplayName(displayName: String): JSONObject {
         val session = requireSession()
-        return request(
+        val profile = request(
             "POST",
             "/api/account/profile",
             JSONObject().put("displayName", displayName),
             session.accessToken,
         ).getJSONObject("profile")
+        updateCachedDisplayName(profile)
+        return profile
+    }
+
+    @Synchronized
+    private fun updateCachedDisplayName(profile: JSONObject) {
+        val current = sessions.load() ?: return
+        val name = profile.optString("displayName").trim().take(24)
+        if (name.isBlank() || current.displayName == name) return
+        sessions.save(current.copy(displayName = name))
     }
 
     fun storeStatus(): JSONObject = request("GET", "/api/store/status")

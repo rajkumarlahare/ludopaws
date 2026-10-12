@@ -99,7 +99,27 @@ export default {
           accountId: session.accountId,
           subjectHash,
         });
-        return json(200, { ok: true, accountId: session.accountId, linked: linked.linked === true });
+        let profile = session.profile;
+        // The default guest label is a placeholder, not a player choice. Use the server-verified
+        // Google display name once, but never overwrite an existing custom account name.
+        if (
+          String(profile?.displayName ?? "") === "Guest User" &&
+          typeof google.displayName === "string" &&
+          google.displayName.trim()
+        ) {
+          const updated = await playerRequest(env, session.accountId, "/profile/update", {
+            accountId: session.accountId,
+            sessionId: session.sessionId,
+            displayName: google.displayName,
+          });
+          profile = updated.profile ?? profile;
+        }
+        return json(200, {
+          ok: true,
+          accountId: session.accountId,
+          linked: linked.linked === true,
+          profile,
+        });
       }
 
       if (url.pathname === "/api/account/google/login" && request.method === "POST") {
