@@ -205,6 +205,8 @@ jobs:
         shell: bash
         run: |
           SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          # Keep CI on the supported software renderer with Vulkan disabled.
+          # The current hosted Linux emulator has been segfaulting in the old SwiftShader/Vulkan path.
           nohup "$SDK_ROOT/emulator/emulator" \
             -avd ludopaws-ci \
             -no-window \
@@ -213,7 +215,8 @@ jobs:
             -no-snapshot \
             -camera-back none \
             -camera-front none \
-            -gpu swiftshader_indirect \
+            -gpu software \
+            -feature -Vulkan \
             > /tmp/ludopaws-emulator.log 2>&1 &
           EMULATOR_PID=$!
           echo "$EMULATOR_PID" > /tmp/ludopaws-emulator.pid
