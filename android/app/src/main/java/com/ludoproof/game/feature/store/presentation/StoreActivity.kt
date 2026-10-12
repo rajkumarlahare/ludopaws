@@ -175,6 +175,16 @@ class StoreActivity :
                         "A previous Play payment could not yet be verified for the currently signed-in account. It remains pending; restore the account that made the purchase and try again.",
                     )
                 }
+                if (
+                    availabilityError == null &&
+                    recoveryError == null &&
+                    recoveredPurchases == 0 &&
+                    wallet.markLegacyUnverifiedNoticeShown()
+                ) {
+                    showStoreMessage(
+                        "Previous device-only store data was preserved for recovery, but it is not used as gems or an entitlement until verified. Your current balance and items come from the secure account wallet.",
+                    )
+                }
             }
         }
     }

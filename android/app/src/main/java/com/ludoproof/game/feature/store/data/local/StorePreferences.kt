@@ -9,6 +9,8 @@ internal object StorePreferences {
         "wallet_account_id"
     const val KEY_LEGACY_WALLET_ARCHIVE =
         "legacy_wallet_unverified_archive_v1"
+    const val KEY_LEGACY_WALLET_NOTICE_SHOWN =
+        "legacy_wallet_unverified_notice_shown_v1"
     const val KEY_ADS_REMOVED =
         "ads_removed"
     const val KEY_APPLIED_TOKENS =

@@ -92,6 +92,18 @@ class GemWalletStore(context: Context) {
     fun hasLegacyUnverifiedSnapshot(): Boolean =
         prefs.contains(StorePreferences.KEY_LEGACY_WALLET_ARCHIVE)
 
+    @Synchronized
+    fun markLegacyUnverifiedNoticeShown(): Boolean {
+        if (!hasLegacyUnverifiedSnapshot()) return false
+        if (prefs.getBoolean(StorePreferences.KEY_LEGACY_WALLET_NOTICE_SHOWN, false)) return false
+        check(
+            prefs.edit()
+                .putBoolean(StorePreferences.KEY_LEGACY_WALLET_NOTICE_SHOWN, true)
+                .commit(),
+        ) { "Legacy wallet migration notice state could not be saved" }
+        return true
+    }
+
     private fun legacyUnverifiedSnapshot(): JSONObject {
         val cosmetics = JSONObject()
         val adProgress = JSONObject()
