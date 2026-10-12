@@ -313,11 +313,31 @@ test("expired token replay still rejects a forged signature before checking the 
 });
 
 
-function makeDeletionSagaEnv({ directoryDeleteFailures = 0 } = {}) {
+function makeDeletionSagaEnv({ directoryDeleteFailures = 0, failureStage = null, linked = false } = {}) {
   const calls = [];
   let playerDeleted = false;
   let directoryDeleted = false;
+  let storeDeleted = false;
+  let friendDeleted = false;
+  let leaderboardDeleted = false;
   let remainingDirectoryDeleteFailures = directoryDeleteFailures;
+  let injectedFailureStage = failureStage;
+  const purchaseLedgerIds = linked ? ["a".repeat(64)] : [];
+  const friendId = "LPF-ABCD-EFGH-IJKL";
+  const leaderboardProfileId = "LPB-ABCD-EFGH-IJKL";
+
+  function shouldFail(stage) {
+    if (injectedFailureStage !== stage) return false;
+    injectedFailureStage = null;
+    return true;
+  }
+
+  function injectedFailure(stage) {
+    return Response.json(
+      { error: "INJECTED_DELETE_FAILURE", message: "injected " + stage + " deletion failure" },
+      { status: 503 },
+    );
+  }
 
   const player = {
     idFromName(name) { return name; },
@@ -328,6 +348,9 @@ function makeDeletionSagaEnv({ directoryDeleteFailures = 0 } = {}) {
           const body = await request.json();
           calls.push("player:" + path);
           if (path === "/session/check") {
+            if (playerDeleted) {
+              return Response.json({ error: "ACCOUNT_SESSION_INVALID" }, { status: 401 });
+            }
             return Response.json({
               ok: true,
               accountId,
@@ -335,10 +358,11 @@ function makeDeletionSagaEnv({ directoryDeleteFailures = 0 } = {}) {
             });
           }
           if (path === "/account/delete-preview") {
-            return Response.json({ ok: true, deleted: playerDeleted, purchaseLedgerIds: [] });
+            return Response.json({ ok: true, deleted: playerDeleted, purchaseLedgerIds: playerDeleted ? [] : purchaseLedgerIds });
           }
           if (path === "/account/delete") {
             assert.equal(body.confirmation, "DELETE_MY_ACCOUNT");
+            if (shouldFail("player")) return injectedFailure("player");
             playerDeleted = true;
             return Response.json({ ok: true, deleted: true, replay: false });
           }
@@ -360,11 +384,12 @@ function makeDeletionSagaEnv({ directoryDeleteFailures = 0 } = {}) {
               ok: true,
               accountId: ACCOUNT_A,
               googleLinked: false,
-              friendId: null,
-              leaderboardProfileId: null,
+              friendId: linked ? friendId : null,
+              leaderboardProfileId: linked ? leaderboardProfileId : null,
             });
           }
           if (path === "/account/delete") {
+            if (shouldFail("directory")) return injectedFailure("directory");
             if (remainingDirectoryDeleteFailures > 0) {
               remainingDirectoryDeleteFailures -= 1;
               return Response.json(
@@ -381,17 +406,73 @@ function makeDeletionSagaEnv({ directoryDeleteFailures = 0 } = {}) {
     },
   };
 
+  const storePurchases = {
+    idFromName(name) { return name; },
+    get(name) {
+      return {
+        async fetch(request) {
+          const path = new URL(request.url).pathname;
+          calls.push("store:" + path);
+          if (path !== "/delete") return Response.json({ error: "NOT_FOUND" }, { status: 404 });
+          if (shouldFail("store")) return injectedFailure("store");
+          storeDeleted = true;
+          return Response.json({ ok: true, deleted: true });
+        },
+      };
+    },
+  };
+
+  const friends = {
+    idFromName(name) { return name; },
+    get(name) {
+      return {
+        async fetch(request) {
+          const path = new URL(request.url).pathname;
+          calls.push("friend:" + path);
+          if (path !== "/account/delete") return Response.json({ error: "NOT_FOUND" }, { status: 404 });
+          if (shouldFail("friend")) return injectedFailure("friend");
+          friendDeleted = true;
+          return Response.json({ ok: true, deleted: true });
+        },
+      };
+    },
+  };
+
+  const leaderboard = {
+    idFromName(name) { return name; },
+    get(name) {
+      return {
+        async fetch(request) {
+          const path = new URL(request.url).pathname;
+          calls.push("leaderboard:" + path);
+          if (path !== "/profile/delete") return Response.json({ error: "NOT_FOUND" }, { status: 404 });
+          if (shouldFail("leaderboard")) return injectedFailure("leaderboard");
+          leaderboardDeleted = true;
+          return Response.json({ ok: true, deleted: true });
+        },
+      };
+    },
+  };
+
   const env = {
     LUDOPROOF_SESSION_HMAC_KEY: SECRET,
     LUDOPROOF_API_GATE: makeRateGate(),
     LUDOPROOF_PLAYER_ACCOUNTS: player,
     LUDOPROOF_ACCOUNT_DIRECTORY: directory,
+    LUDOPROOF_STORE_PURCHASES: storePurchases,
+    LUDOPROOF_FRIENDS: friends,
+    LUDOPROOF_LEADERBOARD: leaderboard,
   };
 
   return {
     env,
     calls,
-    state: () => ({ playerDeleted, directoryDeleted, remainingDirectoryDeleteFailures }),
+    state: () => ({
+      playerDeleted,
+      directoryDeleted,
+      remainingDirectoryDeleteFailures,
+      ...(linked ? { storeDeleted, friendDeleted, leaderboardDeleted } : {}),
+    }),
   };
 }
 
@@ -458,4 +539,53 @@ test("a directory cleanup failure after wallet tombstoning is not reported as su
     directoryDeleted: true,
     remainingDirectoryDeleteFailures: 0,
   });
+});
+
+test("linked account deletion retries safely after each injected downstream failure", async () => {
+  const failureStages = ["store", "friend", "leaderboard", "player", "directory"];
+  const callForStage = {
+    store: "store:/delete",
+    friend: "friend:/account/delete",
+    leaderboard: "leaderboard:/profile/delete",
+    player: "player:/account/delete",
+    directory: "directory:/account/delete",
+  };
+
+  for (const failureStage of failureStages) {
+    const fixture = makeDeletionSagaEnv({ failureStage, linked: true });
+    const token = await issueAccessToken(fixture.env, ACCOUNT_A, SESSION_A, Date.now());
+    const submit = () => accountWorker.fetch(
+      new Request("https://api.example.test/api/account/delete", {
+        method: "POST",
+        headers: { authorization: "Bearer " + token, "content-type": "application/json" },
+        body: JSON.stringify({ confirmation: "DELETE_MY_ACCOUNT" }),
+      }),
+      fixture.env,
+    );
+
+    const first = await submit();
+    assert.equal(first.status, 503, failureStage + " injected failure must not be reported as success");
+    const afterFirst = fixture.state();
+    assert.equal(afterFirst.directoryDeleted, false, failureStage + " failure must not unlink the directory");
+    assert.equal(afterFirst.playerDeleted, failureStage === "directory", failureStage + " failure should preserve the expected PlayerAccount tombstone state");
+
+    const retry = await submit();
+    assert.equal(retry.status, 200, failureStage + " retry should complete deletion");
+    assert.deepEqual(await retry.json(), { ok: true, deleted: true, replay: failureStage === "directory" });
+    assert.deepEqual(fixture.state(), {
+      playerDeleted: true,
+      directoryDeleted: true,
+      remainingDirectoryDeleteFailures: 0,
+      storeDeleted: true,
+      friendDeleted: true,
+      leaderboardDeleted: true,
+    });
+    assert.equal(fixture.calls.filter(call => call === callForStage[failureStage]).length, 2, failureStage + " operation should be retried exactly once");
+
+    const lastIndex = value => fixture.calls.lastIndexOf(value);
+    assert.ok(lastIndex(callForStage.store) < lastIndex(callForStage.friend), "Store ledger cleanup must precede Friend cleanup");
+    assert.ok(lastIndex(callForStage.friend) < lastIndex(callForStage.leaderboard), "Friend cleanup must precede leaderboard cleanup");
+    assert.ok(lastIndex(callForStage.leaderboard) < lastIndex(callForStage.player), "Linked cleanup must precede PlayerAccount tombstoning");
+    assert.ok(lastIndex(callForStage.player) < lastIndex(callForStage.directory), "PlayerAccount tombstone must precede directory unlink");
+  }
 });
