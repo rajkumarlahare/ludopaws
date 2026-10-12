@@ -31,6 +31,13 @@ class AccountRepository(context: Context) {
                 createGuestRecoverySession()
             }
         }
+        if (sessions.lastAccountMode() == "GOOGLE") {
+            throw AccountApiException(
+                401,
+                "ACCOUNT_SESSION_REQUIRED",
+                "Your saved account session is unavailable. Restore the Google-linked account instead of creating a new guest account.",
+            )
+        }
         return createGuestRecoverySession()
     }
 

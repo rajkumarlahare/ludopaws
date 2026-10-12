@@ -89,14 +89,17 @@ class AccountSessionStore(context: Context) {
         cipher.init(Cipher.ENCRYPT_MODE, secretKey())
         cipher.updateAAD(SESSION_AAD)
         val encrypted = cipher.doFinal(json.toString().toByteArray(Charsets.UTF_8))
-        check(
-            prefs.edit()
-                .putInt(KEY_VERSION, 1)
-                .putString(KEY_IV, Base64.encodeToString(cipher.iv, Base64.NO_WRAP))
-                .putString(KEY_CIPHERTEXT, Base64.encodeToString(encrypted, Base64.NO_WRAP))
-                .remove(KEY_PENDING_REFRESH_REQUEST_ID)
-                .commit(),
-        ) { "Account session could not be durably encrypted and saved" }
+        val editor = prefs.edit()
+            .putInt(KEY_VERSION, 1)
+            .putString(KEY_IV, Base64.encodeToString(cipher.iv, Base64.NO_WRAP))
+            .putString(KEY_CIPHERTEXT, Base64.encodeToString(encrypted, Base64.NO_WRAP))
+            .putString(KEY_ACCOUNT_MODE, if (session.guestRecoveryEligible) MODE_GUEST else MODE_GOOGLE)
+            .remove(KEY_PENDING_REFRESH_REQUEST_ID)
+        if (!session.guestRecoveryEligible) {
+            // A Google-restored account must never fall back to this installation's previous guest.
+            editor.remove(KEY_GUEST_REQUEST_IV).remove(KEY_GUEST_REQUEST_CIPHERTEXT)
+        }
+        check(editor.commit()) { "Account session could not be durably encrypted and saved" }
     }
 
     @Synchronized
@@ -110,6 +113,10 @@ class AccountSessionStore(context: Context) {
                 .commit(),
         ) { "Account session could not be cleared safely" }
     }
+
+    fun lastAccountMode(): String? =
+        prefs.getString(KEY_ACCOUNT_MODE, null)
+            ?.takeIf { it == MODE_GUEST || it == MODE_GOOGLE }
 
     @Synchronized
     fun guestRequestId(): String {
@@ -207,6 +214,9 @@ class AccountSessionStore(context: Context) {
         const val KEY_ALIAS = "ludoproof_account_session_key_v1"
         const val TRANSFORMATION = "AES/GCM/NoPadding"
         const val KEY_VERSION = "version"
+        const val KEY_ACCOUNT_MODE = "account_mode"
+        const val MODE_GUEST = "GUEST"
+        const val MODE_GOOGLE = "GOOGLE"
         const val KEY_IV = "session_iv"
         const val KEY_CIPHERTEXT = "session_ciphertext"
         const val KEY_GUEST_REQUEST_IV = "guest_request_iv"
