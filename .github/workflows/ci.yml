@@ -216,6 +216,7 @@ jobs:
             -gpu swiftshader_indirect \
             > /tmp/ludopaws-emulator.log 2>&1 &
           EMULATOR_PID=$!
+          echo "$EMULATOR_PID" > /tmp/ludopaws-emulator.pid
 
           device_ready=""
           for attempt in $(seq 1 90); do
@@ -265,7 +266,8 @@ jobs:
           adb shell settings put global animator_duration_scale 0
           adb devices -l
       - name: Android real-device contract tests
-        run: gradle -p android :app:connectedDebugAndroidTest --stacktrace
+        shell: bash
+        run: bash scripts/run-android-instrumentation-with-retry.sh
       - name: Collect emulator diagnostics
         if: failure()
         shell: bash
@@ -282,6 +284,7 @@ jobs:
             android/app/build/outputs/androidTest-results/connected/**
             /tmp/ludopaws-avd-list.txt
             /tmp/ludopaws-emulator.log
+            /tmp/ludopaws-emulator-retry.log
             /tmp/ludopaws-logcat.txt
             /tmp/ludopaws-activities.txt
           if-no-files-found: warn
