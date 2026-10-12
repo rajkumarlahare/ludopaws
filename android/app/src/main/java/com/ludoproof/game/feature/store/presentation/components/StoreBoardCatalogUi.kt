@@ -1,6 +1,12 @@
 package com.ludoproof.game.feature.store.presentation.components
 
 import android.graphics.Canvas
+import android.graphics.Bitmap
+import android.graphics.BitmapShader
+import android.graphics.Shader
+import java.util.Random
+import kotlin.math.cos
+import kotlin.math.sin
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
@@ -254,6 +260,7 @@ private class ClassicBoardIconView(context: android.content.Context) : View(cont
         style = Paint.Style.FILL
         color = Color.rgb(248, 248, 248)
     }
+    private val yardTexturePaint = createYardTexturePaint()
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
     }
@@ -304,6 +311,7 @@ private class ClassicBoardIconView(context: android.content.Context) : View(cont
         )
         fillPaint.color = color
         canvas.drawRect(yard, fillPaint)
+        canvas.drawRect(yard, yardTexturePaint)
 
         val inset = cell * 0.5f
         val home = RectF(
@@ -315,6 +323,76 @@ private class ClassicBoardIconView(context: android.content.Context) : View(cont
         fillPaint.color = Color.WHITE
         canvas.drawRoundRect(home, cell * 0.35f, cell * 0.35f, fillPaint)
         canvas.drawRoundRect(home, cell * 0.35f, cell * 0.35f, yardStrokePaint)
+    }
+
+
+    /**
+     * Uses the same deterministic matte yard-grain treatment as the gameplay board.
+     */
+    private fun createYardTexturePaint(): Paint {
+        val tileSize = dp(64f).toInt().coerceAtLeast(32)
+        val textureBitmap = Bitmap.createBitmap(
+            tileSize,
+            tileSize,
+            Bitmap.Config.ARGB_8888,
+        )
+        val textureCanvas = Canvas(textureBitmap)
+        val random = Random(0x4C55444FL)
+        val grainPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.FILL
+        }
+
+        repeat(950) {
+            val x = random.nextFloat() * tileSize
+            val y = random.nextFloat() * tileSize
+            val fineGrain = random.nextFloat() < 0.65f
+            val alpha = if (fineGrain) {
+                10 + random.nextInt(23)
+            } else {
+                22 + random.nextInt(51)
+            }
+            val highlight = random.nextFloat() < 0.28f
+            grainPaint.color = if (highlight) {
+                Color.argb((alpha * 0.62f).toInt(), 255, 255, 255)
+            } else {
+                Color.argb(alpha, 12, 16, 22)
+            }
+            val radius = dp(
+                if (fineGrain) {
+                    0.12f + random.nextFloat() * 0.23f
+                } else {
+                    0.22f + random.nextFloat() * 0.48f
+                },
+            )
+            textureCanvas.drawCircle(x, y, radius, grainPaint)
+        }
+
+        grainPaint.style = Paint.Style.STROKE
+        repeat(90) {
+            val x = random.nextFloat() * tileSize
+            val y = random.nextFloat() * tileSize
+            val length = dp(0.55f + random.nextFloat() * 1.55f)
+            val angle = random.nextFloat() * (Math.PI.toFloat() * 2f)
+            val endX = (x + cos(angle) * length).coerceIn(0f, tileSize - 1f)
+            val endY = (y + sin(angle) * length).coerceIn(0f, tileSize - 1f)
+            val alpha = 18 + random.nextInt(35)
+            grainPaint.color = if (random.nextBoolean()) {
+                Color.argb(alpha, 10, 14, 20)
+            } else {
+                Color.argb((alpha * 0.58f).toInt(), 255, 255, 255)
+            }
+            grainPaint.strokeWidth = dp(0.16f + random.nextFloat() * 0.28f)
+            textureCanvas.drawLine(x, y, endX, endY, grainPaint)
+        }
+
+        return Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
+            style = Paint.Style.FILL
+            shader = BitmapShader(
+                textureBitmap,
+                Shader.TileMode.REPEAT,
+                Shader.TileMode.REPEAT,
+            )
+        }
     }
 
     private fun drawTrack(canvas: Canvas, cell: Float) {
