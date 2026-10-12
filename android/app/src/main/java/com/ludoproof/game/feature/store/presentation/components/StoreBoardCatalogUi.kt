@@ -1,5 +1,6 @@
 package com.ludoproof.game.feature.store.presentation.components
 
+import com.ludoproof.game.LudoBoardView
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -130,16 +131,41 @@ private fun StoreActivity.boardPanel(
             ),
         )
 
-        // Leave this area unpainted so the board icon can be added later without another BG.
-        addView(
-            View(this@boardPanel).apply {
-                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-            },
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(42),
-            ),
-        )
+        if (locked) {
+            // Leave the locked placeholder blank; its title and lock state are the only preview.
+            addView(
+                View(this@boardPanel).apply {
+                    importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                },
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    dp(42),
+                ),
+            )
+        } else {
+            // Reuse the exact production renderer from gameplay for the Classic store preview.
+            // This is a miniature board only; it has no match state and draws no player tokens.
+            addView(
+                LudoBoardView(this@boardPanel).apply {
+                    bind(state = null, playerId = null)
+                    isFocusable = false
+                    importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                    contentDescription = "Classic Ludo board preview"
+                    setOnClickListener {
+                        this@boardPanel.playSelectionPopAnimation {
+                            handleCosmeticTap(board)
+                        }
+                    }
+                },
+                LinearLayout.LayoutParams(
+                    dp(62),
+                    dp(62),
+                ).apply {
+                    topMargin = dp(1)
+                    bottomMargin = dp(1)
+                },
+            )
+        }
 
         addView(
             boardStatusBadge(locked = locked, selected = selected),
