@@ -76,6 +76,12 @@ class PendingStorePurchaseStore(context: Context) {
         persist(current.filterNot { it.purchaseToken == purchaseToken })
     }
 
+    @Synchronized
+    fun removeForAccount(billingAccountId: String) {
+        require(ACCOUNT_ID_REGEX.matches(billingAccountId)) { "Pending Play account binding is invalid." }
+        persist(all().filterNot { it.accountId == billingAccountId })
+    }
+
     private fun validate(purchase: PendingStorePurchase) {
         require(PRODUCT_ID_REGEX.matches(purchase.productId)) { "Pending Play product ID is invalid." }
         require(purchase.purchaseToken.length in MIN_TOKEN_LENGTH..MAX_TOKEN_LENGTH) {
