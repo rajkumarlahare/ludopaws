@@ -532,7 +532,10 @@ class StoreActivity :
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(58),
-            ),
+            ).apply {
+                // Separate category tabs from the back button and gem/plus pill above.
+                topMargin = dp(14)
+            },
         )
         content.addView(
             storeContent(),

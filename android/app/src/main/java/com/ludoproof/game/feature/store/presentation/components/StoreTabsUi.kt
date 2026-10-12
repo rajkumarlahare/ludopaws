@@ -3,9 +3,11 @@ package com.ludoproof.game.feature.store.presentation.components
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.LayerDrawable
 import android.view.Gravity
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.ludoproof.game.core.ui.art.plywoodBackground
 import com.ludoproof.game.core.ui.components.AppFocusRing
 import com.ludoproof.game.feature.store.domain.model.StoreTab
 import com.ludoproof.game.feature.store.presentation.StoreActivity
@@ -40,8 +42,14 @@ internal fun StoreActivity.storeTabs():
                             if (selected) {
                                 Color.WHITE
                             } else {
-                                0xFFC4D4E9.toInt()
+                                0xFF5B381F.toInt()
                             },
+                        )
+                        setShadowLayer(
+                            2f,
+                            0f,
+                            dp(1).toFloat(),
+                            0x99000000.toInt(),
                         )
                         gravity =
                             Gravity.CENTER
@@ -52,40 +60,38 @@ internal fun StoreActivity.storeTabs():
                         isSelected = selected
                         contentDescription =
                             if (selected) "${tab.label}, selected" else tab.label
+                        val woodSurface =
+                            plywoodBackground(
+                                context = this@storeTabs,
+                                cornerRadiusDp = 10f,
+                            )
                         background =
-                            GradientDrawable(
-                                GradientDrawable.Orientation.TOP_BOTTOM,
-                                if (selected) {
-                                    intArrayOf(
-                                        0xFF9D3BB0.toInt(),
-                                        0xFF6E237D.toInt(),
-                                    )
-                                } else {
-                                    intArrayOf(
-                                        0xFF1B64BE.toInt(),
-                                        0xFF0B438F.toInt(),
-                                    )
-                                },
-                            ).apply {
-                                cornerRadii =
-                                    floatArrayOf(
-                                        dp(10).toFloat(),
-                                        dp(10).toFloat(),
-                                        dp(10).toFloat(),
-                                        dp(10).toFloat(),
-                                        0f,
-                                        0f,
-                                        0f,
-                                        0f,
-                                    )
-                                setStroke(
-                                    dp(1),
-                                    if (selected) {
-                                        0xFFFF76C9.toInt()
-                                    } else {
-                                        0xFF4BA8F0.toInt()
-                                    },
-                                )
+                            if (selected) {
+                                // Keep the plywood visible and add an inset gold gradient
+                                // so the active category stays obvious without a flat colour tile.
+                                LayerDrawable(
+                                    arrayOf(
+                                        woodSurface,
+                                        GradientDrawable(
+                                            GradientDrawable.Orientation.TOP_BOTTOM,
+                                            intArrayOf(
+                                                0x66FFE8A3.toInt(),
+                                                0x44C98722.toInt(),
+                                            ),
+                                        ).apply {
+                                            cornerRadius = dp(5).toFloat()
+                                            setStroke(
+                                                dp(1),
+                                                0xFFFFD45E.toInt(),
+                                            )
+                                        },
+                                    ),
+                                ).apply {
+                                    val inset = dp(6)
+                                    setLayerInset(1, inset, inset, inset, inset)
+                                }
+                            } else {
+                                woodSurface
                             }
                         setOnClickListener {
                             selectTab(
