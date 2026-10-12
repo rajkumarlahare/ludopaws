@@ -178,10 +178,10 @@ class HomeActivity : Activity() {
                 gravity =
                     Gravity.CENTER_HORIZONTAL
                 topMargin =
-                    // Keep the mode cards in their existing position after
-                    // the Profile/Gems HUD and shortcut row are reduced by 25%.
+                    // Lift only the five main game-mode cards. The hero artwork
+                    // and the top HUD keep their own existing positions.
                     dp(
-                        if (isCompact()) 338 else 351,
+                        if (isCompact()) 322 else 335,
                     )
             },
         )
