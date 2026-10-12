@@ -309,6 +309,17 @@ class GooglePlayBillingGateway(
                             ?.let(StoreCatalog::find)
                             ?.kind ==
                             StoreProductKind.NON_CONSUMABLE_REMOVE_ADS
+                    val validPurchaseAccountId =
+                        purchaseAccountId?.takeIf(OBFUSCATED_ACCOUNT_ID_REGEX::matches)
+                    if (
+                        purchaseAccountId == null &&
+                        restorableNonConsumable
+                    ) {
+                        listener.onBillingUnavailable(
+                            "This Remove Ads purchase has no recoverable Ludo Paws account binding. Restore the account that made the purchase; no entitlement was granted.",
+                        )
+                        return@forEach
+                    }
                     if (
                         purchaseAccountId != accountId &&
                         !restorableNonConsumable
@@ -318,7 +329,15 @@ class GooglePlayBillingGateway(
                         )
                         return@forEach
                     }
-                    if (!processingPurchaseTokens.add(purchase.purchaseToken)) {
+                    if (
+                        validPurchaseAccountId == null ||
+                        !processingPurchaseTokens.add(purchase.purchaseToken)
+                    ) {
+                        if (validPurchaseAccountId == null) {
+                            listener.onBillingUnavailable(
+                                "This Play purchase has an invalid Ludo Paws account binding. No content was granted.",
+                            )
+                        }
                         return@forEach
                     }
                     if (purchase.products.size != 1) {
@@ -332,7 +351,10 @@ class GooglePlayBillingGateway(
                         listener.onPurchaseRequiresVerification(
                             productId = productId,
                             purchaseToken = purchase.purchaseToken,
-                            accountId = accountId,
+                            // Preserve the account encoded by Google Play. For a Remove Ads
+                            // purchase from another account, the server must wait until that
+                            // exact Ludo Paws account is restored; never relabel the purchase.
+                            accountId = validPurchaseAccountId,
                         ) {
                             processingPurchaseTokens.remove(purchase.purchaseToken)
                         }
@@ -450,6 +472,10 @@ class GooglePlayBillingGateway(
                         mapped,
                     )
             }
+    }
+
+    private companion object {
+        val OBFUSCATED_ACCOUNT_ID_REGEX = Regex("^[a-f0-9]{64}$")
     }
 
     interface Listener {
