@@ -90,10 +90,14 @@ class AccountWalletSecurityInstrumentedTest {
     @Test
     fun convertingGuestToGoogleModeClearsTheGuestRecoveryCredential() {
         val sessionStore = AccountSessionStore(context)
+        val sessionPreferences = context.getSharedPreferences(
+            "ludoproof_account_session_v1",
+            Context.MODE_PRIVATE,
+        )
         saveTestSession()
         val guestRecoveryId = sessionStore.guestRequestId()
         val storedGuestCiphertext = requireNotNull(
-            walletPreferences.getString("guest_request_ciphertext", null),
+            sessionPreferences.getString("guest_request_ciphertext", null),
         )
         assertFalse(storedGuestCiphertext.contains(guestRecoveryId))
         assertEquals("GUEST", sessionStore.lastAccountMode())
@@ -102,8 +106,8 @@ class AccountWalletSecurityInstrumentedTest {
         sessionStore.save(session.copy(guestRecoveryEligible = false))
 
         assertEquals("GOOGLE", sessionStore.lastAccountMode())
-        assertFalse(walletPreferences.contains("guest_request_ciphertext"))
-        assertFalse(walletPreferences.contains("guest_request_iv"))
+        assertFalse(sessionPreferences.contains("guest_request_ciphertext"))
+        assertFalse(sessionPreferences.contains("guest_request_iv"))
     }
 
     @Test
