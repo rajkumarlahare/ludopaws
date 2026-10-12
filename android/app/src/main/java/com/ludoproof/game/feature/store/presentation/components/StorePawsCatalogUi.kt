@@ -2,6 +2,7 @@ package com.ludoproof.game.feature.store.presentation.components
 
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -120,7 +121,7 @@ private fun StoreActivity.pawsCharacterCard(
                 checkBadgeAtTopEnd = true,
                 emphasizeSelected = true,
                 showCheckBadge = true,
-                checkMarkScale = 1.35f,
+                checkMarkScale = 2.7f,
             )
         elevation = dp(if (selected) 5 else 3).toFloat()
         isClickable = true
@@ -151,11 +152,11 @@ private fun StoreActivity.pawsCharacterCard(
                 text = character.displayName.uppercase()
                 textSize = 15f
                 setTypeface(Typeface.DEFAULT_BOLD)
-                setTextColor(0xFF57351E.toInt())
+                setTextColor(Color.WHITE)
                 gravity = Gravity.CENTER
                 includeFontPadding = false
                 maxLines = 1
-                setShadowLayer(0.8f, 0f, dp(1).toFloat(), 0x44FFFFFF)
+                setShadowLayer(2.5f, 0f, dp(1).toFloat(), 0xAA3B2414.toInt())
                 setPadding(0, dp(6), 0, dp(3))
             },
             LinearLayout.LayoutParams(
@@ -166,18 +167,34 @@ private fun StoreActivity.pawsCharacterCard(
 
         addView(
             TextView(this@pawsCharacterCard).apply {
-                text = if (selected) "SELECTED" else "UNLOCKED"
+                text = if (selected) "✓ SELECTED" else "🔓 UNLOCKED"
                 textSize = 10f
                 setTypeface(Typeface.DEFAULT_BOLD)
                 setTextColor(
-                    if (selected) 0xFF77501B.toInt() else 0xFF286C37.toInt(),
+                    if (selected) 0xFF67430F.toInt() else 0xFF104B29.toInt(),
                 )
                 gravity = Gravity.CENTER
                 includeFontPadding = false
-                setPadding(dp(4), dp(4), dp(4), dp(4))
+                letterSpacing = 0.025f
+                setPadding(dp(8), dp(5), dp(8), dp(5))
+                background =
+                    GradientDrawable(
+                        GradientDrawable.Orientation.TOP_BOTTOM,
+                        if (selected) {
+                            intArrayOf(0xFFFFF0AD.toInt(), 0xFFFFCB45.toInt())
+                        } else {
+                            intArrayOf(0xFFBDF5CB.toInt(), 0xFF7CE69A.toInt())
+                        },
+                    ).apply {
+                        cornerRadius = dp(999).toFloat()
+                        setStroke(
+                            dp(1),
+                            if (selected) 0xFFFFF5C9.toInt() else 0xFF47B86C.toInt(),
+                        )
+                    }
             },
             LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
             ),
         )
@@ -260,10 +277,11 @@ private fun StoreActivity.pawsComingSoonCard(
                 text = pack.title
                 textSize = 10.5f
                 setTypeface(Typeface.DEFAULT_BOLD)
-                setTextColor(0xFF57351E.toInt())
+                setTextColor(Color.WHITE)
                 gravity = Gravity.CENTER
                 includeFontPadding = false
                 maxLines = 2
+                setShadowLayer(2f, 0f, dp(1).toFloat(), 0xAA3B2414.toInt())
                 setPadding(0, 0, 0, dp(8))
             },
             LinearLayout.LayoutParams(
@@ -275,13 +293,23 @@ private fun StoreActivity.pawsComingSoonCard(
 
         addView(
             TextView(this@pawsComingSoonCard).apply {
-                text = "COMING SOON"
-                textSize = 9f
+                text = "🔒 COMING SOON"
+                textSize = 8.5f
                 setTypeface(Typeface.DEFAULT_BOLD)
-                setTextColor(0xFF754D2E.toInt())
+                setTextColor(0xFF65421E.toInt())
                 gravity = Gravity.CENTER
                 includeFontPadding = false
                 maxLines = 1
+                letterSpacing = 0.015f
+                setPadding(dp(5), dp(4), dp(5), dp(4))
+                background =
+                    GradientDrawable(
+                        GradientDrawable.Orientation.TOP_BOTTOM,
+                        intArrayOf(0xFFE5D2B5.toInt(), 0xFFC4A47B.toInt()),
+                    ).apply {
+                        cornerRadius = dp(999).toFloat()
+                        setStroke(dp(1), 0xFF987044.toInt())
+                    }
             },
         )
     }
