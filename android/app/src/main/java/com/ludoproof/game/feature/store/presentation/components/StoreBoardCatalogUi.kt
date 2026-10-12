@@ -37,13 +37,14 @@ internal fun StoreActivity.boardCatalogContent(): LinearLayout =
             catalogBoards.first {
                 it.id == StoreCosmeticCatalog.DEFAULT_BOARD
             }
-        // Keep Classic first; the other eight cards are placeholders until their artwork and names
-        // are decided. Their only visible title/status is LOCKED BOARD.
-        val panels =
-            listOf(classicBoard) +
-                catalogBoards.filterNot {
+        // Show Classic plus five locked placeholders until future board artwork and names are ready.
+        val lockedBoards =
+            catalogBoards
+                .filterNot {
                     it.id == StoreCosmeticCatalog.DEFAULT_BOARD
                 }
+                .take(5)
+        val panels = listOf(classicBoard) + lockedBoards
 
         // Use the same two-card row rhythm as Paws so every board preview gets more room.
         panels.chunked(2).forEachIndexed { rowIndex, rowBoards ->
