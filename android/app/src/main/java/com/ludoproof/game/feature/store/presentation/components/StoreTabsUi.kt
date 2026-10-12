@@ -2,13 +2,12 @@ package com.ludoproof.game.feature.store.presentation.components
 
 import android.graphics.Color
 import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
-import android.graphics.drawable.LayerDrawable
 import android.view.Gravity
 import android.widget.LinearLayout
 import android.widget.TextView
-import com.ludoproof.game.core.ui.art.plywoodBackground
+import com.ludoproof.game.core.ui.art.playerCountSelectionBackground
 import com.ludoproof.game.core.ui.components.AppFocusRing
+import com.ludoproof.game.core.ui.components.playSelectionPopAnimation
 import com.ludoproof.game.feature.store.domain.model.StoreTab
 import com.ludoproof.game.feature.store.presentation.StoreActivity
 
@@ -40,9 +39,9 @@ internal fun StoreActivity.storeTabs():
                         )
                         setTextColor(
                             if (selected) {
-                                Color.WHITE
+                                0xFFFFD45E.toInt()
                             } else {
-                                0xFF5B381F.toInt()
+                                Color.WHITE
                             },
                         )
                         setShadowLayer(
@@ -60,43 +59,25 @@ internal fun StoreActivity.storeTabs():
                         isSelected = selected
                         contentDescription =
                             if (selected) "${tab.label}, selected" else tab.label
-                        val woodSurface =
-                            plywoodBackground(
-                                context = this@storeTabs,
-                                cornerRadiusDp = 10f,
-                            )
+                        // Match the Online/Pass & Play selection style: recessed plywood,
+                        // warm gold selection wash and the corner checkmark on the active tab.
                         background =
-                            if (selected) {
-                                // Keep the plywood visible and add an inset gold gradient
-                                // so the active category stays obvious without a flat colour tile.
-                                LayerDrawable(
-                                    arrayOf(
-                                        woodSurface,
-                                        GradientDrawable(
-                                            GradientDrawable.Orientation.TOP_BOTTOM,
-                                            intArrayOf(
-                                                0x66FFE8A3.toInt(),
-                                                0x44C98722.toInt(),
-                                            ),
-                                        ).apply {
-                                            cornerRadius = dp(5).toFloat()
-                                            setStroke(
-                                                dp(1),
-                                                0xFFFFD45E.toInt(),
-                                            )
-                                        },
-                                    ),
-                                ).apply {
-                                    val inset = dp(6)
-                                    setLayerInset(1, inset, inset, inset, inset)
-                                }
-                            } else {
-                                woodSurface
-                            }
-                        setOnClickListener {
-                            selectTab(
-                                tab,
+                            playerCountSelectionBackground(
+                                context = this@storeTabs,
+                                selected = selected,
+                                outerCornerRadiusDp = 10f,
+                                checkBadgeAtTopEnd = true,
+                                emphasizeSelected = true,
+                                showCheckBadge = true,
+                                checkMarkScale = 1.1f,
                             )
+                        elevation = dp(if (selected) 3 else 1).toFloat()
+                        setOnClickListener { clicked ->
+                            // Delay rerender until the shared press-and-return animation finishes,
+                            // otherwise renderStore() would replace this view before the press is visible.
+                            clicked.playSelectionPopAnimation {
+                                selectTab(tab)
+                            }
                         }
                         AppFocusRing.apply(this, cornerRadiusDp = 10f)
                     },
