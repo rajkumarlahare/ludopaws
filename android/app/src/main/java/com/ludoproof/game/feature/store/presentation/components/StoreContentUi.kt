@@ -233,29 +233,18 @@ private fun StoreActivity.featuredRemoveAdsCard(
             LinearLayout(
                 this@featuredRemoveAdsCard,
             ).apply {
+                // Keep the gem reward immediately to the left of the title.
                 orientation =
-                    LinearLayout.VERTICAL
+                    LinearLayout.HORIZONTAL
                 gravity =
                     Gravity.CENTER
                 setPadding(
-                    dp(4),
+                    dp(2),
                     0,
-                    dp(4),
+                    dp(2),
                     0,
                 )
             }
-        copy.addView(
-            TextView(
-                this@featuredRemoveAdsCard,
-            ).apply {
-                text = "Remove Ads"
-                textSize = 16f
-                setTypeface(Typeface.DEFAULT_BOLD)
-                setTextColor(Color.WHITE)
-                gravity = Gravity.CENTER
-                maxLines = 1
-            },
-        )
 
         val gemReward =
             LinearLayout(
@@ -263,6 +252,7 @@ private fun StoreActivity.featuredRemoveAdsCard(
             ).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER
+                setPadding(0, 0, dp(2), 0)
             }
         gemReward.addView(
             TextView(this@featuredRemoveAdsCard).apply {
@@ -287,9 +277,23 @@ private fun StoreActivity.featuredRemoveAdsCard(
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
+            ),
+        )
+        copy.addView(
+            TextView(
+                this@featuredRemoveAdsCard,
             ).apply {
-                topMargin = dp(2)
+                text = "Remove Ads"
+                textSize = 16f
+                setTypeface(Typeface.DEFAULT_BOLD)
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
+                maxLines = 1
             },
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ),
         )
 
         body.addView(
