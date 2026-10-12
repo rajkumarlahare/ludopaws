@@ -44,6 +44,9 @@ export class FriendDirectory {
           )
         `);
 
+        sql.exec(`CREATE TABLE IF NOT EXISTS deleted_friend_profiles (friend_id TEXT PRIMARY KEY, deleted_at INTEGER NOT NULL)`);
+        sql.exec(`CREATE TABLE IF NOT EXISTS deleted_friend_registration_requests (request_hash TEXT PRIMARY KEY, deleted_at INTEGER NOT NULL)`);
+
         sql.exec(`
           CREATE TABLE IF NOT EXISTS friend_requests (
             request_id TEXT PRIMARY KEY,
@@ -301,6 +304,20 @@ export class FriendDirectory {
         identity
           .friendToken,
       );
+    const registrationRequestHash = await sha256Hex(
+      "ludoproof:friend-registration:v1:" + clientRequestId,
+    );
+    const deletedProfileRows = [...this.ctx.storage.sql.exec(
+      "SELECT friend_id FROM deleted_friend_profiles WHERE friend_id = ? LIMIT 1",
+      identity.friendId,
+    )];
+    const deletedRequestRows = [...this.ctx.storage.sql.exec(
+      "SELECT request_hash FROM deleted_friend_registration_requests WHERE request_hash = ? LIMIT 1",
+      registrationRequestHash,
+    )];
+    if (deletedProfileRows.length || deletedRequestRows.length) {
+      throw httpError(410, "FRIEND_IDENTITY_DELETED", "this friend identity has been deleted");
+    }
     const now =
       Date.now();
 
@@ -517,7 +534,27 @@ export class FriendDirectory {
       const ownRecent = this.env.LUDOPROOF_FRIEND_RECENT.get(this.env.LUDOPROOF_FRIEND_RECENT.idFromName(friendId));
       await requireInternalOk(await ownRecent.fetch(new Request("https://recent/delete-owner", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ownerFriendId: friendId }) })), "FRIEND_RECENT_DELETE_FAILED");
     }
+    const profileRows = [...this.ctx.storage.sql.exec(
+      "SELECT registration_request_id FROM friend_profiles WHERE friend_id = ? LIMIT 1",
+      friendId,
+    )];
+    const registrationRequestHash = profileRows.length
+      ? await sha256Hex("ludoproof:friend-registration:v1:" + String(profileRows[0].registration_request_id))
+      : null;
+    const deletedAt = Date.now();
     this.ctx.storage.transactionSync(() => {
+      this.ctx.storage.sql.exec(
+        "INSERT OR IGNORE INTO deleted_friend_profiles (friend_id, deleted_at) VALUES (?, ?)",
+        friendId,
+        deletedAt,
+      );
+      if (registrationRequestHash) {
+        this.ctx.storage.sql.exec(
+          "INSERT OR IGNORE INTO deleted_friend_registration_requests (request_hash, deleted_at) VALUES (?, ?)",
+          registrationRequestHash,
+          deletedAt,
+        );
+      }
       this.ctx.storage.sql.exec("DELETE FROM friend_requests WHERE sender_id = ? OR receiver_id = ?", friendId, friendId);
       this.ctx.storage.sql.exec("DELETE FROM friend_invites WHERE sender_id = ? OR receiver_id = ?", friendId, friendId);
       this.ctx.storage.sql.exec("DELETE FROM friendships WHERE friend_a = ? OR friend_b = ?", friendId, friendId);
