@@ -17,7 +17,24 @@ class AccountRepository(context: Context) {
     @Synchronized
     fun ensureGuestSession(): AccountSession {
         val current = sessions.load()
-        if (current != null) return validSession(current)
+        if (current != null) {
+            return try {
+                validSession(current)
+            } catch (error: AccountApiException) {
+                val recoverableGuestExpiry = error.status == 401 &&
+                    error.code == "REFRESH_TOKEN_INVALID" &&
+                    current.guestRecoveryEligible
+                if (!recoverableGuestExpiry) throw error
+                // Re-use the Keystore-encrypted idempotency credential to reopen a session on
+                // the same guest account. Never do this for an account restored through Google.
+                sessions.clearSession()
+                createGuestRecoverySession()
+            }
+        }
+        return createGuestRecoverySession()
+    }
+
+    private fun createGuestRecoverySession(): AccountSession {
         val response = request(
             "POST",
             "/api/account/guest",
@@ -25,7 +42,7 @@ class AccountRepository(context: Context) {
                 .put("clientRequestId", sessions.guestRequestId())
                 .put("displayName", "Guest User"),
         )
-        return parseAndSaveSession(response)
+        return parseAndSaveSession(response, guestRecoveryEligible = true)
     }
 
     fun requireSession(): AccountSession {
@@ -50,7 +67,7 @@ class AccountRepository(context: Context) {
                 .put("refreshToken", current.refreshToken)
                 .put("clientRequestId", requestId),
         )
-        return parseAndSaveSession(response)
+        return parseAndSaveSession(response, guestRecoveryEligible = current.guestRecoveryEligible)
     }
 
     fun googleChallenge(): String {
@@ -78,7 +95,7 @@ class AccountRepository(context: Context) {
                 .put("idToken", idToken)
                 .put("nonce", nonce),
         )
-        return parseAndSaveSession(response)
+        return parseAndSaveSession(response, guestRecoveryEligible = false)
     }
 
     fun wallet(): JSONObject {
@@ -182,7 +199,10 @@ class AccountRepository(context: Context) {
 
     fun clearLocalSession() = sessions.clearSession()
 
-    private fun parseAndSaveSession(response: JSONObject): AccountSession {
+    private fun parseAndSaveSession(
+        response: JSONObject,
+        guestRecoveryEligible: Boolean,
+    ): AccountSession {
         val profile = response.optJSONObject("profile") ?: JSONObject()
         val session = AccountSession(
             accountId = response.getString("accountId"),
@@ -193,6 +213,7 @@ class AccountRepository(context: Context) {
             accessExpiresAt = response.getLong("accessExpiresAt"),
             sessionExpiresAt = response.getLong("sessionExpiresAt"),
             displayName = profile.optString("displayName", "Guest User").take(24),
+            guestRecoveryEligible = guestRecoveryEligible,
         )
         sessions.save(session)
         return session

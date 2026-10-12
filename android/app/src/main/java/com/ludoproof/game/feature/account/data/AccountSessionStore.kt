@@ -21,6 +21,7 @@ data class AccountSession(
     val accessExpiresAt: Long,
     val sessionExpiresAt: Long,
     val displayName: String,
+    val guestRecoveryEligible: Boolean = false,
 )
 
 class AccountSessionStore(context: Context) {
@@ -31,6 +32,7 @@ class AccountSessionStore(context: Context) {
         val ivText = prefs.getString(KEY_IV, null) ?: return null
         val cipherText = prefs.getString(KEY_CIPHERTEXT, null) ?: return null
         return try {
+            require(prefs.getInt(KEY_VERSION, 0) == 1)
             val cipher = Cipher.getInstance(TRANSFORMATION)
             cipher.init(
                 Cipher.DECRYPT_MODE,
@@ -50,6 +52,8 @@ class AccountSessionStore(context: Context) {
                 accessExpiresAt = json.getLong("accessExpiresAt"),
                 sessionExpiresAt = json.getLong("sessionExpiresAt"),
                 displayName = json.optString("displayName", "Guest User"),
+                // Missing flags from a pre-release session are treated as non-guest for safety.
+                guestRecoveryEligible = json.optBoolean("guestRecoveryEligible", false),
             )
             require(ACCOUNT_ID.matches(value.accountId))
             require(ACCOUNT_ID.matches(value.sessionId))
