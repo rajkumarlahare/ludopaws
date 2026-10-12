@@ -6,6 +6,7 @@ export async function verifyAdMobSsvRequest(request, env, fetchImpl = fetch, now
   const url = new URL(request.url);
   if (request.method !== "GET" || url.pathname !== "/api/admob/ssv") throw ssvError(404, "SSV_NOT_FOUND", "route not found");
   const query = url.search.startsWith("?") ? url.search.slice(1) : "";
+  if (query.length > 8 * 1024) throw ssvError(413, "SSV_REQUEST_TOO_LARGE", "reward callback is too large");
   const marker = "&signature=";
   const signatureIndex = query.indexOf(marker);
   if (signatureIndex < 1) throw ssvError(400, "SSV_SIGNATURE_MISSING", "signed reward callback is invalid");
@@ -28,6 +29,9 @@ export async function verifyAdMobSsvRequest(request, env, fetchImpl = fetch, now
   const rewardAmount = getSingle("reward_amount"), rewardItem = getSingle("reward_item");
   const timestampRaw = getSingle("timestamp"), transactionId = getSingle("transaction_id");
   const customDataRaw = getSingle("custom_data");
+  if (customDataRaw.length > 1024 || signature.length > 4096) {
+    throw ssvError(400, "SSV_PARAMETER_TOO_LARGE", "reward callback parameters are too large");
+  }
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(accountId)) {
     throw ssvError(400, "SSV_ACCOUNT_INVALID", "reward account is invalid");
   }

@@ -92,7 +92,7 @@ export async function verifyAccessToken(env, token, nowMs = Date.now()) {
   if (claims?.iss !== "https://ludoproof" || claims?.aud !== "ludoproof-android" || claims?.typ !== "access" ||
       !isAccountId(claims?.sub) || !isSessionId(claims?.sid) ||
       !Number.isSafeInteger(claims?.iat) || !Number.isSafeInteger(claims?.exp) ||
-      claims.iat > now + CLOCK_SKEW_SECONDS || claims.exp <= now ||
+      claims.iat > now + CLOCK_SKEW_SECONDS || claims.exp <= now || claims.exp <= claims.iat ||
       claims.exp - claims.iat > ACCESS_TOKEN_TTL_SECONDS) {
     throw httpError(401, "ACCOUNT_SESSION_INVALID", "Account session is invalid or expired");
   }
