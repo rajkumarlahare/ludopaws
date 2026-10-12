@@ -109,14 +109,58 @@ class AccountSessionStore(context: Context) {
 
     @Synchronized
     fun guestRequestId(): String {
-        prefs.getString(KEY_GUEST_REQUEST_ID, null)
-            ?.takeIf { UUID_V4.matches(it) }
-            ?.let { return it }
+        loadGuestRequestId()?.let { return it }
         val generated = UUID.randomUUID().toString().lowercase()
-        check(prefs.edit().putString(KEY_GUEST_REQUEST_ID, generated).commit()) {
-            "Guest-account recovery request could not be saved"
-        }
+        persistGuestRequestId(generated)
         return generated
+    }
+
+    private fun loadGuestRequestId(): String? {
+        val ivText = prefs.getString(KEY_GUEST_REQUEST_IV, null) ?: return null
+        val ciphertextText = prefs.getString(KEY_GUEST_REQUEST_CIPHERTEXT, null) ?: return null
+        return try {
+            val cipher = Cipher.getInstance(TRANSFORMATION)
+            cipher.init(
+                Cipher.DECRYPT_MODE,
+                secretKey(),
+                GCMParameterSpec(128, Base64.decode(ivText, Base64.NO_WRAP)),
+            )
+            cipher.updateAAD(GUEST_REQUEST_AAD)
+            val requestId = cipher.doFinal(Base64.decode(ciphertextText, Base64.NO_WRAP))
+                .toString(Charsets.UTF_8)
+                .trim()
+                .lowercase()
+            if (UUID_V4.matches(requestId)) requestId else {
+                clearGuestRequestId()
+                null
+            }
+        } catch (_: Exception) {
+            clearGuestRequestId()
+            null
+        }
+    }
+
+    private fun persistGuestRequestId(requestId: String) {
+        require(UUID_V4.matches(requestId))
+        val cipher = Cipher.getInstance(TRANSFORMATION)
+        cipher.init(Cipher.ENCRYPT_MODE, secretKey())
+        cipher.updateAAD(GUEST_REQUEST_AAD)
+        val encrypted = cipher.doFinal(requestId.toByteArray(Charsets.UTF_8))
+        check(
+            prefs.edit()
+                .putString(KEY_GUEST_REQUEST_IV, Base64.encodeToString(cipher.iv, Base64.NO_WRAP))
+                .putString(KEY_GUEST_REQUEST_CIPHERTEXT, Base64.encodeToString(encrypted, Base64.NO_WRAP))
+                .commit(),
+        ) { "Guest-account recovery secret could not be encrypted and saved" }
+    }
+
+    private fun clearGuestRequestId() {
+        check(
+            prefs.edit()
+                .remove(KEY_GUEST_REQUEST_IV)
+                .remove(KEY_GUEST_REQUEST_CIPHERTEXT)
+                .commit(),
+        ) { "Guest-account recovery secret could not be cleared safely" }
     }
 
     @Synchronized
@@ -161,9 +205,11 @@ class AccountSessionStore(context: Context) {
         const val KEY_VERSION = "version"
         const val KEY_IV = "session_iv"
         const val KEY_CIPHERTEXT = "session_ciphertext"
-        const val KEY_GUEST_REQUEST_ID = "guest_request_id"
+        const val KEY_GUEST_REQUEST_IV = "guest_request_iv"
+        const val KEY_GUEST_REQUEST_CIPHERTEXT = "guest_request_ciphertext"
         const val KEY_PENDING_REFRESH_REQUEST_ID = "pending_refresh_request_id"
         val SESSION_AAD = "ludoproof:account-session:v1".toByteArray(Charsets.UTF_8)
+        val GUEST_REQUEST_AAD = "ludoproof:guest-request:v1".toByteArray(Charsets.UTF_8)
         val ACCOUNT_ID = Regex("^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
         val UUID_V4 = ACCOUNT_ID
         val OPAQUE_BILLING_ID = Regex("^[a-f0-9]{64}$")

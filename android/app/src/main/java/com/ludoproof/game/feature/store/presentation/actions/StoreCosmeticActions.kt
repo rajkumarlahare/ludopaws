@@ -7,6 +7,7 @@ import com.ludoproof.game.feature.store.domain.model.StoreCosmetic
 import com.ludoproof.game.feature.store.presentation.StoreActivity
 
 internal fun StoreActivity.handleCosmeticTap(cosmetic: StoreCosmetic) {
+    // CONTENT_UNAVAILABLE is handled before any server request or value-bearing action.
     if (!cosmetic.contentAvailable) {
         showStoreMessage(
             cosmetic.title +

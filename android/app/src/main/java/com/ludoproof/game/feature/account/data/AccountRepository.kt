@@ -177,7 +177,7 @@ class AccountRepository(context: Context) {
             JSONObject(),
             session.accessToken,
         )
-        sessions.clearSession()
+        sessions.clear()
     }
 
     fun clearLocalSession() = sessions.clearSession()

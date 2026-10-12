@@ -71,6 +71,7 @@ class ProfileActivity : Activity() {
     }
     private var accountSwitchFromId: String? = null
     private var friendPresencePausedForAccountSwitch = false
+    private var accountIdentityRecoveryPending = false
     internal val isAccountSignInConfigured: Boolean
         get() = BuildConfig.GOOGLE_SIGN_IN_WEB_CLIENT_ID.isNotBlank()
 
@@ -321,7 +322,11 @@ class ProfileActivity : Activity() {
         renderProfile()
         accountAuthExecutor.execute {
             try {
-                accountRepository.ensureGuestSession()
+                // A restore must not depend on the old access/refresh token still being valid.
+                // Create a guest first only when this install has no encrypted session at all.
+                if (linkCurrentAccount || accountRepository.currentSession() == null) {
+                    accountRepository.ensureGuestSession()
+                }
                 if (!linkCurrentAccount && accountSwitchFromId == null) {
                     accountSwitchFromId = accountRepository.currentSession()?.accountId
                 }
@@ -371,6 +376,8 @@ class ProfileActivity : Activity() {
                         return
                     }
                     accountAuthExecutor.execute {
+                        var restoreSessionChanged = false
+                        var identityRecoveryCompleted = false
                         try {
                             if (linkCurrentAccount) {
                                 accountRepository.linkGoogleIdentity(idToken, nonce)
@@ -381,7 +388,11 @@ class ProfileActivity : Activity() {
                                 LeaderboardIdentityStore(this@ProfileActivity)
                                     .load()?.let { accountRepository.linkLeaderboardIdentity(it.profileToken) }
                             } else {
+                                // Scope the existing local profile to the guest account before the
+                                // active session is replaced; another account must not inherit its stats.
+                                profileStore.ensureCurrentAccountScope()
                                 accountRepository.restoreGoogleAccount(idToken, nonce)
+                                restoreSessionChanged = true
                                 val recovered = accountRepository.recoverLinkedIdentities()
                                 val friendStore = FriendIdentityStore(this@ProfileActivity)
                                 val friend = recovered.optJSONObject("friend")
@@ -409,17 +420,19 @@ class ProfileActivity : Activity() {
                                 } else {
                                     leaderboardStore.clearAllForAccountSwitch()
                                 }
+                                accountIdentityRecoveryPending = false
+                                identityRecoveryCompleted = true
                             }
                             val session = accountRepository.currentSession()
                             val links = accountRepository.linkedIdentities()
                             runOnUiThread {
                                 if (isFinishing || isDestroyed) return@runOnUiThread
                                 accountAuthInProgress = false
-                                if (friendPresencePausedForAccountSwitch) {
+                                if (friendPresencePausedForAccountSwitch && !accountIdentityRecoveryPending) {
                                     (application as LudoProofApplication).resumeFriendPresenceAfterAccountSwitch()
                                     friendPresencePausedForAccountSwitch = false
                                 }
-                                accountSwitchFromId = null
+                                if (!accountIdentityRecoveryPending) accountSwitchFromId = null
                                 accountGoogleLinked = links.optBoolean("googleLinked")
                                 accountStatus = if (linkCurrentAccount) {
                                     "Saved to Google · ${session?.displayName ?: "Player"}"
@@ -440,13 +453,13 @@ class ProfileActivity : Activity() {
                                     .show()
                             }
                         } catch (error: Exception) {
-                            if (
-                                !linkCurrentAccount &&
-                                accountRepository.currentSession()?.accountId != accountSwitchFromId
+                            if (!linkCurrentAccount && !identityRecoveryCompleted &&
+                                (restoreSessionChanged || accountRepository.currentSession()?.accountId != accountSwitchFromId)
                             ) {
-                                // The account session has switched, but recovery may have failed.
-                                // Clear old local credentials rather than accidentally using another
-                                // guest's Friend ID/profile with the restored account. Recovery can be retried.
+                                // The server session changed but identity recovery did not complete.
+                                // Clear old credentials and keep friend presence paused to prevent a
+                                // freshly registered identity from replacing the linked one.
+                                accountIdentityRecoveryPending = true
                                 FriendIdentityStore(this@ProfileActivity).clearAllForAccountSwitch()
                                 LeaderboardIdentityStore(this@ProfileActivity).clearAllForAccountSwitch()
                             }
@@ -485,11 +498,11 @@ class ProfileActivity : Activity() {
         runOnUiThread {
             if (isFinishing || isDestroyed) return@runOnUiThread
             accountAuthInProgress = false
-            if (friendPresencePausedForAccountSwitch) {
+            if (friendPresencePausedForAccountSwitch && !accountIdentityRecoveryPending) {
                 (application as LudoProofApplication).resumeFriendPresenceAfterAccountSwitch()
                 friendPresencePausedForAccountSwitch = false
             }
-            accountSwitchFromId = null
+            if (!accountIdentityRecoveryPending) accountSwitchFromId = null
             accountStatus = message.take(100)
             renderProfile()
             if (!success) {

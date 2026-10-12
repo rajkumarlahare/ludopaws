@@ -19,6 +19,7 @@ import com.ludoproof.game.feature.store.data.billing.PendingStorePurchase
 import com.ludoproof.game.feature.store.data.billing.PendingStorePurchaseStore
 import com.ludoproof.game.feature.store.data.local.CosmeticInventoryStore
 import com.ludoproof.game.feature.store.data.local.GemWalletStore
+import com.ludoproof.game.feature.profile.data.local.ProfileStore
 import com.ludoproof.game.feature.store.domain.StoreCosmeticCatalog
 import com.ludoproof.game.feature.store.domain.model.StoreBillingProduct
 import com.ludoproof.game.feature.store.domain.model.StoreTab

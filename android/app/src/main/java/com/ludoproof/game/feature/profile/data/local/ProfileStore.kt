@@ -1,6 +1,7 @@
 package com.ludoproof.game.feature.profile.data.local
 
 import android.content.Context
+import com.ludoproof.game.feature.account.data.AccountSessionStore
 import com.ludoproof.game.feature.profile.domain.ProfileProgression
 import com.ludoproof.game.feature.profile.domain.model.ProfileGameMode
 import com.ludoproof.game.feature.profile.domain.model.ProfileMatchSource
@@ -13,11 +14,35 @@ import java.time.LocalDate
 class ProfileStore(
     context: Context,
 ) {
+    private val appContext = context.applicationContext
     private val prefs =
-        context.getSharedPreferences(
+        appContext.getSharedPreferences(
             PREFS_NAME,
             Context.MODE_PRIVATE,
         )
+
+    /**
+     * Pins the legacy local profile to the currently active guest/account before account switching.
+     * Old stats are never silently copied into a different restored account.
+     */
+    @Synchronized
+    fun ensureCurrentAccountScope(): Boolean {
+        val accountId = AccountSessionStore(appContext).load()?.accountId ?: return false
+        val targetKey = PROFILE_JSON_PREFIX + accountId
+        val editor = prefs.edit()
+        if (!prefs.contains(targetKey) && !prefs.getBoolean(KEY_LEGACY_PROFILE_MIGRATED, false)) {
+            val legacy = prefs.getString(KEY_PROFILE_JSON, null)
+            if (legacy != null) editor.putString(targetKey, legacy)
+        }
+        editor.putBoolean(KEY_LEGACY_PROFILE_MIGRATED, true)
+        check(editor.commit()) { "Profile account scope could not be saved safely" }
+        return true
+    }
+
+    private fun profileStorageKey(): String {
+        val accountId = AccountSessionStore(appContext).load()?.accountId
+        return accountId?.let { PROFILE_JSON_PREFIX + it } ?: KEY_PROFILE_JSON
+    }
 
     fun snapshot():
         ProfileSnapshot =
@@ -212,11 +237,16 @@ class ProfileStore(
 
     private fun load():
         MutableProfileState {
-        val raw =
-            prefs.getString(
-                KEY_PROFILE_JSON,
-                null,
-            ) ?: return MutableProfileState()
+        var storageKey = profileStorageKey()
+        var raw = prefs.getString(storageKey, null)
+        if (raw == null && storageKey != KEY_PROFILE_JSON &&
+            !prefs.getBoolean(KEY_LEGACY_PROFILE_MIGRATED, false)
+        ) {
+            ensureCurrentAccountScope()
+            storageKey = profileStorageKey()
+            raw = prefs.getString(storageKey, null)
+        }
+        raw ?: return MutableProfileState()
 
         return runCatching {
             val json =
@@ -430,14 +460,12 @@ class ProfileStore(
                     ),
                 )
 
-        check(
-            prefs.edit()
-                .putString(
-                    KEY_PROFILE_JSON,
-                    json.toString(),
-                )
-                .commit(),
-        ) {
+        val storageKey = profileStorageKey()
+        val editor = prefs.edit().putString(storageKey, json.toString())
+        if (storageKey != KEY_PROFILE_JSON) {
+            editor.putBoolean(KEY_LEGACY_PROFILE_MIGRATED, true)
+        }
+        check(editor.commit()) {
             "Profile stats could not be persisted"
         }
     }
@@ -554,6 +582,10 @@ class ProfileStore(
             "ludoproof_profile"
         const val KEY_PROFILE_JSON =
             "profile_json_v1"
+        const val PROFILE_JSON_PREFIX =
+            "profile_json_v2_account_"
+        const val KEY_LEGACY_PROFILE_MIGRATED =
+            "profile_legacy_scope_migrated"
         const val MAX_RECORDED_MATCHES =
             250
         const val MAX_NAME_LENGTH =
