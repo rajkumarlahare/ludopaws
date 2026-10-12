@@ -18,9 +18,12 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import com.ludoproof.game.LudoProofTheme
+import com.ludoproof.game.LudoPawsCharacterAvatarView
 import com.ludoproof.game.core.ui.art.playerCountSelectionBackground
 import com.ludoproof.game.core.ui.art.plywoodBackground
 import com.ludoproof.game.core.ui.components.AppFocusRing
+import com.ludoproof.game.feature.characters.data.local.CharacterSelectionStore
+import com.ludoproof.game.core.ui.art.recessedPlywoodBackground
 import com.ludoproof.game.feature.leaderboard.data.local.LeaderboardCacheStore
 import com.ludoproof.game.feature.leaderboard.data.local.LeaderboardCredential
 import com.ludoproof.game.feature.leaderboard.data.local.LeaderboardIdentityStore
@@ -28,9 +31,6 @@ import com.ludoproof.game.feature.leaderboard.data.remote.LeaderboardApi
 import com.ludoproof.game.feature.leaderboard.domain.model.LeaderboardEntry
 import com.ludoproof.game.feature.leaderboard.domain.model.LeaderboardSnapshot
 import com.ludoproof.game.feature.profile.data.local.ProfileStore
-import com.ludoproof.game.feature.store.data.local.CosmeticInventoryStore
-import com.ludoproof.game.feature.store.domain.StoreCosmeticCatalog
-import com.ludoproof.game.feature.store.domain.model.CosmeticCategory
 import java.text.NumberFormat
 import java.util.Date
 import java.util.concurrent.Executors
@@ -56,6 +56,9 @@ class LeaderboardActivity :
         LeaderboardCacheStore(
             this,
         )
+    }
+    private val selectedCharacterId by lazy {
+        CharacterSelectionStore(this).load().characterId
     }
 
     private var snapshot:
@@ -621,22 +624,6 @@ class LeaderboardActivity :
                 ?.displayName
                 ?: localProfile
                     .displayName
-        val avatarId =
-            CosmeticInventoryStore(
-                this,
-            ).selectedId(
-                CosmeticCategory.AVATAR,
-            )
-        val avatarSymbol =
-            StoreCosmeticCatalog
-                .find(
-                    avatarId,
-                )
-                ?.previewSymbol
-                ?: initials(
-                    displayName,
-                )
-
         return LinearLayout(
             this,
         ).apply {
@@ -667,40 +654,7 @@ class LeaderboardActivity :
                         Gravity.CENTER_VERTICAL
 
                     addView(
-                        TextView(
-                            this@LeaderboardActivity,
-                        ).apply {
-                            text =
-                                avatarSymbol
-                            textSize =
-                                20f
-                            setTypeface(
-                                Typeface.DEFAULT_BOLD,
-                            )
-                            setTextColor(
-                                Color.WHITE,
-                            )
-                            gravity =
-                                Gravity.CENTER
-                            background =
-                                GradientDrawable(
-                                    GradientDrawable
-                                        .Orientation
-                                        .TOP_BOTTOM,
-                                    intArrayOf(
-                                        0xFF2C91FF.toInt(),
-                                        0xFF0756BE.toInt(),
-                                        0xFF062B72.toInt(),
-                                    ),
-                                ).apply {
-                                    shape =
-                                        GradientDrawable.OVAL
-                                    setStroke(
-                                        dp(2),
-                                        LudoProofTheme.GOLD,
-                                    )
-                                }
-                        },
+                        leaderboardCharacterPortrait(),
                         LinearLayout.LayoutParams(
                             dp(68),
                             dp(68),
@@ -1105,34 +1059,38 @@ class LeaderboardActivity :
                         )
 
                         addView(
-                            TextView(
-                                this@LeaderboardActivity,
-                            ).apply {
-                                text =
-                                    initials(
-                                        entry.displayName,
-                                    )
-                                textSize = 14f
-                                setTypeface(
-                                    Typeface.DEFAULT_BOLD,
-                                )
-                                setTextColor(Color.WHITE)
-                                gravity = Gravity.CENTER
-                                background =
-                                    GradientDrawable(
-                                        GradientDrawable.Orientation.TOP_BOTTOM,
-                                        intArrayOf(
-                                            0xFF278DEB.toInt(),
-                                            0xFF0A55B2.toInt(),
-                                        ),
-                                    ).apply {
-                                        shape =
-                                            GradientDrawable.OVAL
-                                        setStroke(
-                                            dp(if (champion) 2 else 1),
-                                            accent,
+                            if (entry.isViewer) {
+                                leaderboardCharacterPortrait()
+                            } else {
+                                TextView(
+                                    this@LeaderboardActivity,
+                                ).apply {
+                                    text =
+                                        initials(
+                                            entry.displayName,
                                         )
-                                    }
+                                    textSize = 14f
+                                    setTypeface(
+                                        Typeface.DEFAULT_BOLD,
+                                    )
+                                    setTextColor(Color.WHITE)
+                                    gravity = Gravity.CENTER
+                                    background =
+                                        GradientDrawable(
+                                            GradientDrawable.Orientation.TOP_BOTTOM,
+                                            intArrayOf(
+                                                0xFF278DEB.toInt(),
+                                                0xFF0A55B2.toInt(),
+                                            ),
+                                        ).apply {
+                                            shape =
+                                                GradientDrawable.OVAL
+                                            setStroke(
+                                                dp(if (champion) 2 else 1),
+                                                accent,
+                                            )
+                                        }
+                                }
                             },
                             LinearLayout.LayoutParams(
                                 dp(if (champion) 44 else 40),
@@ -1343,40 +1301,44 @@ class LeaderboardActivity :
             )
 
             addView(
-                TextView(
-                    this@LeaderboardActivity,
-                ).apply {
-                    text =
-                        initials(
-                            entry.displayName,
-                        )
-                    textSize =
-                        15f
-                    setTypeface(
-                        Typeface.DEFAULT_BOLD,
-                    )
-                    setTextColor(
-                        Color.WHITE,
-                    )
-                    gravity =
-                        Gravity.CENTER
-                    background =
-                        GradientDrawable(
-                            GradientDrawable
-                                .Orientation
-                                .TOP_BOTTOM,
-                            intArrayOf(
-                                0xFF278DEB.toInt(),
-                                0xFF0A55B2.toInt(),
-                            ),
-                        ).apply {
-                            shape =
-                                GradientDrawable.OVAL
-                            setStroke(
-                                dp(1),
-                                border,
+                if (entry.isViewer) {
+                    leaderboardCharacterPortrait()
+                } else {
+                    TextView(
+                        this@LeaderboardActivity,
+                    ).apply {
+                        text =
+                            initials(
+                                entry.displayName,
                             )
-                        }
+                        textSize =
+                            15f
+                        setTypeface(
+                            Typeface.DEFAULT_BOLD,
+                        )
+                        setTextColor(
+                            Color.WHITE,
+                        )
+                        gravity =
+                            Gravity.CENTER
+                        background =
+                            GradientDrawable(
+                                GradientDrawable
+                                    .Orientation
+                                    .TOP_BOTTOM,
+                                intArrayOf(
+                                    0xFF278DEB.toInt(),
+                                    0xFF0A55B2.toInt(),
+                                ),
+                            ).apply {
+                                shape =
+                                    GradientDrawable.OVAL
+                                setStroke(
+                                    dp(1),
+                                    border,
+                                )
+                            }
+                    }
                 },
                 LinearLayout.LayoutParams(
                     dp(48),
@@ -1578,6 +1540,46 @@ class LeaderboardActivity :
                     this@LeaderboardActivity,
                     cornerRadiusDp = 14f,
                 )
+        }
+
+    /**
+     * Reuses the Profile page's production 3D Paw portrait on a circular,
+     * recessed-plywood pocket. Keep the character art transparent so the
+     * same carved-wood surface remains visible around the portrait.
+     */
+    private fun leaderboardCharacterPortrait(): FrameLayout =
+        FrameLayout(this).apply {
+            clipChildren = false
+            clipToPadding = false
+            background =
+                recessedPlywoodBackground(
+                    this@LeaderboardActivity,
+                    outerCornerRadiusDp = 999f,
+                )
+            setPadding(
+                dp(2),
+                dp(2),
+                dp(2),
+                dp(2),
+            )
+            addView(
+                LudoPawsCharacterAvatarView(this@LeaderboardActivity).apply {
+                    setPadding(0, 0, 0, 0)
+                    bind(
+                        characterId = selectedCharacterId,
+                        ringColor = 0xFF5BE0FF.toInt(),
+                        highlighted = false,
+                        showCircularChrome = false,
+                    )
+                    importantForAccessibility =
+                        View.IMPORTANT_FOR_ACCESSIBILITY_YES
+                },
+                FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    Gravity.CENTER,
+                ),
+            )
         }
 
     private fun initials(
