@@ -203,6 +203,21 @@ test("AdMob SSV rate limiting runs before signature/key verification", async () 
 
 function makeDeletionReplayEnv(deleted) {
   const calls = [];
+  const directoryCalls = [];
+  const directory = {
+    idFromName(name) { return name; },
+    get(name) {
+      return {
+        async fetch(request) {
+          const path = new URL(request.url).pathname;
+          const body = await request.json();
+          directoryCalls.push({ name, path, body });
+          if (path === "/account/delete") return Response.json({ ok: true, deleted: true });
+          return Response.json({ error: "NOT_FOUND" }, { status: 404 });
+        },
+      };
+    },
+  };
   const player = {
     calls,
     idFromName(name) { return name; },
@@ -225,10 +240,12 @@ function makeDeletionReplayEnv(deleted) {
   };
   return {
     player,
+    directoryCalls,
     env: {
       LUDOPROOF_SESSION_HMAC_KEY: SECRET,
       LUDOPROOF_API_GATE: makeRateGate(),
       LUDOPROOF_PLAYER_ACCOUNTS: player,
+      LUDOPROOF_ACCOUNT_DIRECTORY: directory,
     },
   };
 }
@@ -251,6 +268,7 @@ test("expired signed access token can only confirm an already-deleted account", 
   assert.equal(player.calls[0].path, "/account/delete-preview");
   assert.equal(player.calls[0].accountId, ACCOUNT_A);
   assert.equal(player.calls[0].body.sessionId, SESSION_A);
+  assert.deepEqual(directoryCalls.map(call => call.path), ["/account/delete"]);
 });
 
 test("expired signed access token cannot authorize a deletion when no deletion tombstone exists", async () => {
@@ -273,7 +291,7 @@ test("expired signed access token cannot authorize a deletion when no deletion t
 
 
 test("expired token replay still rejects a forged signature before checking the tombstone", async () => {
-  const { env, player } = makeDeletionReplayEnv(true);
+  const { env, player, directoryCalls } = makeDeletionReplayEnv(true);
   const token = await issueAccessToken(env, ACCOUNT_A, SESSION_A, Date.now() - 20 * 60 * 1000);
   const parts = token.split(".");
   parts[2] = (parts[2][0] === "A" ? "B" : "A") + parts[2].slice(1);
@@ -291,6 +309,7 @@ test("expired token replay still rejects a forged signature before checking the 
   assert.equal(response.status, 401);
   assert.equal((await response.json()).error, "ACCOUNT_SESSION_INVALID");
   assert.equal(player.calls.length, 0);
+  assert.equal(directoryCalls.length, 0);
 });
 
 
