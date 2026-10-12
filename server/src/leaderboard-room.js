@@ -94,6 +94,7 @@ export class LeaderboardRoom {
       ) {
         return await this.#recoverProfileIdentity(request);
       }
+      if (request.method === "POST" && url.pathname === "/profile/delete") return await this.#deleteProfile(request);
 
       if (
         request.method === "POST" &&
@@ -297,6 +298,16 @@ export class LeaderboardRoom {
       profileToken: identity.profileToken,
       registrationRequestId,
     });
+  }
+
+  async #deleteProfile(request) {
+    const body = await readJson(request), profileId = normalizeLeaderboardProfileId(body?.profileId);
+    if (!profileId) throw badRequest("INVALID_PROFILE_ID", "leaderboard profile ID is invalid");
+    this.ctx.storage.transactionSync(() => {
+      this.ctx.storage.sql.exec("DELETE FROM leaderboard_entries_v2 WHERE profile_id = ?", profileId);
+      this.ctx.storage.sql.exec("DELETE FROM leaderboard_profiles_v2 WHERE profile_id = ?", profileId);
+    });
+    return json(200, { ok: true, deleted: true });
   }
 
   async #record(request) {
