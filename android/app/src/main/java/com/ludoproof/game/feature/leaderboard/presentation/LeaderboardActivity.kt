@@ -22,6 +22,8 @@ import com.ludoproof.game.LudoPawsCharacterAvatarView
 import com.ludoproof.game.core.ui.art.playerCountSelectionBackground
 import com.ludoproof.game.core.ui.art.plywoodBackground
 import com.ludoproof.game.core.ui.components.AppFocusRing
+import com.ludoproof.game.core.ui.components.appIconActionButton
+import com.ludoproof.game.core.ui.icons.AppIconName
 import com.ludoproof.game.feature.characters.data.local.CharacterSelectionStore
 import com.ludoproof.game.feature.leaderboard.data.local.LeaderboardCacheStore
 import com.ludoproof.game.feature.leaderboard.data.local.LeaderboardCredential
@@ -459,21 +461,18 @@ class LeaderboardActivity :
                 dp(58)
 
             addView(
-                Button(
-                    this@LeaderboardActivity,
-                ).apply {
-                    LudoProofTheme
-                        .circularAction(
-                            this,
-                            "←",
+                appIconActionButton(
+                    context = this@LeaderboardActivity,
+                    contentDescription = "Back",
+                    iconName = AppIconName.CHEVRON_LEFT,
+                    sizeDp = 48,
+                ) { finish() }.apply {
+                    // Match the shared chevron used by Profile and other screens.
+                    background =
+                        plywoodBackground(
+                            this@LeaderboardActivity,
+                            cornerRadiusDp = 999f,
                         )
-                    applyPlywoodActionBackground(this)
-                    contentDescription =
-                        "Back"
-                    setOnClickListener {
-                        finish()
-                    }
-                    AppFocusRing.apply(this, cornerRadiusDp = 999f)
                 },
                 LinearLayout.LayoutParams(
                     dp(48),
@@ -482,84 +481,14 @@ class LeaderboardActivity :
             )
 
             addView(
-                LinearLayout(
-                    this@LeaderboardActivity,
-                ).apply {
-                    orientation =
-                        LinearLayout.VERTICAL
-                    gravity =
-                        Gravity.START or
-                            Gravity.CENTER_VERTICAL
-
-                    addView(
-                        TextView(
-                            this@LeaderboardActivity,
-                        ).apply {
-                            text =
-                                "TOP LEADERS"
-                            textSize =
-                                if (
-                                    LudoProofTheme
-                                        .isCompactWidth(
-                                            this@LeaderboardActivity,
-                                        )
-                                ) {
-                                    23f
-                                } else {
-                                    27f
-                                }
-                            setTypeface(
-                                Typeface.DEFAULT_BOLD,
-                            )
-                            setTextColor(
-                                Color.WHITE,
-                            )
-                            setSingleLine(
-                                true,
-                            )
-                        },
-                    )
-
-                    addView(
-                        TextView(
-                            this@LeaderboardActivity,
-                        ).apply {
-                            text =
-                                when {
-                                    showingCached ->
-                                        "SAVED • " +
-                                            cachedTimeLabel()
-                                    refreshing ->
-                                        "SYNCING VERIFIED RANKS"
-                                    else ->
-                                        "SERVER VERIFIED • ALL TIME"
-                                }
-                            textSize =
-                                10f
-                            setTypeface(
-                                Typeface.DEFAULT_BOLD,
-                            )
-                            setTextColor(
-                                0xFF6EEBFF.toInt(),
-                            )
-                            setPadding(
-                                0,
-                                dp(2),
-                                0,
-                                0,
-                            )
-                        },
-                    )
-                },
+                View(this@LeaderboardActivity),
                 LinearLayout.LayoutParams(
                     0,
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.MATCH_PARENT,
                     1f,
                 ).apply {
-                    marginStart =
-                        dp(12)
-                    marginEnd =
-                        dp(8)
+                    marginStart = dp(12)
+                    marginEnd = dp(8)
                 },
             )
 
@@ -643,6 +572,58 @@ class LeaderboardActivity :
                 dp(7)
                     .toFloat()
 
+            // Keep the title and its verification status together inside the
+            // plywood player card, centered above the selected character.
+            addView(
+                TextView(
+                    this@LeaderboardActivity,
+                ).apply {
+                    text = "TOP LEADERS"
+                    textSize =
+                        if (LudoProofTheme.isCompactWidth(this@LeaderboardActivity)) {
+                            21f
+                        } else {
+                            24f
+                        }
+                    setTypeface(Typeface.DEFAULT_BOLD)
+                    setTextColor(Color.WHITE)
+                    gravity = Gravity.CENTER
+                    includeFontPadding = false
+                    maxLines = 1
+                },
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ),
+            )
+
+            addView(
+                TextView(
+                    this@LeaderboardActivity,
+                ).apply {
+                    text =
+                        when {
+                            showingCached ->
+                                "SAVED • " + cachedTimeLabel()
+                            refreshing ->
+                                "SYNCING VERIFIED RANKS"
+                            else ->
+                                "SERVER VERIFIED • ALL TIME"
+                        }
+                    textSize = 10f
+                    setTypeface(Typeface.DEFAULT_BOLD)
+                    setTextColor(0xFF6EEBFF.toInt())
+                    gravity = Gravity.CENTER
+                    includeFontPadding = false
+                    maxLines = 1
+                    setPadding(0, dp(3), 0, dp(9))
+                },
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ),
+            )
+
             addView(
                 LinearLayout(
                     this@LeaderboardActivity,
@@ -679,7 +660,7 @@ class LeaderboardActivity :
                                         Typeface.DEFAULT_BOLD,
                                     )
                                     setTextColor(
-                                        0xFF503018.toInt(),
+                                        Color.WHITE,
                                     )
                                     maxLines =
                                         1
