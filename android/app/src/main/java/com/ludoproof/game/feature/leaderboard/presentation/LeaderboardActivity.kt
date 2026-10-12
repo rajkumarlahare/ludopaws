@@ -16,6 +16,8 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import com.ludoproof.game.LudoProofTheme
+import com.ludoproof.game.core.ui.art.playerCountSelectionBackground
+import com.ludoproof.game.core.ui.art.plywoodBackground
 import com.ludoproof.game.core.ui.components.AppFocusRing
 import com.ludoproof.game.feature.leaderboard.data.local.LeaderboardCacheStore
 import com.ludoproof.game.feature.leaderboard.data.local.LeaderboardCredential
@@ -28,6 +30,7 @@ import com.ludoproof.game.feature.store.data.local.CosmeticInventoryStore
 import com.ludoproof.game.feature.store.domain.StoreCosmeticCatalog
 import com.ludoproof.game.feature.store.domain.model.CosmeticCategory
 import java.text.NumberFormat
+import java.util.Date
 import java.util.concurrent.Executors
 
 class LeaderboardActivity :
@@ -60,6 +63,10 @@ class LeaderboardActivity :
         true
     private var showingCached =
         false
+    private var cachedAt: Long? =
+        null
+    private var refreshing =
+        false
     private var statusMessage:
         String? =
         null
@@ -91,6 +98,8 @@ class LeaderboardActivity :
                             cachedSnapshot
                         showingCached =
                             true
+                        cachedAt =
+                            cached.savedAt
                         loading =
                             false
                     }
@@ -106,14 +115,15 @@ class LeaderboardActivity :
     }
 
     private fun refreshLeaderboard() {
-        if (
-            snapshot ==
-            null
-        ) {
-            loading =
-                true
-            render()
+        if (refreshing) {
+            return
         }
+        refreshing = true
+        loading =
+            snapshot == null
+        statusMessage =
+            null
+        render()
 
         executor.execute {
             try {
@@ -147,6 +157,10 @@ class LeaderboardActivity :
                         fresh
                     showingCached =
                         false
+                    cachedAt =
+                        System.currentTimeMillis()
+                    refreshing =
+                        false
                     loading =
                         false
                     statusMessage =
@@ -163,6 +177,8 @@ class LeaderboardActivity :
                     ) {
                         return@post
                     }
+                    refreshing =
+                        false
                     loading =
                         false
                     statusMessage =
@@ -368,28 +384,32 @@ class LeaderboardActivity :
             }
 
             else -> {
-                snapshot
-                    ?.entries
-                    .orEmpty()
-                    .forEachIndexed {
-                            index,
-                            entry ->
-                        content.addView(
-                            rankingRow(
-                                entry,
-                            ),
-                            sectionParams(
-                                if (
-                                    index ==
-                                    0
-                                ) {
-                                    10
-                                } else {
-                                    8
-                                },
-                            ),
-                        )
+                val entries =
+                    snapshot
+                        ?.entries
+                        .orEmpty()
+
+                if (entries.size >= 3) {
+                    content.addView(
+                        topThreePodium(
+                            entries.take(3),
+                        ),
+                        sectionParams(12),
+                    )
+                }
+
+                val remainingEntries =
+                    if (entries.size >= 3) {
+                        entries.drop(3)
+                    } else {
+                        entries
                     }
+                remainingEntries.forEach { entry ->
+                    content.addView(
+                        rankingRow(entry),
+                        sectionParams(8),
+                    )
+                }
             }
         }
 
@@ -476,12 +496,14 @@ class LeaderboardActivity :
                             this@LeaderboardActivity,
                         ).apply {
                             text =
-                                if (
-                                    showingCached
-                                ) {
-                                    "VERIFIED ONLINE • SAVED"
-                                } else {
-                                    "VERIFIED ONLINE • ALL TIME"
+                                when {
+                                    showingCached ->
+                                        "SAVED • " +
+                                            cachedTimeLabel()
+                                    refreshing ->
+                                        "SYNCING VERIFIED RANKS"
+                                    else ->
+                                        "SERVER VERIFIED • ALL TIME"
                                 }
                             textSize =
                                 10f
@@ -524,10 +546,10 @@ class LeaderboardActivity :
                     contentDescription =
                         "Refresh leaderboard"
                     isEnabled =
-                        !loading
+                        !refreshing
                     alpha =
                         if (
-                            loading
+                            refreshing
                         ) {
                             0.55f
                         } else {
@@ -587,12 +609,10 @@ class LeaderboardActivity :
                 dp(14),
             )
             background =
-                LudoProofTheme
-                    .darkPanelDrawable(
-                        this@LeaderboardActivity,
-                        goldBorder =
-                            true,
-                    )
+                plywoodBackground(
+                    this@LeaderboardActivity,
+                    cornerRadiusDp = 17f,
+                )
             elevation =
                 dp(7)
                     .toFloat()
@@ -666,7 +686,7 @@ class LeaderboardActivity :
                                         Typeface.DEFAULT_BOLD,
                                     )
                                     setTextColor(
-                                        Color.WHITE,
+                                        0xFF503018.toInt(),
                                     )
                                     maxLines =
                                         1
@@ -697,14 +717,7 @@ class LeaderboardActivity :
                                         Typeface.DEFAULT_BOLD,
                                     )
                                     setTextColor(
-                                        if (
-                                            viewer !=
-                                            null
-                                        ) {
-                                            LudoProofTheme.GOLD
-                                        } else {
-                                            LudoProofTheme.TEXT_DIM
-                                        },
+                                        0xFF65421E.toInt(),
                                     )
                                     setPadding(
                                         0,
@@ -873,18 +886,17 @@ class LeaderboardActivity :
             this,
         ).apply {
             text =
-                "SERVER-VERIFIED SCORING  •  FINISH +" +
+                "SERVER VERIFIED  •  MATCH COMPLETED +" +
                     finish +
-                    "  •  WIN +" +
-                    bonus +
-                    " BONUS"
+                    "  •  WIN BONUS +" +
+                    bonus
             textSize =
                 10f
             setTypeface(
                 Typeface.DEFAULT_BOLD,
             )
             setTextColor(
-                0xFFBFEAFF.toInt(),
+                0xFF5B381F.toInt(),
             )
             gravity =
                 Gravity.CENTER
@@ -895,14 +907,10 @@ class LeaderboardActivity :
                 dp(10),
             )
             background =
-                LudoProofTheme
-                    .rounded(
-                        0xB507255E.toInt(),
-                        12f,
-                        0x445FDFFF,
-                        1f,
-                        this@LeaderboardActivity,
-                    )
+                plywoodBackground(
+                    this@LeaderboardActivity,
+                    cornerRadiusDp = 12f,
+                )
         }
     }
 
@@ -973,6 +981,221 @@ class LeaderboardActivity :
             )
         }
 
+    private fun topThreePodium(
+        entries: List<LeaderboardEntry>,
+    ): LinearLayout =
+        LinearLayout(this).apply {
+            orientation =
+                LinearLayout.HORIZONTAL
+            gravity =
+                Gravity.BOTTOM
+
+            val podiumEntries =
+                listOf(2, 1, 3)
+                    .mapNotNull { rank ->
+                        entries.firstOrNull {
+                            it.rank == rank
+                        }
+                    }
+
+            podiumEntries.forEach { entry ->
+                val accent =
+                    when (entry.rank) {
+                        1 -> 0xFF9A6500.toInt()
+                        2 -> 0xFF65717B.toInt()
+                        else -> 0xFF974F1F.toInt()
+                    }
+                val champion =
+                    entry.rank == 1
+
+                val card =
+                    LinearLayout(
+                        this@topThreePodium,
+                    ).apply {
+                        orientation =
+                            LinearLayout.VERTICAL
+                        gravity =
+                            Gravity.CENTER
+                        setPadding(
+                            dp(5),
+                            dp(9),
+                            dp(5),
+                            dp(8),
+                        )
+                        background =
+                            if (entry.isViewer) {
+                                playerCountSelectionBackground(
+                                    context =
+                                        this@LeaderboardActivity,
+                                    selected = true,
+                                    outerCornerRadiusDp = 13f,
+                                    checkBadgeAtTopEnd = true,
+                                    emphasizeSelected = true,
+                                    showCheckBadge = false,
+                                    useRecessedPlywood = false,
+                                )
+                            } else {
+                                plywoodBackground(
+                                    this@LeaderboardActivity,
+                                    cornerRadiusDp = 13f,
+                                )
+                            }
+                        elevation =
+                            dp(if (champion) 6 else 3).toFloat()
+
+                        addView(
+                            TextView(
+                                this@topThreePodium,
+                            ).apply {
+                                text =
+                                    when (entry.rank) {
+                                        1 -> "CHAMPION"
+                                        2 -> "2ND PLACE"
+                                        else -> "3RD PLACE"
+                                    }
+                                textSize = 9f
+                                setTypeface(
+                                    Typeface.DEFAULT_BOLD,
+                                )
+                                setTextColor(accent)
+                                gravity = Gravity.CENTER
+                                includeFontPadding = false
+                                maxLines = 1
+                            },
+                        )
+
+                        addView(
+                            TextView(
+                                this@topThreePodium,
+                            ).apply {
+                                text =
+                                    initials(
+                                        entry.displayName,
+                                    )
+                                textSize = 14f
+                                setTypeface(
+                                    Typeface.DEFAULT_BOLD,
+                                )
+                                setTextColor(Color.WHITE)
+                                gravity = Gravity.CENTER
+                                background =
+                                    GradientDrawable(
+                                        GradientDrawable.Orientation.TOP_BOTTOM,
+                                        intArrayOf(
+                                            0xFF278DEB.toInt(),
+                                            0xFF0A55B2.toInt(),
+                                        ),
+                                    ).apply {
+                                        shape =
+                                            GradientDrawable.OVAL
+                                        setStroke(
+                                            dp(if (champion) 2 else 1),
+                                            accent,
+                                        )
+                                    }
+                            },
+                            LinearLayout.LayoutParams(
+                                dp(if (champion) 44 else 40),
+                                dp(if (champion) 44 else 40),
+                            ).apply {
+                                topMargin = dp(7)
+                            },
+                        )
+
+                        addView(
+                            TextView(
+                                this@topThreePodium,
+                            ).apply {
+                                text =
+                                    entry.displayName
+                                textSize =
+                                    if (champion) 12.5f else 11.5f
+                                setTypeface(
+                                    Typeface.DEFAULT_BOLD,
+                                )
+                                setTextColor(0xFF503018.toInt())
+                                gravity = Gravity.CENTER
+                                maxLines = 1
+                                ellipsize =
+                                    TextUtils.TruncateAt.END
+                                includeFontPadding = false
+                                setPadding(0, dp(4), 0, 0)
+                            },
+                            LinearLayout.LayoutParams(
+                                LinearLayout.LayoutParams.MATCH_PARENT,
+                                LinearLayout.LayoutParams.WRAP_CONTENT,
+                            ),
+                        )
+
+                        addView(
+                            TextView(
+                                this@topThreePodium,
+                            ).apply {
+                                text =
+                                    number(entry.points)
+                                textSize =
+                                    if (champion) 18f else 15f
+                                setTypeface(
+                                    Typeface.DEFAULT_BOLD,
+                                )
+                                setTextColor(
+                                    if (champion) accent else 0xFF503018.toInt(),
+                                )
+                                gravity = Gravity.CENTER
+                                includeFontPadding = false
+                                setPadding(0, dp(3), 0, 0)
+                            },
+                        )
+
+                        addView(
+                            TextView(
+                                this@topThreePodium,
+                            ).apply {
+                                text = "POINTS"
+                                textSize = 8f
+                                setTypeface(
+                                    Typeface.DEFAULT_BOLD,
+                                )
+                                setTextColor(0xFF765333.toInt())
+                                gravity = Gravity.CENTER
+                                includeFontPadding = false
+                            },
+                        )
+
+                        addView(
+                            TextView(
+                                this@topThreePodium,
+                            ).apply {
+                                text =
+                                    "${entry.wins} W  •  ${entry.games} G"
+                                textSize = 8.5f
+                                setTextColor(0xFF765333.toInt())
+                                gravity = Gravity.CENTER
+                                maxLines = 1
+                                includeFontPadding = false
+                                setPadding(0, dp(4), 0, 0)
+                            },
+                        )
+                    }
+
+                addView(
+                    card,
+                    LinearLayout.LayoutParams(
+                        0,
+                        dp(if (champion) 164 else 148),
+                        1f,
+                    ).apply {
+                        setMargins(
+                            dp(3),
+                            0,
+                            dp(3),
+                            0,
+                        )
+                    },
+                )
+            }
+        }
+
     private fun rankingRow(
         entry: LeaderboardEntry,
     ):
@@ -980,19 +1203,18 @@ class LeaderboardActivity :
         val border =
             when {
                 entry.isViewer ->
-                    0xFF5DE6FF.toInt()
+                    0xFF6A3F18.toInt()
                 entry.rank ==
                     1 ->
-                    0xFFFFD33D.toInt()
+                    0xFF9A6500.toInt()
                 entry.rank ==
                     2 ->
-                    0xFFC8D8EA.toInt()
+                    0xFF65717B.toInt()
                 entry.rank ==
                     3 ->
-                    0xFFD18A50.toInt()
+                    0xFF974F1F.toInt()
                 else ->
-                    0x6659BFFF
-                        .toInt()
+                    0xFF76502E.toInt()
             }
 
         return LinearLayout(
@@ -1020,28 +1242,23 @@ class LeaderboardActivity :
                 dp(9),
             )
             background =
-                LudoProofTheme
-                    .rounded(
-                        if (
-                            entry.isViewer
-                        ) {
-                            0xE50B3B83.toInt()
-                        } else {
-                            0xDC0B3278.toInt()
-                        },
-                        15f,
-                        border,
-                        if (
-                            entry.rank <=
-                                3 ||
-                            entry.isViewer
-                        ) {
-                            1.8f
-                        } else {
-                            1f
-                        },
-                        this@LeaderboardActivity,
+                if (entry.isViewer) {
+                    playerCountSelectionBackground(
+                        context =
+                            this@LeaderboardActivity,
+                        selected = true,
+                        outerCornerRadiusDp = 15f,
+                        checkBadgeAtTopEnd = true,
+                        emphasizeSelected = true,
+                        showCheckBadge = false,
+                        useRecessedPlywood = false,
                     )
+                } else {
+                    plywoodBackground(
+                        this@LeaderboardActivity,
+                        cornerRadiusDp = 15f,
+                    )
+                }
             elevation =
                 dp(
                     if (
@@ -1143,9 +1360,7 @@ class LeaderboardActivity :
                         ).apply {
                             text =
                                 entry.displayName +
-                                if (
-                                    entry.isViewer
-                                ) {
+                                if (entry.isViewer) {
                                     "  • YOU"
                                 } else {
                                     ""
@@ -1156,7 +1371,7 @@ class LeaderboardActivity :
                                 Typeface.DEFAULT_BOLD,
                             )
                             setTextColor(
-                                Color.WHITE,
+                                0xFF503018.toInt(),
                             )
                             maxLines =
                                 1
@@ -1193,7 +1408,7 @@ class LeaderboardActivity :
                             textSize =
                                 11f
                             setTextColor(
-                                LudoProofTheme.TEXT_MUTED,
+                                0xFF765333.toInt(),
                             )
                             setPadding(
                                 0,
@@ -1235,13 +1450,10 @@ class LeaderboardActivity :
                                 Typeface.DEFAULT_BOLD,
                             )
                             setTextColor(
-                                if (
-                                    entry.rank ==
-                                    1
-                                ) {
-                                    LudoProofTheme.GOLD
+                                if (entry.rank == 1) {
+                                    0xFF9A6500.toInt()
                                 } else {
-                                    Color.WHITE
+                                    0xFF503018.toInt()
                                 },
                             )
                             gravity =
@@ -1260,7 +1472,7 @@ class LeaderboardActivity :
                                 Typeface.DEFAULT_BOLD,
                             )
                             setTextColor(
-                                0xFF77DEFF.toInt(),
+                                0xFF765333.toInt(),
                             )
                             gravity =
                                 Gravity.END
@@ -1279,14 +1491,14 @@ class LeaderboardActivity :
         TextView =
         messagePanel(
             "Loading verified rankings…",
-            LudoProofTheme.TEXT_MUTED,
+            0xFF65421E.toInt(),
         )
 
     private fun emptyPanel():
         TextView =
         messagePanel(
             "No ranked players yet. Finish a verified online match to enter the leaderboard.",
-            LudoProofTheme.TEXT_MUTED,
+            0xFF65421E.toInt(),
         )
 
     private fun statusPanel(
@@ -1295,7 +1507,7 @@ class LeaderboardActivity :
         TextView =
         messagePanel(
             message,
-            LudoProofTheme.GOLD,
+            0xFF65421E.toInt(),
         )
 
     private fun messagePanel(
@@ -1322,14 +1534,10 @@ class LeaderboardActivity :
                 dp(16),
             )
             background =
-                LudoProofTheme
-                    .rounded(
-                        0xC708265E.toInt(),
-                        14f,
-                        0x445FDFFF,
-                        1f,
-                        this@LeaderboardActivity,
-                    )
+                plywoodBackground(
+                    this@LeaderboardActivity,
+                    cornerRadiusDp = 14f,
+                )
         }
 
     private fun initials(
@@ -1372,6 +1580,16 @@ class LeaderboardActivity :
                 "LP"
         }
     }
+
+    private fun cachedTimeLabel(): String =
+        cachedAt
+            ?.takeIf { it > 0L }
+            ?.let { savedAt ->
+                android.text.format.DateFormat
+                    .getTimeFormat(this)
+                    .format(Date(savedAt))
+            }
+            ?: "LOCAL CACHE"
 
     private fun number(
         value: Int,
