@@ -169,6 +169,20 @@ test("account deletion web CORS allows only the configured static-site origin an
     { LUDOPROOF_ACCOUNT_WEB_ORIGIN: "https://rajkumarlahare.github.io" },
   );
   assert.equal(unexpectedHeader.status, 403);
+
+  const unconfigured = await accountWorker.fetch(
+    new Request("https://api.example.test/api/account/delete", {
+      method: "OPTIONS",
+      headers: {
+        origin: "https://rajkumarlahare.github.io",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "authorization,content-type",
+      },
+    }),
+    {},
+  );
+  assert.equal(unconfigured.status, 403);
+  assert.equal(unconfigured.headers.get("access-control-allow-origin"), null);
 });
 
 test("AdMob SSV rate limiting runs before signature/key verification", async () => {
