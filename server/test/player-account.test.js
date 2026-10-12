@@ -5,6 +5,7 @@ import { PlayerAccount } from "../src/player-account.js";
 class FakeAccountSql {
   constructor() {
     this.accountMeta = new Map();
+    this.deletedAccounts = new Map();
     this.wallet = new Map();
     this.sessions = new Map();
     this.ownedCosmetics = new Map();
@@ -17,6 +18,20 @@ class FakeAccountSql {
     const sql = String(statement).replace(/\s+/g, " ").trim();
     if (/^(CREATE TABLE|CREATE INDEX)/i.test(sql)) return { rowsWritten: 0 };
 
+    if (sql.startsWith("SELECT account_id FROM account_deletions WHERE account_id = ?")) {
+      return this.deletedAccounts.has(params[0]) ? [{ account_id: params[0] }] : [];
+    }
+    if (sql.startsWith("SELECT source_ref_hash FROM wallet_transactions WHERE kind IN")) {
+      return [...this.walletTransactions.values()].filter(row => ["PLAY_GEM_PURCHASE", "PLAY_REMOVE_ADS"].includes(row.kind) && row.source_ref_hash).map(row => ({ source_ref_hash: row.source_ref_hash }));
+    }
+    if (/^DELETE FROM account_sessions$/.test(sql)) { this.sessions.clear(); return { rowsWritten: 1 }; }
+    if (/^DELETE FROM wallet_transactions$/.test(sql)) { this.walletTransactions.clear(); return { rowsWritten: 1 }; }
+    if (/^DELETE FROM cosmetic_ad_progress$/.test(sql)) { this.adProgress.clear(); return { rowsWritten: 1 }; }
+    if (/^DELETE FROM selected_cosmetics$/.test(sql)) { this.selectedCosmetics.clear(); return { rowsWritten: 1 }; }
+    if (/^DELETE FROM owned_cosmetics$/.test(sql)) { this.ownedCosmetics.clear(); return { rowsWritten: 1 }; }
+    if (/^DELETE FROM wallet$/.test(sql)) { this.wallet.clear(); return { rowsWritten: 1 }; }
+    if (sql.startsWith("DELETE FROM account_meta WHERE account_id = ?")) { this.accountMeta.delete(params[0]); return { rowsWritten: 1 }; }
+    if (sql.startsWith("INSERT INTO account_deletions")) { this.deletedAccounts.set(params[0], { deleted_at: params[1] }); return { rowsWritten: 1 }; }
     if (sql.startsWith("SELECT account_id FROM account_meta WHERE account_id = ?")) {
       return this.accountMeta.has(params[0]) ? [{ account_id: params[0] }] : [];
     }
@@ -169,7 +184,10 @@ class FakeAccountSql {
       const kind = isCosmeticInsert ? "COSMETIC_PURCHASE" : params[3];
       const delta = isCosmeticInsert ? params[3] : params[4];
       const balanceAfter = isCosmeticInsert ? params[4] : params[5];
-      this.walletTransactions.set(idempotencyKey, { payload_hash: payloadHash, kind, delta, balance_after: balanceAfter });
+      this.walletTransactions.set(idempotencyKey, {
+        payload_hash: payloadHash, kind, delta, balance_after: balanceAfter,
+        source_ref_hash: isCosmeticInsert ? params[5] ?? null : params[6] ?? null,
+      });
       return { rowsWritten: 1 };
     }
 
@@ -200,6 +218,41 @@ async function post(account, path, body) {
     body: JSON.stringify(body),
   }));
 }
+
+test("account deletion requires explicit confirmation, clears server-owned data, and prevents resurrection", async () => {
+  const { account, sql } = makeAccount();
+  const accountId = "0a2c3a83-e0fb-4abc-8ac4-581a6d994fe7";
+  const created = await post(account, "/session/create", { accountId, displayName: "Delete Me" });
+  assert.equal(created.status, 200);
+  const session = await created.json();
+  assert.equal(sql.wallet.get(accountId).balance, 0);
+
+  const denied = await post(account, "/account/delete", {
+    accountId, sessionId: session.sessionId, confirmation: "wrong",
+  });
+  assert.equal(denied.status, 400);
+  assert.ok(sql.accountMeta.has(accountId));
+
+  const deleted = await post(account, "/account/delete", {
+    accountId, sessionId: session.sessionId, confirmation: "DELETE_MY_ACCOUNT",
+  });
+  assert.equal(deleted.status, 200);
+  assert.equal((await deleted.json()).deleted, true);
+  assert.equal(sql.accountMeta.has(accountId), false);
+  assert.equal(sql.wallet.has(accountId), false);
+  assert.equal(sql.sessions.size, 0);
+  assert.ok(sql.deletedAccounts.has(accountId));
+
+  const retry = await post(account, "/account/delete", {
+    accountId, sessionId: session.sessionId, confirmation: "DELETE_MY_ACCOUNT",
+  });
+  assert.equal(retry.status, 200);
+  assert.equal((await retry.json()).replay, true);
+
+  const resurrect = await post(account, "/session/create", { accountId, displayName: "Again" });
+  assert.equal(resurrect.status, 410);
+  assert.equal((await resurrect.json()).error, "ACCOUNT_DELETED");
+});
 
 test("account sessions are required to read the server-owned wallet and cannot be replayed for another account", async () => {
   const { account } = makeAccount();
