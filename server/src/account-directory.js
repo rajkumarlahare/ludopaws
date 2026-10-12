@@ -13,6 +13,7 @@ export class AccountDirectory {
       const sql = ctx.storage.sql;
       sql.exec(`CREATE TABLE IF NOT EXISTS account_registry (account_id TEXT PRIMARY KEY, account_kind TEXT NOT NULL, created_at INTEGER NOT NULL)`);
       sql.exec(`CREATE TABLE IF NOT EXISTS guest_requests (client_request_id TEXT PRIMARY KEY, account_id TEXT NOT NULL, created_at INTEGER NOT NULL)`);
+      sql.exec(`CREATE TABLE IF NOT EXISTS deleted_guest_requests (client_request_id TEXT PRIMARY KEY, deleted_at INTEGER NOT NULL)`);
       sql.exec(`CREATE TABLE IF NOT EXISTS google_identities (subject_hash TEXT PRIMARY KEY, account_id TEXT NOT NULL UNIQUE, linked_at INTEGER NOT NULL)`);
       sql.exec(`CREATE TABLE IF NOT EXISTS google_nonces (nonce_hash TEXT PRIMARY KEY, created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, consumed_at INTEGER)`);
       sql.exec(`CREATE TABLE IF NOT EXISTS account_identity_links (identity_type TEXT NOT NULL, external_id TEXT NOT NULL, account_id TEXT NOT NULL, linked_at INTEGER NOT NULL, PRIMARY KEY(identity_type, external_id), UNIQUE(identity_type, account_id))`);
@@ -24,6 +25,7 @@ export class AccountDirectory {
     try {
       const url = new URL(request.url);
       if (request.method === "POST" && url.pathname === "/guest") return await this.#createGuest(request);
+      if (request.method === "POST" && url.pathname === "/account/delete") return await this.#deleteAccount(request);
       if (request.method === "POST" && url.pathname === "/nonce/create") return await this.#createNonce();
       if (request.method === "POST" && url.pathname === "/nonce/consume") return await this.#consumeNonce(request);
       if (request.method === "POST" && url.pathname === "/google/link") return await this.#linkGoogle(request);
@@ -39,6 +41,8 @@ export class AccountDirectory {
     const requestId = requireUuid(body?.clientRequestId, "clientRequestId");
     // This key is a guest-account recovery credential. Never persist the raw bearer-like value.
     const requestKey = await sha256Hex("ludoproof:guest-recovery-key:v1:" + requestId);
+    const deleted = [...this.ctx.storage.sql.exec("SELECT client_request_id FROM deleted_guest_requests WHERE client_request_id = ? LIMIT 1", requestKey)];
+    if (deleted.length) throw httpError(410, "GUEST_ACCOUNT_DELETED", "this guest account has already been deleted");
     const existing = [...this.ctx.storage.sql.exec("SELECT account_id FROM guest_requests WHERE client_request_id = ? LIMIT 1", requestKey)];
     if (existing.length === 1) return json(200, { ok: true, accountId: String(existing[0].account_id), replay: true });
 
@@ -53,6 +57,26 @@ export class AccountDirectory {
     const saved = [...this.ctx.storage.sql.exec("SELECT account_id FROM guest_requests WHERE client_request_id = ? LIMIT 1", requestKey)];
     if (saved.length !== 1) throw httpError(503, "ACCOUNT_CREATE_FAILED", "guest account could not be created safely");
     return json(200, { ok: true, accountId: String(saved[0].account_id), replay: String(saved[0].account_id) !== generatedId });
+  }
+
+  async #deleteAccount(request) {
+    const body = await readJson(request);
+    const accountId = requireAccountId(body?.accountId);
+    const keys = [...this.ctx.storage.sql.exec("SELECT client_request_id FROM guest_requests WHERE account_id = ?", accountId)]
+      .map((row) => String(row.client_request_id));
+    let existed = false;
+    const now = Date.now();
+    this.ctx.storage.transactionSync(() => {
+      existed = [...this.ctx.storage.sql.exec("SELECT account_id FROM account_registry WHERE account_id = ? LIMIT 1", accountId)].length === 1;
+      for (const key of keys) this.ctx.storage.sql.exec(
+        "INSERT OR IGNORE INTO deleted_guest_requests (client_request_id, deleted_at) VALUES (?, ?)", key, now,
+      );
+      this.ctx.storage.sql.exec("DELETE FROM guest_requests WHERE account_id = ?", accountId);
+      this.ctx.storage.sql.exec("DELETE FROM google_identities WHERE account_id = ?", accountId);
+      this.ctx.storage.sql.exec("DELETE FROM account_identity_links WHERE account_id = ?", accountId);
+      this.ctx.storage.sql.exec("DELETE FROM account_registry WHERE account_id = ?", accountId);
+    });
+    return json(200, { ok: true, deleted: true, replay: !existed });
   }
 
   async #createNonce() {
