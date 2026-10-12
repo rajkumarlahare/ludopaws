@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "ludoproof-game-api",
-  "main": "src/index-forfeit.js",
+  "main": "src/index-account.js",
   "compatibility_date": "2026-09-25",
   "workers_dev": true,
   "durable_objects": {
@@ -45,6 +45,14 @@
       {
         "name": "LUDOPROOF_STORE_PURCHASES",
         "class_name": "StorePurchaseLedger"
+      },
+      {
+        "name": "LUDOPROOF_ACCOUNT_DIRECTORY",
+        "class_name": "AccountDirectory"
+      },
+      {
+        "name": "LUDOPROOF_PLAYER_ACCOUNTS",
+        "class_name": "PlayerAccount"
       }
     ]
   },
@@ -102,6 +110,18 @@
       "tag": "v9-store-purchases",
       "new_sqlite_classes": [
         "StorePurchaseLedger"
+      ]
+    },
+    {
+      "tag": "v10-account-directory",
+      "new_sqlite_classes": [
+        "AccountDirectory"
+      ]
+    },
+    {
+      "tag": "v11-player-accounts",
+      "new_sqlite_classes": [
+        "PlayerAccount"
       ]
     }
   ],

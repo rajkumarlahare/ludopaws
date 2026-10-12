@@ -262,18 +262,19 @@ test("non-consumable purchase is acknowledged after Play verification", async ()
   assert.equal(calls.filter(({ url }) => url.endsWith(":acknowledge")).length, 1);
   assert.equal(calls.filter(({ url }) => url.endsWith(":consume")).length, 0);
 
-  const restored = await verifyAndRedeemGooglePlayPurchase(
-    env,
-    {
-      productId: "remove_ads",
-      purchaseToken: "remove-ads-test-token",
-      accountId: "9".repeat(64),
-    },
-    fetchImpl,
+  await assert.rejects(
+    verifyAndRedeemGooglePlayPurchase(
+      env,
+      {
+        productId: "remove_ads",
+        purchaseToken: "remove-ads-test-token",
+        accountId: "9".repeat(64),
+      },
+      fetchImpl,
+    ),
+    (error) => error.status === 409 && error.code === "PURCHASE_ALREADY_REDEEMED",
   );
-  assert.equal(restored.removeAds, true);
-  assert.equal(restored.replay, true);
-  assert.equal(calls.filter(({ url }) => url.includes("/purchases/products/")).length, 2);
+  assert.equal(calls.filter(({ url }) => url.includes("/purchases/products/")).length, 1);
 });
 
 test("store purchase ledger rejects token reuse by another installation", async () => {

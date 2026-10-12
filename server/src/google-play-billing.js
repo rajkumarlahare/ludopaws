@@ -114,7 +114,6 @@ export async function verifyAndRedeemGooglePlayPurchase(
   if (
     purchase?.productId !== productId ||
     (
-      !product.removeAds &&
       purchase?.obfuscatedExternalAccountId !== accountId
     ) ||
     purchase?.purchaseState !== 0 ||
