@@ -28,6 +28,19 @@ for (const marker of ['class QuickChatButtonView', 'fun showQuickChatPopup(', 'f
 if (!quickChat.includes('QuickChatEmojiCatalog.EMOJIS.chunked(6)')) {
   throw new Error('Quick Chat must render a 6-column emoji grid.');
 }
+if (!quickChat.includes('background = plywoodBackground(')) {
+  throw new Error('Quick Chat popup must use the shared plywood background.');
+}
+const emojiCell = quickChat.match(/val cell = TextView\(context\)\.apply \{([\s\S]*?)\n            \}/);
+if (!emojiCell || !emojiCell[1].includes('background = null')) {
+  throw new Error('Quick Chat emoji cells must not render circular background chips.');
+}
+if (quickChat.includes('setColor(0x1CFFFFFF)')) {
+  throw new Error('Quick Chat emoji circle chips must remain removed.');
+}
+for (const marker of ['selectionInProgress', '.scaleX(1.26f)', '.scaleY(1.26f)', 'onEmojiSelected(emoji)']) {
+  if (!quickChat.includes(marker)) throw new Error(`Quick Chat emoji selection animation is missing ${marker}`);
+}
 
 for (const [label, source] of [
   ['offline profile rail', read('offlineRail')],

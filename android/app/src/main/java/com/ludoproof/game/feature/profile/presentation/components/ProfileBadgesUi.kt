@@ -62,25 +62,7 @@ internal fun ProfileActivity.profileBadgesPanel(
                 background =
                     null
                 setOnClickListener {
-                    viewAllBadges(
-                        badges.joinToString(
-                            "\n\n",
-                        ) {
-                                badge ->
-                            (
-                                if (
-                                    badge.unlocked
-                                ) {
-                                    "✓ "
-                                } else {
-                                    "○ "
-                                }
-                                ) +
-                                badge.title +
-                                " — " +
-                                badge.requirement
-                        },
-                    )
+                    viewAllBadges()
                 }
             },
         )

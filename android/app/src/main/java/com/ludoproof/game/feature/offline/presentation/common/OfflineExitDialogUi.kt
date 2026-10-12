@@ -64,6 +64,9 @@ internal fun OfflineGameActivity.requestOfflineExit() {
                     "PASS & PLAY IN PROGRESS"
                 },
             dialog = dialog,
+            usePlywoodSurface = true,
+            usePlywoodCloseButton = true,
+            showBrandBadge = false,
         )
 
     panel.addView(

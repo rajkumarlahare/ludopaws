@@ -13,12 +13,17 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import com.ludoproof.game.*
+import com.ludoproof.game.core.ui.art.plywoodBackground
+import com.ludoproof.game.core.ui.components.PlywoodCloseButton
 
 internal fun dialogPanel(
     context: Context,
     title: String,
     subtitle: String,
     dialog: Dialog,
+    usePlywoodSurface: Boolean = false,
+    usePlywoodCloseButton: Boolean = false,
+    showBrandBadge: Boolean = true,
 ): LinearLayout =
     LinearLayout(
         context,
@@ -62,12 +67,19 @@ internal fun dialogPanel(
             ),
         )
         background =
-            LudoProofTheme
-                .hudPanelDrawable(
-                    context,
-                    goldBorder =
-                        true,
+            if (usePlywoodSurface) {
+                plywoodBackground(
+                    context = context,
+                    cornerRadiusDp = 20f,
                 )
+            } else {
+                LudoProofTheme
+                    .hudPanelDrawable(
+                        context,
+                        goldBorder =
+                            true,
+                    )
+            }
 
         val header =
             LinearLayout(
@@ -79,36 +91,38 @@ internal fun dialogPanel(
                     Gravity.CENTER_VERTICAL
             }
 
-        header.addView(
-            TextView(
-                context,
-            ).apply {
-                text =
-                    "LP"
-                LudoProofTheme.title(
-                    this,
-                    13f,
-                    gold = true,
-                )
-                gravity =
-                    Gravity.CENTER
-                background =
-                    LudoProofTheme
-                        .brandBadgeDrawable(
-                            context,
-                        )
-            },
-            LinearLayout.LayoutParams(
-                dp(
+        if (showBrandBadge) {
+            header.addView(
+                TextView(
                     context,
-                    44,
+                ).apply {
+                    text =
+                        "LP"
+                    LudoProofTheme.title(
+                        this,
+                        13f,
+                        gold = true,
+                    )
+                    gravity =
+                        Gravity.CENTER
+                    background =
+                        LudoProofTheme
+                            .brandBadgeDrawable(
+                                context,
+                            )
+                },
+                LinearLayout.LayoutParams(
+                    dp(
+                        context,
+                        44,
+                    ),
+                    dp(
+                        context,
+                        44,
+                    ),
                 ),
-                dp(
-                    context,
-                    44,
-                ),
-            ),
-        )
+            )
+        }
 
         header.addView(
             LinearLayout(
@@ -178,37 +192,46 @@ internal fun dialogPanel(
                 marginStart =
                     dp(
                         context,
-                        10,
+                        if (showBrandBadge) 10 else 0,
                     )
             },
         )
 
-        header.addView(
-            Button(
-                context,
-            ).apply {
-                LudoProofTheme
-                    .homeCircularAction(
-                        this,
-                        "×",
-                    )
-                contentDescription =
-                    "Close"
-                setOnClickListener {
+        if (usePlywoodCloseButton) {
+            header.addView(
+                PlywoodCloseButton(
+                    context = context,
+                    contentDescription = "Close exit dialog",
+                ) {
                     dialog.dismiss()
-                }
-            },
-            LinearLayout.LayoutParams(
-                dp(
-                    context,
-                    44,
+                },
+                LinearLayout.LayoutParams(
+                    dp(context, 40),
+                    dp(context, 40),
                 ),
-                dp(
+            )
+        } else {
+            header.addView(
+                Button(
                     context,
-                    44,
+                ).apply {
+                    LudoProofTheme
+                        .homeCircularAction(
+                            this,
+                            "×",
+                        )
+                    contentDescription =
+                        "Close"
+                    setOnClickListener {
+                        dialog.dismiss()
+                    }
+                },
+                LinearLayout.LayoutParams(
+                    dp(context, 44),
+                    dp(context, 44),
                 ),
-            ),
-        )
+            )
+        }
         addView(
             header,
         )

@@ -1,6 +1,18 @@
 package com.ludoproof.game.ui.game
 
+import android.content.ComponentName
 import android.content.Context
+import android.content.pm.ActivityInfo
+import com.ludoproof.game.MainActivity
+import com.ludoproof.game.OfflineGameActivity
+import com.ludoproof.game.HomeActivity
+import com.ludoproof.game.feature.friends.presentation.FriendsActivity
+import com.ludoproof.game.feature.leaderboard.presentation.LeaderboardActivity
+import com.ludoproof.game.feature.mode.presentation.RemoteModeEntryActivity
+import com.ludoproof.game.feature.profile.presentation.BadgesActivity
+import com.ludoproof.game.feature.profile.presentation.ProfileActivity
+import com.ludoproof.game.feature.store.presentation.StoreActivity
+import com.ludoproof.game.feature.team.presentation.TeamUpActivity
 import android.widget.FrameLayout
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -42,6 +54,8 @@ class GameTopActionsUiInstrumentedTest {
             assertTrue(settingsButton.isFocusable)
             assertNotNull(backButton.background)
             assertNotNull(settingsButton.background)
+            assertEquals("PlywoodTextureDrawable", backButton.background.javaClass.simpleName)
+            assertEquals("PlywoodTextureDrawable", settingsButton.background.javaClass.simpleName)
             assertNotNull(backButton.foreground)
             assertNotNull(settingsButton.foreground)
             assertEquals(AppIconName.CHEVRON_LEFT, (backButton.getChildAt(0) as AppIconView).iconName)
@@ -53,4 +67,35 @@ class GameTopActionsUiInstrumentedTest {
             assertEquals(1, settingsClicks)
         }
     }
+    @Suppress("DEPRECATION")
+    @Test
+    fun everyAppScreenIsPortraitOnly() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val packageManager = context.packageManager
+        val activities = listOf(
+            HomeActivity::class.java,
+            OfflineGameActivity::class.java,
+            MainActivity::class.java,
+            RemoteModeEntryActivity::class.java,
+            TeamUpActivity::class.java,
+            FriendsActivity::class.java,
+            LeaderboardActivity::class.java,
+            ProfileActivity::class.java,
+            BadgesActivity::class.java,
+            StoreActivity::class.java,
+        )
+
+        activities.forEach { activityClass ->
+            val info = packageManager.getActivityInfo(
+                ComponentName(context, activityClass),
+                0,
+            )
+            assertEquals(
+                "${activityClass.simpleName} must stay portrait-only",
+                ActivityInfo.SCREEN_ORIENTATION_PORTRAIT,
+                info.screenOrientation,
+            )
+        }
+    }
+
 }
