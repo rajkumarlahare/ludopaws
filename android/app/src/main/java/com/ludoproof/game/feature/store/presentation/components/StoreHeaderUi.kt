@@ -2,9 +2,10 @@ package com.ludoproof.game.feature.store.presentation.components
 
 import android.graphics.Color
 import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
+import com.ludoproof.game.core.ui.art.plywoodBackground
 import android.view.Gravity
-import android.widget.Button
+import com.ludoproof.game.core.ui.components.appIconActionButton
+import com.ludoproof.game.core.ui.icons.AppIconName
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.LudoProofTheme
@@ -23,50 +24,14 @@ internal fun StoreActivity.storeHeader():
             Gravity.CENTER_VERTICAL
 
         addView(
-            Button(
-                this@storeHeader,
-            ).apply {
-                text =
-                    "‹"
-                textSize =
-                    30f
-                setTypeface(
-                    Typeface.DEFAULT_BOLD,
-                )
-                setTextColor(
-                    Color.WHITE,
-                )
-                minWidth =
-                    0
-                minHeight =
-                    0
-                setPadding(
-                    0,
-                    0,
-                    0,
-                    dp(3),
-                )
-                background =
-                    GradientDrawable(
-                        GradientDrawable.Orientation.TOP_BOTTOM,
-                        intArrayOf(
-                            0xFFFFC928.toInt(),
-                            0xFFF07A00.toInt(),
-                        ),
-                    ).apply {
-                        shape =
-                            GradientDrawable.OVAL
-                        setStroke(
-                            dp(2),
-                            0xFFFFE47A.toInt(),
-                        )
-                    }
-                contentDescription =
-                    "Back"
-                setOnClickListener {
-                    finish()
-                }
-                AppFocusRing.apply(this, cornerRadiusDp = 999f)
+            appIconActionButton(
+                context = this@storeHeader,
+                contentDescription = "Back",
+                iconName = AppIconName.CHEVRON_LEFT,
+                sizeDp = 50,
+            ) { finish() }.apply {
+                // Match the shared Profile back button: circular plywood with a white chevron.
+                background = plywoodBackground(this@storeHeader, cornerRadiusDp = 25f)
             },
             LinearLayout.LayoutParams(
                 dp(50),
