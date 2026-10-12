@@ -2,6 +2,7 @@ package com.ludoproof.game.feature.store.presentation.actions
 
 import com.ludoproof.game.feature.profile.data.local.ProfileStore
 import com.ludoproof.game.feature.profile.domain.ProfileProgression
+import com.ludoproof.game.feature.store.domain.model.CosmeticAcquireResult
 import com.ludoproof.game.feature.store.domain.model.CosmeticUnlockKind
 import com.ludoproof.game.feature.store.domain.model.StoreCosmetic
 import com.ludoproof.game.feature.store.presentation.StoreActivity
@@ -38,10 +39,16 @@ internal fun StoreActivity.handleCosmeticTap(cosmetic: StoreCosmetic) {
             }
         }
         CosmeticUnlockKind.EVENT -> {
-            showStoreMessage(
-                cosmetic.title +
-                    " is an event item. It can only be unlocked after the server confirms the event entitlement.",
-            )
+            when (cosmetics.acquireOrSelect(cosmetic, level)) {
+                CosmeticAcquireResult.NEED_EVENT -> showStoreMessage(
+                    cosmetic.title +
+                        " is an event item. It can only be unlocked after the server confirms the event entitlement.",
+                )
+                else -> showStoreMessage(
+                    cosmetic.title +
+                        " cannot be unlocked until its event entitlement is confirmed by the server.",
+                )
+            }
         }
         CosmeticUnlockKind.FREE,
         CosmeticUnlockKind.LEVEL,
