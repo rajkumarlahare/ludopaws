@@ -39,9 +39,23 @@ class GemWalletStore(context: Context) {
 
         val priorAccountId = prefs.getString(StorePreferences.KEY_WALLET_ACCOUNT_ID, null)
         val editor = prefs.edit()
+        val hasLegacyProgress = prefs.all.keys.any {
+            it.startsWith(StorePreferences.KEY_AD_PROGRESS_PREFIX)
+        }
+        val hasLegacyWalletData =
+            prefs.contains(StorePreferences.KEY_BALANCE) ||
+                prefs.contains(StorePreferences.KEY_ADS_REMOVED) ||
+                prefs.contains(StorePreferences.KEY_OWNED_COSMETICS) ||
+                prefs.contains(StorePreferences.KEY_EVENT_ENTITLEMENTS) ||
+                prefs.contains(StorePreferences.KEY_SELECTED_BOARD) ||
+                prefs.contains(StorePreferences.KEY_SELECTED_DICE) ||
+                prefs.contains(StorePreferences.KEY_SELECTED_AVATAR) ||
+                prefs.contains(StorePreferences.KEY_SELECTED_CHARACTER_PACK) ||
+                prefs.contains(StorePreferences.KEY_APPLIED_TOKENS) ||
+                hasLegacyProgress
         if (
             priorAccountId == null &&
-            prefs.contains(StorePreferences.KEY_BALANCE) &&
+            hasLegacyWalletData &&
             !prefs.contains(StorePreferences.KEY_LEGACY_WALLET_ARCHIVE)
         ) {
             // Preserve pre-account device data for a future verified migration/support workflow.
@@ -132,6 +146,11 @@ class GemWalletStore(context: Context) {
             .put("eventEntitlements", org.json.JSONArray(
                 prefs.getStringSet(StorePreferences.KEY_EVENT_ENTITLEMENTS, emptySet<String>())?.toList() ?: emptyList<String>(),
             ))
+            .put("hadAppliedPurchaseTokenCache", prefs.contains(StorePreferences.KEY_APPLIED_TOKENS))
+            .put("appliedPurchaseTokenCount", prefs.getStringSet(
+                StorePreferences.KEY_APPLIED_TOKENS,
+                emptySet<String>(),
+            )?.size ?: 0)
             .put("rewardedAdProgress", adProgress)
     }
 
