@@ -2,7 +2,6 @@ import fs from 'node:fs';
 
 const files = {
   quickChat: 'android/app/src/main/java/com/ludoproof/game/feature/settings/presentation/QuickChatUi.kt',
-  settingsDrawable: 'android/app/src/main/java/com/ludoproof/game/feature/settings/presentation/SettingsSharedWebpDrawable.kt',
   settingsKit: 'android/app/src/main/java/com/ludoproof/game/feature/settings/presentation/SettingsVisualKit.kt',
   settingsUi: 'android/app/src/main/java/com/ludoproof/game/feature/settings/presentation/SettingsDialogUi.kt',
   offlineRail: 'android/app/src/main/java/com/ludoproof/game/feature/offline/presentation/gameplay/OfflinePlayerRailUi.kt',
@@ -70,15 +69,10 @@ for (const removed of ['label = "Animal Voices"', 'label = "Haptics"', 'label = 
 if (!settings.includes('settingsPrivacyLink(')) {
   throw new Error('Settings UI must retain its Privacy Policy link.');
 }
-if (!read('settingsKit').includes('background = SettingsSharedWebpDrawable(context)')) {
-  throw new Error('Settings popup must use the rough Settings texture.');
-}
-const settingsDrawable = read('settingsDrawable');
-for (const marker of ['LinearGradient', 'val grain', 'canvas.drawCircle', 'canvas.drawLine']) {
-  if (!settingsDrawable.includes(marker)) throw new Error(`Settings rough texture is missing ${marker}`);
-}
-if (settingsDrawable.includes('BitmapFactory') || settingsDrawable.includes('ludo_paws_game_background')) {
-  throw new Error('Settings background must not fall back to the glossy gameplay image.');
+const settingsKit = read('settingsKit');
+const themedPlywoodSurfaces = settingsKit.match(/background\s*=\s*plywoodBackground\(/g) || [];
+if (themedPlywoodSurfaces.length < 2) {
+  throw new Error('Settings popup and option dialogs must use the shared plywood theme background.');
 }
 if (!read('offlineRail').includes('isComputerMode') || !read('offlineRail').includes('hasComputerOpponent')) {
   throw new Error('Offline Quick Chat must be reserved for the human in Computer mode, never Pass & Play.');
@@ -96,9 +90,6 @@ if (!realtime.includes('QUICK_CHAT_SEND') || !realtime.includes('type == "QUICK_
 const serverRoom = fs.readFileSync('server/src/match-room.js', 'utf8');
 for (const marker of ['QUICK_CHAT_SEND', 'QUICK_CHAT', 'getTags(socket)', 'QUICK_CHAT_COOLDOWN_MS']) {
   if (!serverRoom.includes(marker)) throw new Error(`Server Quick Chat handler is missing ${marker}`);
-}
-if (!read('settingsKit').includes('background = SettingsSharedWebpDrawable(context)')) {
-  throw new Error('Settings options dialog must use the shared rough-texture background.');
 }
 if (!read('settingsEntry').includes('onChanged: (() -> Unit)? = null')) {
   throw new Error('Settings changes must notify the online UI so Quick Chat visibility refreshes.');

@@ -63,7 +63,9 @@ for (const required of [
 for (const required of [
   '"CHOOSE YOUR PAW"',
   "charactersForPack(",
-  "fallbackDrawableName",
+  // Character selection now uses production 3D portraits instead of fallback drawable names.
+  "LudoPawsCharacterAvatarView",
+  "showCircularChrome = false",
   "selectCharacterForActiveSlot(",
   "rebuildCharacterSlotButtons()",
   "characterSelectionStore.select(",
@@ -81,7 +83,7 @@ for (const required of [
   requireText(activity, required, "offline activity integration");
 }
 
-requireText(screen, "characterPanel()", "offline setup screen");
+requireText(screen, "characterPanel(", "offline setup screen");
 requireText(screen, "persistActiveCharacterSetup()", "offline setup start gate");
 requireText(selection, "updateSelectedPlayerCount(", "player count integration");
 requireText(selection, "refreshCharacterSelectionUi()", "setup refresh integration");
