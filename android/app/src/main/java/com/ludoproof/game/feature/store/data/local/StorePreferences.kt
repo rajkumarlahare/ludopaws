@@ -7,6 +7,8 @@ internal object StorePreferences {
         "gem_balance"
     const val KEY_WALLET_ACCOUNT_ID =
         "wallet_account_id"
+    const val KEY_LEGACY_WALLET_ARCHIVE =
+        "legacy_wallet_unverified_archive_v1"
     const val KEY_ADS_REMOVED =
         "ads_removed"
     const val KEY_APPLIED_TOKENS =

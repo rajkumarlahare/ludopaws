@@ -39,6 +39,18 @@ class GemWalletStore(context: Context) {
 
         val priorAccountId = prefs.getString(StorePreferences.KEY_WALLET_ACCOUNT_ID, null)
         val editor = prefs.edit()
+        if (
+            priorAccountId == null &&
+            prefs.contains(StorePreferences.KEY_BALANCE) &&
+            !prefs.contains(StorePreferences.KEY_LEGACY_WALLET_ARCHIVE)
+        ) {
+            // Preserve pre-account device data for a future verified migration/support workflow.
+            // This archive is explicitly untrusted and is never read to grant currency or inventory.
+            editor.putString(
+                StorePreferences.KEY_LEGACY_WALLET_ARCHIVE,
+                legacyUnverifiedSnapshot().toString(),
+            )
+        }
         if (priorAccountId != expectedAccountId) {
             // Do not leak cached inventory or cosmetic progress between accounts.
             editor.remove(StorePreferences.KEY_APPLIED_TOKENS)
@@ -75,6 +87,40 @@ class GemWalletStore(context: Context) {
 
         check(editor.commit()) { "Server wallet snapshot could not be cached safely." }
         return true
+    }
+
+    fun hasLegacyUnverifiedSnapshot(): Boolean =
+        prefs.contains(StorePreferences.KEY_LEGACY_WALLET_ARCHIVE)
+
+    private fun legacyUnverifiedSnapshot(): JSONObject {
+        val cosmetics = JSONObject()
+        val adProgress = JSONObject()
+        prefs.all.keys
+            .filter { it.startsWith(StorePreferences.KEY_AD_PROGRESS_PREFIX) }
+            .sorted()
+            .forEach { key ->
+                adProgress.put(
+                    key.removePrefix(StorePreferences.KEY_AD_PROGRESS_PREFIX),
+                    prefs.getInt(key, 0).coerceAtLeast(0),
+                )
+            }
+        return JSONObject()
+            .put("formatVersion", 1)
+            .put("verified", false)
+            .put("capturedAt", System.currentTimeMillis())
+            .put("balance", prefs.getInt(StorePreferences.KEY_BALANCE, 0).coerceAtLeast(0))
+            .put("adsRemoved", prefs.getBoolean(StorePreferences.KEY_ADS_REMOVED, false))
+            .put("ownedCosmetics", org.json.JSONArray(
+                prefs.getStringSet(StorePreferences.KEY_OWNED_COSMETICS, emptySet())?.toList() ?: emptyList(),
+            ))
+            .put("selectedBoard", prefs.getString(StorePreferences.KEY_SELECTED_BOARD, null))
+            .put("selectedDice", prefs.getString(StorePreferences.KEY_SELECTED_DICE, null))
+            .put("selectedAvatar", prefs.getString(StorePreferences.KEY_SELECTED_AVATAR, null))
+            .put("selectedCharacterPack", prefs.getString(StorePreferences.KEY_SELECTED_CHARACTER_PACK, null))
+            .put("eventEntitlements", org.json.JSONArray(
+                prefs.getStringSet(StorePreferences.KEY_EVENT_ENTITLEMENTS, emptySet())?.toList() ?: emptyList(),
+            ))
+            .put("rewardedAdProgress", adProgress)
     }
 
     private fun org.json.JSONArray?.toStringSet(): Set<String> {
