@@ -144,6 +144,11 @@ class AccountRepository(context: Context) {
         return request("GET", "/api/account/links", token = session.accessToken)
     }
 
+    fun recoverLinkedIdentities(): JSONObject {
+        val session = requireSession()
+        return request("GET", "/api/account/identities/recover", token = session.accessToken)
+    }
+
     fun linkFriendIdentity(friendToken: String): JSONObject {
         val session = requireSession()
         return request(

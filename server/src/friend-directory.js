@@ -147,6 +147,15 @@ export class FriendDirectory {
         );
       }
 
+      // Internal-only recovery endpoint. The public Worker exposes it only after
+      // the caller's account session and existing account-to-friend link are verified.
+      if (
+        request.method === "POST" &&
+        url.pathname === "/account/recover"
+      ) {
+        return await this.#recoverAccountIdentity(request);
+      }
+
       if (
         request.method ===
           "GET" &&
@@ -402,6 +411,40 @@ export class FriendDirectory {
           me.displayName,
       },
     );
+  }
+
+  async #recoverAccountIdentity(request) {
+    const body = await readJson(request);
+    const friendId = normalizeFriendId(body?.friendId);
+    const rows = [
+      ...this.ctx.storage.sql.exec(
+        "SELECT friend_id, registration_request_id, display_name FROM friend_profiles WHERE friend_id = ? LIMIT 1",
+        friendId,
+      ),
+    ];
+    if (rows.length !== 1) {
+      throw httpError(404, "FRIEND_IDENTITY_NOT_FOUND", "linked friend identity could not be recovered");
+    }
+    const row = rows[0];
+    const registrationRequestId = String(row.registration_request_id);
+    const identity = await deriveFriendIdentity(this.env, registrationRequestId);
+    if (identity.friendId !== friendId) {
+      throw httpError(409, "FRIEND_IDENTITY_RECOVERY_CONFLICT", "linked friend identity did not match its recovery record");
+    }
+    const tokenHash = await friendTokenHash(identity.friendToken);
+    this.ctx.storage.sql.exec(
+      "UPDATE friend_profiles SET token_hash = ?, last_seen_at = ? WHERE friend_id = ?",
+      tokenHash,
+      Date.now(),
+      friendId,
+    );
+    return json(200, {
+      ok: true,
+      friendId,
+      friendToken: identity.friendToken,
+      registrationRequestId,
+      displayName: String(row.display_name),
+    });
   }
 
   async #snapshot(

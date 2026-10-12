@@ -22,6 +22,10 @@ import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.ludoproof.game.LudoProofTheme
 import com.ludoproof.game.LudoProofApplication
 import com.ludoproof.game.feature.account.data.AccountApiException
+import com.ludoproof.game.feature.friends.data.local.FriendCredential
+import com.ludoproof.game.feature.friends.data.local.FriendIdentityStore
+import com.ludoproof.game.feature.leaderboard.data.local.LeaderboardCredential
+import com.ludoproof.game.feature.leaderboard.data.local.LeaderboardIdentityStore
 import com.ludoproof.game.BuildConfig
 import com.ludoproof.game.R
 import com.google.android.gms.games.PlayGames
@@ -65,6 +69,8 @@ class ProfileActivity : Activity() {
     private val accountMainExecutor = Executor { command ->
         runOnUiThread { command.run() }
     }
+    private var accountSwitchFromId: String? = null
+    private var friendPresencePausedForAccountSwitch = false
     internal val isAccountSignInConfigured: Boolean
         get() = BuildConfig.GOOGLE_SIGN_IN_WEB_CLIENT_ID.isNotBlank()
 
@@ -245,9 +251,26 @@ class ProfileActivity : Activity() {
                 },
             )
             .setItems(arrayOf("Save this account to Google", "Restore an account saved to Google")) { _, which ->
-                startGoogleAccountFlow(linkCurrentAccount = which == 0)
+                if (which == 0) {
+                    startGoogleAccountFlow(linkCurrentAccount = true)
+                } else {
+                    confirmAccountRestore()
+                }
             }
             .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun confirmAccountRestore() {
+        AlertDialog.Builder(this)
+            .setTitle("Restore another account?")
+            .setMessage(
+                "This will switch the active account on this device. The current guest profile, its Friend ID, leaderboard identity and inventory will not be merged into the restored account. If you have not saved the current guest to Google, cancel and save it first.",
+            )
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Continue") { _, _ ->
+                startGoogleAccountFlow(linkCurrentAccount = false)
+            }
             .show()
     }
 
@@ -289,11 +312,19 @@ class ProfileActivity : Activity() {
             return
         }
         accountAuthInProgress = true
+        if (!linkCurrentAccount) {
+            accountSwitchFromId = accountRepository.currentSession()?.accountId
+            (application as LudoProofApplication).pauseFriendPresenceForAccountSwitch()
+            friendPresencePausedForAccountSwitch = true
+        }
         accountStatus = "Preparing secure sign-in…"
         renderProfile()
         accountAuthExecutor.execute {
             try {
-                if (linkCurrentAccount) accountRepository.ensureGuestSession()
+                accountRepository.ensureGuestSession()
+                if (!linkCurrentAccount && accountSwitchFromId == null) {
+                    accountSwitchFromId = accountRepository.currentSession()?.accountId
+                }
                 val nonce = accountRepository.googleChallenge()
                 runOnUiThread {
                     if (isFinishing || isDestroyed) return@runOnUiThread
@@ -343,24 +374,52 @@ class ProfileActivity : Activity() {
                         try {
                             if (linkCurrentAccount) {
                                 accountRepository.linkGoogleIdentity(idToken, nonce)
-                                // These legacy identities are linked only when the player explicitly
-                                // chooses to save the currently active guest account.
-                                runCatching {
-                                    com.ludoproof.game.feature.friends.data.local.FriendIdentityStore(this@ProfileActivity)
-                                        .load()?.let { accountRepository.linkFriendIdentity(it.friendToken) }
-                                }
-                                runCatching {
-                                    com.ludoproof.game.feature.leaderboard.data.local.LeaderboardIdentityStore(this@ProfileActivity)
-                                        .load()?.let { accountRepository.linkLeaderboardIdentity(it.profileToken) }
-                                }
+                                // Keep existing social identities with the guest account only after
+                                // each legacy credential has been independently validated by its service.
+                                FriendIdentityStore(this@ProfileActivity)
+                                    .load()?.let { accountRepository.linkFriendIdentity(it.friendToken) }
+                                LeaderboardIdentityStore(this@ProfileActivity)
+                                    .load()?.let { accountRepository.linkLeaderboardIdentity(it.profileToken) }
                             } else {
                                 accountRepository.restoreGoogleAccount(idToken, nonce)
+                                val recovered = accountRepository.recoverLinkedIdentities()
+                                val friendStore = FriendIdentityStore(this@ProfileActivity)
+                                val friend = recovered.optJSONObject("friend")
+                                if (friend != null) {
+                                    friendStore.restoreFromAccount(
+                                        FriendCredential(
+                                            friendId = friend.getString("friendId"),
+                                            friendToken = friend.getString("friendToken"),
+                                            registrationRequestId = friend.getString("registrationRequestId"),
+                                        ),
+                                    )
+                                } else {
+                                    friendStore.clearAllForAccountSwitch()
+                                }
+                                val leaderboardStore = LeaderboardIdentityStore(this@ProfileActivity)
+                                val leaderboard = recovered.optJSONObject("leaderboard")
+                                if (leaderboard != null) {
+                                    leaderboardStore.restoreFromAccount(
+                                        LeaderboardCredential(
+                                            profileId = leaderboard.getString("profileId"),
+                                            profileToken = leaderboard.getString("profileToken"),
+                                            registrationRequestId = leaderboard.getString("registrationRequestId"),
+                                        ),
+                                    )
+                                } else {
+                                    leaderboardStore.clearAllForAccountSwitch()
+                                }
                             }
                             val session = accountRepository.currentSession()
                             val links = accountRepository.linkedIdentities()
                             runOnUiThread {
                                 if (isFinishing || isDestroyed) return@runOnUiThread
                                 accountAuthInProgress = false
+                                if (friendPresencePausedForAccountSwitch) {
+                                    (application as LudoProofApplication).resumeFriendPresenceAfterAccountSwitch()
+                                    friendPresencePausedForAccountSwitch = false
+                                }
+                                accountSwitchFromId = null
                                 accountGoogleLinked = links.optBoolean("googleLinked")
                                 accountStatus = if (linkCurrentAccount) {
                                     "Saved to Google · ${session?.displayName ?: "Player"}"
@@ -381,6 +440,16 @@ class ProfileActivity : Activity() {
                                     .show()
                             }
                         } catch (error: Exception) {
+                            if (
+                                !linkCurrentAccount &&
+                                accountRepository.currentSession()?.accountId != accountSwitchFromId
+                            ) {
+                                // The account session has switched, but recovery may have failed.
+                                // Clear old local credentials rather than accidentally using another
+                                // guest's Friend ID/profile with the restored account. Recovery can be retried.
+                                FriendIdentityStore(this@ProfileActivity).clearAllForAccountSwitch()
+                                LeaderboardIdentityStore(this@ProfileActivity).clearAllForAccountSwitch()
+                            }
                             val message = when (error) {
                                 is AccountApiException -> when (error.code) {
                                     "GOOGLE_IDENTITY_ALREADY_LINKED" ->
@@ -416,6 +485,11 @@ class ProfileActivity : Activity() {
         runOnUiThread {
             if (isFinishing || isDestroyed) return@runOnUiThread
             accountAuthInProgress = false
+            if (friendPresencePausedForAccountSwitch) {
+                (application as LudoProofApplication).resumeFriendPresenceAfterAccountSwitch()
+                friendPresencePausedForAccountSwitch = false
+            }
+            accountSwitchFromId = null
             accountStatus = message.take(100)
             renderProfile()
             if (!success) {

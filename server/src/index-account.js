@@ -156,6 +156,39 @@ export default {
         return await directoryRequest(env, "/identity/list", { accountId: session.accountId });
       }
 
+      if (url.pathname === "/api/account/identities/recover" && request.method === "GET") {
+        await rateLimit(env, request, "account:identity:recover", 10);
+        const session = await authenticate(request, env);
+        const links = await directoryRequest(env, "/identity/list", { accountId: session.accountId });
+        let friend = null;
+        let leaderboard = null;
+        if (links.friendId) {
+          if (!env?.LUDOPROOF_FRIENDS) throw httpError(503, "FRIENDS_NOT_CONFIGURED", "friend directory is not configured");
+          const target = env.LUDOPROOF_FRIENDS.get(env.LUDOPROOF_FRIENDS.idFromName("GLOBAL:V1"));
+          friend = await parseInternalResponse(await target.fetch(new Request("https://friends/account/recover", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ friendId: links.friendId }),
+          })), "FRIEND_IDENTITY_RECOVERY_FAILED");
+        }
+        if (links.leaderboardProfileId) {
+          if (!env?.LUDOPROOF_LEADERBOARD) throw httpError(503, "LEADERBOARD_NOT_CONFIGURED", "leaderboard is not configured");
+          const target = env.LUDOPROOF_LEADERBOARD.get(env.LUDOPROOF_LEADERBOARD.idFromName("global"));
+          leaderboard = await parseInternalResponse(await target.fetch(new Request("https://leaderboard/profile/recover", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ profileId: links.leaderboardProfileId }),
+          })), "LEADERBOARD_IDENTITY_RECOVERY_FAILED");
+        }
+        return json(200, {
+          ok: true,
+          accountId: session.accountId,
+          googleLinked: links.googleLinked === true,
+          friend,
+          leaderboard,
+        });
+      }
+
       if (url.pathname === "/api/account/link/friend" && request.method === "POST") {
         await rateLimit(env, request, "account:identity:friend-link", ACCOUNT_RATE_LIMITS.friendLink);
         const session = await authenticate(request, env);

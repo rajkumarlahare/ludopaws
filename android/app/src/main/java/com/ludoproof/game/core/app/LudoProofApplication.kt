@@ -20,6 +20,8 @@ class LudoProofApplication :
         Thread(runnable, "LudoPawsAccountBootstrap")
     }
     private var resumedActivities = 0
+    @Volatile
+    private var friendPresencePausedForAccountSwitch = false
 
     override fun onCreate() {
         super.onCreate()
@@ -46,7 +48,7 @@ class LudoProofApplication :
 
         resumedActivities += 1
         if (resumedActivities == 1) {
-            friendPresence.start()
+            if (!friendPresencePausedForAccountSwitch) friendPresence.start()
             GameMusicController
                 .onAppForeground(this)
         }
@@ -59,10 +61,20 @@ class LudoProofApplication :
             (resumedActivities - 1)
                 .coerceAtLeast(0)
         if (resumedActivities == 0) {
-            friendPresence.stop()
+            if (!friendPresencePausedForAccountSwitch) friendPresence.stop()
             GameMusicController
                 .onAppBackground()
         }
+    }
+
+    fun pauseFriendPresenceForAccountSwitch() {
+        friendPresencePausedForAccountSwitch = true
+        friendPresence.stop()
+    }
+
+    fun resumeFriendPresenceAfterAccountSwitch() {
+        friendPresencePausedForAccountSwitch = false
+        if (resumedActivities > 0) friendPresence.start()
     }
 
     override fun onActivityCreated(
