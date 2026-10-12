@@ -29,7 +29,6 @@ import com.ludoproof.game.feature.store.domain.model.StoreTab
 import com.ludoproof.game.feature.store.presentation.components.storeContent
 import com.ludoproof.game.feature.store.presentation.components.storeHeader
 import com.ludoproof.game.feature.store.presentation.components.storeTabs
-import com.ludoproof.game.feature.store.presentation.components.storefrontAwning
 import java.util.concurrent.Executors
 
 class StoreActivity :
@@ -527,16 +526,6 @@ class StoreActivity :
 
         content.addView(
             storeHeader(),
-        )
-        content.addView(
-            storefrontAwning(),
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(82),
-            ).apply {
-                topMargin =
-                    dp(8)
-            },
         )
         content.addView(
             storeTabs(),

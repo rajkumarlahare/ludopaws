@@ -40,22 +40,26 @@ private fun StoreActivity.gemsContent():
         orientation =
             LinearLayout.VERTICAL
 
+        val adActionRow =
+            LinearLayout(this@gemsContent).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.END
+                addView(
+                    rewardedAdCard(),
+                    LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                    ),
+                )
+            }
         addView(
-            gemIntroCard(),
-        )
-        addView(
-            TextView(this@gemsContent).apply {
-                text = "GEM POUCHES"
-                textSize = 13f
-                setTypeface(Typeface.DEFAULT_BOLD)
-                setTextColor(0xFFEAF7FF.toInt())
-                letterSpacing = 0.14f
-                setPadding(dp(6), dp(14), dp(6), dp(2))
-            },
+            adActionRow,
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
-            ),
+            ).apply {
+                bottomMargin = dp(8)
+            },
         )
 
         val removeAds =
@@ -148,16 +152,6 @@ private fun StoreActivity.gemsContent():
             },
         )
 
-        addView(
-            rewardedAdCard(),
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            ).apply {
-                topMargin = dp(10)
-            },
-        )
-
         if (adsEnabledForBuild) {
             addView(
                 TextView(this@gemsContent).apply {
@@ -188,52 +182,6 @@ private fun StoreActivity.gemsContent():
                 topMargin =
                     dp(16)
             },
-        )
-    }
-
-private fun StoreActivity.gemIntroCard(): LinearLayout =
-    LinearLayout(this).apply {
-        orientation = LinearLayout.HORIZONTAL
-        gravity = Gravity.CENTER_VERTICAL
-        setPadding(dp(14), dp(10), dp(14), dp(10))
-        background =
-            storePlywoodCardBackground(
-                cornerRadiusDp = 16f,
-                fillColors = intArrayOf(0xD9124F91.toInt(), 0xD934246F.toInt()),
-                strokeColor = 0xFF53DFFF.toInt(),
-                insetDp = 5,
-            )
-
-        addView(
-            GemClusterView(this@gemIntroCard, gemCount = 3).apply {
-                background = recessedPlywoodBackground(this@gemIntroCard, outerCornerRadiusDp = 12f)
-                contentDescription = "A cluster of shining gems"
-            },
-            LinearLayout.LayoutParams(dp(76), dp(72)),
-        )
-
-        addView(
-            LinearLayout(this@gemIntroCard).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding(dp(10), 0, 0, 0)
-                addView(
-                    TextView(this@gemIntroCard).apply {
-                        text = "A LITTLE SPARK GOES A LONG WAY"
-                        textSize = 14f
-                        setTypeface(Typeface.DEFAULT_BOLD)
-                        setTextColor(Color.WHITE)
-                    },
-                )
-                addView(
-                    TextView(this@gemIntroCard).apply {
-                        text = "Pick a gem pouch for your next style upgrade."
-                        textSize = 12f
-                        setTextColor(0xFFD4E6FF.toInt())
-                        setPadding(0, dp(5), 0, 0)
-                    },
-                )
-            },
-            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f),
         )
     }
 
@@ -428,10 +376,10 @@ private fun StoreActivity.rewardedAdCard():
         gravity =
             Gravity.CENTER_VERTICAL
         setPadding(
-            dp(12),
-            dp(10),
-            dp(12),
-            dp(10),
+            dp(7),
+            dp(5),
+            dp(7),
+            dp(5),
         )
         background =
             storeRecessedSurfaceBackground(
@@ -447,21 +395,17 @@ private fun StoreActivity.rewardedAdCard():
                 this@rewardedAdCard,
             ).apply {
                 text =
-                    "5 ◆"
+                    "5 GEMS  •  BEST"
                 textSize =
-                    18f
+                    12f
                 setTypeface(
                     Typeface.DEFAULT_BOLD,
                 )
                 setTextColor(
                     LudoProofTheme.GOLD,
                 )
+                setPadding(0, 0, dp(10), 0)
             },
-            LinearLayout.LayoutParams(
-                0,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                1f,
-            ),
         )
 
         addView(
@@ -497,8 +441,8 @@ private fun StoreActivity.rewardedAdCard():
                 AppFocusRing.apply(this, cornerRadiusDp = 10f)
             },
             LinearLayout.LayoutParams(
-                dp(112),
-                dp(42),
+                dp(108),
+                dp(40),
             ),
         )
     }
