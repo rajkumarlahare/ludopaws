@@ -256,6 +256,9 @@ export default {
         if (env?.LUDOPROOF_ADMOB_SSV_ENABLED !== "true" || !env?.LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID) {
           throw httpError(503, "ADMOB_SSV_NOT_ENABLED", "server-verified ad rewards are not enabled");
         }
+        // Signed callbacks still consume CPU and may refresh Google's public verification keys.
+        // Apply the shared IP rate gate before parsing/cryptographic verification to limit abuse.
+        await rateLimit(env, request, "admob:ssv", 120);
         const verified = await verifyAdMobSsvRequest(request, env);
         return await playerRequest(env, verified.accountId, "/wallet/reward-ad", {
           accountId: verified.accountId,
