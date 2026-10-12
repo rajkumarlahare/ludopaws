@@ -251,7 +251,7 @@ function makeDeletionReplayEnv(deleted) {
 }
 
 test("expired signed access token can only confirm an already-deleted account", async () => {
-  const { env, player } = makeDeletionReplayEnv(true);
+  const { env, player, directoryCalls } = makeDeletionReplayEnv(true);
   const expiredToken = await issueAccessToken(env, ACCOUNT_A, SESSION_A, Date.now() - 20 * 60 * 1000);
   const response = await accountWorker.fetch(
     new Request("https://api.example.test/api/account/delete", {
