@@ -37,6 +37,11 @@ class FriendSql {
   profiles = new Map();
   deletedProfiles = new Set();
   deletedRegistrationHashes = new Set();
+  requests = new Map();
+  invites = new Map();
+  friendships = new Map();
+  conversationIndex = new Map();
+  recentIndex = new Map();
 
   exec(statement, ...params) {
     const sql = String(statement).replace(/\s+/g, " ").trim().toLowerCase();
@@ -57,8 +62,26 @@ class FriendSql {
       const row = this.profiles.get(params[0]);
       return row ? [{ registration_request_id: row.registration_request_id }] : [];
     }
+    if (sql.startsWith("select friend_id from friend_profiles where friend_id in (?, ?)")) {
+      return params.filter(id => this.profiles.has(id)).map(friend_id => ({ friend_id }));
+    }
     if (sql.startsWith("select friend_id from friend_profiles")) {
       return this.profiles.has(params[0]) ? [{ friend_id: params[0] }] : [];
+    }
+    if (sql.startsWith("select friend_a, friend_b from friendships")) {
+      return [...this.friendships.values()].filter(row => row.friend_a === params[0] || row.friend_b === params[1]).map(row => ({ friend_a: row.friend_a, friend_b: row.friend_b }));
+    }
+    if (sql.startsWith("select sender_id, receiver_id from friend_requests")) {
+      return [...this.requests.values()].filter(row => row.sender_id === params[0] || row.receiver_id === params[1]).map(row => ({ sender_id: row.sender_id, receiver_id: row.receiver_id }));
+    }
+    if (sql.startsWith("select sender_id, receiver_id from friend_invites")) {
+      return [...this.invites.values()].filter(row => row.sender_id === params[0] || row.receiver_id === params[1]).map(row => ({ sender_id: row.sender_id, receiver_id: row.receiver_id }));
+    }
+    if (sql.startsWith("select other_friend_id from friend_conversation_index")) {
+      return [...this.conversationIndex.values()].filter(row => row.friend_id === params[0]).map(row => ({ other_friend_id: row.other_friend_id }));
+    }
+    if (sql.startsWith("select owner_friend_id from friend_recent_index")) {
+      return [...this.recentIndex.values()].filter(row => row.opponent_friend_id === params[0]).map(row => ({ owner_friend_id: row.owner_friend_id }));
     }
     if (sql.startsWith("insert into friend_profiles")) {
       const [friendId, tokenHash, registrationRequestId, displayName, createdAt, lastSeenAt] = params;
@@ -79,16 +102,37 @@ class FriendSql {
       this.deletedRegistrationHashes.add(params[0]);
       return [];
     }
+    if (sql.startsWith("delete from friend_requests")) {
+      for (const [key, row] of this.requests) if (row.sender_id === params[0] || row.receiver_id === params[1]) this.requests.delete(key);
+      return { rowsWritten: 1 };
+    }
+    if (sql.startsWith("delete from friend_invites")) {
+      for (const [key, row] of this.invites) if (row.sender_id === params[0] || row.receiver_id === params[1]) this.invites.delete(key);
+      return { rowsWritten: 1 };
+    }
+    if (sql.startsWith("delete from friendships")) {
+      for (const [key, row] of this.friendships) if (row.friend_a === params[0] || row.friend_b === params[1]) this.friendships.delete(key);
+      return { rowsWritten: 1 };
+    }
+    if (sql.startsWith("delete from friend_conversation_index")) {
+      for (const [key, row] of this.conversationIndex) if (row.friend_id === params[0] || row.other_friend_id === params[1]) this.conversationIndex.delete(key);
+      return { rowsWritten: 1 };
+    }
+    if (sql.startsWith("delete from friend_recent_index")) {
+      for (const [key, row] of this.recentIndex) if (row.owner_friend_id === params[0] || row.opponent_friend_id === params[1]) this.recentIndex.delete(key);
+      return { rowsWritten: 1 };
+    }
     if (sql.startsWith("delete from friend_profiles")) {
       this.profiles.delete(params[0]);
-      return [];
+      return { rowsWritten: 1 };
     }
-    return [];
+    throw new Error("Unexpected FriendDirectory SQL in identity-deletion test: " + sql);
   }
 }
 
 class LeaderboardSql {
   profiles = new Map();
+  entries = new Map();
   deletedProfiles = new Set();
   deletedRegistrationHashes = new Set();
 
@@ -128,13 +172,17 @@ class LeaderboardSql {
     }
     if (sql.startsWith("insert or ignore into deleted_leaderboard_registration_requests")) {
       this.deletedRegistrationHashes.add(params[0]);
-      return [];
+      return { rowsWritten: 1 };
+    }
+    if (sql.startsWith("delete from leaderboard_entries_v2")) {
+      this.entries.delete(params[0]);
+      return { rowsWritten: 1 };
     }
     if (sql.startsWith("delete from leaderboard_profiles_v2")) {
       this.profiles.delete(params[0]);
-      return [];
+      return { rowsWritten: 1 };
     }
-    return [];
+    throw new Error("Unexpected LeaderboardRoom SQL in identity-deletion test: " + sql);
   }
 }
 
@@ -150,11 +198,24 @@ test("a deleted Friend identity and its registration key cannot recreate the ide
   assert.equal(createdResponse.status, 200);
   const created = await createdResponse.json();
 
+  sql.requests.set("request-1", { sender_id: created.friendId, receiver_id: "LPF-MNPQ-RSTU-VWXY" });
+  sql.invites.set("invite-1", { sender_id: "LPF-MNPQ-RSTU-VWXY", receiver_id: created.friendId });
+  sql.friendships.set("friendship-1", { friend_a: created.friendId, friend_b: "LPF-MNPQ-RSTU-VWXY" });
+  sql.conversationIndex.set("conversation-1", { friend_id: created.friendId, other_friend_id: "LPF-MNPQ-RSTU-VWXY" });
+  sql.conversationIndex.set("conversation-2", { friend_id: "LPF-MNPQ-RSTU-VWXY", other_friend_id: created.friendId });
+  sql.recentIndex.set("recent-1", { owner_friend_id: "LPF-MNPQ-RSTU-VWXY", opponent_friend_id: created.friendId });
+  sql.recentIndex.set("recent-2", { owner_friend_id: created.friendId, opponent_friend_id: "LPF-MNPQ-RSTU-VWXY" });
+
   const deletedResponse = await directory.fetch(request("/account/delete", { friendId: created.friendId }));
   assert.equal(deletedResponse.status, 200);
   assert.equal((await deletedResponse.json()).deleted, true);
   assert.equal(sql.profiles.has(created.friendId), false);
   assert.equal(sql.deletedProfiles.has(created.friendId), true);
+  assert.equal(sql.requests.size, 0);
+  assert.equal(sql.invites.size, 0);
+  assert.equal(sql.friendships.size, 0);
+  assert.equal(sql.conversationIndex.size, 0);
+  assert.equal(sql.recentIndex.size, 0);
 
   const replay = await directory.fetch(request("/register", { clientRequestId: REQUEST_ID, displayName: "Player One" }));
   assert.equal(replay.status, 410);
@@ -169,11 +230,13 @@ test("a deleted leaderboard profile and its registration key cannot recreate the
   assert.equal(createdResponse.status, 200);
   const created = await createdResponse.json();
 
+  sql.entries.set(created.profileId, { profile_id: created.profileId, display_name: "Player One", games: 2, wins: 1, points: 10, updated_at: Date.now() });
   const deletedResponse = await leaderboard.fetch(request("/profile/delete", { profileId: created.profileId }));
   assert.equal(deletedResponse.status, 200);
   assert.equal((await deletedResponse.json()).deleted, true);
   assert.equal(sql.profiles.has(created.profileId), false);
   assert.equal(sql.deletedProfiles.has(created.profileId), true);
+  assert.equal(sql.entries.has(created.profileId), false);
 
   const replay = await leaderboard.fetch(request("/profile/register", { clientRequestId: REQUEST_ID }));
   assert.equal(replay.status, 410);
