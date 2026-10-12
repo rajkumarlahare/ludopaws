@@ -19,6 +19,9 @@ A release must not be promoted unless all of these are true:
 11. The game Worker remains isolated from Rekixo/AR3D routes.
 12. A real-device multiplayer smoke test covers create, join, start, commit, reveal, move, reconnect, timeout recovery, win, and proof/history display.
 13. The final store/upload-signed Android artifact is signed outside the repository with the controlled release key.
+14. A fresh-install real-device test verifies guest creation/recovery, Google link/restore, account switching, server wallet/inventory, and a two-device multiplayer reconnect/proof flow.
+15. Before accounts can be used by real players, implement and verify account/data deletion (including linked identities and server-owned data) plus the required public deletion-request web path; the current account flow must not be assumed to provide deletion.
+16. Verify the privacy policy, Data safety declarations, consent/child-directed treatment where applicable, content rating, store listing, internal test track, and support contact.
 
 ## Cloudflare
 
@@ -33,6 +36,16 @@ Durable Objects:
 ```text
 LUDOPROOF_MATCHES -> MatchRoom
 LUDOPROOF_API_GATE -> ApiGate
+LUDOPROOF_LEADERBOARD -> LeaderboardRoom
+LUDOPROOF_MATCHMAKER -> MatchmakerQueue
+LUDOPROOF_FRIENDS -> FriendDirectory
+LUDOPROOF_RECEIPTS -> MatchReceiptArchive
+LUDOPROOF_TEAM_MATCHMAKER -> TeamMatchmakerQueue
+LUDOPROOF_FRIEND_CONVERSATIONS -> FriendConversation
+LUDOPROOF_FRIEND_RECENT -> FriendRecentRoom
+LUDOPROOF_STORE_PURCHASES -> StorePurchaseLedger
+LUDOPROOF_ACCOUNT_DIRECTORY -> AccountDirectory
+LUDOPROOF_PLAYER_ACCOUNTS -> PlayerAccount
 ```
 
 Internal Worker service binding:
@@ -53,6 +66,7 @@ ENTRONEX_SIGNING_KEY_ID=cf-v4-eval-sign-1
 ENTRONEX_TENANT_ID=cloudflare_v4_eval
 ENTRONEX_SIGNING_KEY_FINGERPRINT=1fe248e8ee9129fcd13c1ee96c1cd7d162a610e9b1df3037a4ec48935f2d43c4
 ENTRONEX_SIGNING_PUBLIC_KEY_PEM_B64=<pinned in server/wrangler.json>
+GOOGLE_SIGN_IN_WEB_CLIENT_ID=<configured in Cloudflare Worker; not a secret>
 ```
 
 The public pin comes from the EntroNex live public-trust export workflow, which recomputes SHA-256 over the Ed25519 SPKI bytes before publishing the bundle.
@@ -72,7 +86,17 @@ Readiness endpoint:
 GET /ready
 ```
 
-The endpoint fails closed with HTTP 503 until the match-storage and rate-gate bindings, retry-safe session HMAC key, EntroNex server credential, pinned EntroNex signing identity, and upstream EntroNex health check are all ready.
+The endpoint fails closed with HTTP 503 until the match-storage and rate-gate bindings, account directory and player-account Durable Objects, the shared Google OAuth Web client ID variable (`GOOGLE_SIGN_IN_WEB_CLIENT_ID`), retry-safe session HMAC key, EntroNex server credential, pinned EntroNex signing identity, and upstream EntroNex health check are all ready. Billing and AdMob rewards are separately gated and should remain disabled until their own end-to-end tests pass.
+
+## Pre-launch account and store notes
+
+The operator confirms there are no production users and no real purchase transactions today. A historic customer/purchase migration is therefore not a blocker for initial launch. New accounts should begin with server-authoritative empty wallet state. Old device-local gem balances, cosmetics progress, and Remove Ads flags remain unverified test/cache data and must not be automatically imported as paid currency or entitlements.
+
+The current account API includes guest creation, Google link/login, refresh/logout, profile, and identity-link flows. It does not currently expose an account-deletion route or UI. Treat account/data deletion as a **launch blocker before enabling account creation for public users**, and implement deletion across the account directory, wallet/session/inventory/ledger, linked social identities, and any retained server data. Provide the corresponding public web deletion-request path. Do not describe deletion as implemented until it is tested end-to-end.
+
+Google sign-in requires the same public Web OAuth Client ID in the Android Gradle property and Cloudflare Worker variable `GOOGLE_SIGN_IN_WEB_CLIENT_ID`; do not put an OAuth client secret in Android. The Android package is `com.ludoproof.game`.
+
+Billing and rewarded ads remain opt-in integrations. Keep billing/ads build flags and server enablement off until the exact Play product catalog/service account and AdMob production unit/SSV callback have passed internal end-to-end tests.
 
 ## Android release security
 
