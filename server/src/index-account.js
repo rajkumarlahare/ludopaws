@@ -76,7 +76,7 @@ export default {
         const body = await readJson(request);
         const guest = await directoryRequest(env, "/guest", body);
         const accountId = requireText(guest.accountId, "accountId");
-        return await playerRequest(env, accountId, "/session/create", {
+        return await playerResponse(env, accountId, "/session/create", {
           accountId,
           displayName: body.displayName,
         });
@@ -85,7 +85,7 @@ export default {
       if (url.pathname === "/api/account/google/challenge" && request.method === "POST") {
         requireMethod(request, "POST");
         await rateLimit(env, request, "account:google:challenge", ACCOUNT_RATE_LIMITS.challenge);
-        return await directoryRequest(env, "/nonce/create", {});
+        return await directoryResponse(env, "/nonce/create", {});
       }
 
       if (url.pathname === "/api/account/google/link" && request.method === "POST") {
@@ -132,7 +132,7 @@ export default {
         // silently switch identities and orphan the current guest's inventory/social state.
         const existing = await directoryRequest(env, "/google/lookup", { subjectHash });
         const accountId = requireAccountId(existing.accountId);
-        return await playerRequest(env, accountId, "/session/create", {
+        return await playerResponse(env, accountId, "/session/create", {
           accountId,
           displayName: google.displayName,
         });
@@ -143,13 +143,13 @@ export default {
         const body = await readJson(request);
         const accountId = requireAccountId(body.accountId);
         const sessionId = requireAccountId(body.sessionId);
-        return await playerRequest(env, accountId, "/session/refresh", { ...body, accountId, sessionId });
+        return await playerResponse(env, accountId, "/session/refresh", { ...body, accountId, sessionId });
       }
 
       if (url.pathname === "/api/account/logout" && request.method === "POST") {
         await rateLimit(env, request, "account:session:logout", ACCOUNT_RATE_LIMITS.sessionLogout);
         const session = await authenticate(request, env);
-        return await playerRequest(env, session.accountId, "/session/logout", {
+        return await playerResponse(env, session.accountId, "/session/logout", {
           accountId: session.accountId,
           sessionId: session.sessionId,
         });
@@ -158,7 +158,7 @@ export default {
       if (url.pathname === "/api/account/me" && request.method === "GET") {
         await rateLimit(env, request, "account:profile:read", ACCOUNT_RATE_LIMITS.profile);
         const session = await authenticate(request, env);
-        return await playerRequest(env, session.accountId, "/profile/get", {
+        return await playerResponse(env, session.accountId, "/profile/get", {
           accountId: session.accountId,
           sessionId: session.sessionId,
         });
@@ -168,7 +168,7 @@ export default {
         await rateLimit(env, request, "account:profile:update", ACCOUNT_RATE_LIMITS.profile);
         const session = await authenticate(request, env);
         const body = await readJson(request);
-        return await playerRequest(env, session.accountId, "/profile/update", {
+        return await playerResponse(env, session.accountId, "/profile/update", {
           accountId: session.accountId,
           sessionId: session.sessionId,
           displayName: body.displayName,
@@ -178,7 +178,7 @@ export default {
       if (url.pathname === "/api/account/links" && request.method === "GET") {
         await rateLimit(env, request, "account:links:read", ACCOUNT_RATE_LIMITS.profile);
         const session = await authenticate(request, env);
-        return await directoryRequest(env, "/identity/list", { accountId: session.accountId });
+        return await directoryResponse(env, "/identity/list", { accountId: session.accountId });
       }
 
       if (url.pathname === "/api/account/identities/recover" && request.method === "GET") {
@@ -220,7 +220,7 @@ export default {
         const body = await readJson(request);
         const friendToken = requireOpaqueToken(body.friendToken, /^lf_[A-Za-z0-9_-]{32,}$/);
         const friend = await authenticatedIdentity(env, "friends", "/identity", friendToken, "friendId");
-        return await directoryRequest(env, "/identity/link", {
+        return await directoryResponse(env, "/identity/link", {
           accountId: session.accountId,
           identityType: "friend",
           externalId: friend.friendId,
@@ -233,7 +233,7 @@ export default {
         const body = await readJson(request);
         const profileToken = requireOpaqueToken(body.profileToken, /^lpp_[A-Za-z0-9_-]{32,}$/);
         const profile = await authenticatedIdentity(env, "leaderboard", "/profile/identity", profileToken, "profileId");
-        return await directoryRequest(env, "/identity/link", {
+        return await directoryResponse(env, "/identity/link", {
           accountId: session.accountId,
           identityType: "leaderboard",
           externalId: profile.profileId,
@@ -243,7 +243,7 @@ export default {
       if (url.pathname === "/api/wallet" && request.method === "GET") {
         await rateLimit(env, request, "wallet:read", ACCOUNT_RATE_LIMITS.wallet);
         const session = await authenticate(request, env);
-        return await playerRequest(env, session.accountId, "/wallet/get", {
+        return await playerResponse(env, session.accountId, "/wallet/get", {
           accountId: session.accountId,
           sessionId: session.sessionId,
         });
@@ -253,7 +253,7 @@ export default {
         await rateLimit(env, request, "wallet:cosmetic:purchase", ACCOUNT_RATE_LIMITS.walletMutation);
         const session = await authenticate(request, env);
         const body = await readJson(request);
-        return await playerRequest(env, session.accountId, "/wallet/cosmetic/purchase", {
+        return await playerResponse(env, session.accountId, "/wallet/cosmetic/purchase", {
           accountId: session.accountId,
           sessionId: session.sessionId,
           cosmeticId: body.cosmeticId,
@@ -265,7 +265,7 @@ export default {
         await rateLimit(env, request, "wallet:cosmetic:select", ACCOUNT_RATE_LIMITS.walletMutation);
         const session = await authenticate(request, env);
         const body = await readJson(request);
-        return await playerRequest(env, session.accountId, "/wallet/cosmetic/select", {
+        return await playerResponse(env, session.accountId, "/wallet/cosmetic/select", {
           accountId: session.accountId,
           sessionId: session.sessionId,
           cosmeticId: body.cosmeticId,
@@ -280,7 +280,7 @@ export default {
         // Apply the shared IP rate gate before parsing/cryptographic verification to limit abuse.
         await rateLimit(env, request, "admob:ssv", 120);
         const verified = await verifyAdMobSsvRequest(request, env);
-        return await playerRequest(env, verified.accountId, "/wallet/reward-ad", {
+        return await playerResponse(env, verified.accountId, "/wallet/reward-ad", {
           accountId: verified.accountId,
           transactionId: verified.transactionId,
           kind: verified.kind,
@@ -358,6 +358,14 @@ async function authenticatedIdentity(env, kind, path, token, field) {
   const value = await parseInternalResponse(response, "IDENTITY_SERVICE_UNAVAILABLE");
   if (typeof value[field] !== "string") throw httpError(503, "IDENTITY_RESPONSE_INVALID", "identity service returned an invalid response");
   return value;
+}
+
+async function directoryResponse(env, path, body) {
+  return json(200, await directoryRequest(env, path, body));
+}
+
+async function playerResponse(env, accountId, path, body) {
+  return json(200, await playerRequest(env, accountId, path, body));
 }
 
 async function directoryRequest(env, path, body) {
