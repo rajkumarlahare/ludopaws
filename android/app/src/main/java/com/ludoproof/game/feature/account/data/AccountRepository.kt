@@ -231,6 +231,23 @@ class AccountRepository(context: Context) {
         )
     }
 
+    fun deleteCurrentAccount(): JSONObject {
+        val current = sessions.load()
+            ?: throw AccountApiException(401, "ACCOUNT_SESSION_REQUIRED", "Sign in again before deleting your account.")
+        val session = validSession(current)
+        val response = request(
+            "POST",
+            "/api/account/delete",
+            JSONObject().put("confirmation", "DELETE_MY_ACCOUNT"),
+            session.accessToken,
+        )
+        if (!response.optBoolean("deleted", false)) {
+            throw AccountApiException(502, "ACCOUNT_DELETE_INCOMPLETE", "The account service did not confirm deletion.")
+        }
+        sessions.clear()
+        return response
+    }
+
     fun logout() {
         val session = requireSession()
         request(
