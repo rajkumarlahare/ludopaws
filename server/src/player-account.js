@@ -1,4 +1,4 @@
-import { httpError, requireClientRequestId } from "./crypto.js";
+import { httpError, readJsonObject, requireClientRequestId } from "./crypto.js";
 import {
   billingAccountId, deriveRotatedRefreshToken, hashRefreshToken, isAccountId, isSessionId,
   issueAccessToken, newRefreshToken, SESSION_TTL_MS, validRefreshToken, sha256Hex,
@@ -335,15 +335,7 @@ function normalizeDisplayName(value) {
   return String(value ?? "").replace(/[\u0000-\u001f\u007f]/g, "").trim().replace(/\s+/g, " ").slice(0, NAME_LENGTH) || "Guest User";
 }
 async function readJson(request) {
-  const type = request.headers.get("content-type") ?? "";
-  if (!type.toLowerCase().startsWith("application/json")) throw httpError(415, "UNSUPPORTED_MEDIA_TYPE", "content-type must be application/json");
-  const text = await request.text();
-  if (new TextEncoder().encode(text).byteLength > 8 * 1024) throw httpError(413, "REQUEST_TOO_LARGE", "request body is too large");
-  try {
-    const value = text.length ? JSON.parse(text) : {};
-    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("object required");
-    return value;
-  } catch { throw httpError(400, "INVALID_JSON", "request body must be a JSON object"); }
+  return readJsonObject(request, 8 * 1024);
 }
 function errorResponse(error) {
   return json(Number.isInteger(error?.status) && error.status >= 400 && error.status <= 599 ? error.status : 500, {

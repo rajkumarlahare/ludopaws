@@ -5,6 +5,7 @@ import {
   deriveLeaderboardIdentity,
   issueLeaderboardProfileAssertion,
   normalizeDisplayName,
+  readJsonObject,
   verifyLeaderboardProfileAssertion,
 } from "../src/crypto.js";
 
@@ -195,3 +196,53 @@ test(
     );
   },
 );
+
+
+test("bounded JSON reader cancels an oversized streamed request before buffering the full body", async () => {
+  let chunkCount = 0;
+  let cancelled = false;
+  const body = new ReadableStream({
+    pull(controller) {
+      chunkCount += 1;
+      controller.enqueue(new Uint8Array(4096));
+    },
+    cancel() {
+      cancelled = true;
+    },
+  });
+  const request = new Request("https://api.example.test/account", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body,
+    duplex: "half",
+  });
+
+  await assert.rejects(
+    readJsonObject(request, 8 * 1024),
+    (error) => error.status === 413 && error.code === "REQUEST_TOO_LARGE",
+  );
+  assert.equal(cancelled, true);
+  assert.ok(chunkCount <= 4, "reader should cancel after crossing the byte limit");
+});
+
+test("bounded JSON reader rejects malformed UTF-8 and non-object JSON", async () => {
+  const invalidUtf8 = new Request("https://api.example.test/account", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: new Uint8Array([0x7b, 0x22, 0x78, 0x22, 0x3a, 0xff, 0x7d]),
+  });
+  await assert.rejects(
+    readJsonObject(invalidUtf8),
+    (error) => error.status === 400 && error.code === "INVALID_JSON",
+  );
+
+  const arrayBody = new Request("https://api.example.test/account", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: "[]",
+  });
+  await assert.rejects(
+    readJsonObject(arrayBody),
+    (error) => error.status === 400 && error.code === "INVALID_JSON",
+  );
+});

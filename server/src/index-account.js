@@ -20,7 +20,7 @@ import {
 } from "./account-security.js";
 import { GOOGLE_PLAY_PRODUCTS, googlePlayBillingEnabled, verifyAndRedeemGooglePlayPurchase } from "./google-play-billing.js";
 import { verifyAdMobSsvRequest } from "./admob-ssv.js";
-import { bearerToken, httpError, sha256Hex } from "./crypto.js";
+import { bearerToken, httpError, readJsonObject, sha256Hex } from "./crypto.js";
 
 export {
   ApiGate, FriendConversation, FriendDirectory, FriendRecentRoom, LeaderboardRoom,
@@ -397,15 +397,7 @@ async function rateLimit(env, request, scope, limit) {
   if (!response.ok || result?.allowed !== true) throw httpError(503, "RATE_LIMITER_UNAVAILABLE", "API rate limiter rejected the check");
 }
 async function readJson(request) {
-  const contentType = request.headers.get("content-type") ?? "";
-  if (!contentType.toLowerCase().startsWith("application/json")) throw httpError(415, "UNSUPPORTED_MEDIA_TYPE", "content-type must be application/json");
-  const text = await request.text();
-  if (new TextEncoder().encode(text).byteLength > MAX_BODY_BYTES) throw httpError(413, "REQUEST_TOO_LARGE", "request body is too large");
-  try {
-    const value = text.length ? JSON.parse(text) : {};
-    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("object required");
-    return value;
-  } catch { throw httpError(400, "INVALID_JSON", "request body must be a JSON object"); }
+  return readJsonObject(request, MAX_BODY_BYTES);
 }
 function requireText(value, field) {
   if (typeof value !== "string" || !value.trim()) throw httpError(400, "INVALID_" + field.toUpperCase(), field + " is required");
