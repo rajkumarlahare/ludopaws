@@ -77,6 +77,16 @@ test("Google identity rejects wrong audience, nonce and expiry", async () => {
     verifyGoogleIdToken({ GOOGLE_SIGN_IN_WEB_CLIENT_ID: "expected-client" }, expired, nonce, fetchImpl, now),
     (error) => error.code === "GOOGLE_ID_TOKEN_INVALID",
   );
+  const invalidTimeOrder = await googleToken(pair.privateKey, {
+    ...base,
+    aud: "expected-client",
+    iat: Math.floor(now / 1000) + 40,
+    exp: Math.floor(now / 1000) + 30,
+  });
+  await assert.rejects(
+    verifyGoogleIdToken({ GOOGLE_SIGN_IN_WEB_CLIENT_ID: "expected-client" }, invalidTimeOrder, nonce, fetchImpl, now),
+    (error) => error.code === "GOOGLE_ID_TOKEN_INVALID",
+  );
 });
 
 test("access tokens are signed, session-bound, short-lived and reject tampering", async () => {

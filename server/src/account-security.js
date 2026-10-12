@@ -53,6 +53,7 @@ export async function verifyGoogleIdToken(env, idToken, expectedNonce, fetchImpl
       typeof claims?.sub !== "string" || claims.sub.length < 1 || claims.sub.length > 255 ||
       !Number.isSafeInteger(claims?.exp) || claims.exp <= now - CLOCK_SKEW_SECONDS ||
       !Number.isSafeInteger(claims?.iat) || claims.iat > now + CLOCK_SKEW_SECONDS || claims.iat < now - 7200 ||
+      claims.exp <= claims.iat ||
       claims?.nonce !== expectedNonce) {
     throw httpError(401, "GOOGLE_ID_TOKEN_INVALID", "Google identity token claims are invalid or expired");
   }

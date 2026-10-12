@@ -1,4 +1,4 @@
-import { httpError } from "./crypto.js";
+import { httpError, sha256Hex } from "./crypto.js";
 import { hashGoogleNonce, isAccountId } from "./account-security.js";
 
 const FRIEND_ID = /^LPF-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/;
@@ -37,18 +37,20 @@ export class AccountDirectory {
   async #createGuest(request) {
     const body = await readJson(request);
     const requestId = requireUuid(body?.clientRequestId, "clientRequestId");
-    const existing = [...this.ctx.storage.sql.exec("SELECT account_id FROM guest_requests WHERE client_request_id = ? LIMIT 1", requestId)];
+    // This key is a guest-account recovery credential. Never persist the raw bearer-like value.
+    const requestKey = await sha256Hex("ludoproof:guest-recovery-key:v1:" + requestId);
+    const existing = [...this.ctx.storage.sql.exec("SELECT account_id FROM guest_requests WHERE client_request_id = ? LIMIT 1", requestKey)];
     if (existing.length === 1) return json(200, { ok: true, accountId: String(existing[0].account_id), replay: true });
 
     const generatedId = crypto.randomUUID().toLowerCase();
     const now = Date.now();
     this.ctx.storage.transactionSync(() => {
-      const raced = [...this.ctx.storage.sql.exec("SELECT account_id FROM guest_requests WHERE client_request_id = ? LIMIT 1", requestId)];
+      const raced = [...this.ctx.storage.sql.exec("SELECT account_id FROM guest_requests WHERE client_request_id = ? LIMIT 1", requestKey)];
       if (raced.length > 0) return;
       this.ctx.storage.sql.exec("INSERT INTO account_registry (account_id, account_kind, created_at) VALUES (?, 'GUEST', ?)", generatedId, now);
-      this.ctx.storage.sql.exec("INSERT INTO guest_requests (client_request_id, account_id, created_at) VALUES (?, ?, ?)", requestId, generatedId, now);
+      this.ctx.storage.sql.exec("INSERT INTO guest_requests (client_request_id, account_id, created_at) VALUES (?, ?, ?)", requestKey, generatedId, now);
     });
-    const saved = [...this.ctx.storage.sql.exec("SELECT account_id FROM guest_requests WHERE client_request_id = ? LIMIT 1", requestId)];
+    const saved = [...this.ctx.storage.sql.exec("SELECT account_id FROM guest_requests WHERE client_request_id = ? LIMIT 1", requestKey)];
     if (saved.length !== 1) throw httpError(503, "ACCOUNT_CREATE_FAILED", "guest account could not be created safely");
     return json(200, { ok: true, accountId: String(saved[0].account_id), replay: String(saved[0].account_id) !== generatedId });
   }
