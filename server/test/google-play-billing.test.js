@@ -6,6 +6,7 @@ import {
   verifyAndRedeemGooglePlayPurchase,
 } from "../src/google-play-billing.js";
 import worker from "../src/index.js";
+import { sha256Hex } from "../src/crypto.js";
 
 class FakeStorage {
   constructor() {
@@ -149,6 +150,7 @@ test("verified purchases are consumed, redeemed once, and recover idempotently",
     gemAmount: 300,
     removeAds: false,
     replay: false,
+    purchaseLedgerId: await sha256Hex("ludoproof:google-play-purchase:v1:" + purchaseToken),
   });
   assert.equal(calls.filter(({ url }) => url.endsWith(":consume")).length, 1);
 
