@@ -17,6 +17,8 @@ import com.ludoproof.game.feature.store.domain.model.StoreProduct
 import com.ludoproof.game.feature.store.domain.model.StoreTab
 import com.ludoproof.game.feature.store.presentation.StoreActivity
 import com.ludoproof.game.feature.store.presentation.art.GemClusterView
+import com.ludoproof.game.ui.home.HomeIconKind
+import com.ludoproof.game.ui.home.HomeIconView
 
 internal fun StoreActivity.storeContent():
     LinearLayout =
@@ -220,32 +222,32 @@ private fun StoreActivity.featuredRemoveAdsCard(
             }
 
         body.addView(
-            TextView(
+            FrameLayout(
                 this@featuredRemoveAdsCard,
             ).apply {
-                text =
-                    "AD\n×"
-                textSize =
-                    27f
-                setTypeface(
-                    Typeface.DEFAULT_BOLD,
-                )
-                setTextColor(
-                    Color.WHITE,
-                )
-                gravity =
-                    Gravity.CENTER
+                // Circular plywood medallion with the exact Home ADS red slash icon.
                 background =
-                    storeRecessedSurfaceBackground(
-                        cornerRadiusDp = 16f,
-                        fillColors = intArrayOf(0xCC1067B8.toInt(), 0xCC094A92.toInt()),
-                        strokeColor = 0xFF64E0FF.toInt(),
-                        strokeWidthDp = 2,
-                        insetDp = 6,
+                    plywoodBackground(
+                        context = this@featuredRemoveAdsCard,
+                        cornerRadiusDp = 52f,
                     )
+                elevation = dp(3).toFloat()
+
+                addView(
+                    HomeIconView(this@featuredRemoveAdsCard).apply {
+                        kind = HomeIconKind.AD_BLOCKER
+                        importantForAccessibility =
+                            android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                    },
+                    FrameLayout.LayoutParams(
+                        dp(88),
+                        dp(88),
+                        Gravity.CENTER,
+                    ),
+                )
             },
             LinearLayout.LayoutParams(
-                dp(118),
+                dp(104),
                 dp(104),
             ),
         )
