@@ -20,7 +20,7 @@ A release must not be promoted unless all of these are true:
 12. A real-device multiplayer smoke test covers create, join, start, commit, reveal, move, reconnect, timeout recovery, win, and proof/history display.
 13. The final store/upload-signed Android artifact is signed outside the repository with the controlled release key.
 14. A fresh-install real-device test verifies guest creation/recovery, Google link/restore, account switching, server wallet/inventory, and a two-device multiplayer reconnect/proof flow.
-15. Before accounts can be used by real players, implement and verify account/data deletion (including linked identities and server-owned data) plus the required public deletion-request web path; the current account flow must not be assumed to provide deletion.
+15. The current draft adds an authenticated in-app account-deletion API/UI and cleanup for account directory links, player wallet/session/inventory/transactions, linked Friend data, leaderboard profile data, and associated Play purchase-ledger records. This remains a release gate until latest CI/CodeQL passes, full deletion and retry behavior is tested end-to-end, a public web deletion-request resource is hosted and tested for users who uninstalled the app, and account-associated match receipt/history retention is reviewed.
 16. Verify the privacy policy, Data safety declarations, consent/child-directed treatment where applicable, content rating, store listing, internal test track, and support contact.
 
 ## Cloudflare
@@ -92,7 +92,9 @@ The endpoint fails closed with HTTP 503 until the match-storage and rate-gate bi
 
 The operator confirms there are no production users and no real purchase transactions today. A historic customer/purchase migration is therefore not a blocker for initial launch. New accounts should begin with server-authoritative empty wallet state. Old device-local gem balances, cosmetics progress, and Remove Ads flags remain unverified test/cache data and must not be automatically imported as paid currency or entitlements.
 
-The current account API includes guest creation, Google link/login, refresh/logout, profile, and identity-link flows. It does not currently expose an account-deletion route or UI. Treat account/data deletion as a **launch blocker before enabling account creation for public users**, and implement deletion across the account directory, wallet/session/inventory/ledger, linked social identities, and any retained server data. Provide the corresponding public web deletion-request path. Do not describe deletion as implemented until it is tested end-to-end.
+The current draft adds an authenticated `POST /api/account/delete` API and Profile UI confirmation. The API derives the account from a valid bearer session instead of accepting a caller-supplied account ID. Server-side cleanup covers the account directory, wallet/session/inventory/transaction rows, purchase-ledger references, linked Friend/social records, and leaderboard profile; deletion tombstones prevent account/recovery IDs from being silently recreated. After server confirmation the app clears account-scoped local profile, wallet, identity, and pending Play-purchase caches.
+
+This is **implemented in the draft but not yet release-verified**. Latest CI/CodeQL must pass; multi-service deletion/retry needs end-to-end tests; a public web deletion-request resource still needs to be hosted and tested for users who uninstalled the app; and account-associated match receipt/history retention still needs an explicit review. Keep [issue #232](https://github.com/rajkumarlahare/ludoproof/issues/232) open until these gates are complete.
 
 Google sign-in requires the same public Web OAuth Client ID in the Android Gradle property and Cloudflare Worker variable `GOOGLE_SIGN_IN_WEB_CLIENT_ID`; do not put an OAuth client secret in Android. The Android package is `com.ludoproof.game`.
 
