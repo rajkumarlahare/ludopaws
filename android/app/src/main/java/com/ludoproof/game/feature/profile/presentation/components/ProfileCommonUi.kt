@@ -4,7 +4,9 @@ import android.app.AlertDialog
 import android.app.Dialog
 import android.graphics.Color
 import android.graphics.Typeface
+import android.text.InputFilter
 import android.view.Gravity
+import android.view.View
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.EditText
@@ -134,6 +136,8 @@ internal fun ProfileActivity.showNameEditor() {
             )
             setPadding(dp(14), dp(8), dp(14), dp(8))
         }
+    // New nicknames are limited to seven characters; Save validates the six-character minimum.
+    input.filters = arrayOf(InputFilter.LengthFilter(7))
     panel.addView(
         input,
         LinearLayout.LayoutParams(
@@ -141,6 +145,24 @@ internal fun ProfileActivity.showNameEditor() {
             dp(if (compact) 50 else 54),
         ).apply {
             topMargin = dp(16)
+        },
+    )
+
+    val validationMessage =
+        TextView(this).apply {
+            text = "Nickname must be 6–7 characters."
+            textSize = 11f
+            setTextColor(0xFFFFA278.toInt())
+            visibility = View.GONE
+            setPadding(dp(2), dp(6), dp(2), 0)
+        }
+    panel.addView(
+        validationMessage,
+        LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+        ).apply {
+            topMargin = dp(4)
         },
     )
 
@@ -189,8 +211,15 @@ internal fun ProfileActivity.showNameEditor() {
                 this@showNameEditor,
             )
             setOnClickListener {
+                val nickname = input.text.toString().trim()
+                    .replace(Regex("""\s+"""), " ")
+                if (nickname.length !in 6..7) {
+                    validationMessage.visibility = View.VISIBLE
+                    input.requestFocus()
+                    return@setOnClickListener
+                }
                 dialog.dismiss()
-                profileStore.updateDisplayName(input.text.toString())
+                profileStore.updateDisplayName(nickname)
                 renderProfile()
             }
         },

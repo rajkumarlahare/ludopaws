@@ -90,7 +90,7 @@ private fun HomeActivity.homeIdentityRow(): LinearLayout =
         addView(
             homeCurrencyPill(),
             LinearLayout.LayoutParams(
-                dp(if (isCompact()) 140 else 160),
+                LinearLayout.LayoutParams.WRAP_CONTENT,
                 dp(if (isCompact()) 53 else 57),
             ),
         )
@@ -107,7 +107,7 @@ private fun HomeActivity.homeIdentityRow(): LinearLayout =
         addView(
             homeProfilePill(),
             LinearLayout.LayoutParams(
-                dp(if (isCompact()) 140 else 160),
+                LinearLayout.LayoutParams.WRAP_CONTENT,
                 dp(if (isCompact()) 53 else 57),
             ),
         )
@@ -172,9 +172,8 @@ private fun HomeActivity.homeCurrencyPill(): LinearLayout =
                 )
             },
             LinearLayout.LayoutParams(
-                0,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                1f,
             ),
         )
 
@@ -252,6 +251,7 @@ private fun HomeActivity.homeProfilePill(): LinearLayout =
                 gravity = Gravity.CENTER_VERTICAL
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
+                maxWidth = dp(if (isCompact()) 96 else 112)
                 setShadowLayer(
                     2.4f,
                     0f,
@@ -266,9 +266,8 @@ private fun HomeActivity.homeProfilePill(): LinearLayout =
                 )
             },
             LinearLayout.LayoutParams(
-                0,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                1f,
             ),
         )
 
