@@ -11,6 +11,7 @@ import com.ludoproof.game.core.ui.art.playerCountSelectionBackground
 import com.ludoproof.game.core.ui.art.plywoodBackground
 import com.ludoproof.game.core.ui.components.AppFocusRing
 import com.ludoproof.game.core.ui.components.playSelectionPopAnimation
+import com.ludoproof.game.feature.store.domain.StoreCosmeticCatalog
 import com.ludoproof.game.feature.store.domain.model.StoreCosmetic
 import com.ludoproof.game.feature.store.presentation.StoreActivity
 import com.ludoproof.game.feature.store.presentation.actions.handleCosmeticTap
