@@ -45,7 +45,8 @@ internal fun StoreActivity.boardCatalogContent(): LinearLayout =
                     it.id == StoreCosmeticCatalog.DEFAULT_BOARD
                 }
 
-        panels.chunked(3).forEachIndexed { rowIndex, rowBoards ->
+        // Use the same two-card row rhythm as Paws so every board preview gets more room.
+        panels.chunked(2).forEachIndexed { rowIndex, rowBoards ->
             val row =
                 LinearLayout(this@boardCatalogContent).apply {
                     orientation = LinearLayout.HORIZONTAL
@@ -57,7 +58,7 @@ internal fun StoreActivity.boardCatalogContent(): LinearLayout =
                     boardPanel(board),
                     LinearLayout.LayoutParams(
                         0,
-                        dp(132),
+                        dp(188),
                         1f,
                     ).apply {
                         setMargins(dp(4), 0, dp(4), 0)
@@ -65,10 +66,10 @@ internal fun StoreActivity.boardCatalogContent(): LinearLayout =
                 )
             }
 
-            repeat(3 - rowBoards.size) {
+            repeat(2 - rowBoards.size) {
                 row.addView(
                     TextView(this@boardCatalogContent),
-                    LinearLayout.LayoutParams(0, dp(132), 1f),
+                    LinearLayout.LayoutParams(0, dp(188), 1f),
                 )
             }
 
@@ -126,7 +127,7 @@ private fun StoreActivity.boardPanel(
         addView(
             TextView(this@boardPanel).apply {
                 text = if (locked) LOCKED_BOARD_TITLE else board.title
-                textSize = 10.5f
+                textSize = 14.5f
                 setTypeface(Typeface.DEFAULT_BOLD)
                 setTextColor(Color.WHITE)
                 gravity = Gravity.CENTER
@@ -148,7 +149,7 @@ private fun StoreActivity.boardPanel(
                 },
                 LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
-                    dp(42),
+                    dp(82),
                 ),
             )
         } else {
@@ -162,8 +163,8 @@ private fun StoreActivity.boardPanel(
                     contentDescription = "Classic Ludo board preview"
                 },
                 LinearLayout.LayoutParams(
-                    dp(62),
-                    dp(62),
+                    dp(104),
+                    dp(104),
                 ).apply {
                     topMargin = dp(1)
                     bottomMargin = dp(1)
@@ -183,7 +184,7 @@ private fun StoreActivity.boardPanel(
             addView(
                 TextView(this@boardPanel).apply {
                     text = "COMING SOON"
-                    textSize = 7.5f
+                    textSize = 8.5f
                     setTypeface(Typeface.DEFAULT_BOLD)
                     setTextColor(0xFF65421E.toInt())
                     gravity = Gravity.CENTER
@@ -209,7 +210,7 @@ private fun StoreActivity.boardStatusBadge(
 ): TextView =
     TextView(this).apply {
         text = if (locked) "🔒 LOCKED" else "🔓 UNLOCKED"
-        textSize = 8.5f
+        textSize = 9.5f
         setTypeface(Typeface.DEFAULT_BOLD)
         setTextColor(
             when {
