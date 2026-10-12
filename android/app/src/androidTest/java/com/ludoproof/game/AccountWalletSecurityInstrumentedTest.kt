@@ -88,6 +88,25 @@ class AccountWalletSecurityInstrumentedTest {
     }
 
     @Test
+    fun convertingGuestToGoogleModeClearsTheGuestRecoveryCredential() {
+        val sessionStore = AccountSessionStore(context)
+        saveTestSession()
+        val guestRecoveryId = sessionStore.guestRequestId()
+        val storedGuestCiphertext = requireNotNull(
+            walletPreferences.getString("guest_request_ciphertext", null),
+        )
+        assertFalse(storedGuestCiphertext.contains(guestRecoveryId))
+        assertEquals("GUEST", sessionStore.lastAccountMode())
+
+        val session = requireNotNull(sessionStore.load())
+        sessionStore.save(session.copy(guestRecoveryEligible = false))
+
+        assertEquals("GOOGLE", sessionStore.lastAccountMode())
+        assertFalse(walletPreferences.contains("guest_request_ciphertext"))
+        assertFalse(walletPreferences.contains("guest_request_iv"))
+    }
+
+    @Test
     fun firstServerWalletSnapshotArchivesLegacyLocalDataButNeverGrantsIt() {
         saveTestSession()
         walletPreferences.edit()

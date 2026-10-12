@@ -50,7 +50,7 @@ class LudoProofApplication :
         if (resumedActivities == 1) {
             if (
                 !friendPresencePausedForAccountSwitch &&
-                !accountRepository.requiresIdentityRecovery()
+                accountRepository.canStartFriendPresence()
             ) {
                 friendPresence.start()
             }

@@ -96,7 +96,26 @@ class AccountRepository(context: Context) {
             JSONObject().put("idToken", idToken).put("nonce", nonce),
             session.accessToken,
         )
-        response.optJSONObject("profile")?.let(::updateCachedDisplayName)
+        val linkedProfile = response.optJSONObject("profile")
+        synchronized(this) {
+            val latest = sessions.load()
+            if (latest != null && latest.accountId == session.accountId) {
+                val profileName = linkedProfile
+                    ?.optString("displayName")
+                    ?.trim()
+                    ?.take(24)
+                    ?.takeIf(String::isNotBlank)
+                    ?: latest.displayName
+                // The server-confirmed Google link replaces guest-only recovery as the
+                // identity recovery path. Clear the old guest key and persist GOOGLE mode.
+                sessions.save(
+                    latest.copy(
+                        displayName = profileName,
+                        guestRecoveryEligible = false,
+                    ),
+                )
+            }
+        }
     }
 
     fun restoreGoogleAccount(idToken: String, nonce: String): AccountSession {
