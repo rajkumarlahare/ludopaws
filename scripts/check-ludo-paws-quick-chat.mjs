@@ -31,7 +31,7 @@ if (!quickChat.includes('QuickChatEmojiCatalog.EMOJIS.chunked(6)')) {
 if (!quickChat.includes('background = plywoodBackground(')) {
   throw new Error('Quick Chat popup must use the shared plywood background.');
 }
-const emojiCell = quickChat.match(/val cell = TextView\\(context\\)\\.apply \\{([\\s\\S]*?)\\n            \\}/);
+const emojiCell = quickChat.match(/val cell = TextView\(context\)\.apply \{([\s\S]*?)\n            \}/);
 if (!emojiCell || !emojiCell[1].includes('background = null')) {
   throw new Error('Quick Chat emoji cells must not render circular background chips.');
 }
