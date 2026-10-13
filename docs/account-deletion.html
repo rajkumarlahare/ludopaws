@@ -6,7 +6,7 @@
   <meta name="referrer" content="no-referrer">
   <title>Ludo Paws — Account and Data Deletion</title>
   <meta name="description" content="Delete a Google-linked Ludo Paws account or contact publisher support about deleting account data.">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://accounts.google.com 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://ludoproof-game-api.ai-8f3.workers.dev https://accounts.google.com; frame-src https://accounts.google.com; img-src 'self' data: https://*.googleusercontent.com; object-src 'none'; base-uri 'self';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://accounts.google.com 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.ludopaws.rekixo.com https://accounts.google.com; frame-src https://accounts.google.com; img-src 'self' data: https://*.googleusercontent.com; object-src 'none'; base-uri 'self';">
   <script src="./config.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -90,7 +90,7 @@
 (function () {
   "use strict";
   const config = window.LUDO_ACCOUNT_CONFIG || {};
-  const apiBase = String(config.apiBaseUrl || "https://ludoproof-game-api.ai-8f3.workers.dev").replace(/\/+$/, "");
+  const apiBase = String(config.apiBaseUrl || "https://api.ludopaws.rekixo.com").replace(/\/+$/, "");
   const clientId = String(config.googleWebClientId || "").trim();
   const statusBox = document.getElementById("status");
   const setupNote = document.getElementById("setup-note");

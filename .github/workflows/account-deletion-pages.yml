@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
     paths:
+      - "docs/landing-page.html"
       - "docs/account-deletion.html"
       - "docs/privacy-policy.html"
       - ".github/workflows/account-deletion-pages.yml"
@@ -42,6 +43,7 @@ jobs:
           LUDOPROOF_ACCOUNT_WEB_ORIGIN: ${{ vars.LUDOPROOF_ACCOUNT_WEB_ORIGIN }}
         run: |
           set -euo pipefail
+          test -f docs/landing-page.html
           test -f docs/account-deletion.html
           test -f docs/privacy-policy.html
           if grep -q "POLICY_RELEASE_REVIEW_REQUIRED" docs/privacy-policy.html; then
@@ -60,8 +62,8 @@ jobs:
             echo "A monitored publisher support email is required." >&2
             exit 2
           fi
-          if [ "$LUDOPROOF_ACCOUNT_WEB_ORIGIN" != "https://rajkumarlahare.github.io" ]; then
-            echo "LUDOPROOF_ACCOUNT_WEB_ORIGIN must match the GitHub Pages origin: https://rajkumarlahare.github.io" >&2
+          if [ "$LUDOPROOF_ACCOUNT_WEB_ORIGIN" != "https://ludopaws.rekixo.com" ]; then
+            echo "LUDOPROOF_ACCOUNT_WEB_ORIGIN must match the GitHub Pages origin: https://ludopaws.rekixo.com" >&2
             exit 2
           fi
           node scripts/check-account-deletion-pages.mjs
@@ -76,12 +78,14 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p site
-          cp docs/account-deletion.html site/index.html
+          cp docs/landing-page.html site/index.html
+          cp docs/account-deletion.html site/account-deletion.html
           cp docs/privacy-policy.html site/privacy-policy.html
+          printf '%s\n' 'ludopaws.rekixo.com' > site/CNAME
           node <<'NODE'
           const fs = require("node:fs");
           const config = {
-            apiBaseUrl: "https://ludoproof-game-api.ai-8f3.workers.dev",
+            apiBaseUrl: "https://api.ludopaws.rekixo.com",
             googleWebClientId: process.env.GOOGLE_SIGN_IN_WEB_CLIENT_ID,
             supportEmail: process.env.LUDOPROOF_SUPPORT_EMAIL
           };
