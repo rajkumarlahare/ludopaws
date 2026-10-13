@@ -48,7 +48,7 @@ Existing gameplay character cards already expose state-rich content descriptions
 
 Phase 15 deliberately preserves:
 
-- Android `applicationId = "com.ludoproof.game"`;
+- Android `applicationId = "com.rekixo.ludopaws"`;
 - Cloudflare Worker name `ludoproof-game-api`;
 - existing `LUDOPROOF_*` bindings and Durable Object migrations;
 - current proof/randomness identifiers and EntroNex v4 derivation;

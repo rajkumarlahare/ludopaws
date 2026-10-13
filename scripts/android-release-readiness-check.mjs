@@ -20,32 +20,32 @@ function requirePattern(name, source, pattern, message) {
 const appBuild = read("android/app/build.gradle.kts");
 const signedReleaseWorkflow = read(".github/workflows/android-signed-release.yml");
 const snapshotTests = read(
-  "android/app/src/test/java/com/ludoproof/game/GameJsonAuthoritativeSnapshotTest.kt",
+  "android/app/src/test/java/com/rekixo/ludopaws/GameJsonAuthoritativeSnapshotTest.kt",
 );
 const rulesets = read("server/src/rulesets.js");
 const interstitialController = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/store/data/ads/PostWinInterstitialAdController.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/store/data/ads/PostWinInterstitialAdController.kt",
 );
 const interstitialPolicy = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/store/domain/PostWinInterstitialPolicy.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/store/domain/PostWinInterstitialPolicy.kt",
 );
 const interstitialExitGate = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/store/data/ads/PostWinInterstitialExitGate.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/store/data/ads/PostWinInterstitialExitGate.kt",
 );
 const rewardedAdsController = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/store/data/ads/RewardedAdsController.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/store/data/ads/RewardedAdsController.kt",
 );
 const storeActivity = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/store/presentation/StoreActivity.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/store/presentation/StoreActivity.kt",
 );
 const offlineExit = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/offline/presentation/common/OfflineExitDialogUi.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/offline/presentation/common/OfflineExitDialogUi.kt",
 );
 const offlineActivity = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/offline/presentation/OfflineGameActivity.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/offline/presentation/OfflineGameActivity.kt",
 );
 const onlineMain = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/online/presentation/MainActivity.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/online/presentation/MainActivity.kt",
 );
 
 requirePattern(

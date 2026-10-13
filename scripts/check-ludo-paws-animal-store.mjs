@@ -6,31 +6,31 @@ const requireText = (source, token, message) => {
 };
 
 const models = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/store/domain/model/CosmeticModels.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/store/domain/model/CosmeticModels.kt",
 );
 const storeModels = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/store/domain/model/StoreModels.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/store/domain/model/StoreModels.kt",
 );
 const catalog = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/store/domain/StoreCosmeticCatalog.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/store/domain/StoreCosmeticCatalog.kt",
 );
 const inventory = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/store/data/local/CosmeticInventoryStore.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/store/data/local/CosmeticInventoryStore.kt",
 );
 const preferences = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/store/data/local/StorePreferences.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/store/data/local/StorePreferences.kt",
 );
 const contentUi = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/store/presentation/components/StoreContentUi.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/store/presentation/components/StoreContentUi.kt",
 );
 const pawsUi = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/store/presentation/components/StorePawsCatalogUi.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/store/presentation/components/StorePawsCatalogUi.kt",
 );
 const actions = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/store/presentation/actions/StoreCosmeticActions.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/store/presentation/actions/StoreCosmeticActions.kt",
 );
 const tests = read(
-  "android/app/src/test/java/com/ludoproof/game/feature/store/domain/CharacterPackStoreCatalogTest.kt",
+  "android/app/src/test/java/com/rekixo/ludopaws/feature/store/domain/CharacterPackStoreCatalogTest.kt",
 );
 
 requireText(models, "CHARACTER_PACK", "Character packs must be a first-class cosmetic category.");

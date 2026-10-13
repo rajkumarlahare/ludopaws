@@ -8,8 +8,8 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $androidDir = Join-Path $repoRoot "android"
-$packageName = "com.ludoproof.game"
-$activityName = "com.ludoproof.game.HomeActivity"
+$packageName = "com.rekixo.ludopaws"
+$activityName = "com.rekixo.ludopaws.HomeActivity"
 $gradleVersion = "8.11.1"
 $requiredPlatform = "android-36"
 $requiredBuildTools = "35.0.0"

@@ -175,7 +175,7 @@ for (const pack of packsById.values()) {
 
 const selectionStorePath = path.join(
   root,
-  "android/app/src/main/java/com/ludoproof/game/feature/characters/data/local/CharacterSelectionStore.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/characters/data/local/CharacterSelectionStore.kt",
 );
 const selectionStore = fs.readFileSync(selectionStorePath, "utf8");
 if (!selectionStore.includes('"ludo_paws_character_selection_v1"')) {

@@ -10,25 +10,25 @@ const rejectText = (source, token, message) => {
 
 const strings = read("android/app/src/main/res/values/strings.xml");
 const homeHero = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/home/presentation/components/HomeHeroUi.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/home/presentation/components/HomeHeroUi.kt",
 );
 const fairDice = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/proof/domain/core/FairDiceExplainer.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/proof/domain/core/FairDiceExplainer.kt",
 );
 const fairDiceTest = read(
-  "android/app/src/test/java/com/ludoproof/game/feature/proof/domain/core/FairDiceExplainerTest.kt",
+  "android/app/src/test/java/com/rekixo/ludopaws/feature/proof/domain/core/FairDiceExplainerTest.kt",
 );
 const profileActivity = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/profile/presentation/ProfileActivity.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/profile/presentation/ProfileActivity.kt",
 );
 const profileHeader = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/profile/presentation/components/ProfileHeaderUi.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/profile/presentation/components/ProfileHeaderUi.kt",
 );
 const profileStats = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/profile/presentation/components/ProfileStatsUi.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/profile/presentation/components/ProfileStatsUi.kt",
 );
 const storeActivity = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/store/presentation/StoreActivity.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/store/presentation/StoreActivity.kt",
 );
 const buildGradle = read("android/app/build.gradle.kts");
 const wrangler = read("server/wrangler.json");
@@ -170,7 +170,7 @@ requireText(
 );
 requireText(
   buildGradle,
-  'namespace = "com.ludoproof.game"',
+  'namespace = "com.rekixo.ludopaws"',
   "Keep the legacy Kotlin namespace stable during the isolated application-ID migration.",
 );
 requireText(

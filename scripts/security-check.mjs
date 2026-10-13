@@ -134,8 +134,8 @@ if (
 }
 
 for (const file of [
-  "android/app/src/main/java/com/ludoproof/game/feature/online/data/local/PendingRollStore.kt",
-  "android/app/src/main/java/com/ludoproof/game/feature/online/data/local/SecureSessionStore.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/online/data/local/PendingRollStore.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/online/data/local/SecureSessionStore.kt",
 ]) {
   const content =
     fs.readFileSync(
@@ -273,13 +273,13 @@ for (const [name, expected] of [
 }
 
 const offlineV4Files = {
-  core: "android/app/src/main/java/com/ludoproof/game/feature/proof/domain/core/EntroNexV4Local.kt",
-  binding: "android/app/src/main/java/com/ludoproof/game/feature/proof/domain/offline/OfflineLudoV4Binding.kt",
-  gameplayBinding: "android/app/src/main/java/com/ludoproof/game/feature/proof/domain/offline/OfflineLudoV3Binding.kt",
-  engine: "android/app/src/main/java/com/ludoproof/game/feature/offline/domain/engine/OfflineGameEngine.kt",
-  fairness: "android/app/src/main/java/com/ludoproof/game/feature/proof/domain/offline/OfflineFairnessChain.kt",
+  core: "android/app/src/main/java/com/rekixo/ludopaws/feature/proof/domain/core/EntroNexV4Local.kt",
+  binding: "android/app/src/main/java/com/rekixo/ludopaws/feature/proof/domain/offline/OfflineLudoV4Binding.kt",
+  gameplayBinding: "android/app/src/main/java/com/rekixo/ludopaws/feature/proof/domain/offline/OfflineLudoV3Binding.kt",
+  engine: "android/app/src/main/java/com/rekixo/ludopaws/feature/offline/domain/engine/OfflineGameEngine.kt",
+  fairness: "android/app/src/main/java/com/rekixo/ludopaws/feature/proof/domain/offline/OfflineFairnessChain.kt",
   conformance:
-    "android/app/src/test/java/com/ludoproof/game/EntroNexV4LocalConformanceTest.kt",
+    "android/app/src/test/java/com/rekixo/ludopaws/EntroNexV4LocalConformanceTest.kt",
 };
 
 for (const file of Object.values(offlineV4Files)) {

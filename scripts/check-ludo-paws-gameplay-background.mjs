@@ -2,11 +2,11 @@ import fs from 'node:fs';
 
 const required = {
   asset: 'android/app/src/main/res/drawable-nodpi/ludo_paws_game_background.webp',
-  backdrop: 'android/app/src/main/java/com/ludoproof/game/core/ui/art/ArcadeBackdropView.kt',
-  theme: 'android/app/src/main/java/com/ludoproof/game/core/ui/theme/LudoProofTheme.kt',
-  offlineGameplay: 'android/app/src/main/java/com/ludoproof/game/feature/offline/presentation/gameplay/OfflineGameplayScreenUi.kt',
-  offlineSetup: 'android/app/src/main/java/com/ludoproof/game/feature/offline/presentation/setup/OfflineSetupScreenUi.kt',
-  onlineMain: 'android/app/src/main/java/com/ludoproof/game/feature/online/presentation/MainActivity.kt',
+  backdrop: 'android/app/src/main/java/com/rekixo/ludopaws/core/ui/art/ArcadeBackdropView.kt',
+  theme: 'android/app/src/main/java/com/rekixo/ludopaws/core/ui/theme/LudoProofTheme.kt',
+  offlineGameplay: 'android/app/src/main/java/com/rekixo/ludopaws/feature/offline/presentation/gameplay/OfflineGameplayScreenUi.kt',
+  offlineSetup: 'android/app/src/main/java/com/rekixo/ludopaws/feature/offline/presentation/setup/OfflineSetupScreenUi.kt',
+  onlineMain: 'android/app/src/main/java/com/rekixo/ludopaws/feature/online/presentation/MainActivity.kt',
   keep: 'android/app/src/main/res/raw/ludo_paws_background_keep.xml',
 };
 

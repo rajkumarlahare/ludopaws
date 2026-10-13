@@ -14,61 +14,61 @@ const room = read("server/src/match-room.js");
 const publicQueue = read("server/src/matchmaker-queue.js");
 const teamQueue = read("server/src/team-matchmaker-queue.js");
 const models = read(
-  "android/app/src/main/java/com/ludoproof/game/game/domain/model/GameModels.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/game/domain/model/GameModels.kt",
 );
 const gameApi = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/online/data/remote/GameApi.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/online/data/remote/GameApi.kt",
 );
 const teamApi = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/team/data/remote/TeamMatchmakingApi.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/team/data/remote/TeamMatchmakingApi.kt",
 );
 const cachedStore = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/online/data/local/CachedMatchStore.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/online/data/local/CachedMatchStore.kt",
 );
 const runtime = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/characters/data/local/LudoPawsCharacterRuntime.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/characters/data/local/LudoPawsCharacterRuntime.kt",
 );
 const policy = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/online/domain/OnlineLudoPawsCharacterPolicy.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/online/domain/OnlineLudoPawsCharacterPolicy.kt",
 );
 const mainActivity = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/online/presentation/MainActivity.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/online/presentation/MainActivity.kt",
 );
 const renderer = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/online/presentation/actions/OnlineResponseRenderer.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/online/presentation/actions/OnlineResponseRenderer.kt",
 );
 const verificationRenderer = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/online/presentation/actions/OnlineVerificationRenderer.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/online/presentation/actions/OnlineVerificationRenderer.kt",
 );
 const sessionActions = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/online/presentation/actions/OnlineSessionActions.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/online/presentation/actions/OnlineSessionActions.kt",
 );
 const uiState = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/online/presentation/state/OnlineGameUiState.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/online/presentation/state/OnlineGameUiState.kt",
 );
 const verifiedDicePolicy = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/online/presentation/state/OnlineVerifiedDicePresentationPolicy.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/online/presentation/state/OnlineVerifiedDicePresentationPolicy.kt",
 );
 const verifiedDiceTests = read(
-  "android/app/src/test/java/com/ludoproof/game/OnlineVerifiedDicePresentationPolicyTest.kt",
+  "android/app/src/test/java/com/rekixo/ludopaws/OnlineVerifiedDicePresentationPolicyTest.kt",
 );
 const pendingRecoveryPolicy = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/online/presentation/state/OnlinePendingRollRecoveryPolicy.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/online/presentation/state/OnlinePendingRollRecoveryPolicy.kt",
 );
 const pendingRecoveryTests = read(
-  "android/app/src/test/java/com/ludoproof/game/OnlinePendingRollRecoveryPolicyTest.kt",
+  "android/app/src/test/java/com/rekixo/ludopaws/OnlinePendingRollRecoveryPolicyTest.kt",
 );
 const rollActionPolicy = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/online/presentation/state/OnlineRollActionPolicy.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/online/presentation/state/OnlineRollActionPolicy.kt",
 );
 const rollActionTests = read(
-  "android/app/src/test/java/com/ludoproof/game/OnlineRollActionPolicyTest.kt",
+  "android/app/src/test/java/com/rekixo/ludopaws/OnlineRollActionPolicyTest.kt",
 );
 const matchActions = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/online/presentation/actions/OnlineMatchActions.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/online/presentation/actions/OnlineMatchActions.kt",
 );
 const presentation = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/online/presentation/OnlineLudoPawsPresentation.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/online/presentation/OnlineLudoPawsPresentation.kt",
 );
 
 for (const id of ["dog", "goat", "duck", "cat"]) {

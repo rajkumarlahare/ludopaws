@@ -2,36 +2,36 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const requiredSources = [
-  'android/app/src/main/java/com/ludoproof/game/core/audio/LudoPawsAudioCatalog.kt',
-  'android/app/src/main/java/com/ludoproof/game/core/audio/LudoPawsSoundPool.kt',
-  'android/app/src/main/java/com/ludoproof/game/feature/settings/data/local/GameSoundFeedback.kt',
-  'android/app/src/main/java/com/ludoproof/game/feature/settings/data/local/GameMusicController.kt',
-  'android/app/src/main/java/com/ludoproof/game/feature/settings/data/local/GameSettingsStore.kt',
-  'android/app/src/main/java/com/ludoproof/game/feature/settings/data/local/LudoPawsHaptics.kt',
-  'android/app/src/main/java/com/ludoproof/game/feature/characters/data/audio/LudoPawsVoicePlayer.kt',
-  'android/app/src/main/java/com/ludoproof/game/feature/characters/data/audio/LudoPawsAudioAssetPlayer.kt',
-  'android/app/src/main/java/com/ludoproof/game/feature/characters/data/audio/LudoPawsProceduralAudio.kt',
-  'android/app/src/main/java/com/ludoproof/game/feature/characters/domain/audio/LudoPawsReactionAudioProfile.kt',
-  'android/app/src/main/java/com/ludoproof/game/feature/settings/presentation/SettingsDialogUi.kt',
+  'android/app/src/main/java/com/rekixo/ludopaws/core/audio/LudoPawsAudioCatalog.kt',
+  'android/app/src/main/java/com/rekixo/ludopaws/core/audio/LudoPawsSoundPool.kt',
+  'android/app/src/main/java/com/rekixo/ludopaws/feature/settings/data/local/GameSoundFeedback.kt',
+  'android/app/src/main/java/com/rekixo/ludopaws/feature/settings/data/local/GameMusicController.kt',
+  'android/app/src/main/java/com/rekixo/ludopaws/feature/settings/data/local/GameSettingsStore.kt',
+  'android/app/src/main/java/com/rekixo/ludopaws/feature/settings/data/local/LudoPawsHaptics.kt',
+  'android/app/src/main/java/com/rekixo/ludopaws/feature/characters/data/audio/LudoPawsVoicePlayer.kt',
+  'android/app/src/main/java/com/rekixo/ludopaws/feature/characters/data/audio/LudoPawsAudioAssetPlayer.kt',
+  'android/app/src/main/java/com/rekixo/ludopaws/feature/characters/data/audio/LudoPawsProceduralAudio.kt',
+  'android/app/src/main/java/com/rekixo/ludopaws/feature/characters/domain/audio/LudoPawsReactionAudioProfile.kt',
+  'android/app/src/main/java/com/rekixo/ludopaws/feature/settings/presentation/SettingsDialogUi.kt',
   'android/app/src/main/AndroidManifest.xml',
-  'android/app/src/main/java/com/ludoproof/game/game/ui/components/LudoPawsMovementSoundPolicy.kt',
-  'android/app/src/main/java/com/ludoproof/game/game/ui/components/LudoPaws3DSceneView.kt',
-  'android/app/src/main/java/com/ludoproof/game/game/ui/components/LudoPawsGameplayPacingPolicy.kt',
-  'android/app/src/main/java/com/ludoproof/game/feature/online/presentation/actions/OnlineMatchActions.kt',
-  'android/app/src/main/java/com/ludoproof/game/feature/online/presentation/OnlineLudoPawsPresentation.kt',
-  'android/app/src/main/java/com/ludoproof/game/feature/offline/presentation/feedback/OfflineLudoPawsFeedback.kt',
+  'android/app/src/main/java/com/rekixo/ludopaws/game/ui/components/LudoPawsMovementSoundPolicy.kt',
+  'android/app/src/main/java/com/rekixo/ludopaws/game/ui/components/LudoPaws3DSceneView.kt',
+  'android/app/src/main/java/com/rekixo/ludopaws/game/ui/components/LudoPawsGameplayPacingPolicy.kt',
+  'android/app/src/main/java/com/rekixo/ludopaws/feature/online/presentation/actions/OnlineMatchActions.kt',
+  'android/app/src/main/java/com/rekixo/ludopaws/feature/online/presentation/OnlineLudoPawsPresentation.kt',
+  'android/app/src/main/java/com/rekixo/ludopaws/feature/offline/presentation/feedback/OfflineLudoPawsFeedback.kt',
 ];
 
 const reactionFeedbackOwners = [
-  'android/app/src/main/java/com/ludoproof/game/feature/online/presentation/OnlineLudoPawsPresentation.kt',
-  'android/app/src/main/java/com/ludoproof/game/feature/offline/presentation/feedback/OfflineLudoPawsFeedback.kt',
+  'android/app/src/main/java/com/rekixo/ludopaws/feature/online/presentation/OnlineLudoPawsPresentation.kt',
+  'android/app/src/main/java/com/rekixo/ludopaws/feature/offline/presentation/feedback/OfflineLudoPawsFeedback.kt',
 ];
 const feedbackLedger =
-  'android/app/src/main/java/com/ludoproof/game/feature/characters/domain/reaction/LudoPawsFeedbackLedger.kt';
+  'android/app/src/main/java/com/rekixo/ludopaws/feature/characters/domain/reaction/LudoPawsFeedbackLedger.kt';
 const reactiveBoard =
-  'android/app/src/main/java/com/ludoproof/game/game/ui/components/LudoPawsReactiveBoardView.kt';
+  'android/app/src/main/java/com/rekixo/ludopaws/game/ui/components/LudoPawsReactiveBoardView.kt';
 const deletedSpokenLines =
-  'android/app/src/main/java/com/ludoproof/game/feature/characters/domain/reaction/LudoPawsVoiceLines.kt';
+  'android/app/src/main/java/com/rekixo/ludopaws/feature/characters/domain/reaction/LudoPawsVoiceLines.kt';
 
 for (const file of [...requiredSources, ...reactionFeedbackOwners, feedbackLedger, reactiveBoard]) {
   if (!fs.existsSync(file)) {

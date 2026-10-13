@@ -6,7 +6,12 @@
 - Android application ID for the first Play Store release: `com.rekixo.ludopaws`.
 - Game website target: `https://ludopaws.rekixo.com`.
 - API target: `https://api.ludopaws.rekixo.com`; do not switch clients until Cloudflare Custom Domain, TLS, health/readiness, and game-flow tests pass.
-- Keep the legacy Kotlin namespace/source package declarations, Cloudflare Worker name, Durable Object bindings, storage keys, and proof/ruleset identifiers unchanged in this first identity step.
+- The Android application ID, Gradle namespace, and Kotlin/Java source packages now use com.rekixo.ludopaws. The existing Cloudflare Worker name, Durable Object bindings, storage keys, and proof/ruleset identifiers remain unchanged for compatibility.
+
+
+### Android package migration record (13 October 2026)
+
+The Android application ID, Gradle namespace, Kotlin/Java source package declarations, and source directory roots use com.rekixo.ludopaws. Internal class names such as LudoProofApplication and LudoProofTheme remain unchanged; backend Worker names, storage keys, and fairness/proof protocol identifiers are not part of this package rename.
 
 ## Phase 0 baseline
 
@@ -23,7 +28,7 @@ This baseline intentionally separates user-visible branding from identifiers tha
 
 The following must not be changed by a cosmetic/branding phase without a dedicated compatibility migration and tests:
 
-- Android `applicationId` is now approved as `com.rekixo.ludopaws`; retain the legacy Kotlin namespace/source package declarations temporarily.
+- Android `applicationId` is now approved as `com.rekixo.ludopaws`; the Gradle namespace, Kotlin/Java package declarations, and source directory roots now use com.rekixo.ludopaws.
 - Existing SharedPreferences/storage namespaces and persisted-state keys.
 - Cloudflare Worker/Durable Object bindings such as `LUDOPROOF_MATCHES`, `LUDOPROOF_API_GATE`, `LUDOPROOF_LEADERBOARD`, matchmaking, friends, receipts, team matchmaking, and social bindings.
 - Existing Durable Object migration tags/classes.
@@ -67,7 +72,7 @@ Examples include:
 
 Examples include:
 
-- `com.ludoproof.game` package/application identity.
+- `com.rekixo.ludopaws` package/application identity.
 - `LudoProofApplication`, `LudoProofTheme`, and other internal class names unless renaming is done as a separate mechanical refactor.
 - `LUDOPROOF_*` Worker/Durable Object bindings.
 - Existing API base URL/config property names.

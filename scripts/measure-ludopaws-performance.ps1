@@ -22,8 +22,8 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$packageName = "com.ludoproof.game"
-$activityName = "com.ludoproof.game.HomeActivity"
+$packageName = "com.rekixo.ludopaws"
+$activityName = "com.rekixo.ludopaws.HomeActivity"
 
 function Resolve-Adb {
     $candidates = @()

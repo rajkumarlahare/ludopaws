@@ -20,7 +20,7 @@ Branding/repository names are separate from compatibility-sensitive runtime iden
 
 The game is built around **verifiable EntroNex dice outcomes**. Current status: **release candidate / evaluation**. The app and game backend are being hardened for production operation, while EntroNex v4 remains pre-independent-audit.
 
-> Migration compatibility note: the final Android `applicationId` is `com.rekixo.ludopaws`. The Kotlin `namespace` and source package declarations remain `com.ludoproof.game` temporarily as an internal implementation detail; they are not the Play Store application ID. Cloudflare Worker/Durable Object bindings, persisted storage names, proof/ruleset identifiers, and other protocol-sensitive identifiers remain unchanged to protect deployed infrastructure and proof verification.
+> Migration compatibility note: the final Android `applicationId` is `com.rekixo.ludopaws`. The Kotlin `namespace` and source package declarations remain `com.rekixo.ludopaws` temporarily as an internal implementation detail; they are not the Play Store application ID. Cloudflare Worker/Durable Object bindings, persisted storage names, proof/ruleset identifiers, and other protocol-sensitive identifiers remain unchanged to protect deployed infrastructure and proof verification.
 
 The repository contains:
 
@@ -85,7 +85,7 @@ Final Play Store application ID:
 com.rekixo.ludopaws
 ```
 
-The current Kotlin source namespace remains `com.ludoproof.game` in this first safe identity change; Google Play uses the application ID above.
+The current Kotlin source namespace remains `com.rekixo.ludopaws` in this first safe identity change; Google Play uses the application ID above.
 
 The Android MVP now supports:
 
@@ -340,7 +340,7 @@ Digital gems and Remove Ads purchases use the native Google Play Billing Library
 
 The checkout intentionally stays disabled until both Play Console products and the verification service are ready. Before enabling it:
 
-1. Create each one-time in-app product in Play Console using the IDs in `android/app/src/main/java/com/ludoproof/game/feature/store/domain/StoreCatalog.kt`: `remove_ads`, `gems_300`, `gems_1500`, `gems_3500`, `gems_20000`, `gems_40000`, and `gems_200000`. Configure the displayed prices and quantities to match the catalog. Publish the products to an internal testing track and add tester accounts.
+1. Create each one-time in-app product in Play Console using the IDs in `android/app/src/main/java/com/rekixo/ludopaws/feature/store/domain/StoreCatalog.kt`: `remove_ads`, `gems_300`, `gems_1500`, `gems_3500`, `gems_20000`, `gems_40000`, and `gems_200000`. Configure the displayed prices and quantities to match the catalog. Publish the products to an internal testing track and add tester accounts.
 2. In Google Cloud Console, enable the Google Play Developer API and create a service account. Grant that account the Play Console permissions **View financial data, orders, and cancellation survey responses** and **Manage orders and subscriptions**.
 3. Set the service account email as a Worker variable named `GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL`. Store its private key only as a Cloudflare Worker secret:
 

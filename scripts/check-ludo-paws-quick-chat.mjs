@@ -1,13 +1,13 @@
 import fs from 'node:fs';
 
 const files = {
-  quickChat: 'android/app/src/main/java/com/ludoproof/game/feature/settings/presentation/QuickChatUi.kt',
-  settingsKit: 'android/app/src/main/java/com/ludoproof/game/feature/settings/presentation/SettingsVisualKit.kt',
-  settingsUi: 'android/app/src/main/java/com/ludoproof/game/feature/settings/presentation/SettingsDialogUi.kt',
-  offlineRail: 'android/app/src/main/java/com/ludoproof/game/feature/offline/presentation/gameplay/OfflinePlayerRailUi.kt',
-  onlinePresentation: 'android/app/src/main/java/com/ludoproof/game/feature/online/presentation/OnlineLudoPawsPresentation.kt',
-  reactionPolicy: 'android/app/src/main/java/com/ludoproof/game/feature/offline/presentation/gameplay/OfflineQuickReactionPolicy.kt',
-  settingsEntry: 'android/app/src/main/java/com/ludoproof/game/core/ui/dialogs/ArcadeDialogs.kt',
+  quickChat: 'android/app/src/main/java/com/rekixo/ludopaws/feature/settings/presentation/QuickChatUi.kt',
+  settingsKit: 'android/app/src/main/java/com/rekixo/ludopaws/feature/settings/presentation/SettingsVisualKit.kt',
+  settingsUi: 'android/app/src/main/java/com/rekixo/ludopaws/feature/settings/presentation/SettingsDialogUi.kt',
+  offlineRail: 'android/app/src/main/java/com/rekixo/ludopaws/feature/offline/presentation/gameplay/OfflinePlayerRailUi.kt',
+  onlinePresentation: 'android/app/src/main/java/com/rekixo/ludopaws/feature/online/presentation/OnlineLudoPawsPresentation.kt',
+  reactionPolicy: 'android/app/src/main/java/com/rekixo/ludopaws/feature/offline/presentation/gameplay/OfflineQuickReactionPolicy.kt',
+  settingsEntry: 'android/app/src/main/java/com/rekixo/ludopaws/core/ui/dialogs/ArcadeDialogs.kt',
 };
 
 for (const [label, file] of Object.entries(files)) {
@@ -65,7 +65,7 @@ for (const marker of [
     throw new Error(`Offline profile/dice alignment is missing ${marker}`);
   }
 }
-const offlineFeedback = fs.readFileSync('android/app/src/main/java/com/ludoproof/game/feature/offline/presentation/feedback/OfflineLudoPawsFeedback.kt', 'utf8');
+const offlineFeedback = fs.readFileSync('android/app/src/main/java/com/rekixo/ludopaws/feature/offline/presentation/feedback/OfflineLudoPawsFeedback.kt', 'utf8');
 if (offlineFeedback.includes('presentComputerQuickChat') || offlineFeedback.includes('presentQuickReaction(')) {
   throw new Error('CPU players must not auto-send Quick Chat until event-frequency policy is explicitly re-enabled.');
 }
@@ -96,7 +96,7 @@ if (!read('onlinePresentation').includes('quickChatEnabled && localPlayer')) {
 if (!read('onlinePresentation').includes('sendQuickChat(emoji)') || !read('onlinePresentation').includes('presentRemoteQuickChat')) {
   throw new Error('Online Quick Chat must send and render real remote reactions.');
 }
-const realtime = fs.readFileSync('android/app/src/main/java/com/ludoproof/game/feature/online/data/realtime/MatchRealtimeClient.kt', 'utf8');
+const realtime = fs.readFileSync('android/app/src/main/java/com/rekixo/ludopaws/feature/online/data/realtime/MatchRealtimeClient.kt', 'utf8');
 if (!realtime.includes('QUICK_CHAT_SEND') || !realtime.includes('type == "QUICK_CHAT"')) {
   throw new Error('Realtime client must implement Quick Chat send/receive.');
 }

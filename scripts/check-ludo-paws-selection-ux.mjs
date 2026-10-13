@@ -17,19 +17,19 @@ const requireText = (source, needle, label) => {
 };
 
 const policyPath =
-  "android/app/src/main/java/com/ludoproof/game/feature/characters/domain/selection/StarterPawsAssignmentPolicy.kt";
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/characters/domain/selection/StarterPawsAssignmentPolicy.kt";
 const storePath =
-  "android/app/src/main/java/com/ludoproof/game/feature/offline/data/local/OfflineCharacterSetupStore.kt";
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/offline/data/local/OfflineCharacterSetupStore.kt";
 const uiPath =
-  "android/app/src/main/java/com/ludoproof/game/feature/offline/presentation/setup/OfflineCharacterSelectionUi.kt";
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/offline/presentation/setup/OfflineCharacterSelectionUi.kt";
 const activityPath =
-  "android/app/src/main/java/com/ludoproof/game/feature/offline/presentation/OfflineGameActivity.kt";
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/offline/presentation/OfflineGameActivity.kt";
 const screenPath =
-  "android/app/src/main/java/com/ludoproof/game/feature/offline/presentation/setup/OfflineSetupScreenUi.kt";
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/offline/presentation/setup/OfflineSetupScreenUi.kt";
 const selectionPath =
-  "android/app/src/main/java/com/ludoproof/game/feature/offline/presentation/setup/OfflineSetupSelectionUi.kt";
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/offline/presentation/setup/OfflineSetupSelectionUi.kt";
 const testPath =
-  "android/app/src/test/java/com/ludoproof/game/feature/characters/domain/selection/StarterPawsAssignmentPolicyTest.kt";
+  "android/app/src/test/java/com/rekixo/ludopaws/feature/characters/domain/selection/StarterPawsAssignmentPolicyTest.kt";
 
 const policy = read(policyPath);
 const store = read(storePath);
@@ -103,7 +103,7 @@ for (const required of [
 // player count and preferred color; character assignment must not enter the
 // authoritative OfflineGameEngine start contract or proof binding.
 const session = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/offline/domain/session/LocalMatchSession.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/offline/domain/session/LocalMatchSession.kt",
 );
 if (/character(Id|Ids|Selection)/.test(session)) {
   throw new Error(

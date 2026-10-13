@@ -32,10 +32,10 @@ const rootBuild = read("android/build.gradle.kts");
 const appBuild = read("android/app/build.gradle.kts");
 const manifest = read("android/app/src/main/AndroidManifest.xml");
 const application = read(
-  "android/app/src/main/java/com/ludoproof/game/core/app/LudoProofApplication.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/core/app/LudoProofApplication.kt",
 );
 const immersiveWindow = read(
-  "android/app/src/main/java/com/ludoproof/game/core/ui/window/ImmersiveGameWindow.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/core/ui/window/ImmersiveGameWindow.kt",
 );
 const baseTheme = read("android/app/src/main/res/values/styles.xml");
 const api30Theme = read("android/app/src/main/res/values-v30/styles.xml");
