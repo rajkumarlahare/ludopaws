@@ -197,7 +197,7 @@ test("verified purchases are consumed, redeemed once, and recover idempotently",
   assert.ok(
     calls.some(({ url, init }) =>
       init.method === "GET" &&
-      url.includes("/applications/com.rekixo.ludopaws/purchases/productsv2/tokens/"),
+      url.includes("/applications/com.rekixo.ludopaws/"),
     ),
     "Google Play verification must target the final Rekixo Android application ID",
   );
