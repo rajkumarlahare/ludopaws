@@ -6,6 +6,14 @@ import org.junit.Test
 
 class PostWinInterstitialPolicyTest {
     @Test
+    fun removeAdsSuppressesOnlyTheFillerInterstitialPlacement() {
+        assertFalse(PostWinInterstitialPolicy.shouldShowFillerInterstitial(adsRemoved = true))
+        assertTrue(PostWinInterstitialPolicy.shouldShowFillerInterstitial(adsRemoved = false))
+        // Rewarded Ads do not use this policy: watching one for the user-requested +5 Gems reward
+        // remains a separate, explicitly initiated flow.
+    }
+
+    @Test
     fun offlineInterstitialOnlyFollowsFinishedLocalWin() {
         assertTrue(
             PostWinInterstitialPolicy.shouldShowOffline(
