@@ -29,7 +29,7 @@ boot_emulator() {
       if grep -q "^$key=" "$config_file"; then
         sed -i "s|^$key=.*|$setting|" "$config_file"
       else
-        printf '%s\\n' "$setting" >> "$config_file"
+        printf '%s\n' "$setting" >> "$config_file"
       fi
     done
   fi
