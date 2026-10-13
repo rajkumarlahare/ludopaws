@@ -50,6 +50,18 @@ test("AdMob SSV requires valid signature, matching ad unit and configured reward
     verifyAdMobSsvRequest(new Request(request.url.replace("reward_amount=5", "reward_amount=50")),
       { LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID: "ca-app-pub-123/456" }, fetchImpl, now),
   );
+  await assert.rejects(
+    verifyAdMobSsvRequest(
+      request,
+      {
+        LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID: "ca-app-pub-123/456",
+        LUDOPROOF_ADMOB_REWARD_ITEM: "coins",
+      },
+      fetchImpl,
+      now,
+    ),
+    (error) => error.code === "SSV_REWARD_INVALID",
+  );
 });
 
 test("AdMob SSV refuses callback from a different configured ad unit", async () => {
