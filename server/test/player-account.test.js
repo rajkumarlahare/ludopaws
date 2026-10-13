@@ -185,6 +185,10 @@ class FakeAccountSql {
       }));
     }
 
+    if (sql.startsWith("SELECT payload_hash FROM wallet_transactions WHERE idempotency_key = ?")) {
+      const row = this.walletTransactions.get(params[0]);
+      return row ? [{ payload_hash: row.payload_hash }] : [];
+    }
     if (sql.startsWith("SELECT payload_hash, balance_after FROM wallet_transactions WHERE idempotency_key = ?")) {
       const row = this.walletTransactions.get(params[0]);
       return row ? [{ payload_hash: row.payload_hash, balance_after: row.balance_after }] : [];
