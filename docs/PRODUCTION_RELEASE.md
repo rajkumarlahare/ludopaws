@@ -1,6 +1,15 @@
-# LudoProof Production Release Checklist
+# Ludo Paws Production Release Checklist
 
 LudoProof is a production-oriented release candidate. The game backend is authoritative and the Android client cannot select the dice outcome, event index, legal move, capture result, turn advancement, or winner.
+
+## Final publisher identity
+
+- Publisher/parent brand: **Rekixo** (`https://rekixo.com`).
+- Android application ID for the first Play Console release: `com.rekixo.ludopaws`.
+- Public game site target: `https://ludopaws.rekixo.com`.
+- Public API target: `https://api.ludopaws.rekixo.com`.
+- The custom domains are targets only until their Cloudflare zone, TLS, hosting, and live endpoint checks are verified. Keep the existing Worker name and `workers.dev` endpoint as fallback until the custom API hostname passes smoke tests.
+- Keep Billing and Ads disabled during domain/package migration. Do not deploy or publish as part of this migration PR.
 
 ## Release gates
 
@@ -98,9 +107,9 @@ The account deletion API has an authenticated `POST /api/account/delete` route a
 
 The authenticated deletion implementation and guest delete-only code are merged into `main`. This does not mean the public website has been published or the Worker has been deployed. Before launch, validate both deletion paths against the deployed Worker and hosted page, test retries across real Durable Object bindings in a staging/production-like environment, and document the publisher-approved match receipt/history retention or anonymization policy. Existing failure-injection tests use fakes/in-memory Durable Objects and do not replace hosted end-to-end validation. Keep [issue #232](https://github.com/rajkumarlahare/ludoproof/issues/232) open until every acceptance criterion is satisfied.
 
-Google sign-in requires the same public Web OAuth Client ID in the Android Gradle property and Cloudflare Worker variable `GOOGLE_SIGN_IN_WEB_CLIENT_ID`; do not put an OAuth client secret in Android. The Android package is `com.ludoproof.game`.
+Google sign-in requires the same public Web OAuth Client ID in the Android Gradle property and Cloudflare Worker variable `GOOGLE_SIGN_IN_WEB_CLIENT_ID`; do not put an OAuth client secret in Android. The Android package is `com.rekixo.ludopaws`.
 
-The public deletion page source is `docs/account-deletion.html`; the public privacy policy draft is `docs/privacy-policy.html`; and `.github/workflows/account-deletion-pages.yml` publishes both through GitHub Pages only from `main`. The Pages job is skipped until the publisher explicitly sets `LUDOPROOF_POLICY_RELEASE_APPROVED=true`. After opt-in, it still refuses to publish while `POLICY_RELEASE_REVIEW_REQUIRED` remains or the OAuth Client ID, monitored support email, or web origin is missing/invalid. This keeps routine main-branch CI green without accidentally publishing an unreviewed policy. CORS is fail-closed until Cloudflare variable `LUDOPROOF_ACCOUNT_WEB_ORIGIN` is explicitly set to `https://rajkumarlahare.github.io`; there is no fallback origin. The guest-only/uninstalled-app support route is not considered usable until the publisher verifies the support process and the deployed page.
+The public deletion page source is `docs/account-deletion.html`; the public privacy policy draft is `docs/privacy-policy.html`; and `.github/workflows/account-deletion-pages.yml` publishes both through GitHub Pages only from `main`. The Pages job is skipped until the publisher explicitly sets `LUDOPROOF_POLICY_RELEASE_APPROVED=true`. After opt-in, it still refuses to publish while `POLICY_RELEASE_REVIEW_REQUIRED` remains or the OAuth Client ID, monitored support email, or web origin is missing/invalid. This keeps routine main-branch CI green without accidentally publishing an unreviewed policy. CORS is fail-closed until Cloudflare variable `LUDOPROOF_ACCOUNT_WEB_ORIGIN` is explicitly set to `https://ludopaws.rekixo.com`; there is no fallback origin. The guest-only/uninstalled-app support route is not considered usable until the publisher verifies the support process and the deployed page.
 
 Billing and rewarded ads remain opt-in integrations. Keep billing/ads build flags and server enablement off until the exact Play product catalog/service account and AdMob production unit/SSV callback have passed internal end-to-end tests.
 
