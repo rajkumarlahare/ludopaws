@@ -17,6 +17,9 @@ import androidx.activity.OnBackPressedCallback
 import com.ludoproof.game.feature.characters.data.local.CharacterSelectionStore
 import com.ludoproof.game.feature.characters.domain.reaction.LudoPawsFeedbackLedger
 import com.ludoproof.game.feature.offline.data.local.OfflineCharacterSetupStore
+import com.ludoproof.game.feature.store.data.ads.PostWinInterstitialAdController
+import com.ludoproof.game.feature.store.data.ads.PostWinInterstitialExitGate
+import com.ludoproof.game.feature.store.data.local.GemWalletStore
 import com.ludoproof.game.ui.offline.common.*
 import com.ludoproof.game.ui.offline.gameplay.*
 import com.ludoproof.game.ui.offline.setup.*
@@ -117,6 +120,9 @@ class OfflineGameActivity : ComponentActivity() {
     internal var quickReactionLastShownAtMs: Long? = null
     internal lateinit var resultPanel: FrameLayout
     internal lateinit var resultTitleText: TextView
+    private var postWinInterstitialAd: PostWinInterstitialAdController? = null
+    private var postWinInterstitialExitGate: PostWinInterstitialExitGate? = null
+    internal var postWinInterstitialShownForMatchId: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -143,6 +149,37 @@ class OfflineGameActivity : ComponentActivity() {
         } else {
             showSetup()
         }
+        preparePostWinInterstitialAd()
+    }
+
+    internal fun preparePostWinInterstitialAd() {
+        if (!BuildConfig.LUDOPROOF_INTERSTITIAL_ADS_ENABLED || postWinInterstitialAd != null) return
+        postWinInterstitialAd = PostWinInterstitialAdController(
+            activity = this,
+            enabled = true,
+            adUnitId = BuildConfig.ADMOB_INTERSTITIAL_AD_UNIT_ID,
+        ).also { it.prepare() }
+    }
+
+    internal fun showPostWinInterstitialIfReady(
+        matchId: String,
+        onSkipAd: () -> Unit,
+    ): Boolean {
+        if (postWinInterstitialShownForMatchId == matchId) return false
+        val interstitial = postWinInterstitialAd ?: return false
+        val gate = postWinInterstitialExitGate ?: PostWinInterstitialExitGate(
+            activity = this,
+            accountRepository = (application as LudoProofApplication).accountRepository,
+            walletStore = GemWalletStore(this),
+            interstitial = interstitial,
+        ).also { postWinInterstitialExitGate = it }
+        return gate.interceptIfReady(
+            onAdDismissed = {
+                postWinInterstitialShownForMatchId = matchId
+                onSkipAd()
+            },
+            onSkipAd = onSkipAd,
+        )
     }
 
     internal fun prepareOfflineUiTransition() {
@@ -208,6 +245,10 @@ class OfflineGameActivity : ComponentActivity() {
             ?.dismiss()
         turnHandoffDialog =
             null
+        postWinInterstitialExitGate?.close()
+        postWinInterstitialExitGate = null
+        postWinInterstitialAd?.close()
+        postWinInterstitialAd = null
         prepareOfflineUiTransition()
         super.onDestroy()
     }

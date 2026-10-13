@@ -25,6 +25,10 @@ import com.ludoproof.game.core.ui.art.plywoodBackground
 import com.ludoproof.game.ui.online.*
 import com.ludoproof.game.feature.online.*
 import com.ludoproof.game.feature.online.FriendsVoiceChatSession
+import com.ludoproof.game.feature.store.data.ads.PostWinInterstitialAdController
+import com.ludoproof.game.feature.store.data.ads.PostWinInterstitialExitGate
+import com.ludoproof.game.feature.store.data.local.GemWalletStore
+import com.ludoproof.game.feature.store.domain.PostWinInterstitialPolicy
 
 class MainActivity : ComponentActivity() {
     internal val gameMode:
@@ -174,6 +178,9 @@ class MainActivity : ComponentActivity() {
         "Voice is off"
 
     private var friendsVoiceSession: FriendsVoiceChatSession? = null
+    private var postWinInterstitialAd: PostWinInterstitialAdController? = null
+    private var postWinInterstitialExitGate: PostWinInterstitialExitGate? = null
+    private var postWinInterstitialShownForMatchId: String? = null
 
     @Volatile
     internal var screenStarted =
@@ -438,7 +445,7 @@ class MainActivity : ComponentActivity() {
             this,
             object : OnBackPressedCallback(true) {
                 override fun handleOnBackPressed() {
-                    requestRemoteExit()
+                    requestRemoteExitAfterWinInterstitial()
                 }
             },
         )
@@ -675,7 +682,7 @@ class MainActivity : ComponentActivity() {
             addGameTopActions(
                 host = host,
                 context = this,
-                onBack = { requestRemoteExit() },
+                onBack = { requestRemoteExitAfterWinInterstitial() },
                 onSettings = {
                     ArcadeDialogs.showSettings(this) {
                         currentState?.let { state ->
@@ -743,6 +750,65 @@ class MainActivity : ComponentActivity() {
                     )
                 }
         }
+        preparePostWinInterstitialAd()
+    }
+
+    internal fun preparePostWinInterstitialAd() {
+        if (!BuildConfig.LUDOPROOF_INTERSTITIAL_ADS_ENABLED || postWinInterstitialAd != null) return
+        postWinInterstitialAd = PostWinInterstitialAdController(
+            activity = this,
+            enabled = true,
+            adUnitId = BuildConfig.ADMOB_INTERSTITIAL_AD_UNIT_ID,
+        ).also { it.prepare() }
+    }
+
+    private fun showPostWinInterstitialIfReady(
+        matchId: String,
+        onSkipAd: () -> Unit,
+    ): Boolean {
+        if (postWinInterstitialShownForMatchId == matchId) return false
+        val interstitial = postWinInterstitialAd ?: return false
+        val gate = postWinInterstitialExitGate ?: PostWinInterstitialExitGate(
+            activity = this,
+            accountRepository = (application as LudoProofApplication).accountRepository,
+            walletStore = GemWalletStore(this),
+            interstitial = interstitial,
+        ).also { postWinInterstitialExitGate = it }
+        return gate.interceptIfReady(
+            onAdDismissed = {
+                postWinInterstitialShownForMatchId = matchId
+                onSkipAd()
+            },
+            onSkipAd = onSkipAd,
+        )
+    }
+
+    private fun requestRemoteExitAfterWinInterstitial() {
+        val state = currentState
+        val currentPlayer = state?.players?.firstOrNull { it.playerId == playerId }
+        val didCurrentPlayerWin = PostWinInterstitialPolicy.shouldShowRemote(
+            matchStatus = state?.status,
+            teamBased = gameMode.teamBased,
+            winnerPlayerId = state?.winnerPlayerId,
+            playerId = playerId,
+            winnerTeamId = state?.winnerTeamId,
+            playerTeamId = currentPlayer?.teamId,
+        )
+        val resultIsAuthoritative =
+            uiStateHolder.value.currentStateSource == OnlineStateSource.AUTHORITATIVE
+        val finishedMatchId = state?.matchId
+        if (
+            resultIsAuthoritative &&
+            didCurrentPlayerWin &&
+            finishedMatchId != null &&
+            showPostWinInterstitialIfReady(
+                matchId = finishedMatchId,
+                onSkipAd = { requestRemoteExit() },
+            )
+        ) {
+            return
+        }
+        requestRemoteExit()
     }
 
     override fun onStart() {
@@ -803,6 +869,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         stopFriendsVoice("Voice is off")
+        postWinInterstitialExitGate?.close()
+        postWinInterstitialExitGate = null
+        postWinInterstitialAd?.close()
+        postWinInterstitialAd = null
         mainHandler.removeCallbacksAndMessages(
             null,
         )
