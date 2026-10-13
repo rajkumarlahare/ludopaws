@@ -749,6 +749,7 @@ class MainActivity : ComponentActivity() {
                     )
                 }
         }
+        preparePostWinInterstitialAd()
     }
 
     internal fun preparePostWinInterstitialAd() {
