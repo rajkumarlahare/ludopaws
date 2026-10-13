@@ -211,7 +211,10 @@ async function handleAccountRequest(request, env) {
         const credentialHash = await sha256Hex("ludoproof:guest-deletion-credential:v1:" + credential);
         const claim = await directoryRequest(env, "/guest-deletion/claim", { credentialHash });
         if (claim.deleted === true) return json(200, { ok: true, deleted: true, replay: true });
-        const result = await deleteAccountData(env, claim.accountId, null, { guestRecoveryVerified: true });
+        const result = await deleteAccountData(env, claim.accountId, null, {
+          guestRecoveryVerified: true,
+          guestDeletionCredentialHash: credentialHash,
+        });
         return json(200, { ok: true, deleted: result.deleted === true, replay: result.replay === true });
       }
 
@@ -219,18 +222,35 @@ async function handleAccountRequest(request, env) {
         await rateLimit(env, request, "account:delete", 3);
         let session;
         try {
-          session = await authenticate(request, env);
+          // Session validation is still required, but this route may resume an already
+          // claimed deletion. Other account routes remain blocked while the claim exists.
+          session = await authenticate(request, env, { allowDeletionPending: true });
         } catch (error) {
-          // A deletion can commit before the client receives its response. Permit
-          // signature-valid expired access tokens only to check the deletion
-          // tombstone; never treat the token as an active session.
           const claims = await verifyAccessTokenForDeletionReplay(env, bearerToken(request));
-          const status = await playerRequest(env, claims.accountId, "/account/delete-preview", { accountId: claims.accountId, sessionId: claims.sessionId });
+          const body = await readJson(request);
+          let status;
+          try {
+            // An expired signed token is not allowed to start deletion. PlayerAccount
+            // accepts this flag only when a prior deletion claim already exists.
+            status = await playerRequest(env, claims.accountId, "/account/delete-preview", {
+              accountId: claims.accountId,
+              sessionId: claims.sessionId,
+              accountDeletionReplayVerified: true,
+            });
+          } catch {
+            throw error;
+          }
           if (status.deleted === true) {
             // PlayerAccount is the durable deletion tombstone. Only acknowledge
             // replay after the directory's linked identity cleanup also completes.
             await directoryRequest(env, "/account/delete", { accountId: claims.accountId });
             return json(200, { ok: true, deleted: true, replay: true });
+          }
+          if (status.deletionPending === true && body?.confirmation === "DELETE_MY_ACCOUNT") {
+            const result = await deleteAccountData(env, claims.accountId, claims.sessionId, {
+              accountDeletionReplayVerified: true,
+            });
+            return json(200, { ok: true, deleted: result.deleted === true, replay: true });
           }
           throw error;
         }
@@ -422,12 +442,27 @@ async function handleAccountRequest(request, env) {
     }
 }
 
-async function deleteAccountData(env, accountId, sessionId, { guestRecoveryVerified = false } = {}) {
-  const links = await directoryRequest(env, "/identity/list", { accountId });
+async function deleteAccountData(env, accountId, sessionId, {
+  guestRecoveryVerified = false,
+  guestDeletionCredentialHash = null,
+  accountDeletionReplayVerified = false,
+} = {}) {
   const playerDeleteBody = guestRecoveryVerified
     ? { accountId, guestRecoveryVerified: true }
-    : { accountId, sessionId };
+    : accountDeletionReplayVerified
+      ? { accountId, sessionId, accountDeletionReplayVerified: true }
+      : { accountId, sessionId };
+
+  // Lock wallet/session-backed changes before reading identity links. Directory prepare
+  // then blocks identity changes, so an in-flight link is either included in this snapshot
+  // or rejected before the cleanup list is read.
   const wallet = await playerRequest(env, accountId, "/account/delete-preview", playerDeleteBody);
+  await directoryRequest(env, "/account/delete-prepare", {
+    accountId,
+    source: guestRecoveryVerified ? "GUEST_CODE" : "SESSION",
+    ...(guestDeletionCredentialHash ? { credentialHash: guestDeletionCredentialHash } : {}),
+  });
+  const links = await directoryRequest(env, "/identity/list", { accountId });
 
   if (wallet.deleted !== true && wallet.purchaseLedgerIds?.length) {
     if (!env?.LUDOPROOF_STORE_PURCHASES) throw httpError(503, "STORE_LEDGER_NOT_CONFIGURED", "purchase ledger is not configured for account deletion");
@@ -456,8 +491,7 @@ async function deleteAccountData(env, accountId, sessionId, { guestRecoveryVerif
     })), "LEADERBOARD_ACCOUNT_DELETE_FAILED");
   }
 
-  // The PlayerAccount tombstone is durable before identity links are removed. Guest-only
-  // requests reach this helper only after AccountDirectory has claimed a valid delete-only code.
+  // The PlayerAccount tombstone is durable before AccountDirectory identity unlink.
   const result = await playerRequest(env, accountId, "/account/delete", {
     ...playerDeleteBody,
     confirmation: "DELETE_MY_ACCOUNT",
@@ -509,12 +543,13 @@ function withAccountWebCors(request, response, env) {
   });
 }
 
-async function authenticate(request, env) {
+async function authenticate(request, env, { allowDeletionPending = false } = {}) {
   const token = bearerToken(request);
   const session = await verifyAccessToken(env, token);
   const checked = await playerRequest(env, session.accountId, "/session/check", {
     accountId: session.accountId,
     sessionId: session.sessionId,
+    ...(allowDeletionPending ? { allowDeletionPending: true } : {}),
   });
   return { ...session, profile: checked.profile };
 }
