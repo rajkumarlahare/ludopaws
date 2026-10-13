@@ -293,6 +293,52 @@ test("guest deletion codes are stored as hashes, block Google linking after clai
   assert.deepEqual(await replay.json(), { ok: true, deleted: true, replay: true });
 });
 
+
+
+test("explicit guest deletion code rotation invalidates every previous saved code", async () => {
+  const { directory, sql } = makeDirectory();
+  const requestId = "8d5e7f90-68e5-4c30-8fb8-c5a7b0f0f8e1";
+  const createdResponse = await guestRequest(directory, requestId);
+  const created = await createdResponse.json();
+
+  const register = (rotate) => directory.fetch(new Request("https://account-directory/guest-deletion/register", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ accountId: created.accountId, rotate }),
+  }));
+  const firstResponse = await register(false);
+  assert.equal(firstResponse.status, 200);
+  const firstCredential = (await firstResponse.json()).credential;
+  const firstHash = await sha256Hex("ludoproof:guest-deletion-credential:v1:" + firstCredential);
+  assert.equal(sql.guestDeletionCredentials.has(firstHash), true);
+
+  const additionalResponse = await register(false);
+  assert.equal(additionalResponse.status, 200);
+  const additionalCredential = (await additionalResponse.json()).credential;
+  const additionalHash = await sha256Hex("ludoproof:guest-deletion-credential:v1:" + additionalCredential);
+  assert.equal(sql.guestDeletionCredentials.has(firstHash), true);
+  assert.equal(sql.guestDeletionCredentials.has(additionalHash), true);
+
+  const replacementResponse = await register(true);
+  assert.equal(replacementResponse.status, 200);
+  const replacementCredential = (await replacementResponse.json()).credential;
+  const replacementHash = await sha256Hex("ludoproof:guest-deletion-credential:v1:" + replacementCredential);
+  assert.equal(sql.guestDeletionCredentials.size, 1);
+  assert.equal(sql.guestDeletionCredentials.has(firstHash), false);
+  assert.equal(sql.guestDeletionCredentials.has(additionalHash), false);
+  assert.equal(sql.guestDeletionCredentials.has(replacementHash), true);
+
+  for (const oldHash of [firstHash, additionalHash]) {
+    const denied = await directory.fetch(new Request("https://account-directory/guest-deletion/claim", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ credentialHash: oldHash }),
+    }));
+    assert.equal(denied.status, 404);
+    assert.equal((await denied.json()).error, "GUEST_DELETION_CODE_INVALID");
+  }
+});
+
 test("guest deletion codes are unavailable for Google-linked accounts", async () => {
   const { directory, sql } = makeDirectory();
   const requestId = "8b5e7f90-68e5-4c30-8fb8-c5a7b0f0f8dd";
