@@ -430,7 +430,21 @@ async function handleAccountRequest(request, env) {
           // Verification may have started before an account-deletion claim was acquired.
           // If PlayerAccount rejects the final grant because deletion has begun, remove the
           // now-orphaned owner-bound ledger record as part of that deletion race.
-          if (["ACCOUNT_DELETION_IN_PROGRESS", "ACCOUNT_DELETED"].includes(error?.code)) {
+          let deletionWonRace = ["ACCOUNT_DELETION_IN_PROGRESS", "ACCOUNT_DELETED"].includes(error?.code);
+          if (error?.code === "ACCOUNT_SESSION_INVALID") {
+            // The tombstone also revokes sessions, so confirm that this is a deletion replay
+            // before cleaning up. A logout/ordinary session expiry must not discard a purchase.
+            try {
+              const deletionState = await playerRequest(env, session.accountId, "/account/delete-preview", {
+                accountId: session.accountId,
+                accountDeletionReplayVerified: true,
+              });
+              deletionWonRace = deletionState.deleted === true || deletionState.deletionPending === true;
+            } catch {
+              deletionWonRace = false;
+            }
+          }
+          if (deletionWonRace) {
             try {
               if (!env?.LUDOPROOF_STORE_PURCHASES || typeof verified.purchaseLedgerId !== "string") {
                 throw httpError(503, "STORE_LEDGER_CLEANUP_FAILED", "purchase ledger cleanup is unavailable after deletion began");
