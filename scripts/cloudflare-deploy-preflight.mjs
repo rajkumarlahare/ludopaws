@@ -98,6 +98,16 @@ const wrangler =
 const vars =
   wrangler?.vars ?? {};
 
+const apiRouteConfigured = Array.isArray(wrangler?.routes) &&
+  wrangler.routes.some((route) =>
+    route?.pattern === "api.ludopaws.rekixo.com/*" &&
+    route?.zone_name === "rekixo.com"
+  );
+if (!apiRouteConfigured) {
+  console.error("Cloudflare production config must explicitly route api.ludopaws.rekixo.com/* through the ludoproof-game-api Worker.");
+  process.exit(2);
+}
+
 const oauthClientId = String(vars.GOOGLE_SIGN_IN_WEB_CLIENT_ID ?? "").trim();
 if (!/^[0-9]+-[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$/.test(oauthClientId)) {
   console.error("GOOGLE_SIGN_IN_WEB_CLIENT_ID is missing or malformed in the prepared production Worker config.");
