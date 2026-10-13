@@ -307,7 +307,7 @@ class ProfileActivity : Activity() {
                         })
                         addView(TextView(this@ProfileActivity).apply {
                             text = code
-                            textIsSelectable = true
+                            isTextSelectable = true
                             typeface = Typeface.MONOSPACE
                             textSize = 16f
                             setPadding(0, dp(14), 0, dp(8))
