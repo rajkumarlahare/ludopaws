@@ -122,6 +122,7 @@ class OfflineGameActivity : ComponentActivity() {
     internal lateinit var resultTitleText: TextView
     private var postWinInterstitialAd: PostWinInterstitialAdController? = null
     private var postWinInterstitialExitGate: PostWinInterstitialExitGate? = null
+    internal var postWinInterstitialShownForMatchId: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -160,7 +161,11 @@ class OfflineGameActivity : ComponentActivity() {
         ).also { it.prepare() }
     }
 
-    internal fun showPostWinInterstitialIfReady(onFinished: () -> Unit): Boolean {
+    internal fun showPostWinInterstitialIfReady(
+        matchId: String,
+        onSkipAd: () -> Unit,
+    ): Boolean {
+        if (postWinInterstitialShownForMatchId == matchId) return false
         val interstitial = postWinInterstitialAd ?: return false
         val gate = postWinInterstitialExitGate ?: PostWinInterstitialExitGate(
             activity = this,
@@ -168,7 +173,10 @@ class OfflineGameActivity : ComponentActivity() {
             walletStore = GemWalletStore(this),
             interstitial = interstitial,
         ).also { postWinInterstitialExitGate = it }
-        return gate.interceptIfReady(onFinished)
+        return gate.interceptIfReady(
+            onAdDismissed = { postWinInterstitialShownForMatchId = matchId },
+            onSkipAd = onSkipAd,
+        )
     }
 
     internal fun prepareOfflineUiTransition() {
