@@ -23,6 +23,18 @@ const snapshotTests = read(
   "android/app/src/test/java/com/ludoproof/game/GameJsonAuthoritativeSnapshotTest.kt",
 );
 const rulesets = read("server/src/rulesets.js");
+const interstitialController = read(
+  "android/app/src/main/java/com/ludoproof/game/feature/store/data/ads/PostWinInterstitialAdController.kt",
+);
+const interstitialPolicy = read(
+  "android/app/src/main/java/com/ludoproof/game/feature/store/domain/PostWinInterstitialPolicy.kt",
+);
+const offlineExit = read(
+  "android/app/src/main/java/com/ludoproof/game/feature/offline/presentation/common/OfflineExitDialogUi.kt",
+);
+const onlineMain = read(
+  "android/app/src/main/java/com/ludoproof/game/feature/online/presentation/MainActivity.kt",
+);
 
 requirePattern(
   "android/app/build.gradle.kts",
@@ -96,6 +108,43 @@ for (const rulesetId of [
   );
 }
 
+requireText(
+  "android/app/build.gradle.kts",
+  appBuild,
+  'providers.gradleProperty("LUDOPROOF_INTERSTITIAL_ADS_ENABLED")',
+  "the post-win interstitial placement must remain independently configurable and default-off.",
+);
+requireText(
+  "PostWinInterstitialAdController.kt",
+  interstitialController,
+  "InterstitialAd.load(",
+  "the initial placement must use AdMob interstitials, not rewarded ads.",
+);
+requireText(
+  "PostWinInterstitialAdController.kt",
+  interstitialController,
+  "consentInformation.canRequestAds()",
+  "interstitial requests must honor UMP consent eligibility.",
+);
+requireText(
+  "PostWinInterstitialPolicy.kt",
+  interstitialPolicy,
+  'matchStatus != FINISHED_STATUS',
+  "post-win placement must reject unfinished matches.",
+);
+requireText(
+  "OfflineExitDialogUi.kt",
+  offlineExit,
+  "showPostWinInterstitialIfReady",
+  "local-game interstitial must be attached to result-screen exit only.",
+);
+requireText(
+  "MainActivity.kt",
+  onlineMain,
+  "requestRemoteExitAfterWinInterstitial",
+  "remote-game back actions must route through the win-only placement policy.",
+);
+
 for (const policyToken of [
   "extraTurnOnHome: true",
   'rollTimeoutPolicy: "FORFEIT_ROLL_AND_ADVANCE_TURN"',
@@ -115,8 +164,10 @@ for (const property of [
   "LUDOPROOF_API_BASE_URL",
   "LUDOPROOF_BILLING_ENABLED",
   "LUDOPROOF_ADS_ENABLED",
+  "LUDOPROOF_INTERSTITIAL_ADS_ENABLED",
   "ADMOB_APP_ID",
   "ADMOB_REWARDED_AD_UNIT_ID",
+  "ADMOB_INTERSTITIAL_AD_UNIT_ID",
   "GOOGLE_SIGN_IN_WEB_CLIENT_ID",
   "PLAY_GAMES_PROJECT_ID",
 ]) {
