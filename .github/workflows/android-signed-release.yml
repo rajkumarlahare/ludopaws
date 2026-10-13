@@ -85,7 +85,7 @@ jobs:
           fi
 
           API_BASE="$LUDOPROOF_API_BASE_URL"
-          if [ -z "$API_BASE" ]; then API_BASE="https://ludoproof-game-api.ai-8f3.workers.dev"; fi
+          if [ -z "$API_BASE" ]; then API_BASE="https://api.ludopaws.rekixo.com"; fi
           case "$API_BASE" in https://*) ;; *) echo "LUDOPROOF_API_BASE_URL must use HTTPS." >&2; exit 2 ;; esac
 
           APP_BILLING="$LUDOPROOF_BILLING_ENABLED"
