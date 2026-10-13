@@ -33,15 +33,19 @@ internal fun OfflineGameActivity.requestOfflineExit() {
             isComputerMode = isComputerMode,
         )
 
-        if (snapshot?.status == "FINISHED") {
-            session.clear()
-        }
-
+        val finishedMatchId = snapshot?.matchId
         val finishExit: () -> Unit = {
+            if (snapshot?.status == "FINISHED") {
+                session.clear()
+            }
             prepareOfflineUiTransition()
             finish()
         }
-        if (shouldShowPostWinAd && showPostWinInterstitialIfReady(finishExit)) {
+        if (
+            shouldShowPostWinAd &&
+            finishedMatchId != null &&
+            showPostWinInterstitialIfReady(finishedMatchId, finishExit)
+        ) {
             return
         }
         finishExit()
