@@ -1,0 +1,44 @@
+name: One-time Cloudflare Production Dispatch
+
+on:
+  push:
+    branches:
+      - ops/dispatch-cloudflare-production-20261013-once
+    paths:
+      - .github/workflows/dispatch-cloudflare-production-once.yml
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  dispatch-production:
+    if: github.ref == 'refs/heads/ops/dispatch-cloudflare-production-20261013-once'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Dispatch the existing production workflow on main
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          response_file="$(mktemp)"
+          trap 'rm -f "$response_file"' EXIT
+          status="$(
+            curl --silent --show-error \
+              --output "$response_file" \
+              --write-out '%{http_code}' \
+              --request POST \
+              --header "Accept: application/vnd.github+json" \
+              --header "Authorization: Bearer $GH_TOKEN" \
+              --header "X-GitHub-Api-Version: 2022-11-28" \
+              --data '{"ref":"main"}' \
+              "https://api.github.com/repos/rajkumarlahare/ludopaws/actions/workflows/deploy-cloudflare.yml/dispatches"
+          )"
+          if [ "$status" != "204" ]; then
+            echo "GitHub did not accept the Cloudflare Production workflow dispatch (HTTP $status)." >&2
+            cat "$response_file" >&2
+            exit 1
+          fi
+          echo "Accepted workflow_dispatch for LudoProof Cloudflare Production on ref main."
