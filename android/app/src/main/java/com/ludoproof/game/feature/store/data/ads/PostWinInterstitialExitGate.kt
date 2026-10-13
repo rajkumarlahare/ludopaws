@@ -29,7 +29,7 @@ internal class PostWinInterstitialExitGate(
 
     /**
      * Returns true when an eligible, loaded interstitial check has been accepted.
-     * Dismissal leaves the result screen visible; a second Back action navigates away.
+     * Dismissal runs the caller-provided exit callback after the ad closes.
      * If an ad is skipped or fails to show, onSkipAd performs normal navigation.
      */
     fun interceptIfReady(
