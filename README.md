@@ -6,12 +6,12 @@
 
 **Game website target:** `https://ludopaws.rekixo.com`
 
-**API hostname target:** `https://api.ludopaws.rekixo.com` (activate only after Cloudflare domain and live API checks pass).
+**API hostname:** `https://api.ludopaws.rekixo.com` (verified by Cloudflare production deployment run #50 on 13 October 2026; the checks passed with `productionClaim=false` while EntroNex v4 remains an evaluation candidate).
 
 **Publisher / parent brand:** Rekixo  
 **Repository:** `ludopaws`
 
-Rekixo is the publisher/parent brand for Ludo Paws. The intended public-domain layout is `rekixo.com` for the company site, `ludopaws.rekixo.com` for the game site, and `api.ludopaws.rekixo.com` for the game API. These are target names only: configure DNS, GitHub Pages, OAuth origins, and Cloudflare custom domains only after the domains and hosting are verified.
+Rekixo is the publisher/parent brand for Ludo Paws. The intended public-domain layout is `rekixo.com` for the company site, `ludopaws.rekixo.com` for the game site, and `api.ludopaws.rekixo.com` for the game API. The dedicated API hostname has passed the production workflow health, readiness, store-status and game-flow checks. The game website/account host is a separate publisher-gated static-site cutover: it is not considered published until policy approval, Pages/DNS/TLS checks, and public deletion/privacy flows have passed. Do not attach or alter unrelated Rekixo/AR3D Workers or routes.
 
 Branding/repository names are separate from compatibility-sensitive runtime identifiers. Keep the existing Android application ID, Cloudflare Worker and Durable Object names, persisted storage names, proof/ruleset identifiers, and protocol values unchanged until a separately tested migration plan explicitly authorizes changes. Repository rename does not require renaming those runtime identifiers.
 
@@ -105,7 +105,7 @@ The Android MVP now supports:
 The current API URL compiled into the app is:
 
 ```text
-https://ludoproof-game-api.ai-8f3.workers.dev
+https://api.ludopaws.rekixo.com
 ```
 
 ## Offline v4 engine
@@ -214,7 +214,7 @@ Build command: (empty)
 Deploy command: npx --yes wrangler@4.135.0 deploy
 ```
 
-Keep the Worker isolated on `workers.dev` during the current evaluation stage. Do not attach existing Rekixo/AR3D domains or routes.
+Keep the Worker name `ludoproof-game-api` and its Durable Object identifiers unchanged. The dedicated Ludo Paws API domain `api.ludopaws.rekixo.com` is now the branded API endpoint validated by production smoke checks; retain the `workers.dev` hostname as a rollback/test fallback. Do not attach or alter unrelated Rekixo/AR3D domains, Workers, or routes.
 
 ## Local checks
 
