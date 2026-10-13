@@ -48,6 +48,49 @@ const onlineMain = read(
   "android/app/src/main/java/com/rekixo/ludopaws/feature/online/presentation/MainActivity.kt",
 );
 
+const androidSourceRoots = [
+  "android/app/src/main/java/com/rekixo/ludopaws",
+  "android/app/src/test/java/com/rekixo/ludopaws",
+  "android/app/src/androidTest/java/com/rekixo/ludopaws",
+];
+
+function listSourceFiles(directory) {
+  if (!fs.existsSync(path.join(repoRoot, directory))) {
+    failures.push(`android source package: required source root ${directory} is missing.`);
+    return [];
+  }
+  const files = [];
+  for (const entry of fs.readdirSync(path.join(repoRoot, directory), { withFileTypes: true })) {
+    const relative = path.join(directory, entry.name);
+    if (entry.isDirectory()) files.push(...listSourceFiles(relative));
+    else if (entry.isFile() && /\\.(kt|java)$/.test(entry.name)) files.push(relative);
+  }
+  return files;
+}
+
+requireText(
+  "android/app/build.gradle.kts",
+  appBuild,
+  'namespace = "com.rekixo.ludopaws"',
+  "Android Gradle namespace must use the approved Rekixo application package.",
+);
+requireText(
+  "android/app/build.gradle.kts",
+  appBuild,
+  'applicationId = "com.rekixo.ludopaws"',
+  "Android applicationId must use the approved Rekixo package.",
+);
+const androidSourceFiles = androidSourceRoots.flatMap(listSourceFiles);
+if (androidSourceFiles.length === 0) {
+  failures.push("android source package: no Kotlin/Java source files were found under the Rekixo package roots.");
+}
+for (const relativePath of androidSourceFiles) {
+  const source = read(relativePath);
+  if (!/^package com\\.rekixo\\.ludopaws(?:\\.|$)/m.test(source)) {
+    failures.push(`${relativePath}: Kotlin/Java package declaration must be under com.rekixo.ludopaws.`);
+  }
+}
+
 requirePattern(
   "android/app/build.gradle.kts",
   appBuild,
