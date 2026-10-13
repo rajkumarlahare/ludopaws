@@ -1,5 +1,13 @@
 # Ludo Paws migration plan
 
+## Approved publisher identity
+
+- Parent/publisher brand: **Rekixo**.
+- Android application ID for the first Play Store release: `com.rekixo.ludopaws`.
+- Game website target: `https://ludopaws.rekixo.com`.
+- API target: `https://api.ludopaws.rekixo.com`; do not switch clients until Cloudflare Custom Domain, TLS, health/readiness, and game-flow tests pass.
+- Keep the legacy Kotlin namespace/source package declarations, Cloudflare Worker name, Durable Object bindings, storage keys, and proof/ruleset identifiers unchanged in this first identity step.
+
 ## Phase 0 baseline
 
 - Source repository: `rajkumarlahare/ludoproof`
@@ -15,7 +23,7 @@ This baseline intentionally separates user-visible branding from identifiers tha
 
 The following must not be changed by a cosmetic/branding phase without a dedicated compatibility migration and tests:
 
-- Android `applicationId` / namespace (`com.ludoproof.game`) until package-identity migration is explicitly approved.
+- Android `applicationId` is now approved as `com.rekixo.ludopaws`; retain the legacy Kotlin namespace/source package declarations temporarily.
 - Existing SharedPreferences/storage namespaces and persisted-state keys.
 - Cloudflare Worker/Durable Object bindings such as `LUDOPROOF_MATCHES`, `LUDOPROOF_API_GATE`, `LUDOPROOF_LEADERBOARD`, matchmaking, friends, receipts, team matchmaking, and social bindings.
 - Existing Durable Object migration tags/classes.
