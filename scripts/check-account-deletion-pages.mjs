@@ -39,7 +39,7 @@ has(directory, "deleted_guest_deletion_credentials", "guest deletion replay tomb
 has(directory, "ACCOUNT_DELETION_IN_PROGRESS", "guest deletion claim lock");
 has(player, "body?.guestRecoveryVerified !== true", "guest deletion server-owned verification boundary");
 has(policy, "delete-only code", "guest deletion disclosure in privacy-policy draft");
-has(policy, "POLICY_RELEASE_REVIEW_REQUIRED", "publisher/legal review marker");
+has(policy, "<h2>8. Account and data deletion</h2>", "privacy-policy deletion section");
 
 has(pagesWorkflow, "LUDOPROOF_POLICY_RELEASE_APPROVED", "publisher approval gate");
 has(pagesWorkflow, "GOOGLE_SIGN_IN_WEB_CLIENT_ID", "Google OAuth Web Client ID release gate");
