@@ -37,7 +37,7 @@ has(worker, '"/guest-deletion/claim"', "guest code claim route");
 has(worker, 'ludoproof:guest-deletion-credential:v1:', "domain-separated guest code hash");
 has(directory, "deleted_guest_deletion_credentials", "guest deletion replay tombstone");
 has(directory, "ACCOUNT_DELETION_IN_PROGRESS", "guest deletion claim lock");
-has(player, "body?.guestRecoveryVerified !== true", "guest deletion server-owned verification boundary");
+has(player, "const guestRecoveryVerified = body?.guestRecoveryVerified === true", "guest deletion server-owned verification boundary");
 has(policy, "delete-only code", "guest deletion disclosure in privacy-policy draft");
 has(policy, "<h2>8. Account and data deletion</h2>", "privacy-policy deletion section");
 
