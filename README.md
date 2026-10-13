@@ -1,5 +1,13 @@
 # Ludo Paws
 
+**Publisher / parent brand:** Rekixo  
+**Repository:** `ludopaws`
+
+Rekixo is the publisher/parent brand for Ludo Paws. The intended public-domain layout is `rekixo.com` for the company site, `ludopaws.rekixo.com` for the game site, and `api.ludopaws.rekixo.com` for the game API. These are target names only: configure DNS, GitHub Pages, OAuth origins, and Cloudflare custom domains only after the domains and hosting are verified.
+
+Branding/repository names are separate from compatibility-sensitive runtime identifiers. Keep the existing Android application ID, Cloudflare Worker and Durable Object names, persisted storage names, proof/ruleset identifiers, and protocol values unchanged until a separately tested migration plan explicitly authorizes changes. Repository rename does not require renaming those runtime identifiers.
+
+
 **Ludo Paws** is the consumer-facing name of this Android Ludo game. The working store title is **Ludo Paws: Talking Animals** and the product tagline is **Roll. Race. Roar!**
 
 The game is built around **verifiable EntroNex dice outcomes**. Current status: **release candidate / evaluation**. The app and game backend are being hardened for production operation, while EntroNex v4 remains pre-independent-audit.
