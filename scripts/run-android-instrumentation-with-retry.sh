@@ -20,6 +20,20 @@ boot_emulator() {
   sleep 2
   rm -f "$AVD_HOME/$AVD_NAME.avd"/*.lock
 
+  # Keep the retry AVD's software-rendered framebuffer aligned with the
+  # lower-load settings configured by the workflow's initial boot.
+  local config_file="$AVD_HOME/$AVD_NAME.avd/config.ini"
+  if [[ -f "$config_file" ]]; then
+    for setting in "hw.lcd.width=720" "hw.lcd.height=1600" "hw.lcd.density=320"; do
+      local key="${setting%%=*}"
+      if grep -q "^$key=" "$config_file"; then
+        sed -i "s|^$key=.*|$setting|" "$config_file"
+      else
+        printf '%s\\n' "$setting" >> "$config_file"
+      fi
+    done
+  fi
+
   # Pin the SwiftShader backend rather than the generic software selector.
   # Emulator 37.2.12 selected swangle/lavapipe with -gpu software and
   # segfaulted mid-suite on the hosted Linux runner.
