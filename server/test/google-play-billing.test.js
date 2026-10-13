@@ -72,6 +72,7 @@ function mockPlayApi({
   purchaseState = 0,
   consumptionState = 0,
   acknowledgementState = 0,
+  legacyOnly = false,
 } = {}) {
   const calls = [];
   const fetchImpl = async (input, init = {}) => {
@@ -88,7 +89,31 @@ function mockPlayApi({
       assert.equal(claims.scope, "https://www.googleapis.com/auth/androidpublisher");
       return Response.json({ access_token: "test-access-token", expires_in: 3600 });
     }
-    if (init.method === "GET") {
+    if (init.method === "GET" && url.includes("/purchases/productsv2/tokens/")) {
+      if (legacyOnly) return new Response(null, { status: 404 });
+      const states = {
+        0: "PURCHASED",
+        1: "CANCELLED",
+        2: "PENDING",
+      };
+      return Response.json({
+        productLineItem: [{
+          productId,
+          productOfferDetails: {
+            quantity: 1,
+            consumptionState: consumptionState === 1
+              ? "CONSUMPTION_STATE_CONSUMED"
+              : "CONSUMPTION_STATE_YET_TO_BE_CONSUMED",
+          },
+        }],
+        purchaseStateContext: { purchaseState: states[purchaseState] ?? "PURCHASE_STATE_UNSPECIFIED" },
+        acknowledgementState: acknowledgementState === 1
+          ? "ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED"
+          : "ACKNOWLEDGEMENT_STATE_PENDING",
+        obfuscatedExternalAccountId: accountId,
+      });
+    }
+    if (init.method === "GET" && url.includes("/purchases/products/")) {
       return Response.json({
         productId,
         purchaseState,
@@ -205,7 +230,7 @@ test("verified purchases are consumed, redeemed once, and recover idempotently",
   assert.equal(
     calls.filter(
       ({ url, init }) =>
-        url.includes("/purchases/products/") && init.method === "GET",
+        url.includes("/purchases/productsv2/tokens/") && init.method === "GET",
     ).length,
     1,
   );
@@ -217,6 +242,33 @@ test("verified purchases are consumed, redeemed once, and recover idempotently",
       fetchImpl,
     ),
     (error) => error.status === 409 && error.code === "PURCHASE_ALREADY_REDEEMED",
+  );
+});
+
+
+test("legacy in-app products fall back only when productsv2 returns 404", async () => {
+  const env = await makeEnv();
+  const accountId = "e".repeat(64);
+  const { calls, fetchImpl } = mockPlayApi({
+    productId: "gems_300",
+    accountId,
+    legacyOnly: true,
+  });
+
+  const result = await verifyAndRedeemGooglePlayPurchase(
+    env,
+    { productId: "gems_300", purchaseToken: "legacy-purchase-token", accountId },
+    fetchImpl,
+  );
+  assert.equal(result.verified, true);
+  assert.equal(result.gemAmount, 300);
+  assert.equal(
+    calls.filter(({ url, init }) => url.includes("/purchases/productsv2/tokens/") && init.method === "GET").length,
+    1,
+  );
+  assert.equal(
+    calls.filter(({ url, init }) => url.includes("/purchases/products/gems_300/tokens/") && init.method === "GET").length,
+    1,
   );
 });
 
@@ -246,7 +298,7 @@ test("invalid and pending Play purchases are never reserved or acknowledged", as
     false,
   );
   assert.equal(
-    pending.calls.some(({ url }) => url.includes("/purchases/products/")),
+    pending.calls.some(({ url }) => url.includes("/purchases/productsv2/tokens/")),
     true,
   );
 
