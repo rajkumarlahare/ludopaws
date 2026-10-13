@@ -76,3 +76,12 @@ test("production preflight requires the API hostname to target the deployed Work
   assert.notEqual(result.status, 0, "stdout: " + result.stdout + " stderr: " + result.stderr);
   assert.match(result.stderr, /must explicitly route api\.ludopaws\.rekixo\.com/);
 });
+
+
+test("production readiness verifier reads its response from the explicit READY_FILE environment variable", () => {
+  const workflow = fs.readFileSync(path.join(repoRoot, ".github", "workflows", "deploy-cloudflare.yml"), "utf8");
+  const readinessStep = workflow.split("name: Verify production readiness")[1]?.split("name: Verify store status route and feature flags")[0] ?? "";
+  assert.ok(readinessStep.includes('READY_FILE="$ready_file" node -e'));
+  assert.ok(readinessStep.includes('readFileSync(process.env.READY_FILE, "utf8")'));
+  assert.equal(readinessStep.includes("readFileSync(process.argv[1]"), false);
+});

@@ -260,9 +260,9 @@ jobs:
             exit 22
           fi
 
-          node -e '
+          READY_FILE="$ready_file" node -e '
             const fs = require("node:fs");
-            const body = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+            const body = JSON.parse(fs.readFileSync(process.env.READY_FILE, "utf8"));
             if (body.ready !== true || body.ok !== true) {
               console.error("Worker readiness response is not ready.");
               process.exit(2);
@@ -280,7 +280,7 @@ jobs:
               process.exit(3);
             }
             console.log("LudoProof API route is operational; Rewarded Ads configuration matches the validated deployment; productionClaim=false.");
-          ' "$ready_file"
+          '
 
       - name: Verify store status route and feature flags
         shell: bash
