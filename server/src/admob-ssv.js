@@ -63,23 +63,38 @@ export async function verifyAdMobSsvRequest(request, env, fetchImpl = fetch, now
     throw ssvError(400, "SSV_CUSTOM_DATA_INVALID", "reward callback data is invalid");
   }
 
+  // Prefer the production key only when its signature actually verifies.
+  // A matching key_id can also occur in Google's test key set, so ID lookup alone
+  // must not classify the callback or prevent trying the test signature.
   let isTest = false;
-  let keyInfo = (await getKeys(fetchImpl, nowMs, false, KEY_URL)).find((key) => Number(key.keyId) === keyId);
-  if (!keyInfo) {
-    keyInfo = (await getKeys(fetchImpl, nowMs, false, TEST_KEY_URL)).find((key) => Number(key.keyId) === keyId);
-    isTest = Boolean(keyInfo);
-  }
-  if (!keyInfo) {
-    keyInfo = (await getKeys(fetchImpl, nowMs, true, KEY_URL)).find((key) => Number(key.keyId) === keyId);
-    if (!keyInfo) {
-      keyInfo = (await getKeys(fetchImpl, nowMs, true, TEST_KEY_URL)).find((key) => Number(key.keyId) === keyId);
-      isTest = Boolean(keyInfo);
+  let keyInfo = null;
+  let sawMatchingKeyId = false;
+  for (const refresh of [false, true]) {
+    const productionKeys = await getKeys(fetchImpl, nowMs, refresh, KEY_URL);
+    const productionKey = productionKeys.find((key) => Number(key.keyId) === keyId);
+    sawMatchingKeyId = sawMatchingKeyId || Boolean(productionKey);
+
+    if (productionKey && typeof productionKey.base64 === "string" &&
+        await verifySignature(productionKey, signature, signedContent)) {
+      keyInfo = productionKey;
+      isTest = false;
+      break;
+    }
+
+    const testKeys = await getKeys(fetchImpl, nowMs, refresh, TEST_KEY_URL);
+    const testKey = testKeys.find((key) => Number(key.keyId) === keyId);
+    sawMatchingKeyId = sawMatchingKeyId || Boolean(testKey);
+    if (testKey && typeof testKey.base64 === "string" &&
+        await verifySignature(testKey, signature, signedContent)) {
+      keyInfo = testKey;
+      isTest = true;
+      break;
     }
   }
-  if (!keyInfo || typeof keyInfo.base64 !== "string") throw ssvError(401, "SSV_KEY_UNKNOWN", "reward signing key was not recognized");
-
-  const verified = await verifySignature(keyInfo, signature, signedContent);
-  if (!verified) throw ssvError(401, "SSV_SIGNATURE_INVALID", "reward callback signature is invalid");
+  if (!keyInfo) {
+    if (!sawMatchingKeyId) throw ssvError(401, "SSV_KEY_UNKNOWN", "reward signing key was not recognized");
+    throw ssvError(401, "SSV_SIGNATURE_INVALID", "reward callback signature is invalid");
+  }
 
   // AdMob URL-verification test callbacks can use a short dummy transaction ID.
   // Allow that only after the callback verifies with Google test signing keys; production callbacks keep the strict ID format.
