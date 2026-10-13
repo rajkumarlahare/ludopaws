@@ -1686,12 +1686,12 @@ internal class LudoPaws3DSceneRenderer {
         val vertex =
             compileShader(
                 GLES30.GL_VERTEX_SHADER,
-                vertexSource,
+                normalizeShaderSource(vertexSource),
             )
         val fragment =
             compileShader(
                 GLES30.GL_FRAGMENT_SHADER,
-                fragmentSource,
+                normalizeShaderSource(fragmentSource),
             )
         return GLES30.glCreateProgram().also { created ->
             GLES30.glAttachShader(created, vertex)
@@ -1710,6 +1710,15 @@ internal class LudoPaws3DSceneRenderer {
             GLES30.glDeleteShader(vertex)
             GLES30.glDeleteShader(fragment)
         }
+    }
+
+    private fun normalizeShaderSource(source: String): String {
+        // Some GLES drivers reject any empty/indented prefix before #version.
+        // Find the directive explicitly instead of relying on multiline-string
+        // indentation behavior, and make it the first character passed to GLES.
+        val versionIndex = source.indexOf("#version")
+        check(versionIndex >= 0) { "3D pawn shader is missing its #version directive" }
+        return source.substring(versionIndex).trimStart()
     }
 
     private fun compileShader(
