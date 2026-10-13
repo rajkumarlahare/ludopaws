@@ -47,7 +47,6 @@ export async function verifyAdMobSsvRequest(request, env, fetchImpl = fetch, now
     });
     throw ssvError(403, "SSV_REWARD_INVALID", "reward callback does not match the configured reward");
   }
-  if (!/^[A-Fa-f0-9]{16,128}$/.test(transactionId)) throw ssvError(400, "SSV_TRANSACTION_INVALID", "reward transaction ID is invalid");
   const timestampNumber = Number(timestampRaw);
   if (!Number.isSafeInteger(timestampNumber) || timestampNumber <= 0) throw ssvError(400, "SSV_TIMESTAMP_INVALID", "reward timestamp is invalid");
   const timestampMs = timestampNumber > nowMs * 100 ? Math.floor(timestampNumber / 1000) : timestampNumber;
@@ -81,6 +80,10 @@ export async function verifyAdMobSsvRequest(request, env, fetchImpl = fetch, now
 
   const verified = await verifySignature(keyInfo, signature, signedContent);
   if (!verified) throw ssvError(401, "SSV_SIGNATURE_INVALID", "reward callback signature is invalid");
+
+  // AdMob URL-verification test callbacks can use a short dummy transaction ID.
+  // Allow that only after the callback verifies with Google test signing keys; production callbacks keep the strict ID format.
+  if (!isTest && !/^[A-Fa-f0-9]{16,128}$/.test(transactionId)) throw ssvError(400, "SSV_TRANSACTION_INVALID", "reward transaction ID is invalid");
 
   if (!isTest) {
     const configuredAdUnit = String(env?.LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID ?? "").trim();
