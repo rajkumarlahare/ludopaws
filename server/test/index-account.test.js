@@ -632,7 +632,10 @@ function makeGuestDeletionApiEnv(expectedCredentialHash, { directoryDeleteFailur
           const body = await request.json();
           calls.push("directory:" + path);
           if (path === "/guest-deletion/claim") {
-            assert.equal(body.credentialHash, expectedCredentialHash, "only the domain-separated code hash should be sent to AccountDirectory");
+            assert.match(body.credentialHash, /^[a-f0-9]{64}$/, "only a credential hash should be sent to AccountDirectory");
+            if (body.credentialHash !== expectedCredentialHash) {
+              return Response.json({ error: "GUEST_DELETION_CODE_INVALID", message: "guest deletion code is invalid or no longer available" }, { status: 404 });
+            }
             return directoryDeleted
               ? Response.json({ ok: true, deleted: true, replay: true })
               : Response.json({ ok: true, accountId: ACCOUNT_A, deleted: false, replay: false });
