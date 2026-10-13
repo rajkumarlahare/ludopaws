@@ -29,6 +29,15 @@ const interstitialController = read(
 const interstitialPolicy = read(
   "android/app/src/main/java/com/ludoproof/game/feature/store/domain/PostWinInterstitialPolicy.kt",
 );
+const interstitialExitGate = read(
+  "android/app/src/main/java/com/ludoproof/game/feature/store/data/ads/PostWinInterstitialExitGate.kt",
+);
+const rewardedAdsController = read(
+  "android/app/src/main/java/com/ludoproof/game/feature/store/data/ads/RewardedAdsController.kt",
+);
+const storeActivity = read(
+  "android/app/src/main/java/com/ludoproof/game/feature/store/presentation/StoreActivity.kt",
+);
 const offlineExit = read(
   "android/app/src/main/java/com/ludoproof/game/feature/offline/presentation/common/OfflineExitDialogUi.kt",
 );
@@ -131,6 +140,39 @@ requireText(
   interstitialPolicy,
   'matchStatus != FINISHED_STATUS',
   "post-win placement must reject unfinished matches.",
+);
+requireText(
+  "PostWinInterstitialPolicy.kt",
+  interstitialPolicy,
+  "shouldShowFillerInterstitial(adsRemoved: Boolean): Boolean = !adsRemoved",
+  "Remove Ads must suppress the unsolicited interstitial placement.",
+);
+requireText(
+  "PostWinInterstitialExitGate.kt",
+  interstitialExitGate,
+  'val wallet = accountRepository.wallet()',
+  "Remove Ads entitlement must be freshly confirmed from the authoritative wallet before display.",
+);
+requireText(
+  "PostWinInterstitialExitGate.kt",
+  interstitialExitGate,
+  "if (mayShowInterstitial && interstitial.showIfReady(onExit))",
+  "entitlement checks must complete before showing a post-win interstitial.",
+);
+requireText(
+  "RewardedAdsController.kt",
+  rewardedAdsController,
+  "fun showRewardedAd(",
+  "the user-initiated rewarded-ad flow must remain available.",
+);
+if (rewardedAdsController.includes("adsRemoved")) {
+  failures.push("RewardedAdsController.kt: Remove Ads must not suppress the user-requested +5 Gems rewarded ad.");
+}
+requireText(
+  "StoreActivity.kt",
+  storeActivity,
+  "rewardedAdsEnabledByServer &&",
+  "rewarded ads must remain independently controlled by the rewarded-ad server flag.",
 );
 requireText(
   "OfflineExitDialogUi.kt",
