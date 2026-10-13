@@ -1,5 +1,13 @@
 # Ludo Paws migration plan
 
+## Approved publisher identity
+
+- Parent/publisher brand: **Rekixo**.
+- Android application ID for the first store release: `com.rekixo.ludopaws`.
+- Target game website: `https://ludopaws.rekixo.com`.
+- Target API origin: `https://api.ludopaws.rekixo.com` (do not switch runtime clients until Cloudflare custom-domain and smoke tests pass).
+- The game has not been published to Google Play; this is a pre-launch identity change. Do not rename existing Worker/Durable Object/storage/proof identifiers as part of it.
+
 ## Phase 0 baseline
 
 - Source repository: `rajkumarlahare/ludoproof`
@@ -15,7 +23,7 @@ This baseline intentionally separates user-visible branding from identifiers tha
 
 The following must not be changed by a cosmetic/branding phase without a dedicated compatibility migration and tests:
 
-- Android `applicationId` / namespace (`com.ludoproof.game`) until package-identity migration is explicitly approved.
+- Android application ID is `com.rekixo.ludopaws`; preserve legacy namespace/source declarations for now to avoid mixing a package identity change with a source refactor.
 - Existing SharedPreferences/storage namespaces and persisted-state keys.
 - Cloudflare Worker/Durable Object bindings such as `LUDOPROOF_MATCHES`, `LUDOPROOF_API_GATE`, `LUDOPROOF_LEADERBOARD`, matchmaking, friends, receipts, team matchmaking, and social bindings.
 - Existing Durable Object migration tags/classes.
@@ -59,7 +67,7 @@ Examples include:
 
 Examples include:
 
-- `com.ludoproof.game` package/application identity.
+- `com.rekixo.ludopaws` Android application identity; legacy internal source namespace remains `com.ludoproof.game` temporarily.
 - `LudoProofApplication`, `LudoProofTheme`, and other internal class names unless renaming is done as a separate mechanical refactor.
 - `LUDOPROOF_*` Worker/Durable Object bindings.
 - Existing API base URL/config property names.
