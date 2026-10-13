@@ -13,6 +13,7 @@ import android.widget.Toast
 import com.ludoproof.game.BuildConfig
 import com.ludoproof.game.LudoProofApplication
 import com.ludoproof.game.LudoProofTheme
+import com.ludoproof.game.feature.store.data.ads.PostWinInterstitialAdController
 import com.ludoproof.game.feature.store.data.ads.RewardedAdsController
 import com.ludoproof.game.feature.store.data.billing.GooglePlayBillingGateway
 import com.ludoproof.game.feature.store.data.billing.PendingStorePurchase
@@ -277,7 +278,7 @@ class StoreActivity :
     }
 
     internal fun showAdPrivacyOptions() {
-        rewardedAds.showPrivacyOptions()
+        PostWinInterstitialAdController.showPrivacyOptions(this, ::showStoreMessage)
     }
 
     override fun onCatalogLoaded(
