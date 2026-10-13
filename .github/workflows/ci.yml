@@ -205,6 +205,18 @@ jobs:
             --name ludopaws-ci \
             --package "system-images;android-35;google_apis;x86_64" \
             --device "pixel_6"
+          # The Pixel 6 profile's 1080x2400 framebuffer puts unnecessary load
+          # on headless SwiftShader during long instrumentation runs. Keep the
+          # same 3:~7 aspect ratio while reducing software-rendering pressure.
+          AVD_CONFIG="$ANDROID_AVD_HOME/ludopaws-ci.avd/config.ini"
+          for setting in "hw.lcd.width=720" "hw.lcd.height=1600" "hw.lcd.density=320"; do
+            key="${setting%%=*}"
+            if grep -q "^$key=" "$AVD_CONFIG"; then
+              sed -i "s|^$key=.*|$setting|" "$AVD_CONFIG"
+            else
+              printf '%s\\n' "$setting" >> "$AVD_CONFIG"
+            fi
+          done
           "$SDK_ROOT/emulator/emulator" -list-avds | tee /tmp/ludopaws-avd-list.txt
           grep -qx "ludopaws-ci" /tmp/ludopaws-avd-list.txt
       - name: Boot Android emulator
