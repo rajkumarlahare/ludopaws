@@ -174,7 +174,10 @@ class OfflineGameActivity : ComponentActivity() {
             interstitial = interstitial,
         ).also { postWinInterstitialExitGate = it }
         return gate.interceptIfReady(
-            onAdDismissed = { postWinInterstitialShownForMatchId = matchId },
+            onAdDismissed = {
+                postWinInterstitialShownForMatchId = matchId
+                onSkipAd()
+            },
             onSkipAd = onSkipAd,
         )
     }
