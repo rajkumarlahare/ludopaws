@@ -63,18 +63,16 @@ export async function verifyAdMobSsvRequest(request, env, fetchImpl = fetch, now
     throw ssvError(400, "SSV_CUSTOM_DATA_INVALID", "reward callback data is invalid");
   }
 
-  // Verify the signature against both key sets before classifying a callback.
-  // A key_id may be present in the production set but the signed test callback can
-  // still require Google's test key set; key ID presence alone does not identify the signer.
+  // Prefer the production key only when its signature actually verifies.
+  // A matching key_id can also occur in Google's test key set, so ID lookup alone
+  // must not classify the callback or prevent trying the test signature.
   let isTest = false;
   let keyInfo = null;
   let sawMatchingKeyId = false;
   for (const refresh of [false, true]) {
     const productionKeys = await getKeys(fetchImpl, nowMs, refresh, KEY_URL);
-    const testKeys = await getKeys(fetchImpl, nowMs, refresh, TEST_KEY_URL);
     const productionKey = productionKeys.find((key) => Number(key.keyId) === keyId);
-    const testKey = testKeys.find((key) => Number(key.keyId) === keyId);
-    sawMatchingKeyId = sawMatchingKeyId || Boolean(productionKey || testKey);
+    sawMatchingKeyId = sawMatchingKeyId || Boolean(productionKey);
 
     if (productionKey && typeof productionKey.base64 === "string" &&
         await verifySignature(productionKey, signature, signedContent)) {
@@ -82,6 +80,10 @@ export async function verifyAdMobSsvRequest(request, env, fetchImpl = fetch, now
       isTest = false;
       break;
     }
+
+    const testKeys = await getKeys(fetchImpl, nowMs, refresh, TEST_KEY_URL);
+    const testKey = testKeys.find((key) => Number(key.keyId) === keyId);
+    sawMatchingKeyId = sawMatchingKeyId || Boolean(testKey);
     if (testKey && typeof testKey.base64 === "string" &&
         await verifySignature(testKey, signature, signedContent)) {
       keyInfo = testKey;
