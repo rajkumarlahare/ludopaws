@@ -217,6 +217,10 @@ test("guest deletion codes are stored as hashes, block Google linking after clai
   assert.equal(claimed.deleted, false);
   assert.equal(sql.guestDeletionClaims.get(created.accountId).credentialHash, credentialHash);
 
+  const guestRecoveryReplay = await guestRequest(directory, requestId);
+  assert.equal(guestRecoveryReplay.status, 409);
+  assert.equal((await guestRecoveryReplay.json()).error, "ACCOUNT_DELETION_IN_PROGRESS");
+
   const linking = await directory.fetch(new Request("https://account-directory/google/link", {
     method: "POST",
     headers: { "content-type": "application/json" },
