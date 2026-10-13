@@ -28,6 +28,14 @@ class GameJsonAuthoritativeSnapshotTest {
     }
 
     @Test(expected = GameSchemaException::class)
+    fun activeSnapshotRejectsNullTurnSeatInsteadOfDefaultingToZero() {
+        val state = classicState(status = "ACTIVE", playerCount = 2)
+        state.put("turnSeat", JSONObject.NULL)
+
+        GameJson.envelope(JSONObject().put("state", state))
+    }
+
+    @Test(expected = GameSchemaException::class)
     fun snapshotRejectsMalformedTokenCount() {
         val state = classicState(status = "ACTIVE", playerCount = 2)
         state.getJSONArray("players")
