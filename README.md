@@ -298,6 +298,24 @@ The account Worker owns profile display name, gem balance, Remove Ads entitlemen
 
 Local match history and profile progression statistics remain device-local and are scoped to the active account; this does **not** automatically upload all historical stats. Play Games Services sign-in remains a separate feature from the Ludo Paws account identity.
 
+## Production configuration source of truth
+
+The production deploy workflow materializes the following **non-secret GitHub Actions repository Variables** into `server/wrangler.json` in its ephemeral runner before dry-run/deploy. This is intentional: Wrangler treats its config as the source of truth for ordinary vars and may override vars configured only in the Cloudflare dashboard. The deployed values must therefore be reviewed in the repository's Actions Variables, not only in Cloudflare's dashboard.
+
+Required before any production Worker deployment:
+
+- `GOOGLE_SIGN_IN_WEB_CLIENT_ID`: the Google **Web** OAuth client ID used by Android and the account-deletion site.
+- `LUDOPROOF_ACCOUNT_WEB_ORIGIN`: currently exactly `https://rajkumarlahare.github.io`.
+- Keep `GOOGLE_PLAY_BILLING_ENABLED=false` and `LUDOPROOF_ADMOB_SSV_ENABLED=false` until each integration has passed internal-track end-to-end tests.
+
+Optional store variables, which remain fail-closed unless enabled explicitly:
+
+- `GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL`: set only after the Play Console service account exists. Its private key is a **Cloudflare Worker secret** named `GOOGLE_PLAY_SERVICE_ACCOUNT_PRIVATE_KEY`, never a GitHub Variable, source file, Android build property, or chat message.
+- `GOOGLE_PLAY_BILLING_ENABLED`: Worker-side checkout flag; default false.
+- `LUDOPROOF_ADMOB_SSV_ENABLED`, `LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID`, `LUDOPROOF_ADMOB_REWARD_ITEM=gems`: server-side rewarded-ad configuration; default disabled, configured reward fixed at five gems.
+
+The signed Android release workflow reads these repository Variables: `GOOGLE_SIGN_IN_WEB_CLIENT_ID`, `LUDOPROOF_API_BASE_URL` (optional; defaults to the production Worker), `LUDOPROOF_BILLING_ENABLED`, `LUDOPROOF_ADS_ENABLED`, `ADMOB_APP_ID`, `ADMOB_REWARDED_AD_UNIT_ID`, and `PLAY_GAMES_PROJECT_ID` (optional). The Android Billing/Ads flags must match their Worker counterparts; the workflow checks `/ready` and `/api/store/status` before building the signed artifacts. Ads remain disabled unless you deliberately configure matching real IDs on both sides. Do not set a flag to true until the associated Google/AdMob setup and end-to-end tests are finished.
+
 ## Google Play Billing
 
 Digital gems and Remove Ads purchases use the native Google Play Billing Library. A client purchase callback only produces a pending transaction; the Worker verifies it through the Google Play Developer API, checks the obfuscated account ID, and reserves/redeems the purchase token through a Durable Object ledger. Only after verification does the per-account wallet transaction grant gems or set Remove Ads. Pending purchase tokens are encrypted with Android Keystore AES-GCM in private, backup-disabled app storage for retry; older plaintext recovery records are migrated in place. The canonical balance and inventory are held by the server and can be restored on another device after the same Google-linked account is restored.
