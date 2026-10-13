@@ -25,6 +25,8 @@ import com.ludoproof.game.core.ui.art.plywoodBackground
 import com.ludoproof.game.ui.online.*
 import com.ludoproof.game.feature.online.*
 import com.ludoproof.game.feature.online.FriendsVoiceChatSession
+import com.ludoproof.game.feature.store.data.ads.PostWinInterstitialAdController
+import com.ludoproof.game.feature.store.domain.PostWinInterstitialPolicy
 
 class MainActivity : ComponentActivity() {
     internal val gameMode:
@@ -174,6 +176,7 @@ class MainActivity : ComponentActivity() {
         "Voice is off"
 
     private var friendsVoiceSession: FriendsVoiceChatSession? = null
+    private var postWinInterstitialAd: PostWinInterstitialAdController? = null
 
     @Volatile
     internal var screenStarted =
@@ -438,7 +441,7 @@ class MainActivity : ComponentActivity() {
             this,
             object : OnBackPressedCallback(true) {
                 override fun handleOnBackPressed() {
-                    requestRemoteExit()
+                    requestRemoteExitAfterWinInterstitial()
                 }
             },
         )
@@ -675,7 +678,7 @@ class MainActivity : ComponentActivity() {
             addGameTopActions(
                 host = host,
                 context = this,
-                onBack = { requestRemoteExit() },
+                onBack = { requestRemoteExitAfterWinInterstitial() },
                 onSettings = {
                     ArcadeDialogs.showSettings(this) {
                         currentState?.let { state ->
@@ -743,6 +746,34 @@ class MainActivity : ComponentActivity() {
                     )
                 }
         }
+        preparePostWinInterstitialAd()
+    }
+
+    private fun preparePostWinInterstitialAd() {
+        if (!BuildConfig.LUDOPROOF_INTERSTITIAL_ADS_ENABLED || postWinInterstitialAd != null) return
+        postWinInterstitialAd = PostWinInterstitialAdController(
+            activity = this,
+            enabled = true,
+            adUnitId = BuildConfig.ADMOB_INTERSTITIAL_AD_UNIT_ID,
+        ).also { it.prepare() }
+    }
+
+    private fun showPostWinInterstitialIfReady(onFinished: () -> Unit): Boolean =
+        postWinInterstitialAd?.showIfReady(onFinished) ?: false
+
+    private fun requestRemoteExitAfterWinInterstitial() {
+        val state = currentState
+        val currentPlayer = state?.players?.firstOrNull { it.playerId == playerId }
+        val didCurrentPlayerWin = PostWinInterstitialPolicy.shouldShowRemote(
+            matchStatus = state?.status,
+            teamBased = gameMode.teamBased,
+            winnerPlayerId = state?.winnerPlayerId,
+            playerId = playerId,
+            winnerTeamId = state?.winnerTeamId,
+            playerTeamId = currentPlayer?.teamId,
+        )
+        if (didCurrentPlayerWin && showPostWinInterstitialIfReady { requestRemoteExit() }) return
+        requestRemoteExit()
     }
 
     override fun onStart() {
@@ -803,6 +834,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         stopFriendsVoice("Voice is off")
+        postWinInterstitialAd?.close()
+        postWinInterstitialAd = null
         mainHandler.removeCallbacksAndMessages(
             null,
         )
