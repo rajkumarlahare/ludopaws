@@ -14,6 +14,9 @@ export class AccountDirectory {
       sql.exec(`CREATE TABLE IF NOT EXISTS account_registry (account_id TEXT PRIMARY KEY, account_kind TEXT NOT NULL, created_at INTEGER NOT NULL)`);
       sql.exec(`CREATE TABLE IF NOT EXISTS guest_requests (client_request_id TEXT PRIMARY KEY, account_id TEXT NOT NULL, created_at INTEGER NOT NULL)`);
       sql.exec(`CREATE TABLE IF NOT EXISTS deleted_guest_requests (client_request_id TEXT PRIMARY KEY, deleted_at INTEGER NOT NULL)`);
+      sql.exec(`CREATE TABLE IF NOT EXISTS guest_deletion_credentials (credential_hash TEXT PRIMARY KEY, account_id TEXT NOT NULL UNIQUE, created_at INTEGER NOT NULL)`);
+      sql.exec(`CREATE TABLE IF NOT EXISTS guest_deletion_claims (account_id TEXT PRIMARY KEY, credential_hash TEXT NOT NULL UNIQUE, created_at INTEGER NOT NULL)`);
+      sql.exec(`CREATE TABLE IF NOT EXISTS deleted_guest_deletion_credentials (credential_hash TEXT PRIMARY KEY, deleted_at INTEGER NOT NULL)`);
       sql.exec(`CREATE TABLE IF NOT EXISTS google_identities (subject_hash TEXT PRIMARY KEY, account_id TEXT NOT NULL UNIQUE, linked_at INTEGER NOT NULL)`);
       sql.exec(`CREATE TABLE IF NOT EXISTS google_nonces (nonce_hash TEXT PRIMARY KEY, created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, consumed_at INTEGER)`);
       sql.exec(`CREATE TABLE IF NOT EXISTS account_identity_links (identity_type TEXT NOT NULL, external_id TEXT NOT NULL, account_id TEXT NOT NULL, linked_at INTEGER NOT NULL, PRIMARY KEY(identity_type, external_id), UNIQUE(identity_type, account_id))`);
@@ -26,6 +29,8 @@ export class AccountDirectory {
       const url = new URL(request.url);
       if (request.method === "POST" && url.pathname === "/guest") return await this.#createGuest(request);
       if (request.method === "POST" && url.pathname === "/account/delete") return await this.#deleteAccount(request);
+      if (request.method === "POST" && url.pathname === "/guest-deletion/register") return await this.#registerGuestDeletionCredential(request);
+      if (request.method === "POST" && url.pathname === "/guest-deletion/claim") return await this.#claimGuestDeletionCredential(request);
       if (request.method === "POST" && url.pathname === "/nonce/create") return await this.#createNonce();
       if (request.method === "POST" && url.pathname === "/nonce/consume") return await this.#consumeNonce(request);
       if (request.method === "POST" && url.pathname === "/google/link") return await this.#linkGoogle(request);
@@ -44,7 +49,13 @@ export class AccountDirectory {
     const deleted = [...this.ctx.storage.sql.exec("SELECT client_request_id FROM deleted_guest_requests WHERE client_request_id = ? LIMIT 1", requestKey)];
     if (deleted.length) throw httpError(410, "GUEST_ACCOUNT_DELETED", "this guest account has already been deleted");
     const existing = [...this.ctx.storage.sql.exec("SELECT account_id FROM guest_requests WHERE client_request_id = ? LIMIT 1", requestKey)];
-    if (existing.length === 1) return json(200, { ok: true, accountId: String(existing[0].account_id), replay: true });
+    if (existing.length === 1) {
+      const accountId = String(existing[0].account_id);
+      if ([...this.ctx.storage.sql.exec("SELECT account_id FROM guest_deletion_claims WHERE account_id = ? LIMIT 1", accountId)].length) {
+        throw httpError(409, "ACCOUNT_DELETION_IN_PROGRESS", "this guest account is being deleted");
+      }
+      return json(200, { ok: true, accountId, replay: true });
+    }
 
     const generatedId = crypto.randomUUID().toLowerCase();
     const now = Date.now();
@@ -64,6 +75,10 @@ export class AccountDirectory {
     const accountId = requireAccountId(body?.accountId);
     const keys = [...this.ctx.storage.sql.exec("SELECT client_request_id FROM guest_requests WHERE account_id = ?", accountId)]
       .map((row) => String(row.client_request_id));
+    const credentialHashes = [
+      ...this.ctx.storage.sql.exec("SELECT credential_hash FROM guest_deletion_credentials WHERE account_id = ?", accountId),
+      ...this.ctx.storage.sql.exec("SELECT credential_hash FROM guest_deletion_claims WHERE account_id = ?", accountId),
+    ].map((row) => String(row.credential_hash));
     let existed = false;
     const now = Date.now();
     this.ctx.storage.transactionSync(() => {
@@ -71,12 +86,89 @@ export class AccountDirectory {
       for (const key of keys) this.ctx.storage.sql.exec(
         "INSERT OR IGNORE INTO deleted_guest_requests (client_request_id, deleted_at) VALUES (?, ?)", key, now,
       );
+      for (const credentialHash of new Set(credentialHashes)) this.ctx.storage.sql.exec(
+        "INSERT OR IGNORE INTO deleted_guest_deletion_credentials (credential_hash, deleted_at) VALUES (?, ?)",
+        credentialHash, now,
+      );
+      this.ctx.storage.sql.exec("DELETE FROM guest_deletion_credentials WHERE account_id = ?", accountId);
+      this.ctx.storage.sql.exec("DELETE FROM guest_deletion_claims WHERE account_id = ?", accountId);
       this.ctx.storage.sql.exec("DELETE FROM guest_requests WHERE account_id = ?", accountId);
       this.ctx.storage.sql.exec("DELETE FROM google_identities WHERE account_id = ?", accountId);
       this.ctx.storage.sql.exec("DELETE FROM account_identity_links WHERE account_id = ?", accountId);
       this.ctx.storage.sql.exec("DELETE FROM account_registry WHERE account_id = ?", accountId);
     });
     return json(200, { ok: true, deleted: true, replay: !existed });
+  }
+
+  async #registerGuestDeletionCredential(request) {
+    const body = await readJson(request);
+    const accountId = requireAccountId(body?.accountId);
+    const credentialHash = requireHash(body?.credentialHash, "credentialHash");
+    this.ctx.storage.transactionSync(() => {
+      const accounts = [...this.ctx.storage.sql.exec(
+        "SELECT account_kind FROM account_registry WHERE account_id = ? LIMIT 1", accountId,
+      )];
+      if (!accounts.length) throw httpError(404, "ACCOUNT_NOT_FOUND", "account was not found");
+      const google = [...this.ctx.storage.sql.exec(
+        "SELECT account_id FROM google_identities WHERE account_id = ? LIMIT 1", accountId,
+      )];
+      if (google.length || String(accounts[0].account_kind) !== "GUEST") {
+        throw httpError(409, "GUEST_DELETION_CODE_NOT_AVAILABLE", "guest deletion codes are available only for unlinked guest accounts");
+      }
+      const claim = [...this.ctx.storage.sql.exec(
+        "SELECT credential_hash FROM guest_deletion_claims WHERE account_id = ? LIMIT 1", accountId,
+      )];
+      if (claim.length) throw httpError(409, "ACCOUNT_DELETION_IN_PROGRESS", "this guest account is being deleted");
+      this.ctx.storage.sql.exec("DELETE FROM guest_deletion_credentials WHERE account_id = ?", accountId);
+      this.ctx.storage.sql.exec(
+        "INSERT INTO guest_deletion_credentials (credential_hash, account_id, created_at) VALUES (?, ?, ?)",
+        credentialHash, accountId, Date.now(),
+      );
+    });
+    return json(200, { ok: true, ready: true });
+  }
+
+  async #claimGuestDeletionCredential(request) {
+    const body = await readJson(request);
+    const credentialHash = requireHash(body?.credentialHash, "credentialHash");
+    const deleted = [...this.ctx.storage.sql.exec(
+      "SELECT credential_hash FROM deleted_guest_deletion_credentials WHERE credential_hash = ? LIMIT 1", credentialHash,
+    )];
+    if (deleted.length) return json(200, { ok: true, deleted: true, replay: true });
+
+    let accountId = null;
+    this.ctx.storage.transactionSync(() => {
+      const deletedAgain = [...this.ctx.storage.sql.exec(
+        "SELECT credential_hash FROM deleted_guest_deletion_credentials WHERE credential_hash = ? LIMIT 1", credentialHash,
+      )];
+      if (deletedAgain.length) return;
+      const credentials = [...this.ctx.storage.sql.exec(
+        "SELECT account_id FROM guest_deletion_credentials WHERE credential_hash = ? LIMIT 1", credentialHash,
+      )];
+      if (!credentials.length) throw httpError(404, "GUEST_DELETION_CODE_INVALID", "guest deletion code is invalid or no longer available");
+      accountId = requireAccountId(String(credentials[0].account_id));
+      const accounts = [...this.ctx.storage.sql.exec(
+        "SELECT account_kind FROM account_registry WHERE account_id = ? LIMIT 1", accountId,
+      )];
+      const google = [...this.ctx.storage.sql.exec(
+        "SELECT account_id FROM google_identities WHERE account_id = ? LIMIT 1", accountId,
+      )];
+      if (!accounts.length || google.length || String(accounts[0].account_kind) !== "GUEST") {
+        throw httpError(409, "GUEST_DELETION_CODE_NOT_AVAILABLE", "this code can delete only an unlinked guest account");
+      }
+      const existingClaim = [...this.ctx.storage.sql.exec(
+        "SELECT credential_hash FROM guest_deletion_claims WHERE account_id = ? LIMIT 1", accountId,
+      )];
+      if (existingClaim.length && String(existingClaim[0].credential_hash) !== credentialHash) {
+        throw httpError(409, "ACCOUNT_DELETION_IN_PROGRESS", "this guest account is already being deleted");
+      }
+      this.ctx.storage.sql.exec(
+        "INSERT OR IGNORE INTO guest_deletion_claims (account_id, credential_hash, created_at) VALUES (?, ?, ?)",
+        accountId, credentialHash, Date.now(),
+      );
+    });
+    if (accountId == null) return json(200, { ok: true, deleted: true, replay: true });
+    return json(200, { ok: true, accountId, deleted: false, replay: false });
   }
 
   async #createNonce() {
@@ -107,6 +199,9 @@ export class AccountDirectory {
     const accountId = requireAccountId(body?.accountId);
     const subjectHash = requireHash(body?.subjectHash, "subjectHash");
     if ([...this.ctx.storage.sql.exec("SELECT account_id FROM account_registry WHERE account_id = ? LIMIT 1", accountId)].length !== 1) throw httpError(404, "ACCOUNT_NOT_FOUND", "account was not found");
+    if ([...this.ctx.storage.sql.exec("SELECT credential_hash FROM guest_deletion_claims WHERE account_id = ? LIMIT 1", accountId)].length) {
+      throw httpError(409, "ACCOUNT_DELETION_IN_PROGRESS", "this account is being deleted and cannot be linked");
+    }
     const rows = [...this.ctx.storage.sql.exec("SELECT subject_hash, account_id FROM google_identities WHERE subject_hash = ? OR account_id = ? LIMIT 2", subjectHash, accountId)];
     if (rows.length) {
       const exact = rows.some((row) => String(row.subject_hash) === subjectHash && String(row.account_id) === accountId);
@@ -115,7 +210,11 @@ export class AccountDirectory {
       throw httpError(409, "GOOGLE_IDENTITY_ALREADY_LINKED", "this Google account is already linked to another Ludo Paws account, or this account already has a different Google identity");
     }
     this.ctx.storage.transactionSync(() => {
+      if ([...this.ctx.storage.sql.exec("SELECT credential_hash FROM guest_deletion_claims WHERE account_id = ? LIMIT 1", accountId)].length) {
+        throw httpError(409, "ACCOUNT_DELETION_IN_PROGRESS", "this account is being deleted and cannot be linked");
+      }
       this.ctx.storage.sql.exec("INSERT INTO google_identities (subject_hash, account_id, linked_at) VALUES (?, ?, ?)", subjectHash, accountId, Date.now());
+      this.ctx.storage.sql.exec("DELETE FROM guest_deletion_credentials WHERE account_id = ?", accountId);
       this.ctx.storage.sql.exec("UPDATE account_registry SET account_kind = 'GOOGLE_LINKED' WHERE account_id = ?", accountId);
     });
     return json(200, { ok: true, accountId, linked: true, replay: false });
@@ -137,6 +236,9 @@ export class AccountDirectory {
     if (!["friend", "leaderboard"].includes(identityType)) throw httpError(400, "IDENTITY_TYPE_INVALID", "identity type is invalid");
     if ((identityType === "friend" && !FRIEND_ID.test(externalId)) || (identityType === "leaderboard" && !PROFILE_ID.test(externalId))) throw httpError(400, "EXTERNAL_ID_INVALID", "linked identity is invalid");
     if ([...this.ctx.storage.sql.exec("SELECT account_id FROM account_registry WHERE account_id = ? LIMIT 1", accountId)].length !== 1) throw httpError(404, "ACCOUNT_NOT_FOUND", "account was not found");
+    if ([...this.ctx.storage.sql.exec("SELECT credential_hash FROM guest_deletion_claims WHERE account_id = ? LIMIT 1", accountId)].length) {
+      throw httpError(409, "ACCOUNT_DELETION_IN_PROGRESS", "this account is being deleted and cannot link another identity");
+    }
     const rows = [...this.ctx.storage.sql.exec("SELECT identity_type, external_id, account_id FROM account_identity_links WHERE identity_type = ? AND (external_id = ? OR account_id = ?) LIMIT 2", identityType, externalId, accountId)];
     if (rows.length) {
       const exact = rows.some((row) => String(row.external_id) === externalId && String(row.account_id) === accountId);
