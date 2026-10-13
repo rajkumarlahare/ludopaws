@@ -41,6 +41,11 @@ internal class PostWinInterstitialAdController(
             return
         }
 
+        if (sdkInitialized && consentInformation.canRequestAds()) {
+            loadInterstitial()
+            return
+        }
+
         consentUpdateInProgress = true
         consentInformation.requestConsentInfoUpdate(
             activity,
@@ -82,7 +87,11 @@ internal class PostWinInterstitialAdController(
             if (completed) return
             completed = true
             showing = false
+            showConsumed = false
             onFinished()
+            // Refill for the next completed match only while this gameplay host remains alive.
+            // A dismissed interstitial does not itself display another ad.
+            if (!closed && !activity.isFinishing && !activity.isDestroyed) prepare()
         }
 
         ad.fullScreenContentCallback =
