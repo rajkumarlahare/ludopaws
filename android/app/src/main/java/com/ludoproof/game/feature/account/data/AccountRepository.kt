@@ -7,6 +7,7 @@ import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
+import java.security.SecureRandom
 import java.util.UUID
 
 class AccountRepository(context: Context) {
@@ -78,6 +79,7 @@ class AccountRepository(context: Context) {
             response,
             guestRecoveryEligible = current.guestRecoveryEligible,
             identityRecoveryPending = current.identityRecoveryPending,
+            guestDeletionCredential = current.guestDeletionCredential,
         )
     }
 
@@ -112,6 +114,7 @@ class AccountRepository(context: Context) {
                     latest.copy(
                         displayName = profileName,
                         guestRecoveryEligible = false,
+                        guestDeletionCredential = null,
                     ),
                 )
             }
@@ -231,6 +234,45 @@ class AccountRepository(context: Context) {
         )
     }
 
+    @Synchronized
+    fun ensureGuestDeletionCredential(): String {
+        var session = requireSession()
+        if (!session.guestRecoveryEligible) {
+            throw AccountApiException(
+                409,
+                "GUEST_DELETION_CODE_NOT_AVAILABLE",
+                "A delete-only code is available only while this account is a guest. Use Google sign-in for a linked account.",
+            )
+        }
+        var credential = session.guestDeletionCredential
+        if (credential == null) {
+            val bytes = ByteArray(32)
+            SecureRandom().nextBytes(bytes)
+            val alphabet = "0123456789abcdef"
+            credential = buildString(bytes.size * 2) {
+                for (byte in bytes) {
+                    val value = byte.toInt() and 0xff
+                    append(alphabet[value ushr 4])
+                    append(alphabet[value and 0x0f])
+                }
+            }
+            sessions.save(session.copy(guestDeletionCredential = credential))
+        }
+        // Re-register on every open: this makes a retry idempotent if the previous response
+        // was lost and ensures the code was not only saved locally.
+        session = requireSession()
+        if (!session.guestRecoveryEligible) {
+            throw AccountApiException(409, "GUEST_DELETION_CODE_NOT_AVAILABLE", "this account is no longer a guest account")
+        }
+        request(
+            "POST",
+            "/api/account/guest/deletion-code",
+            JSONObject().put("credential", credential),
+            session.accessToken,
+        )
+        return credential
+    }
+
     fun deleteCurrentAccount(): JSONObject {
         val current = sessions.load()
             ?: throw AccountApiException(401, "ACCOUNT_SESSION_REQUIRED", "Sign in again before deleting your account.")
@@ -283,6 +325,7 @@ class AccountRepository(context: Context) {
         response: JSONObject,
         guestRecoveryEligible: Boolean,
         identityRecoveryPending: Boolean = false,
+        guestDeletionCredential: String? = null,
     ): AccountSession {
         val profile = response.optJSONObject("profile") ?: JSONObject()
         val session = AccountSession(
@@ -296,6 +339,7 @@ class AccountRepository(context: Context) {
             displayName = profile.optString("displayName", "Guest User").take(24),
             guestRecoveryEligible = guestRecoveryEligible,
             identityRecoveryPending = identityRecoveryPending,
+            guestDeletionCredential = guestDeletionCredential?.takeIf { guestRecoveryEligible },
         )
         sessions.save(session)
         return session
