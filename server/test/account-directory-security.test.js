@@ -71,6 +71,9 @@ class FakeSql {
     if (sql.startsWith("SELECT account_id FROM guest_deletion_claims WHERE account_id = ?")) {
       return this.guestDeletionClaims.has(params[0]) ? [{ account_id: params[0] }] : [];
     }
+    if (sql.startsWith("SELECT account_id FROM guest_deletion_claims WHERE account_id = ?")) {
+      return this.guestDeletionClaims.has(params[0]) ? [{ account_id: params[0] }] : [];
+    }
     if (sql.startsWith("SELECT client_request_id FROM guest_requests WHERE account_id = ?")) {
       return [...this.guestRequests.entries()].filter(([, value]) => value.accountId === params[0]).map(([client_request_id]) => ({ client_request_id }));
     }
