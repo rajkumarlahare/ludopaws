@@ -597,7 +597,7 @@ test("linked account deletion retries safely after each injected downstream fail
 });
 
 
-function makeGuestDeletionApiEnv(expectedCredentialHash, { directoryDeleteFailures = 0, serverGeneratedCredential = "12".repeat(32) } = {}) {
+function makeGuestDeletionApiEnv(expectedCredentialHash, { directoryDeleteFailures = 0, serverGeneratedCredential = "12".repeat(32), rotatedCredential = "34".repeat(32) } = {}) {
   const calls = [];
   let playerDeleted = false;
   let directoryDeleted = false;
@@ -646,7 +646,12 @@ function makeGuestDeletionApiEnv(expectedCredentialHash, { directoryDeleteFailur
           if (path === "/guest-deletion/register") {
             assert.equal(body.accountId, ACCOUNT_A);
             assert.equal(Object.hasOwn(body, "credentialHash"), false, "client must not choose the deletion code or its hash");
-            return Response.json({ ok: true, ready: true, credential: serverGeneratedCredential });
+            assert.equal(typeof body.rotate, "boolean");
+            return Response.json({
+              ok: true,
+              ready: true,
+              credential: body.rotate ? rotatedCredential : serverGeneratedCredential,
+            });
           }
           if (path === "/guest-deletion/claim") {
             assert.match(body.credentialHash, /^[a-f0-9]{64}$/, "only a credential hash should be sent to AccountDirectory");
@@ -773,4 +778,15 @@ test("guest deletion code endpoint returns a server-generated code to an active 
   );
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { ok: true, ready: true, credential: code });
+
+  const replacement = await accountWorker.fetch(
+    new Request("https://api.example.test/api/account/guest/deletion-code", {
+      method: "POST",
+      headers: { authorization: "Bearer " + token, "content-type": "application/json" },
+      body: JSON.stringify({ rotate: true }),
+    }),
+    fixture.env,
+  );
+  assert.equal(replacement.status, 200);
+  assert.deepEqual(await replacement.json(), { ok: true, ready: true, credential: "34".repeat(32) });
 });
