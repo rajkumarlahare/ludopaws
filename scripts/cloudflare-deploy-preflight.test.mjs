@@ -84,4 +84,10 @@ test("production readiness verifier reads its response from the explicit READY_F
   assert.ok(readinessStep.includes('READY_FILE="$ready_file" node -e'));
   assert.ok(readinessStep.includes('readFileSync(process.env.READY_FILE, "utf8")'));
   assert.equal(readinessStep.includes("readFileSync(process.argv[1]"), false);
+  const scriptStartMarker = "READY_FILE=\"$ready_file\" node -e '";
+  const scriptStart = readinessStep.indexOf(scriptStartMarker) + scriptStartMarker.length;
+  const scriptEnd = readinessStep.indexOf("\n          '", scriptStart);
+  const inlineNodeScript = readinessStep.slice(scriptStart, scriptEnd);
+  assert.ok(scriptStart >= scriptStartMarker.length && scriptEnd > scriptStart, "readiness inline Node.js script must be present");
+  assert.equal(inlineNodeScript.includes("'"), false, "single-quoted bash inline script must not contain unescaped apostrophes");
 });

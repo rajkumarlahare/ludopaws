@@ -273,7 +273,7 @@ jobs:
               process.exit(4);
             }
             // Operational readiness is not independent certification. Until
-            // the repository's independent-review gate is deliberately changed,
+            // the independent-review gate is deliberately changed,
             // require an explicit false claim (missing is not good enough).
             if (body.productionClaim !== false) {
               console.error("Worker readiness must explicitly report productionClaim=false until independent review is completed.");
