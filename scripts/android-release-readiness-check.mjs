@@ -18,6 +18,7 @@ function requirePattern(name, source, pattern, message) {
 }
 
 const appBuild = read("android/app/build.gradle.kts");
+const signedReleaseWorkflow = read(".github/workflows/android-signed-release.yml");
 const snapshotTests = read(
   "android/app/src/test/java/com/ludoproof/game/GameJsonAuthoritativeSnapshotTest.kt",
 );
@@ -107,6 +108,23 @@ for (const policyToken of [
     rulesets,
     policyToken,
     `ruleset v2 release contract is missing ${policyToken}.`,
+  );
+}
+
+for (const property of [
+  "LUDOPROOF_API_BASE_URL",
+  "LUDOPROOF_BILLING_ENABLED",
+  "LUDOPROOF_ADS_ENABLED",
+  "ADMOB_APP_ID",
+  "ADMOB_REWARDED_AD_UNIT_ID",
+  "GOOGLE_SIGN_IN_WEB_CLIENT_ID",
+  "PLAY_GAMES_PROJECT_ID",
+]) {
+  requireText(
+    ".github/workflows/android-signed-release.yml",
+    signedReleaseWorkflow,
+    `ORG_GRADLE_PROJECT_${property}=%s\\n`,
+    `validated ${property} must be mapped into a Gradle project property before the signed build.`,
   );
 }
 
