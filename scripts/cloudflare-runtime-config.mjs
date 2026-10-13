@@ -4,7 +4,7 @@ const ADMOB_REWARDED_UNIT = /^ca-app-pub-[0-9]{16}\/[0-9]{10}$/;
 export const ACCOUNT_WEB_ORIGIN = "https://rajkumarlahare.github.io";
 
 function readBoolean(name, raw) {
-  const value = String(raw ?? "").trim().toLowerCase();
+  const value = String(raw ?? "").trim();
   if (!value) return false;
   if (value === "true") return true;
   if (value === "false") return false;
