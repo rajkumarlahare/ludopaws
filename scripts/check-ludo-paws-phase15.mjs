@@ -165,8 +165,13 @@ for (const marker of [
 
 requireText(
   buildGradle,
-  'applicationId = "com.ludoproof.game"',
-  "Phase 15 must not migrate the Android package identity.",
+  'applicationId = "com.rekixo.ludopaws"',
+  "The approved first-release Android application ID must remain Rekixo-branded.",
+);
+requireText(
+  buildGradle,
+  'namespace = "com.ludoproof.game"',
+  "Keep the legacy Kotlin namespace stable during the isolated application-ID migration.",
 );
 requireText(
   wrangler,
