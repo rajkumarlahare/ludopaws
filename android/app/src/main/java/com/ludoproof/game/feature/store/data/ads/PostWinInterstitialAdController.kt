@@ -92,8 +92,8 @@ internal class PostWinInterstitialAdController(
             showing = false
             showConsumed = false
             if (wasDismissed) onAdDismissed() else onFailedToShow()
-            // Refill for the next completed match only while this gameplay host remains alive.
-            // Dismissal returns to the result screen; navigation requires the next Back press.
+            // Refill for a later completed match only while this gameplay host remains alive.
+            // The caller owns navigation after dismissal or a failed-to-show callback.
             if (!closed && !activity.isFinishing && !activity.isDestroyed) prepare()
         }
 
