@@ -74,7 +74,10 @@ internal class PostWinInterstitialAdController(
     fun isReady(): Boolean =
         enabled && !closed && !showConsumed && !showing && interstitialAd != null
 
-    fun showIfReady(onFinished: () -> Unit): Boolean {
+    fun showIfReady(
+        onAdDismissed: () -> Unit,
+        onFailedToShow: () -> Unit,
+    ): Boolean {
         if (!enabled || closed || showConsumed || showing) return false
         val ad = interstitialAd ?: return false
 
@@ -83,26 +86,26 @@ internal class PostWinInterstitialAdController(
         showing = true
         var completed = false
 
-        fun finishOnce() {
+        fun finishOnce(wasDismissed: Boolean) {
             if (completed) return
             completed = true
             showing = false
             showConsumed = false
-            onFinished()
+            if (wasDismissed) onAdDismissed() else onFailedToShow()
             // Refill for the next completed match only while this gameplay host remains alive.
-            // A dismissed interstitial does not itself display another ad.
+            // Dismissal returns to the result screen; navigation requires the next Back press.
             if (!closed && !activity.isFinishing && !activity.isDestroyed) prepare()
         }
 
         ad.fullScreenContentCallback =
             object : FullScreenContentCallback() {
                 override fun onAdDismissedFullScreenContent() {
-                    finishOnce()
+                    finishOnce(wasDismissed = true)
                 }
 
                 override fun onAdFailedToShowFullScreenContent(error: AdError) {
                     Log.w(TAG, "Post-win interstitial failed to show: ${error.message}")
-                    finishOnce()
+                    finishOnce(wasDismissed = false)
                 }
             }
 
@@ -110,7 +113,7 @@ internal class PostWinInterstitialAdController(
             ad.show(activity)
         } catch (error: Exception) {
             Log.w(TAG, "Post-win interstitial could not be shown", error)
-            finishOnce()
+            finishOnce(wasDismissed = false)
         }
         return true
     }
