@@ -193,8 +193,10 @@ async function handleAccountRequest(request, env) {
       if (url.pathname === "/api/account/guest/deletion-code" && request.method === "POST") {
         await rateLimit(env, request, "account:guest:deletion-code", ACCOUNT_RATE_LIMITS.guestDeletionCode);
         const session = await authenticate(request, env);
+        const body = await readJson(request);
         const registration = await directoryRequest(env, "/guest-deletion/register", {
           accountId: session.accountId,
+          rotate: body?.rotate === true,
         });
         const credential = normalizeGuestDeletionCredential(registration?.credential);
         return json(200, { ok: true, ready: true, credential });
