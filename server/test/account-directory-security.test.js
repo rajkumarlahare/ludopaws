@@ -223,14 +223,16 @@ test("guest deletion codes are stored as hashes, block Google linking after clai
   assert.equal(createdResponse.status, 200);
   const created = await createdResponse.json();
 
-  const credential = "ab".repeat(32);
-  const credentialHash = await sha256Hex("ludoproof:guest-deletion-credential:v1:" + credential);
   const registered = await directory.fetch(new Request("https://account-directory/guest-deletion/register", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ accountId: created.accountId, credentialHash }),
+    body: JSON.stringify({ accountId: created.accountId }),
   }));
   assert.equal(registered.status, 200);
+  const registeredBody = await registered.json();
+  const credential = registeredBody.credential;
+  assert.match(credential, /^[a-f0-9]{64}$/);
+  const credentialHash = await sha256Hex("ludoproof:guest-deletion-credential:v1:" + credential);
   assert.equal(sql.guestDeletionCredentials.has(credentialHash), true);
   assert.equal(sql.guestDeletionCredentials.has(credential), false);
 
@@ -284,12 +286,10 @@ test("guest deletion codes are unavailable for Google-linked accounts", async ()
   const created = await createdResponse.json();
   sql.googleIdentities.set(created.accountId, { subjectHash: "ef".repeat(32) });
   sql.accounts.set(created.accountId, { kind: "GOOGLE_LINKED", createdAt: Date.now() });
-  const credentialHash = await sha256Hex("ludoproof:guest-deletion-credential:v1:" + "ef".repeat(32));
-
   const response = await directory.fetch(new Request("https://account-directory/guest-deletion/register", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ accountId: created.accountId, credentialHash }),
+    body: JSON.stringify({ accountId: created.accountId }),
   }));
   assert.equal(response.status, 409);
   assert.equal((await response.json()).error, "GUEST_DELETION_CODE_NOT_AVAILABLE");
