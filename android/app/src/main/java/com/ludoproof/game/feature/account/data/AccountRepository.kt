@@ -78,6 +78,7 @@ class AccountRepository(context: Context) {
             response,
             guestRecoveryEligible = current.guestRecoveryEligible,
             identityRecoveryPending = current.identityRecoveryPending,
+            guestDeletionCredential = current.guestDeletionCredential,
         )
     }
 
@@ -112,6 +113,7 @@ class AccountRepository(context: Context) {
                     latest.copy(
                         displayName = profileName,
                         guestRecoveryEligible = false,
+                        guestDeletionCredential = null,
                     ),
                 )
             }
@@ -231,6 +233,50 @@ class AccountRepository(context: Context) {
         )
     }
 
+    @Synchronized
+    fun ensureGuestDeletionCredential(rotateExisting: Boolean = false): String {
+        val session = requireSession()
+        if (!session.guestRecoveryEligible) {
+            throw AccountApiException(
+                409,
+                "GUEST_DELETION_CODE_NOT_AVAILABLE",
+                "A delete-only code is available only while this account is a guest. Use Google sign-in for a linked account.",
+            )
+        }
+
+        session.guestDeletionCredential?.let { existing ->
+            if (!rotateExisting) return existing
+        }
+
+        // AccountDirectory generates the 256-bit secret server-side and stores only its hash.
+        // Keep other installations' saved codes valid unless the owner explicitly replaces them.
+        val rotate = rotateExisting
+        val response = request(
+            "POST",
+            "/api/account/guest/deletion-code",
+            JSONObject().put("rotate", rotate),
+            session.accessToken,
+        )
+        val credential = response.optString("credential")
+        if (!Regex("^[a-f0-9]{64}$").matches(credential)) {
+            throw AccountApiException(
+                503,
+                "GUEST_DELETION_CODE_RESPONSE_INVALID",
+                "The account service did not return a valid guest deletion code.",
+            )
+        }
+        val latest = requireSession()
+        if (latest.accountId != session.accountId || !latest.guestRecoveryEligible) {
+            throw AccountApiException(
+                409,
+                "GUEST_DELETION_CODE_NOT_AVAILABLE",
+                "This account is no longer an eligible guest account.",
+            )
+        }
+        sessions.save(latest.copy(guestDeletionCredential = credential))
+        return credential
+    }
+
     fun deleteCurrentAccount(): JSONObject {
         val current = sessions.load()
             ?: throw AccountApiException(401, "ACCOUNT_SESSION_REQUIRED", "Sign in again before deleting your account.")
@@ -283,6 +329,7 @@ class AccountRepository(context: Context) {
         response: JSONObject,
         guestRecoveryEligible: Boolean,
         identityRecoveryPending: Boolean = false,
+        guestDeletionCredential: String? = null,
     ): AccountSession {
         val profile = response.optJSONObject("profile") ?: JSONObject()
         val session = AccountSession(
@@ -296,6 +343,7 @@ class AccountRepository(context: Context) {
             displayName = profile.optString("displayName", "Guest User").take(24),
             guestRecoveryEligible = guestRecoveryEligible,
             identityRecoveryPending = identityRecoveryPending,
+            guestDeletionCredential = guestDeletionCredential?.takeIf { guestRecoveryEligible },
         )
         sessions.save(session)
         return session

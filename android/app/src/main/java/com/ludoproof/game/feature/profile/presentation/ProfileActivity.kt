@@ -2,6 +2,7 @@ package com.ludoproof.game.feature.profile.presentation
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.graphics.Typeface
 import android.os.Bundle
 import android.os.Build
 import android.util.Log
@@ -12,6 +13,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.Toast
+import android.widget.TextView
 import androidx.credentials.CredentialManager
 import androidx.credentials.CredentialManagerCallback
 import androidx.credentials.CustomCredential
@@ -209,6 +211,31 @@ class ProfileActivity : Activity() {
             profilePurchasesPanel(profile),
             sectionParams(12),
         )
+        if (!accountGoogleLinked && accountRepository.currentSession()?.guestRecoveryEligible == true) {
+            content.addView(
+                Button(this).apply {
+                    text = "Guest deletion code (for uninstall)"
+                    isAllCaps = false
+                    setOnClickListener { showGuestDeletionCode() }
+                },
+                sectionParams(12),
+            )
+            content.addView(
+                Button(this).apply {
+                    text = "Replace guest deletion code"
+                    isAllCaps = false
+                    setOnClickListener {
+                        AlertDialog.Builder(this@ProfileActivity)
+                            .setTitle("Replace saved guest deletion code?")
+                            .setMessage("This invalidates all previously saved guest deletion codes for this account. Save the replacement privately before uninstalling.")
+                            .setNegativeButton("Cancel", null)
+                            .setPositiveButton("Replace code") { _, _ -> showGuestDeletionCode(rotateExisting = true) }
+                            .show()
+                    }
+                },
+                sectionParams(8),
+            )
+        }
         content.addView(
             Button(this).apply {
                 text = "Delete account and data"
@@ -271,6 +298,60 @@ class ProfileActivity : Activity() {
             }
             .setNegativeButton("Cancel", null)
             .show()
+    }
+
+    private fun showGuestDeletionCode(rotateExisting: Boolean = false) {
+        if (accountAuthInProgress) return
+        accountAuthInProgress = true
+        accountStatus = "Preparing guest deletion code…"
+        renderProfile()
+        accountAuthExecutor.execute {
+            try {
+                val code = accountRepository.ensureGuestDeletionCredential(rotateExisting)
+                runOnUiThread {
+                    if (isFinishing || isDestroyed) return@runOnUiThread
+                    accountAuthInProgress = false
+                    accountStatus = "Guest deletion code ready"
+                    renderProfile()
+                    val content = LinearLayout(this).apply {
+                        orientation = LinearLayout.VERTICAL
+                        setPadding(dp(24), dp(12), dp(24), dp(4))
+                        addView(TextView(this@ProfileActivity).apply {
+                            text = if (rotateExisting) {
+                                "This new code replaces every previously saved guest deletion code for this account. Save it somewhere private before uninstalling. It can delete this guest account only; it cannot sign in or restore your account. Never send it to support or share it with anyone."
+                            } else {
+                                "Save this code somewhere private before uninstalling. On the official Ludo Paws deletion page, it can delete this guest account only; it cannot sign in or restore your account. Never send this code to support or share it with anyone."
+                            }
+                            textSize = 14f
+                        })
+                        addView(TextView(this@ProfileActivity).apply {
+                            text = code
+                            setTextIsSelectable(true)
+                            typeface = Typeface.MONOSPACE
+                            textSize = 16f
+                            setPadding(0, dp(14), 0, dp(8))
+                        })
+                    }
+                    AlertDialog.Builder(this@ProfileActivity)
+                        .setTitle("Guest deletion code")
+                        .setView(content)
+                        .setPositiveButton("Close", null)
+                        .show()
+                }
+            } catch (error: Exception) {
+                runOnUiThread {
+                    if (isFinishing || isDestroyed) return@runOnUiThread
+                    accountAuthInProgress = false
+                    accountStatus = "Guest deletion code unavailable"
+                    renderProfile()
+                    AlertDialog.Builder(this@ProfileActivity)
+                        .setTitle("Could not prepare code")
+                        .setMessage(error.message ?: "Connect to the internet and try again. The guest account has not been deleted.")
+                        .setPositiveButton("OK", null)
+                        .show()
+                }
+            }
+        }
     }
 
     private fun confirmAccountDeletion() {

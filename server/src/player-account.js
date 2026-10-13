@@ -58,6 +58,7 @@ export class PlayerAccount {
       const sql = ctx.storage.sql;
       sql.exec("CREATE TABLE IF NOT EXISTS account_meta (account_id TEXT PRIMARY KEY, display_name TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)");
       sql.exec("CREATE TABLE IF NOT EXISTS account_deletions (account_id TEXT PRIMARY KEY, deleted_at INTEGER NOT NULL)");
+      sql.exec("CREATE TABLE IF NOT EXISTS account_deletion_claims (account_id TEXT PRIMARY KEY, claimed_at INTEGER NOT NULL)");
       sql.exec("CREATE TABLE IF NOT EXISTS account_sessions (session_id TEXT PRIMARY KEY, refresh_token_hash TEXT NOT NULL, previous_refresh_hash TEXT, last_refresh_request_id TEXT, created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, revoked_at INTEGER, last_seen_at INTEGER NOT NULL)");
       sql.exec("CREATE TABLE IF NOT EXISTS wallet (account_id TEXT PRIMARY KEY, balance INTEGER NOT NULL DEFAULT 0 CHECK(balance >= 0), ads_removed INTEGER NOT NULL DEFAULT 0 CHECK(ads_removed IN (0, 1)), updated_at INTEGER NOT NULL)");
       sql.exec("CREATE TABLE IF NOT EXISTS wallet_transactions (transaction_id TEXT PRIMARY KEY, idempotency_key TEXT NOT NULL UNIQUE, payload_hash TEXT NOT NULL, kind TEXT NOT NULL, delta INTEGER NOT NULL, balance_after INTEGER NOT NULL, source_ref_hash TEXT, created_at INTEGER NOT NULL)");
@@ -91,15 +92,43 @@ export class PlayerAccount {
   async #deletePreview(request) {
     const body = await readJson(request), accountId = requireAccountId(body?.accountId);
     if ([...this.ctx.storage.sql.exec("SELECT account_id FROM account_deletions WHERE account_id = ? LIMIT 1", accountId)].length) {
-      return json(200, { ok: true, deleted: true, purchaseLedgerIds: [] });
+      return json(200, { ok: true, deleted: true, deletionPending: false, purchaseLedgerIds: [] });
     }
-    const sessionId = requireSessionId(body?.sessionId);
-    this.#requireActiveSession(accountId, sessionId);
-    this.#profileSnapshot(accountId);
-    const purchaseLedgerIds = [...this.ctx.storage.sql.exec(
-      "SELECT source_ref_hash FROM wallet_transactions WHERE kind IN ('PLAY_GEM_PURCHASE', 'PLAY_REMOVE_ADS') AND source_ref_hash IS NOT NULL",
-    )].map((row) => String(row.source_ref_hash)).filter((value) => /^[a-f0-9]{64}$/.test(value));
-    return json(200, { ok: true, deleted: false, purchaseLedgerIds: [...new Set(purchaseLedgerIds)] });
+
+    const guestRecoveryVerified = body?.guestRecoveryVerified === true;
+    const accountDeletionReplayVerified = body?.accountDeletionReplayVerified === true;
+    const sessionId = guestRecoveryVerified || accountDeletionReplayVerified ? null : requireSessionId(body?.sessionId);
+    let deleted = false;
+    let purchaseLedgerIds = [];
+
+    // Claim the account and snapshot all known purchase ledgers in one synchronous transaction.
+    // Writes that arrive after this point reject the deletion claim before changing wallet data.
+    this.ctx.storage.transactionSync(() => {
+      if ([...this.ctx.storage.sql.exec("SELECT account_id FROM account_deletions WHERE account_id = ? LIMIT 1", accountId)].length) {
+        deleted = true;
+        return;
+      }
+      const existingClaim = [...this.ctx.storage.sql.exec(
+        "SELECT account_id FROM account_deletion_claims WHERE account_id = ? LIMIT 1", accountId,
+      )];
+      if (accountDeletionReplayVerified && !existingClaim.length) {
+        throw httpError(409, "ACCOUNT_DELETION_NOT_IN_PROGRESS", "an expired session can only resume an existing deletion");
+      }
+      if (!guestRecoveryVerified && !accountDeletionReplayVerified) {
+        this.#requireActiveSession(accountId, sessionId, true);
+      }
+      this.#profileSnapshot(accountId);
+      this.ctx.storage.sql.exec(
+        "INSERT OR IGNORE INTO account_deletion_claims (account_id, claimed_at) VALUES (?, ?)",
+        accountId, Date.now(),
+      );
+      purchaseLedgerIds = [...this.ctx.storage.sql.exec(
+        "SELECT source_ref_hash FROM wallet_transactions WHERE kind IN ('PLAY_GEM_PURCHASE', 'PLAY_REMOVE_ADS') AND source_ref_hash IS NOT NULL",
+      )].map((row) => String(row.source_ref_hash)).filter((value) => /^[a-f0-9]{64}$/.test(value));
+    });
+
+    if (deleted) return json(200, { ok: true, deleted: true, deletionPending: false, purchaseLedgerIds: [] });
+    return json(200, { ok: true, deleted: false, deletionPending: true, purchaseLedgerIds: [...new Set(purchaseLedgerIds)] });
   }
 
   async #deleteAccount(request) {
@@ -107,12 +136,31 @@ export class PlayerAccount {
     if ([...this.ctx.storage.sql.exec("SELECT account_id FROM account_deletions WHERE account_id = ? LIMIT 1", accountId)].length) {
       return json(200, { ok: true, accountId, deleted: true, replay: true });
     }
-    const sessionId = requireSessionId(body?.sessionId);
-    this.#requireActiveSession(accountId, sessionId);
+    const guestRecoveryVerified = body?.guestRecoveryVerified === true;
+    const accountDeletionReplayVerified = body?.accountDeletionReplayVerified === true;
+    const sessionId = guestRecoveryVerified || accountDeletionReplayVerified ? null : requireSessionId(body?.sessionId);
     if (body?.confirmation !== "DELETE_MY_ACCOUNT") throw httpError(400, "ACCOUNT_DELETE_CONFIRMATION_REQUIRED", "account deletion confirmation is required");
-    this.#profileSnapshot(accountId);
+
     const deletedAt = Date.now();
+    let replay = false;
     this.ctx.storage.transactionSync(() => {
+      if ([...this.ctx.storage.sql.exec("SELECT account_id FROM account_deletions WHERE account_id = ? LIMIT 1", accountId)].length) {
+        replay = true;
+        return;
+      }
+      const claim = [...this.ctx.storage.sql.exec(
+        "SELECT account_id FROM account_deletion_claims WHERE account_id = ? LIMIT 1", accountId,
+      )];
+      if (guestRecoveryVerified || accountDeletionReplayVerified) {
+        if (!claim.length) throw httpError(409, "ACCOUNT_DELETION_NOT_IN_PROGRESS", "verified deletion replay requires an existing deletion claim");
+      } else {
+        this.#requireActiveSession(accountId, sessionId, true);
+      }
+      this.ctx.storage.sql.exec(
+        "INSERT OR IGNORE INTO account_deletion_claims (account_id, claimed_at) VALUES (?, ?)",
+        accountId, deletedAt,
+      );
+      this.#profileSnapshot(accountId);
       this.ctx.storage.sql.exec("DELETE FROM account_sessions");
       this.ctx.storage.sql.exec("DELETE FROM wallet_transactions");
       this.ctx.storage.sql.exec("DELETE FROM cosmetic_ad_progress");
@@ -121,8 +169,9 @@ export class PlayerAccount {
       this.ctx.storage.sql.exec("DELETE FROM wallet");
       this.ctx.storage.sql.exec("DELETE FROM account_meta WHERE account_id = ?", accountId);
       this.ctx.storage.sql.exec("INSERT INTO account_deletions (account_id, deleted_at) VALUES (?, ?)", accountId, deletedAt);
+      this.ctx.storage.sql.exec("DELETE FROM account_deletion_claims WHERE account_id = ?", accountId);
     });
-    return json(200, { ok: true, accountId, deleted: true, replay: false });
+    return json(200, { ok: true, accountId, deleted: true, replay });
   }
 
   async #createSession(request) {
@@ -133,7 +182,13 @@ export class PlayerAccount {
     const now = Date.now(), expiresAt = now + SESSION_TTL_MS;
     const accessToken = await issueAccessToken(this.env, accountId, sessionId, now);
     const billingId = await billingAccountId(accountId);
-    this.ctx.storage.sql.exec("INSERT INTO account_sessions (session_id, refresh_token_hash, previous_refresh_hash, last_refresh_request_id, created_at, expires_at, revoked_at, last_seen_at) VALUES (?, ?, NULL, NULL, ?, ?, NULL, ?)", sessionId, refreshHash, now, expiresAt, now);
+    this.ctx.storage.transactionSync(() => {
+      if ([...this.ctx.storage.sql.exec("SELECT account_id FROM account_deletions WHERE account_id = ? LIMIT 1", accountId)].length) {
+        throw httpError(410, "ACCOUNT_DELETED", "this account has been deleted");
+      }
+      this.#requireAccountNotDeleting(accountId);
+      this.ctx.storage.sql.exec("INSERT INTO account_sessions (session_id, refresh_token_hash, previous_refresh_hash, last_refresh_request_id, created_at, expires_at, revoked_at, last_seen_at) VALUES (?, ?, NULL, NULL, ?, ?, NULL, ?)", sessionId, refreshHash, now, expiresAt, now);
+    });
     return json(200, { ok: true, accountId, sessionId, billingAccountId: billingId, accessToken, refreshToken, accessExpiresAt: Math.floor(now / 1000) + 900, sessionExpiresAt: expiresAt, profile: this.#profileSnapshot(accountId), wallet: this.#walletSnapshot(accountId) });
   }
 
@@ -150,6 +205,7 @@ export class PlayerAccount {
     // rotated the token after an earlier read; in that case accept only the exact same
     // request ID + old token + deterministically derived next token.
     this.ctx.storage.transactionSync(() => {
+      this.#requireAccountNotDeleting(accountId);
       const currentRows = [...this.ctx.storage.sql.exec(
         "SELECT refresh_token_hash, previous_refresh_hash, last_refresh_request_id, expires_at, revoked_at FROM account_sessions WHERE session_id = ? LIMIT 1",
         sessionId,
@@ -198,7 +254,7 @@ export class PlayerAccount {
 
   async #checkSession(request) {
     const body = await readJson(request), accountId = requireAccountId(body?.accountId), sessionId = requireSessionId(body?.sessionId);
-    this.#requireActiveSession(accountId, sessionId);
+    this.#requireActiveSession(accountId, sessionId, body?.allowDeletionPending === true);
     return json(200, { ok: true, accountId, profile: this.#profileSnapshot(accountId) });
   }
   async #logout(request) {
@@ -256,6 +312,7 @@ export class PlayerAccount {
       if (cosmetic.level > 0) throw httpError(409, "PROFILE_PROGRESSION_NOT_SERVER_AUTHORITATIVE", "this cosmetic requires server-verified progression before it can be unlocked");
       let replay = false;
       this.ctx.storage.transactionSync(() => {
+        this.#requireAccountNotDeleting(accountId);
         const prior = [...this.ctx.storage.sql.exec("SELECT payload_hash FROM wallet_transactions WHERE idempotency_key = ? LIMIT 1", idempotencyKey)];
         if (prior.length) {
           if (String(prior[0].payload_hash) !== payloadHash) throw httpError(409, "AD_REWARD_IDEMPOTENCY_CONFLICT", "reward transaction was reused for a different reward");
@@ -284,6 +341,7 @@ export class PlayerAccount {
     if (cosmetic.kind === "FREE") {
       let alreadyOwned = false;
       this.ctx.storage.transactionSync(() => {
+        this.#requireAccountNotDeleting(accountId);
         const now = Date.now();
         const inserted = this.ctx.storage.sql.exec("INSERT OR IGNORE INTO owned_cosmetics (cosmetic_id, category, source, acquired_at, source_ref_hash) VALUES (?, ?, 'DEFAULT', ?, NULL)", cosmeticId, cosmetic.category, now);
         alreadyOwned = Number(inserted.rowsWritten ?? 0) === 0;
@@ -298,6 +356,7 @@ export class PlayerAccount {
       const sourceRefHash = await sha256Hex("ludoproof:cosmetic-purchase:v1:" + requestId);
       let result;
       this.ctx.storage.transactionSync(() => {
+        this.#requireAccountNotDeleting(accountId);
         const prior = [...this.ctx.storage.sql.exec("SELECT payload_hash, balance_after FROM wallet_transactions WHERE idempotency_key = ? LIMIT 1", idem)];
         if (prior.length) {
           if (String(prior[0].payload_hash) !== payloadHash) throw httpError(409, "WALLET_IDEMPOTENCY_CONFLICT", "purchase request ID was reused for a different operation");
@@ -325,6 +384,7 @@ export class PlayerAccount {
       if (progress < cosmetic.ads) throw httpError(409, "NEED_REWARDED_ADS", "this cosmetic needs more verified rewarded ads");
       let alreadyOwned = false;
       this.ctx.storage.transactionSync(() => {
+        this.#requireAccountNotDeleting(accountId);
         const now = Date.now();
         const inserted = this.ctx.storage.sql.exec("INSERT OR IGNORE INTO owned_cosmetics (cosmetic_id, category, source, acquired_at, source_ref_hash) VALUES (?, ?, 'REWARDED_ADS', ?, NULL)", cosmeticId, cosmetic.category, now);
         alreadyOwned = Number(inserted.rowsWritten ?? 0) === 0;
@@ -348,6 +408,7 @@ export class PlayerAccount {
   #applyWalletTransaction({ accountId, idempotencyKey, payloadHash, kind, delta, sourceRefHash, removeAds }) {
     let result;
     this.ctx.storage.transactionSync(() => {
+      this.#requireAccountNotDeleting(accountId);
       const prior = [...this.ctx.storage.sql.exec("SELECT payload_hash, balance_after FROM wallet_transactions WHERE idempotency_key = ? LIMIT 1", idempotencyKey)];
       if (prior.length) {
         if (String(prior[0].payload_hash) !== payloadHash) throw httpError(409, "WALLET_IDEMPOTENCY_CONFLICT", "wallet transaction key was reused with different details");
@@ -369,9 +430,11 @@ export class PlayerAccount {
     if ([...this.ctx.storage.sql.exec("SELECT account_id FROM account_deletions WHERE account_id = ? LIMIT 1", accountId)].length) {
       throw httpError(410, "ACCOUNT_DELETED", "this account has been deleted");
     }
+    this.#requireAccountNotDeleting(accountId);
     const now = Date.now();
     this.ctx.storage.transactionSync(() => {
       if ([...this.ctx.storage.sql.exec("SELECT account_id FROM account_deletions WHERE account_id = ? LIMIT 1", accountId)].length) throw httpError(410, "ACCOUNT_DELETED", "this account has been deleted");
+      this.#requireAccountNotDeleting(accountId);
       const exists = [...this.ctx.storage.sql.exec("SELECT account_id FROM account_meta WHERE account_id = ? LIMIT 1", accountId)];
       if (!exists.length) this.ctx.storage.sql.exec("INSERT INTO account_meta (account_id, display_name, created_at, updated_at) VALUES (?, ?, ?, ?)", accountId, normalizeDisplayName(displayName), now, now);
       this.ctx.storage.sql.exec("INSERT OR IGNORE INTO wallet (account_id, balance, ads_removed, updated_at) VALUES (?, 0, 0, ?)", accountId, now);
@@ -379,9 +442,18 @@ export class PlayerAccount {
       for (const [category, id] of Object.entries(DEFAULT_SELECTIONS)) this.ctx.storage.sql.exec("INSERT OR IGNORE INTO selected_cosmetics (category, cosmetic_id, updated_at) VALUES (?, ?, ?)", category, id, now);
     });
   }
-  #requireActiveSession(accountId, sessionId) {
+  #requireActiveSession(accountId, sessionId, allowDeletionPending = false) {
+    if (!allowDeletionPending) this.#requireAccountNotDeleting(accountId);
     const rows = [...this.ctx.storage.sql.exec("SELECT session_id FROM account_sessions WHERE session_id = ? AND revoked_at IS NULL AND expires_at > ? AND EXISTS (SELECT 1 FROM account_meta WHERE account_id = ?) LIMIT 1", sessionId, Date.now(), accountId)];
     if (!rows.length) throw httpError(401, "ACCOUNT_SESSION_INVALID", "account session is invalid, expired or revoked");
+  }
+
+  #requireAccountNotDeleting(accountId) {
+    if ([...this.ctx.storage.sql.exec(
+      "SELECT account_id FROM account_deletion_claims WHERE account_id = ? LIMIT 1", accountId,
+    )].length) {
+      throw httpError(409, "ACCOUNT_DELETION_IN_PROGRESS", "this account is being deleted");
+    }
   }
   #profileSnapshot(accountId) {
     const rows = [...this.ctx.storage.sql.exec("SELECT account_id, display_name, created_at, updated_at FROM account_meta WHERE account_id = ? LIMIT 1", accountId)];

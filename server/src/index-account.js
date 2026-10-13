@@ -34,13 +34,14 @@ const RATE_WINDOW_MS = 60_000;
 const ACCOUNT_RATE_LIMITS = Object.freeze({
   guest: 5, challenge: 20, googleLogin: 10, googleLink: 10, sessionRefresh: 30,
   sessionLogout: 20, profile: 60, wallet: 120, walletMutation: 30, friendLink: 15, leaderboardLink: 15,
-  storePurchase: 10,
+  storePurchase: 10, guestDeletionCode: 3, guestDeletion: 3,
 });
 
 const ACCOUNT_WEB_CORS_PATHS = new Set([
   "/api/account/google/challenge",
   "/api/account/google/login",
   "/api/account/delete",
+  "/api/account/guest/delete",
 ]);
 
 export default {
@@ -189,58 +190,72 @@ async function handleAccountRequest(request, env) {
         });
       }
 
+      if (url.pathname === "/api/account/guest/deletion-code" && request.method === "POST") {
+        await rateLimit(env, request, "account:guest:deletion-code", ACCOUNT_RATE_LIMITS.guestDeletionCode);
+        const session = await authenticate(request, env);
+        const body = await readJson(request);
+        const registration = await directoryRequest(env, "/guest-deletion/register", {
+          accountId: session.accountId,
+          rotate: body?.rotate === true,
+        });
+        const credential = normalizeGuestDeletionCredential(registration?.credential);
+        return json(200, { ok: true, ready: true, credential });
+      }
+
+      if (url.pathname === "/api/account/guest/delete" && request.method === "POST") {
+        await rateLimit(env, request, "account:guest:delete", ACCOUNT_RATE_LIMITS.guestDeletion);
+        const body = await readJson(request);
+        if (body?.confirmation !== "DELETE_MY_ACCOUNT") throw httpError(400, "ACCOUNT_DELETE_CONFIRMATION_REQUIRED", "confirm account deletion to continue");
+        const credential = normalizeGuestDeletionCredential(body?.credential);
+        const credentialHash = await sha256Hex("ludoproof:guest-deletion-credential:v1:" + credential);
+        const claim = await directoryRequest(env, "/guest-deletion/claim", { credentialHash });
+        if (claim.deleted === true) return json(200, { ok: true, deleted: true, replay: true });
+        const result = await deleteAccountData(env, claim.accountId, null, {
+          guestRecoveryVerified: true,
+          guestDeletionCredentialHash: credentialHash,
+        });
+        return json(200, { ok: true, deleted: result.deleted === true, replay: result.replay === true });
+      }
+
       if (url.pathname === "/api/account/delete" && request.method === "POST") {
         await rateLimit(env, request, "account:delete", 3);
         let session;
         try {
-          session = await authenticate(request, env);
+          // Session validation is still required, but this route may resume an already
+          // claimed deletion. Other account routes remain blocked while the claim exists.
+          session = await authenticate(request, env, { allowDeletionPending: true });
         } catch (error) {
-          // A deletion can commit before the client receives its response. Permit
-          // signature-valid expired access tokens only to check the deletion
-          // tombstone; never treat the token as an active session.
           const claims = await verifyAccessTokenForDeletionReplay(env, bearerToken(request));
-          const status = await playerRequest(env, claims.accountId, "/account/delete-preview", { accountId: claims.accountId, sessionId: claims.sessionId });
+          const body = await readJson(request);
+          let status;
+          try {
+            // An expired signed token is not allowed to start deletion. PlayerAccount
+            // accepts this flag only when a prior deletion claim already exists.
+            status = await playerRequest(env, claims.accountId, "/account/delete-preview", {
+              accountId: claims.accountId,
+              sessionId: claims.sessionId,
+              accountDeletionReplayVerified: true,
+            });
+          } catch {
+            throw error;
+          }
           if (status.deleted === true) {
             // PlayerAccount is the durable deletion tombstone. Only acknowledge
             // replay after the directory's linked identity cleanup also completes.
             await directoryRequest(env, "/account/delete", { accountId: claims.accountId });
             return json(200, { ok: true, deleted: true, replay: true });
           }
+          if (status.deletionPending === true && body?.confirmation === "DELETE_MY_ACCOUNT") {
+            const result = await deleteAccountData(env, claims.accountId, claims.sessionId, {
+              accountDeletionReplayVerified: true,
+            });
+            return json(200, { ok: true, deleted: result.deleted === true, replay: true });
+          }
           throw error;
         }
         const body = await readJson(request);
         if (body?.confirmation !== "DELETE_MY_ACCOUNT") throw httpError(400, "ACCOUNT_DELETE_CONFIRMATION_REQUIRED", "confirm account deletion to continue");
-        const links = await directoryRequest(env, "/identity/list", { accountId: session.accountId });
-        const wallet = await playerRequest(env, session.accountId, "/account/delete-preview", { accountId: session.accountId, sessionId: session.sessionId });
-        if (wallet.deleted !== true && wallet.purchaseLedgerIds?.length) {
-          if (!env?.LUDOPROOF_STORE_PURCHASES) throw httpError(503, "STORE_LEDGER_NOT_CONFIGURED", "purchase ledger is not configured for account deletion");
-          const billingId = await billingAccountId(session.accountId);
-          for (const ledgerId of wallet.purchaseLedgerIds) {
-            const ledger = env.LUDOPROOF_STORE_PURCHASES.get(env.LUDOPROOF_STORE_PURCHASES.idFromName(ledgerId));
-            await parseInternalResponse(await ledger.fetch(new Request("https://store-purchase-ledger/delete", {
-              method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ accountId: billingId }),
-            })), "STORE_PURCHASE_DELETE_FAILED");
-          }
-        }
-        if (links.friendId) {
-          if (!env?.LUDOPROOF_FRIENDS) throw httpError(503, "FRIENDS_NOT_CONFIGURED", "friend service is not configured for account deletion");
-          const target = env.LUDOPROOF_FRIENDS.get(env.LUDOPROOF_FRIENDS.idFromName("GLOBAL:V1"));
-          await parseInternalResponse(await target.fetch(new Request("https://friends/account/delete", {
-            method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ friendId: links.friendId }),
-          })), "FRIEND_ACCOUNT_DELETE_FAILED");
-        }
-        if (links.leaderboardProfileId) {
-          if (!env?.LUDOPROOF_LEADERBOARD) throw httpError(503, "LEADERBOARD_NOT_CONFIGURED", "leaderboard is not configured for account deletion");
-          const target = env.LUDOPROOF_LEADERBOARD.get(env.LUDOPROOF_LEADERBOARD.idFromName("global"));
-          await parseInternalResponse(await target.fetch(new Request("https://leaderboard/profile/delete", {
-            method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ profileId: links.leaderboardProfileId }),
-          })), "LEADERBOARD_ACCOUNT_DELETE_FAILED");
-        }
-        // Keep identity links/recovery tombstones available until PlayerAccount
-        // commits its deletion tombstone. If directory cleanup fails afterwards,
-        // a retry can prove the PlayerAccount tombstone and finish this final step.
-        const result = await playerRequest(env, session.accountId, "/account/delete", { accountId: session.accountId, sessionId: session.sessionId, confirmation: "DELETE_MY_ACCOUNT" });
-        await directoryRequest(env, "/account/delete", { accountId: session.accountId });
+        const result = await deleteAccountData(env, session.accountId, session.sessionId);
         return json(200, { ok: true, deleted: result.deleted === true, replay: result.replay === true });
       }
 
@@ -402,13 +417,52 @@ async function handleAccountRequest(request, env) {
           accountId: obfuscatedAccountId,
         });
         const purchaseTokenHash = await sha256Hex("ludoproof:google-play-wallet-token:v1:" + purchaseToken);
-        const grant = await playerRequest(env, session.accountId, "/wallet/play-purchase", {
-          accountId: session.accountId,
-          sessionId: session.sessionId,
-          productId,
-          purchaseTokenHash,
-          purchaseLedgerId: verified.purchaseLedgerId,
-        });
+        let grant;
+        try {
+          grant = await playerRequest(env, session.accountId, "/wallet/play-purchase", {
+            accountId: session.accountId,
+            sessionId: session.sessionId,
+            productId,
+            purchaseTokenHash,
+            purchaseLedgerId: verified.purchaseLedgerId,
+          });
+        } catch (error) {
+          // Verification may have started before an account-deletion claim was acquired.
+          // If PlayerAccount rejects the final grant because deletion has begun, remove the
+          // now-orphaned owner-bound ledger record as part of that deletion race.
+          let deletionWonRace = ["ACCOUNT_DELETION_IN_PROGRESS", "ACCOUNT_DELETED"].includes(error?.code);
+          if (error?.code === "ACCOUNT_SESSION_INVALID") {
+            // The tombstone also revokes sessions, so confirm that this is a deletion replay
+            // before cleaning up. A logout/ordinary session expiry must not discard a purchase.
+            try {
+              const deletionState = await playerRequest(env, session.accountId, "/account/delete-preview", {
+                accountId: session.accountId,
+                accountDeletionReplayVerified: true,
+              });
+              deletionWonRace = deletionState.deleted === true || deletionState.deletionPending === true;
+            } catch {
+              deletionWonRace = false;
+            }
+          }
+          if (deletionWonRace) {
+            try {
+              if (!env?.LUDOPROOF_STORE_PURCHASES || typeof verified.purchaseLedgerId !== "string") {
+                throw httpError(503, "STORE_LEDGER_CLEANUP_FAILED", "purchase ledger cleanup is unavailable after deletion began");
+              }
+              const ledger = env.LUDOPROOF_STORE_PURCHASES.get(
+                env.LUDOPROOF_STORE_PURCHASES.idFromName(verified.purchaseLedgerId),
+              );
+              await parseInternalResponse(await ledger.fetch(new Request("https://store-purchase-ledger/delete", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ accountId: obfuscatedAccountId }),
+              })), "STORE_LEDGER_CLEANUP_FAILED");
+            } catch {
+              throw httpError(503, "STORE_LEDGER_CLEANUP_FAILED", "purchase ledger cleanup failed while account deletion was in progress");
+            }
+          }
+          throw error;
+        }
         return json(200, {
           ok: true,
           verified: true,
@@ -424,6 +478,71 @@ async function handleAccountRequest(request, env) {
     } catch (error) {
       return errorResponse(error);
     }
+}
+
+async function deleteAccountData(env, accountId, sessionId, {
+  guestRecoveryVerified = false,
+  guestDeletionCredentialHash = null,
+  accountDeletionReplayVerified = false,
+} = {}) {
+  const playerDeleteBody = guestRecoveryVerified
+    ? { accountId, guestRecoveryVerified: true }
+    : accountDeletionReplayVerified
+      ? { accountId, sessionId, accountDeletionReplayVerified: true }
+      : { accountId, sessionId };
+
+  // Lock wallet/session-backed changes before reading identity links. Directory prepare
+  // then blocks identity changes, so an in-flight link is either included in this snapshot
+  // or rejected before the cleanup list is read.
+  const wallet = await playerRequest(env, accountId, "/account/delete-preview", playerDeleteBody);
+  await directoryRequest(env, "/account/delete-prepare", {
+    accountId,
+    source: guestRecoveryVerified ? "GUEST_CODE" : "SESSION",
+    ...(guestDeletionCredentialHash ? { credentialHash: guestDeletionCredentialHash } : {}),
+  });
+  const links = await directoryRequest(env, "/identity/list", { accountId });
+
+  if (wallet.deleted !== true && wallet.purchaseLedgerIds?.length) {
+    if (!env?.LUDOPROOF_STORE_PURCHASES) throw httpError(503, "STORE_LEDGER_NOT_CONFIGURED", "purchase ledger is not configured for account deletion");
+    const billingId = await billingAccountId(accountId);
+    for (const ledgerId of wallet.purchaseLedgerIds) {
+      const ledger = env.LUDOPROOF_STORE_PURCHASES.get(env.LUDOPROOF_STORE_PURCHASES.idFromName(ledgerId));
+      await parseInternalResponse(await ledger.fetch(new Request("https://store-purchase-ledger/delete", {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ accountId: billingId }),
+      })), "STORE_PURCHASE_DELETE_FAILED");
+    }
+  }
+
+  if (links.friendId) {
+    if (!env?.LUDOPROOF_FRIENDS) throw httpError(503, "FRIENDS_NOT_CONFIGURED", "friend service is not configured for account deletion");
+    const target = env.LUDOPROOF_FRIENDS.get(env.LUDOPROOF_FRIENDS.idFromName("GLOBAL:V1"));
+    await parseInternalResponse(await target.fetch(new Request("https://friends/account/delete", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ friendId: links.friendId }),
+    })), "FRIEND_ACCOUNT_DELETE_FAILED");
+  }
+
+  if (links.leaderboardProfileId) {
+    if (!env?.LUDOPROOF_LEADERBOARD) throw httpError(503, "LEADERBOARD_NOT_CONFIGURED", "leaderboard is not configured for account deletion");
+    const target = env.LUDOPROOF_LEADERBOARD.get(env.LUDOPROOF_LEADERBOARD.idFromName("global"));
+    await parseInternalResponse(await target.fetch(new Request("https://leaderboard/profile/delete", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ profileId: links.leaderboardProfileId }),
+    })), "LEADERBOARD_ACCOUNT_DELETE_FAILED");
+  }
+
+  // The PlayerAccount tombstone is durable before AccountDirectory identity unlink.
+  const result = await playerRequest(env, accountId, "/account/delete", {
+    ...playerDeleteBody,
+    confirmation: "DELETE_MY_ACCOUNT",
+  });
+  await directoryRequest(env, "/account/delete", { accountId });
+  return result;
+}
+
+function normalizeGuestDeletionCredential(value) {
+  if (typeof value !== "string" || !/^[a-f0-9]{64}$/i.test(value)) {
+    throw httpError(400, "GUEST_DELETION_CODE_INVALID", "guest deletion code must contain 64 hexadecimal characters");
+  }
+  return value.toLowerCase();
 }
 
 function accountWebOrigin(env) {
@@ -462,12 +581,13 @@ function withAccountWebCors(request, response, env) {
   });
 }
 
-async function authenticate(request, env) {
+async function authenticate(request, env, { allowDeletionPending = false } = {}) {
   const token = bearerToken(request);
   const session = await verifyAccessToken(env, token);
   const checked = await playerRequest(env, session.accountId, "/session/check", {
     accountId: session.accountId,
     sessionId: session.sessionId,
+    ...(allowDeletionPending ? { allowDeletionPending: true } : {}),
   });
   return { ...session, profile: checked.profile };
 }

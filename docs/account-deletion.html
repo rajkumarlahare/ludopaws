@@ -31,6 +31,7 @@
     a { color: #245d92; }
     .check { display: flex; gap: 10px; align-items: flex-start; margin-top: 18px; }
     .check input { margin-top: 5px; width: 18px; height: 18px; flex: 0 0 auto; }
+    #guest-deletion-code { width: 100%; padding: 12px; border: 1px solid #aeb9c7; border-radius: 10px; font: 16px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .04em; }
     .fine-print { font-size: 14px; color: #596879; }
     #account-actions[hidden], #google-signin[hidden], #support-missing[hidden], #support-link[hidden] { display: none; }
     footer { margin: 18px 4px 0; font-size: 13px; color: #657384; }
@@ -62,8 +63,22 @@
         </div>
       </div>
 
-      <h2>Guest-only accounts or sign-in problems</h2>
-      <p>If you still have the app and did not link your guest account to Google, open <strong>Profile → Delete account and data</strong> in the app. If you have uninstalled the app or cannot restore the account, contact publisher support using the contact link below. Do not send passwords, session tokens, purchase tokens, or full payment details.</p>
+      <h2>Guest-only account (including after uninstall)</h2>
+      <p>Before uninstalling, open <strong>Profile → Guest deletion code (for uninstall)</strong> in the app and save the code somewhere private. This separate code can delete an unlinked guest account only; it cannot sign in, recover the account, or access its data. To revoke a saved code, use <strong>Profile → Replace guest deletion code</strong> before uninstalling; replacing it invalidates all previously saved codes. If your guest account was linked to Google, use the Google sign-in section above instead.</p>
+      <label for="guest-deletion-code">Guest deletion code (64 characters)</label>
+      <input id="guest-deletion-code" type="password" maxlength="64" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="text" aria-describedby="guest-code-help">
+      <p id="guest-code-help" class="fine-print">Enter the code only on this official Ludo Paws deletion page. Do not email it or send it to support.</p>
+      <label class="check">
+        <input type="checkbox" id="confirm-guest-delete">
+        <span>I understand that deleting this guest account is permanent and cannot be undone.</span>
+      </label>
+      <div class="button-row">
+        <button id="guest-delete-button" class="danger" type="button" disabled>Delete guest account</button>
+      </div>
+      <div id="guest-delete-status" class="status" role="status" aria-live="polite">Enter your saved guest deletion code to continue.</div>
+
+      <h2>Accounts without a saved guest code or sign-in problems</h2>
+      <p>If you still have the app, you can also use <strong>Profile → Delete account and data</strong>. If you uninstalled without saving a guest deletion code, contact publisher support using the contact link below so the publisher can verify ownership through a separate process. Do not send passwords, session tokens, guest deletion codes, purchase tokens, or full payment details.</p>
       <p id="support-missing" class="fine-print">Publisher support contact has not been configured on this page yet. This site is not ready for public launch until the publisher adds and verifies a monitored support address.</p>
       <p id="support-link" hidden><a id="support-email" href="#">Contact publisher support for a deletion request</a></p>
 
@@ -83,6 +98,10 @@
   const accountActions = document.getElementById("account-actions");
   const deleteButton = document.getElementById("delete-button");
   const confirmDelete = document.getElementById("confirm-delete");
+  const guestDeletionCode = document.getElementById("guest-deletion-code");
+  const guestDeleteConfirmation = document.getElementById("confirm-guest-delete");
+  const guestDeleteButton = document.getElementById("guest-delete-button");
+  const guestDeleteStatus = document.getElementById("guest-delete-status");
   let signInNonce = null;
   let accessToken = null;
   let callbackBusy = false;
@@ -113,6 +132,43 @@
     }
     return value;
   }
+
+  guestDeletionCode.addEventListener("input", updateGuestDeleteButton);
+  guestDeleteConfirmation.addEventListener("change", updateGuestDeleteButton);
+
+  function updateGuestDeleteButton() {
+    const validCode = /^[a-f0-9]{64}$/i.test(guestDeletionCode.value.trim());
+    guestDeleteButton.disabled = !validCode || !guestDeleteConfirmation.checked;
+  }
+
+  guestDeleteButton.addEventListener("click", async function () {
+    const credential = guestDeletionCode.value.trim().toLowerCase();
+    if (!/^[a-f0-9]{64}$/.test(credential) || !guestDeleteConfirmation.checked) return;
+    if (!window.confirm("Permanently delete this unlinked guest account and its server-managed account data? This cannot be undone.")) return;
+    guestDeleteButton.disabled = true;
+    guestDeleteStatus.textContent = "Submitting the guest deletion request…";
+    guestDeleteStatus.className = "status";
+    try {
+      const result = await post("/api/account/guest/delete", {
+        credential: credential,
+        confirmation: "DELETE_MY_ACCOUNT"
+      });
+      if (result.deleted !== true) throw new Error("The account service did not confirm deletion.");
+      guestDeletionCode.value = "";
+      guestDeleteConfirmation.checked = false;
+      guestDeleteStatus.textContent = "Your guest account deletion was completed by the account service. You can close this page.";
+      guestDeleteStatus.className = "status success";
+    } catch (error) {
+      const message = error.code === "GUEST_DELETION_CODE_INVALID" || error.code === "GUEST_DELETION_CODE_NOT_AVAILABLE"
+        ? "This code is invalid or no longer eligible. If your account was linked to Google, use the Google sign-in section above. Otherwise, contact publisher support."
+        : error.code === "ACCOUNT_DELETION_IN_PROGRESS"
+          ? "A deletion request is already being processed. Retry with the same code in a moment."
+          : (error.message || "The service could not confirm deletion. The code has been kept so you can retry.");
+      guestDeleteStatus.textContent = message;
+      guestDeleteStatus.className = "status error";
+      guestDeleteButton.disabled = false;
+    }
+  });
 
   function showSupportContact() {
     const email = String(config.supportEmail || "").trim();
