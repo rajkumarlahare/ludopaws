@@ -35,8 +35,15 @@ export async function verifyAdMobSsvRequest(request, env, fetchImpl = fetch, now
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(accountId)) {
     throw ssvError(400, "SSV_ACCOUNT_INVALID", "reward account is invalid");
   }
-  const configuredAdUnit = String(env?.LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID ?? "");
-  if (!configuredAdUnit || adUnit !== configuredAdUnit) throw ssvError(403, "SSV_AD_UNIT_INVALID", "reward callback came from an unexpected ad unit");
+  const configuredAdUnit = String(env?.LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID ?? "").trim();
+  // The SDK is configured with the full ca-app-pub-.../<numeric-unit-id> value,
+  // while AdMob SSV callbacks report the numeric ad_unit identifier.
+  // Accept the exact configured value as well for compatibility, but reject
+  // every other unit identifier before verifying a reward.
+  const configuredAdUnitId = configuredAdUnit.split("/").at(-1);
+  if (!configuredAdUnit || ![configuredAdUnit, configuredAdUnitId].includes(adUnit)) {
+    throw ssvError(403, "SSV_AD_UNIT_INVALID", "reward callback came from an unexpected ad unit");
+  }
   const configuredRewardItem = String(env?.LUDOPROOF_ADMOB_REWARD_ITEM ?? "gems");
   if (configuredRewardItem !== "gems" || rewardAmount !== "5" || rewardItem !== "gems") {
     throw ssvError(403, "SSV_REWARD_INVALID", "reward callback does not match the configured reward");
