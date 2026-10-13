@@ -28,6 +28,13 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: 8f31060fbcfee2b3e9309138cad7f12f
       ENTRONEX_API_TOKEN: ${{ secrets.ENTRONEX_API_TOKEN }}
       LUDOPROOF_SESSION_HMAC_KEY: ${{ secrets.LUDOPROOF_SESSION_HMAC_KEY }}
+      GOOGLE_SIGN_IN_WEB_CLIENT_ID: ${{ vars.GOOGLE_SIGN_IN_WEB_CLIENT_ID }}
+      LUDOPROOF_ACCOUNT_WEB_ORIGIN: ${{ vars.LUDOPROOF_ACCOUNT_WEB_ORIGIN }}
+      GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL: ${{ vars.GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL }}
+      GOOGLE_PLAY_BILLING_ENABLED: ${{ vars.GOOGLE_PLAY_BILLING_ENABLED }}
+      LUDOPROOF_ADMOB_SSV_ENABLED: ${{ vars.LUDOPROOF_ADMOB_SSV_ENABLED }}
+      LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID: ${{ vars.LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID }}
+      LUDOPROOF_ADMOB_REWARD_ITEM: ${{ vars.LUDOPROOF_ADMOB_REWARD_ITEM }}
       LUDOPROOF_WORKER_URL: https://ludoproof-game-api.ai-8f3.workers.dev
 
     steps:
@@ -38,6 +45,12 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
+
+      - name: Prepare explicit Cloudflare runtime variables
+        run: node scripts/prepare-cloudflare-runtime-config.mjs
+
+      - name: Test Cloudflare runtime configuration
+        run: node --test scripts/cloudflare-runtime-config.test.mjs
 
       - name: Prepare EntroNex customer credential
         working-directory: server
@@ -121,6 +134,25 @@ jobs:
 
       - name: Validate production configuration
         run: node scripts/cloudflare-deploy-preflight.mjs
+
+      - name: Verify Google Play service-account secret when Billing is enabled
+        if: ${{ vars.GOOGLE_PLAY_BILLING_ENABLED == 'true' }}
+        working-directory: server
+        shell: bash
+        run: |
+          set -euo pipefail
+          secret_file="$(mktemp)"
+          trap 'rm -f "$secret_file"' EXIT
+          npx --yes wrangler@4.135.0 secret list --format json > "$secret_file"
+          node -e '
+            const fs = require("node:fs");
+            const parsed = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+            const list = Array.isArray(parsed) ? parsed : (parsed.secrets ?? []);
+            if (!list.some((item) => item?.name === "GOOGLE_PLAY_SERVICE_ACCOUNT_PRIVATE_KEY")) {
+              console.error("Billing is enabled but GOOGLE_PLAY_SERVICE_ACCOUNT_PRIVATE_KEY is missing in Cloudflare.");
+              process.exit(2);
+            }
+          ' "$secret_file"
 
       - name: Repository security gate
         run: node scripts/security-check.mjs
