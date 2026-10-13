@@ -13,41 +13,41 @@ const requireAbsent = (path, message) => {
 };
 
 const boardPath =
-  "android/app/src/main/java/com/ludoproof/game/game/ui/components/LudoPawsBoardView.kt";
+  "android/app/src/main/java/com/rekixo/ludopaws/game/ui/components/LudoPawsBoardView.kt";
 const canonicalBoardPath =
-  "android/app/src/main/java/com/ludoproof/game/game/ui/components/LudoBoardView.kt";
+  "android/app/src/main/java/com/rekixo/ludopaws/game/ui/components/LudoBoardView.kt";
 const boardChromePath =
-  "android/app/src/main/java/com/ludoproof/game/game/ui/components/LudoPawsBoardChromeView.kt";
+  "android/app/src/main/java/com/rekixo/ludopaws/game/ui/components/LudoPawsBoardChromeView.kt";
 const footprintPolicyPath =
-  "android/app/src/main/java/com/ludoproof/game/game/ui/components/LudoPawsYardFootprintPolicy.kt";
+  "android/app/src/main/java/com/rekixo/ludopaws/game/ui/components/LudoPawsYardFootprintPolicy.kt";
 const footprintTestsPath =
-  "android/app/src/test/java/com/ludoproof/game/LudoPawsYardFootprintPolicyTest.kt";
+  "android/app/src/test/java/com/rekixo/ludopaws/LudoPawsYardFootprintPolicyTest.kt";
 const reactiveBoardPath =
-  "android/app/src/main/java/com/ludoproof/game/game/ui/components/LudoPawsReactiveBoardView.kt";
+  "android/app/src/main/java/com/rekixo/ludopaws/game/ui/components/LudoPawsReactiveBoardView.kt";
 const scenePath =
-  "android/app/src/main/java/com/ludoproof/game/game/ui/components/LudoPaws3DSceneView.kt";
+  "android/app/src/main/java/com/rekixo/ludopaws/game/ui/components/LudoPaws3DSceneView.kt";
 const rendererPath =
-  "android/app/src/main/java/com/ludoproof/game/game/ui/components/LudoPaws3DSceneRenderer.kt";
+  "android/app/src/main/java/com/rekixo/ludopaws/game/ui/components/LudoPaws3DSceneRenderer.kt";
 const policyPath =
-  "android/app/src/main/java/com/ludoproof/game/game/ui/components/LudoPaws3DCharacterPolicy.kt";
+  "android/app/src/main/java/com/rekixo/ludopaws/game/ui/components/LudoPaws3DCharacterPolicy.kt";
 const cadencePolicyPath =
-  "android/app/src/main/java/com/ludoproof/game/game/ui/components/LudoPaws3DRenderCadencePolicy.kt";
+  "android/app/src/main/java/com/rekixo/ludopaws/game/ui/components/LudoPaws3DRenderCadencePolicy.kt";
 const layoutPath =
-  "android/app/src/main/java/com/ludoproof/game/game/ui/components/LudoPawsPawnLayout.kt";
+  "android/app/src/main/java/com/rekixo/ludopaws/game/ui/components/LudoPawsPawnLayout.kt";
 const activityPath =
-  "android/app/src/main/java/com/ludoproof/game/feature/offline/presentation/OfflineGameActivity.kt";
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/offline/presentation/OfflineGameActivity.kt";
 const screenPath =
-  "android/app/src/main/java/com/ludoproof/game/feature/offline/presentation/gameplay/OfflineGameplayScreenUi.kt";
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/offline/presentation/gameplay/OfflineGameplayScreenUi.kt";
 const controlsPath =
-  "android/app/src/main/java/com/ludoproof/game/feature/offline/presentation/gameplay/OfflineGameplayControlsUi.kt";
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/offline/presentation/gameplay/OfflineGameplayControlsUi.kt";
 const characterStatePath =
-  "android/app/src/main/java/com/ludoproof/game/feature/offline/presentation/state/OfflineCharacterPresentationState.kt";
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/offline/presentation/state/OfflineCharacterPresentationState.kt";
 const testsPath =
-  "android/app/src/test/java/com/ludoproof/game/LudoPawsPawnLayoutTest.kt";
+  "android/app/src/test/java/com/rekixo/ludopaws/LudoPawsPawnLayoutTest.kt";
 const policyTestsPath =
-  "android/app/src/test/java/com/ludoproof/game/LudoPaws3DCharacterPolicyTest.kt";
+  "android/app/src/test/java/com/rekixo/ludopaws/LudoPaws3DCharacterPolicyTest.kt";
 const cadenceTestsPath =
-  "android/app/src/test/java/com/ludoproof/game/LudoPaws3DRenderCadencePolicyTest.kt";
+  "android/app/src/test/java/com/rekixo/ludopaws/LudoPaws3DRenderCadencePolicyTest.kt";
 
 const board = read(boardPath);
 const canonicalBoard = read(canonicalBoardPath);
@@ -347,24 +347,24 @@ requireText(
   "Idle 3D cadence regression coverage is missing.",
 );
 for (const retired of [
-  "android/app/src/main/java/com/ludoproof/game/game/ui/components/LudoPawsCaptureReturnOverlayView.kt",
-  "android/app/src/main/java/com/ludoproof/game/game/ui/components/LudoPawsCharacterReactionOverlayView.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/game/ui/components/LudoPawsCaptureReturnOverlayView.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/game/ui/components/LudoPawsCharacterReactionOverlayView.kt",
   "android/app/src/main/res/drawable/lp_starter_duck.xml",
   "android/app/src/main/res/drawable/lp_starter_squirrel.xml",
   "android/app/src/main/res/drawable/lp_starter_hedgehog.xml",
   "android/app/src/main/res/drawable/lp_starter_sheep.xml",
-  "android/app/src/main/java/com/ludoproof/game/feature/characters/prototype/Dog3DPrototypeActivity.kt",
-  "android/app/src/main/java/com/ludoproof/game/feature/characters/prototype/Dog3DPrototypeView.kt",
-  "android/app/src/main/java/com/ludoproof/game/feature/characters/prototype/Dog3DRenderer.kt",
-  "android/app/src/main/java/com/ludoproof/game/feature/characters/prototype/Goat3DPrototypeActivity.kt",
-  "android/app/src/main/java/com/ludoproof/game/feature/characters/prototype/Goat3DPrototypeView.kt",
-  "android/app/src/main/java/com/ludoproof/game/feature/characters/prototype/Goat3DRenderer.kt",
-  "android/app/src/main/java/com/ludoproof/game/feature/characters/prototype/Duck3DPrototypeActivity.kt",
-  "android/app/src/main/java/com/ludoproof/game/feature/characters/prototype/Duck3DPrototypeView.kt",
-  "android/app/src/main/java/com/ludoproof/game/feature/characters/prototype/Duck3DRenderer.kt",
-  "android/app/src/main/java/com/ludoproof/game/feature/characters/prototype/Cat3DPrototypeActivity.kt",
-  "android/app/src/main/java/com/ludoproof/game/feature/characters/prototype/Cat3DPrototypeView.kt",
-  "android/app/src/main/java/com/ludoproof/game/feature/characters/prototype/Cat3DRenderer.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/characters/prototype/Dog3DPrototypeActivity.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/characters/prototype/Dog3DPrototypeView.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/characters/prototype/Dog3DRenderer.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/characters/prototype/Goat3DPrototypeActivity.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/characters/prototype/Goat3DPrototypeView.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/characters/prototype/Goat3DRenderer.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/characters/prototype/Duck3DPrototypeActivity.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/characters/prototype/Duck3DPrototypeView.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/characters/prototype/Duck3DRenderer.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/characters/prototype/Cat3DPrototypeActivity.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/characters/prototype/Cat3DPrototypeView.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/characters/prototype/Cat3DRenderer.kt",
 ]) {
   requireAbsent(
     retired,
@@ -374,7 +374,7 @@ for (const retired of [
 
 for (const retainedMotion of ["Dog", "Goat", "Duck", "Cat"]) {
   const path =
-    `android/app/src/main/java/com/ludoproof/game/feature/characters/prototype/${retainedMotion}3DMotion.kt`;
+    `android/app/src/main/java/com/rekixo/ludopaws/feature/characters/prototype/${retainedMotion}3DMotion.kt`;
   if (!fs.existsSync(path)) {
     throw new Error(
       `Production renderer still consumes this pure motion timeline, so it must remain: ${path}`,

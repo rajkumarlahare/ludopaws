@@ -132,7 +132,7 @@ val syncAuthoredAudioAssets =
     }
 
 android {
-    namespace = "com.ludoproof.game"
+    namespace = "com.rekixo.ludopaws"
 
     androidResources {
         noCompress += listOf("wav", "ogg")

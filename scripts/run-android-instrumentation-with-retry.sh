@@ -155,8 +155,8 @@ run_with_transport_retry() {
 # Then run all other instrumentation tests without repeating this class.
 run_with_transport_retry \
   "remote-ui-focused" \
-  "-Pandroid.testInstrumentationRunnerArguments.class=com.ludoproof.game.RemoteMatchUiInstrumentedTest"
+  "-Pandroid.testInstrumentationRunnerArguments.class=com.rekixo.ludopaws.RemoteMatchUiInstrumentedTest"
 
 run_with_transport_retry \
   "remaining-suite" \
-  "-Pandroid.testInstrumentationRunnerArguments.notClass=com.ludoproof.game.RemoteMatchUiInstrumentedTest"
+  "-Pandroid.testInstrumentationRunnerArguments.notClass=com.rekixo.ludopaws.RemoteMatchUiInstrumentedTest"

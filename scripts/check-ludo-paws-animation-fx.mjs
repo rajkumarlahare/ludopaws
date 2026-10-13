@@ -24,7 +24,7 @@ const requireAbsent = (path) => {
 };
 
 requireText(
-  "android/app/src/main/java/com/ludoproof/game/game/ui/components/LudoPawsReactiveBoardView.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/game/ui/components/LudoPawsReactiveBoardView.kt",
   [
     "LudoPaws3DSceneView",
     "LudoPawsGameFxOverlayView",
@@ -35,12 +35,12 @@ requireText(
   ],
 );
 forbidText(
-  "android/app/src/main/java/com/ludoproof/game/game/ui/components/LudoPawsReactiveBoardView.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/game/ui/components/LudoPawsReactiveBoardView.kt",
   ["LudoPaws3DLegalHaloView", "pawn3DLegalHalo"],
 );
 
 requireText(
-  "android/app/src/main/java/com/ludoproof/game/game/ui/components/LudoPaws3DSceneView.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/game/ui/components/LudoPaws3DSceneView.kt",
   [
     "LudoPawsPawnAnimationPolicy",
     ".plans(",
@@ -58,12 +58,12 @@ requireText(
   ],
 );
 forbidText(
-  "android/app/src/main/java/com/ludoproof/game/game/ui/components/LudoPaws3DSceneView.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/game/ui/components/LudoPaws3DSceneView.kt",
   ["captureHiddenUntilMillis"],
 );
 
 requireText(
-  "android/app/src/main/java/com/ludoproof/game/game/ui/components/LudoPaws3DReactionMotion.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/game/ui/components/LudoPaws3DReactionMotion.kt",
   [
     "data class LudoPaws3DReactionPose",
     "data class LudoPaws3DActiveReaction",
@@ -82,7 +82,7 @@ requireText(
 );
 
 requireText(
-  "android/app/src/main/java/com/ludoproof/game/game/ui/components/LudoPaws3DSceneRenderer.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/game/ui/components/LudoPaws3DSceneRenderer.kt",
   [
     "LudoPawsFxBoardGeometry",
     "LudoPathEncoding",
@@ -110,12 +110,12 @@ requireText(
   ],
 );
 forbidText(
-  "android/app/src/main/java/com/ludoproof/game/game/ui/components/LudoPaws3DSceneRenderer.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/game/ui/components/LudoPaws3DSceneRenderer.kt",
   ["captureHiddenUntilMillis"],
 );
 
 requireText(
-  "android/app/src/main/java/com/ludoproof/game/game/ui/components/LudoPawsCaptureReturnPlacement.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/game/ui/components/LudoPawsCaptureReturnPlacement.kt",
   [
     "object LudoPawsCaptureReturnPlacement",
     "captureReturnFrame(progress)",
@@ -127,7 +127,7 @@ requireText(
 );
 
 requireText(
-  "android/app/src/test/java/com/ludoproof/game/LudoPawsCaptureReturnPlacementTest.kt",
+  "android/app/src/test/java/com/rekixo/ludopaws/LudoPawsCaptureReturnPlacementTest.kt",
   [
     "capturedPawnStartsAtImpactCell",
     "capturedPawnUsesCurvedVisibleReturn",
@@ -137,7 +137,7 @@ requireText(
 );
 
 requireText(
-  "android/app/src/test/java/com/ludoproof/game/LudoPaws3DReactionMotionTest.kt",
+  "android/app/src/test/java/com/rekixo/ludopaws/LudoPaws3DReactionMotionTest.kt",
   [
     "everySpeciesAndCueHasSafeFiniteMotion",
     "homeAddsBodyLanguageButNeverAddsSecondFullSpin",
@@ -147,7 +147,7 @@ requireText(
 );
 
 requireText(
-  "android/app/src/main/java/com/ludoproof/game/game/ui/components/LudoPawsPawnAnimationPolicy.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/game/ui/components/LudoPawsPawnAnimationPolicy.kt",
   [
     "CAPTURE_RETURN",
     "IMPACT_SHAKE",
@@ -158,7 +158,7 @@ requireText(
 );
 
 requireText(
-  "android/app/src/test/java/com/ludoproof/game/LudoPawsPawnAnimationPolicyTest.kt",
+  "android/app/src/test/java/com/rekixo/ludopaws/LudoPawsPawnAnimationPolicyTest.kt",
   [
     "captureSnapshotProducesMoverAndVictimAnimationsTogether",
     "captureReturnUsesImpactPopTravelAndSettleStages",
@@ -167,7 +167,7 @@ requireText(
 );
 
 requireText(
-  "android/app/src/main/java/com/ludoproof/game/game/ui/components/DiceRollAnimationPolicy.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/game/ui/components/DiceRollAnimationPolicy.kt",
   [
     "SETTLE_DURATION_MILLIS",
     "rollingFrame(",
@@ -177,7 +177,7 @@ requireText(
 );
 
 requireText(
-  "android/app/src/main/java/com/ludoproof/game/game/ui/components/DiceView.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/game/ui/components/DiceView.kt",
   [
     "DiceRollAnimationPolicy",
     "DiceAttentionAnimationPolicy",
@@ -192,7 +192,7 @@ requireText(
 );
 
 requireText(
-  "android/app/src/test/java/com/ludoproof/game/DiceRollAnimationPolicyTest.kt",
+  "android/app/src/test/java/com/rekixo/ludopaws/DiceRollAnimationPolicyTest.kt",
   [
     "rollingFrameCyclesFacesWithoutClaimingOutcome",
     "rollingFrameHasPhysicalTransform",
@@ -202,7 +202,7 @@ requireText(
 );
 
 requireText(
-  "android/app/src/main/java/com/ludoproof/game/game/ui/components/LudoPawsGameFxOverlayView.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/game/ui/components/LudoPawsGameFxOverlayView.kt",
   [
     "isCaptureReturn",
     "drawCaptureReturn",
@@ -213,7 +213,7 @@ requireText(
 );
 
 requireText(
-  "android/app/src/main/java/com/ludoproof/game/game/ui/components/LudoPawsFxPainter.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/game/ui/components/LudoPawsFxPainter.kt",
   [
     "drawSafeShield",
     "drawConfetti",
@@ -225,7 +225,7 @@ requireText(
 );
 
 requireText(
-  "android/app/src/main/java/com/ludoproof/game/game/ui/components/LudoPawsFxBoardGeometry.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/game/ui/components/LudoPawsFxBoardGeometry.kt",
   [
     "tokenCenter",
     "yardReactionAnchor",
@@ -235,7 +235,7 @@ requireText(
 );
 
 requireText(
-  "android/app/src/main/java/com/ludoproof/game/feature/characters/domain/reaction/LudoPawsFxPolicy.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/characters/domain/reaction/LudoPawsFxPolicy.kt",
   [
     "allowTranslation",
     "allowConfetti",
@@ -243,7 +243,7 @@ requireText(
 );
 
 requireText(
-  "android/app/src/test/java/com/ludoproof/game/feature/characters/domain/reaction/LudoPawsFxPolicyTest.kt",
+  "android/app/src/test/java/com/rekixo/ludopaws/feature/characters/domain/reaction/LudoPawsFxPolicyTest.kt",
   [
     "victory enables dense confetti in full motion",
     "captured reaction supports full return movement",
@@ -253,8 +253,8 @@ requireText(
 
 
 for (const retired of [
-  "android/app/src/main/java/com/ludoproof/game/game/ui/components/LudoPawsCaptureReturnOverlayView.kt",
-  "android/app/src/main/java/com/ludoproof/game/game/ui/components/LudoPawsCharacterReactionOverlayView.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/game/ui/components/LudoPawsCaptureReturnOverlayView.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/game/ui/components/LudoPawsCharacterReactionOverlayView.kt",
 ]) {
   requireAbsent(retired);
 }

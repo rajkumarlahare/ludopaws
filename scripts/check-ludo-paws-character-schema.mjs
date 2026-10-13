@@ -15,16 +15,16 @@ const publicQueue = read("server/src/matchmaker-queue.js");
 const teamQueue = read("server/src/team-matchmaker-queue.js");
 const serverTests = read("server/test/ludo-paws-characters.test.js");
 const androidContract = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/online/domain/LudoPawsCharacterIdentityContract.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/online/domain/LudoPawsCharacterIdentityContract.kt",
 );
 const androidPolicy = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/online/domain/OnlineLudoPawsCharacterPolicy.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/online/domain/OnlineLudoPawsCharacterPolicy.kt",
 );
 const gameApi = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/online/data/remote/GameApi.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/online/data/remote/GameApi.kt",
 );
 const models = read(
-  "android/app/src/main/java/com/ludoproof/game/game/domain/model/GameModels.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/game/domain/model/GameModels.kt",
 );
 
 requireText(serverContract, 'CHARACTER_ID_WIRE_FIELD = "characterId"', "Server character wire field changed unexpectedly.");

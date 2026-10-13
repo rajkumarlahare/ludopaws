@@ -21,7 +21,7 @@ const forbidText = (path, needles) => {
 };
 
 requireText(
-  "android/app/src/main/java/com/ludoproof/game/feature/offline/presentation/feedback/OfflineLudoPawsFeedback.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/offline/presentation/feedback/OfflineLudoPawsFeedback.kt",
   [
     "OfflineFeedbackAction",
     "OfflineFeedbackSound",
@@ -35,7 +35,7 @@ requireText(
 );
 
 requireText(
-  "android/app/src/main/java/com/ludoproof/game/feature/offline/presentation/actions/OfflineGameActions.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/offline/presentation/actions/OfflineGameActions.kt",
   [
     "GameSoundFeedback.roll",
     "OfflineLudoPawsFeedbackDispatcher.committed",
@@ -47,7 +47,7 @@ requireText(
 );
 
 requireText(
-  "android/app/src/main/java/com/ludoproof/game/feature/offline/domain/ai/LudoPawsComputerMovePolicy.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/offline/domain/ai/LudoPawsComputerMovePolicy.kt",
   [
     "destinationForRoll",
     "SCORE_CAPTURE_EACH",
@@ -60,7 +60,7 @@ requireText(
 );
 
 requireText(
-  "android/app/src/test/java/com/ludoproof/game/feature/offline/domain/ai/LudoPawsComputerMovePolicyTest.kt",
+  "android/app/src/test/java/com/rekixo/ludopaws/feature/offline/domain/ai/LudoPawsComputerMovePolicyTest.kt",
   [
     "canonical destination handles yard exit and exact home",
     "capture outranks plain forward progress",
@@ -71,7 +71,7 @@ requireText(
 );
 
 requireText(
-  "android/app/src/main/java/com/ludoproof/game/feature/offline/domain/engine/OfflineGameEngine.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/offline/domain/engine/OfflineGameEngine.kt",
   [
     "finishedPlayerIds",
     "current.finishedPlayerIds.size",
@@ -81,7 +81,7 @@ requireText(
 );
 
 requireText(
-  "android/app/src/main/java/com/ludoproof/game/feature/offline/domain/engine/OfflineMatchInvariantPolicy.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/offline/domain/engine/OfflineMatchInvariantPolicy.kt",
   [
     "OfflineMatchInvariantPolicy",
     "pending.legalTokenIndexes == expectedLegal",
@@ -92,7 +92,7 @@ requireText(
 );
 
 requireText(
-  "android/app/src/main/java/com/ludoproof/game/feature/offline/domain/session/LocalMatchSession.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/offline/domain/session/LocalMatchSession.kt",
   [
     "OfflineMatchInvariantPolicy::requireValid",
     "OfflineMatchInvariantPolicy.requireValid",
@@ -100,7 +100,7 @@ requireText(
 );
 
 requireText(
-  "android/app/src/test/java/com/ludoproof/game/OfflineMatchInvariantPolicyTest.kt",
+  "android/app/src/test/java/com/rekixo/ludopaws/OfflineMatchInvariantPolicyTest.kt",
   [
     "pending legal set must exactly match canonical path legality",
     "pending proof must match the same history event",
@@ -109,7 +109,7 @@ requireText(
 );
 
 requireText(
-  "android/app/src/androidTest/java/com/ludoproof/game/OfflineFullMatchInstrumentedTest.kt",
+  "android/app/src/androidTest/java/com/rekixo/ludopaws/OfflineFullMatchInstrumentedTest.kt",
   [
     "twoAndFourPlayerMatchesFinishThroughProductionEngineAndCpuPolicy",
     "LudoPawsComputerMovePolicy.chooseToken",
@@ -120,7 +120,7 @@ requireText(
 );
 
 requireText(
-  "android/app/src/main/java/com/ludoproof/game/feature/offline/presentation/gameplay/OfflineGameplayScreenUi.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/offline/presentation/gameplay/OfflineGameplayScreenUi.kt",
   [
     "val previous =",
     "session.snapshot()",
@@ -133,16 +133,16 @@ requireText(
 );
 
 forbidText(
-  "android/app/src/main/java/com/ludoproof/game/feature/offline/presentation/actions/OfflineGameActions.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/offline/presentation/actions/OfflineGameActions.kt",
   ["GameSoundFeedback.move("],
 );
 forbidText(
-  "android/app/src/main/java/com/ludoproof/game/feature/offline/presentation/gameplay/OfflineGameplayScreenUi.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/offline/presentation/gameplay/OfflineGameplayScreenUi.kt",
   ["GameSoundFeedback.move("],
 );
 
 requireText(
-  "android/app/src/main/java/com/ludoproof/game/feature/offline/presentation/state/OfflineCharacterPresentationState.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/offline/presentation/state/OfflineCharacterPresentationState.kt",
   [
     "OfflineCharacterAssignmentPolicy",
     "resolveOfflineCharacterIds",
@@ -153,7 +153,7 @@ requireText(
 );
 
 requireText(
-  "android/app/src/main/java/com/ludoproof/game/feature/offline/presentation/gameplay/OfflineGameplayControlsUi.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/offline/presentation/gameplay/OfflineGameplayControlsUi.kt",
   [
     "resolveOfflineCharacterIds",
     "characterIdsBySeat =",
@@ -169,12 +169,12 @@ requireText(
 );
 
 requireText(
-  "android/app/src/main/java/com/ludoproof/game/feature/offline/presentation/gameplay/OfflinePlayerRailUi.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/offline/presentation/gameplay/OfflinePlayerRailUi.kt",
   ["activeCharacterIdsBySeat"],
 );
 
 requireText(
-  "android/app/src/main/java/com/ludoproof/game/feature/offline/presentation/OfflineGameActivity.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/offline/presentation/OfflineGameActivity.kt",
   [
     "activeCharacterMatchId",
     "activeCharacterIdsBySeat",
@@ -183,7 +183,7 @@ requireText(
 );
 
 requireText(
-  "android/app/src/test/java/com/ludoproof/game/feature/offline/presentation/feedback/OfflineLudoPawsFeedbackPolicyTest.kt",
+  "android/app/src/test/java/com/rekixo/ludopaws/feature/offline/presentation/feedback/OfflineLudoPawsFeedbackPolicyTest.kt",
   [
     "normal committed move uses move sound",
     "capture replaces generic move sound",
@@ -195,7 +195,7 @@ requireText(
 );
 
 requireText(
-  "android/app/src/test/java/com/ludoproof/game/feature/offline/presentation/state/OfflineCharacterAssignmentPolicyTest.kt",
+  "android/app/src/test/java/com/rekixo/ludopaws/feature/offline/presentation/state/OfflineCharacterAssignmentPolicyTest.kt",
   [
     "matching pass and play assignment is preserved",
     "mismatched saved presentation state is repaired deterministically",

@@ -1,15 +1,15 @@
 import fs from 'node:fs';
 
 const required = [
-  'android/app/src/main/java/com/ludoproof/game/feature/characters/domain/reaction/LudoPawsGameMomentDetector.kt',
-  'android/app/src/main/java/com/ludoproof/game/feature/characters/domain/reaction/LudoPawsReactionEngine.kt',
-  'android/app/src/main/java/com/ludoproof/game/feature/characters/domain/reaction/LudoPawsIdleReactionPolicy.kt',
-  'android/app/src/main/java/com/ludoproof/game/game/ui/components/LudoPawsReactiveBoardView.kt',
-  'android/app/src/main/java/com/ludoproof/game/game/ui/components/LudoPawsPlayerCardView.kt',
-  'android/app/src/main/java/com/ludoproof/game/feature/offline/presentation/gameplay/OfflinePlayerRailUi.kt',
-  'android/app/src/test/java/com/ludoproof/game/feature/characters/domain/reaction/LudoPawsGameMomentDetectorTest.kt',
-  'android/app/src/test/java/com/ludoproof/game/feature/characters/domain/reaction/LudoPawsPoorRollStreakTest.kt',
-  'android/app/src/test/java/com/ludoproof/game/feature/characters/domain/reaction/LudoPawsIdleReactionPolicyTest.kt',
+  'android/app/src/main/java/com/rekixo/ludopaws/feature/characters/domain/reaction/LudoPawsGameMomentDetector.kt',
+  'android/app/src/main/java/com/rekixo/ludopaws/feature/characters/domain/reaction/LudoPawsReactionEngine.kt',
+  'android/app/src/main/java/com/rekixo/ludopaws/feature/characters/domain/reaction/LudoPawsIdleReactionPolicy.kt',
+  'android/app/src/main/java/com/rekixo/ludopaws/game/ui/components/LudoPawsReactiveBoardView.kt',
+  'android/app/src/main/java/com/rekixo/ludopaws/game/ui/components/LudoPawsPlayerCardView.kt',
+  'android/app/src/main/java/com/rekixo/ludopaws/feature/offline/presentation/gameplay/OfflinePlayerRailUi.kt',
+  'android/app/src/test/java/com/rekixo/ludopaws/feature/characters/domain/reaction/LudoPawsGameMomentDetectorTest.kt',
+  'android/app/src/test/java/com/rekixo/ludopaws/feature/characters/domain/reaction/LudoPawsPoorRollStreakTest.kt',
+  'android/app/src/test/java/com/rekixo/ludopaws/feature/characters/domain/reaction/LudoPawsIdleReactionPolicyTest.kt',
 ];
 
 for (const path of required) {

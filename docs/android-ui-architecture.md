@@ -9,7 +9,7 @@ Runtime Kotlin package/class names are intentionally preserved during this migra
 ## Source tree
 
 ```text
-com/ludoproof/game/
+com/rekixo/ludopaws/
 ├─ core/
 │  ├─ network/ConnectivityMonitor.kt
 │  └─ ui/

@@ -1,9 +1,9 @@
 import fs from 'node:fs';
 
 const files = {
-  engine: 'android/app/src/main/java/com/ludoproof/game/feature/characters/domain/reaction/LudoPawsReactionEngine.kt',
-  director: 'android/app/src/main/java/com/ludoproof/game/feature/characters/domain/reaction/LudoPawsReactionDirector.kt',
-  tests: 'android/app/src/test/java/com/ludoproof/game/feature/characters/domain/reaction/LudoPawsReactionDirectorTest.kt',
+  engine: 'android/app/src/main/java/com/rekixo/ludopaws/feature/characters/domain/reaction/LudoPawsReactionEngine.kt',
+  director: 'android/app/src/main/java/com/rekixo/ludopaws/feature/characters/domain/reaction/LudoPawsReactionDirector.kt',
+  tests: 'android/app/src/test/java/com/rekixo/ludopaws/feature/characters/domain/reaction/LudoPawsReactionDirectorTest.kt',
 };
 
 for (const file of Object.values(files)) {

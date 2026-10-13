@@ -20,33 +20,76 @@ function requirePattern(name, source, pattern, message) {
 const appBuild = read("android/app/build.gradle.kts");
 const signedReleaseWorkflow = read(".github/workflows/android-signed-release.yml");
 const snapshotTests = read(
-  "android/app/src/test/java/com/ludoproof/game/GameJsonAuthoritativeSnapshotTest.kt",
+  "android/app/src/test/java/com/rekixo/ludopaws/GameJsonAuthoritativeSnapshotTest.kt",
 );
 const rulesets = read("server/src/rulesets.js");
 const interstitialController = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/store/data/ads/PostWinInterstitialAdController.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/store/data/ads/PostWinInterstitialAdController.kt",
 );
 const interstitialPolicy = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/store/domain/PostWinInterstitialPolicy.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/store/domain/PostWinInterstitialPolicy.kt",
 );
 const interstitialExitGate = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/store/data/ads/PostWinInterstitialExitGate.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/store/data/ads/PostWinInterstitialExitGate.kt",
 );
 const rewardedAdsController = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/store/data/ads/RewardedAdsController.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/store/data/ads/RewardedAdsController.kt",
 );
 const storeActivity = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/store/presentation/StoreActivity.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/store/presentation/StoreActivity.kt",
 );
 const offlineExit = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/offline/presentation/common/OfflineExitDialogUi.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/offline/presentation/common/OfflineExitDialogUi.kt",
 );
 const offlineActivity = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/offline/presentation/OfflineGameActivity.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/offline/presentation/OfflineGameActivity.kt",
 );
 const onlineMain = read(
-  "android/app/src/main/java/com/ludoproof/game/feature/online/presentation/MainActivity.kt",
+  "android/app/src/main/java/com/rekixo/ludopaws/feature/online/presentation/MainActivity.kt",
 );
+
+const androidSourceRoots = [
+  "android/app/src/main/java/com/rekixo/ludopaws",
+  "android/app/src/test/java/com/rekixo/ludopaws",
+  "android/app/src/androidTest/java/com/rekixo/ludopaws",
+];
+
+function listSourceFiles(directory) {
+  if (!fs.existsSync(path.join(repoRoot, directory))) {
+    failures.push(`android source package: required source root ${directory} is missing.`);
+    return [];
+  }
+  const files = [];
+  for (const entry of fs.readdirSync(path.join(repoRoot, directory), { withFileTypes: true })) {
+    const relative = path.join(directory, entry.name);
+    if (entry.isDirectory()) files.push(...listSourceFiles(relative));
+    else if (entry.isFile() && /\.(kt|java)$/.test(entry.name)) files.push(relative);
+  }
+  return files;
+}
+
+requireText(
+  "android/app/build.gradle.kts",
+  appBuild,
+  'namespace = "com.rekixo.ludopaws"',
+  "Android Gradle namespace must use the approved Rekixo application package.",
+);
+requireText(
+  "android/app/build.gradle.kts",
+  appBuild,
+  'applicationId = "com.rekixo.ludopaws"',
+  "Android applicationId must use the approved Rekixo package.",
+);
+const androidSourceFiles = androidSourceRoots.flatMap(listSourceFiles);
+if (androidSourceFiles.length === 0) {
+  failures.push("android source package: no Kotlin/Java source files were found under the Rekixo package roots.");
+}
+for (const relativePath of androidSourceFiles) {
+  const source = read(relativePath);
+  if (!/^package com\.rekixo\.ludopaws(?:\.|$)/m.test(source)) {
+    failures.push(`${relativePath}: Kotlin/Java package declaration must be under com.rekixo.ludopaws.`);
+  }
+}
 
 requirePattern(
   "android/app/build.gradle.kts",

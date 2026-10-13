@@ -1,14 +1,14 @@
 import fs from 'node:fs';
 
 const requiredFiles = [
-  'android/app/src/main/java/com/ludoproof/game/feature/characters/domain/reaction/LudoPawsReactionEngine.kt',
-  'android/app/src/main/java/com/ludoproof/game/feature/characters/domain/reaction/LudoPawsGameMomentDetector.kt',
-  'android/app/src/main/java/com/ludoproof/game/feature/characters/domain/reaction/LudoPawsReactionDirector.kt',
-  'android/app/src/main/java/com/ludoproof/game/feature/characters/data/audio/LudoPawsVoicePlayer.kt',
-  'android/app/src/main/java/com/ludoproof/game/feature/characters/domain/audio/LudoPawsReactionAudioProfile.kt',
-  'android/app/src/main/java/com/ludoproof/game/game/ui/components/LudoPawsReactiveBoardView.kt',
-  'android/app/src/test/java/com/ludoproof/game/feature/characters/domain/reaction/LudoPawsReactionEngineTest.kt',
-  'android/app/src/test/java/com/ludoproof/game/feature/characters/domain/reaction/LudoPawsGameMomentDetectorTest.kt',
+  'android/app/src/main/java/com/rekixo/ludopaws/feature/characters/domain/reaction/LudoPawsReactionEngine.kt',
+  'android/app/src/main/java/com/rekixo/ludopaws/feature/characters/domain/reaction/LudoPawsGameMomentDetector.kt',
+  'android/app/src/main/java/com/rekixo/ludopaws/feature/characters/domain/reaction/LudoPawsReactionDirector.kt',
+  'android/app/src/main/java/com/rekixo/ludopaws/feature/characters/data/audio/LudoPawsVoicePlayer.kt',
+  'android/app/src/main/java/com/rekixo/ludopaws/feature/characters/domain/audio/LudoPawsReactionAudioProfile.kt',
+  'android/app/src/main/java/com/rekixo/ludopaws/game/ui/components/LudoPawsReactiveBoardView.kt',
+  'android/app/src/test/java/com/rekixo/ludopaws/feature/characters/domain/reaction/LudoPawsReactionEngineTest.kt',
+  'android/app/src/test/java/com/rekixo/ludopaws/feature/characters/domain/reaction/LudoPawsGameMomentDetectorTest.kt',
 ];
 
 for (const file of requiredFiles) {
@@ -16,7 +16,7 @@ for (const file of requiredFiles) {
 }
 
 const spokenLines =
-  'android/app/src/main/java/com/ludoproof/game/feature/characters/domain/reaction/LudoPawsVoiceLines.kt';
+  'android/app/src/main/java/com/rekixo/ludopaws/feature/characters/domain/reaction/LudoPawsVoiceLines.kt';
 if (fs.existsSync(spokenLines)) {
   throw new Error('Spoken character commentary must stay removed.');
 }
