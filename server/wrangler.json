@@ -4,6 +4,12 @@
   "main": "src/index-account.js",
   "compatibility_date": "2026-09-25",
   "workers_dev": true,
+  "routes": [
+    {
+      "pattern": "api.ludopaws.rekixo.com/*",
+      "zone_name": "rekixo.com"
+    }
+  ],
   "durable_objects": {
     "bindings": [
       {
