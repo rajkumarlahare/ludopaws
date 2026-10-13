@@ -206,6 +206,10 @@ class FakeAccountSql {
     if (sql.startsWith("SELECT cosmetic_id, progress FROM cosmetic_ad_progress ORDER BY cosmetic_id")) {
       return [...this.adProgress.entries()].map(([cosmetic_id, progress]) => ({ cosmetic_id, progress }));
     }
+    if (sql.startsWith("INSERT INTO cosmetic_ad_progress")) {
+      this.adProgress.set(params[0], Number(params[1]));
+      return { rowsWritten: 1 };
+    }
     if (sql.startsWith("SELECT progress FROM cosmetic_ad_progress WHERE cosmetic_id = ?")) {
       return this.adProgress.has(params[0]) ? [{ progress: this.adProgress.get(params[0]) }] : [];
     }
@@ -340,6 +344,41 @@ test("refresh-token retries with the same request ID return the same rotated tok
   assert.equal(retry.refreshToken, first.refreshToken);
   assert.equal(retry.sessionExpiresAt, first.sessionExpiresAt);
 });
+
+test("cosmetic-targeted AdMob view grants the configured 5 gems and progress exactly once", async () => {
+  const { account, sql } = makeAccount();
+  const accountId = "0a2c3a83-e0fb-4abc-8ac4-581a6d994fe7";
+  const sessionResponse = await post(account, "/session/create", { accountId, displayName: "Ad Tester" });
+  assert.equal(sessionResponse.status, 200);
+  const event = {
+    accountId,
+    transactionId: "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+    kind: "cosmetic",
+    cosmeticId: "dice_diwali",
+  };
+
+  const firstResponse = await post(account, "/wallet/reward-ad", event);
+  assert.equal(firstResponse.status, 200);
+  const first = await firstResponse.json();
+  assert.equal(first.wallet.balance, 5);
+  assert.equal(sql.wallet.get(accountId).balance, 5);
+  assert.equal(sql.adProgress.get("dice_diwali"), 1);
+  assert.equal(sql.walletTransactions.size, 1);
+  const transaction = [...sql.walletTransactions.values()][0];
+  assert.equal(transaction.kind, "REWARDED_AD_COSMETIC_PROGRESS_AND_GEMS");
+  assert.equal(transaction.delta, 5);
+  assert.equal(transaction.balance_after, 5);
+
+  const replayResponse = await post(account, "/wallet/reward-ad", event);
+  assert.equal(replayResponse.status, 200);
+  const replay = await replayResponse.json();
+  assert.equal(replay.replay, true);
+  assert.equal(replay.wallet.balance, 5);
+  assert.equal(sql.wallet.get(accountId).balance, 5);
+  assert.equal(sql.adProgress.get("dice_diwali"), 1);
+  assert.equal(sql.walletTransactions.size, 1);
+});
+
 
 test("deletion preview locks account mutations until the deletion saga commits or retries", async () => {
   const { account, sql } = makeAccount();
