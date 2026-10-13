@@ -10,6 +10,7 @@ import com.ludoproof.game.*
 import com.ludoproof.game.feature.offline.*
 import com.ludoproof.game.feature.offline.presentation.feedback.OfflineFeedbackAction
 import com.ludoproof.game.feature.offline.presentation.feedback.OfflineLudoPawsFeedbackDispatcher
+import com.ludoproof.game.feature.store.domain.PostWinInterstitialPolicy
 import com.ludoproof.game.ui.game.addGameTopActions
 import com.ludoproof.game.ui.dialogs.showSettingsDialog
 import com.ludoproof.game.ui.offline.common.*
@@ -23,6 +24,17 @@ internal fun OfflineGameActivity.showGame(snapshot: MatchSnapshot?) {
         }
 
     prepareOfflineUiTransition()
+
+    if (
+        PostWinInterstitialPolicy.shouldShowOffline(
+            matchStatus = state.status,
+            winnerPlayerId = state.winnerPlayerId,
+            humanPlayerId = session.localPlayerId(),
+            isComputerMode = isComputerMode,
+        )
+    ) {
+        preparePostWinInterstitialAd()
+    }
 
     val (root, host) =
         LudoProofTheme.arcadeRoot(
