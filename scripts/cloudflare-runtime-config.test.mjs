@@ -40,7 +40,7 @@ test("account-site origin mismatch is rejected", () => {
 
 test("Billing cannot be enabled without the Google Play service-account email", () => {
   assert.throws(
-    () => buildCloudflareRuntimeVars({}, { ...valid, GOOGLE_PLAY_BILLING_ENABLED: "true" }),
+    () => buildCloudflareRuntimeVars({}, { ...valid, GOOGLE_PLAY_BILLING_ENABLED: "true", LUDOPROOF_BILLING_ENABLED: "true" }),
     /cannot be enabled until GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL/,
   );
 });
@@ -49,6 +49,7 @@ test("Billing accepts a correctly shaped service-account email", () => {
   const vars = buildCloudflareRuntimeVars({}, {
     ...valid,
     GOOGLE_PLAY_BILLING_ENABLED: "true",
+    LUDOPROOF_BILLING_ENABLED: "true",
     GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL: "ludoproof-play@ludoproof-prod.iam.gserviceaccount.com",
   });
   assert.equal(vars.GOOGLE_PLAY_BILLING_ENABLED, "true");
@@ -57,7 +58,7 @@ test("Billing accepts a correctly shaped service-account email", () => {
 
 test("AdMob SSV cannot be enabled without a real rewarded-unit ID", () => {
   assert.throws(
-    () => buildCloudflareRuntimeVars({}, { ...valid, LUDOPROOF_ADMOB_SSV_ENABLED: "true" }),
+    () => buildCloudflareRuntimeVars({}, { ...valid, LUDOPROOF_ADMOB_SSV_ENABLED: "true", LUDOPROOF_ADS_ENABLED: "true" }),
     /cannot be enabled until LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID/,
   );
 });
@@ -66,8 +67,11 @@ test("AdMob SSV only permits the configured gems reward and validates the unit I
   const vars = buildCloudflareRuntimeVars({}, {
     ...valid,
     LUDOPROOF_ADMOB_SSV_ENABLED: "true",
+    LUDOPROOF_ADS_ENABLED: "true",
     LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID: adUnit,
     LUDOPROOF_ADMOB_REWARD_ITEM: "gems",
+    ADMOB_APP_ID: "ca-app-pub-1234567890123456~1234567890",
+    ADMOB_REWARDED_AD_UNIT_ID: adUnit,
   });
   assert.equal(vars.LUDOPROOF_ADMOB_SSV_ENABLED, "true");
   assert.equal(vars.LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID, adUnit);
@@ -81,13 +85,24 @@ test("AdMob SSV only permits the configured gems reward and validates the unit I
   );
 });
 
+test("Worker and Android store flags must match before deployment", () => {
+  assert.throws(
+    () => buildCloudflareRuntimeVars({}, { ...valid, GOOGLE_PLAY_BILLING_ENABLED: "true" }),
+    /must match before deployment/,
+  );
+  assert.throws(
+    () => buildCloudflareRuntimeVars({}, { ...valid, LUDOPROOF_ADMOB_SSV_ENABLED: "true" }),
+    /must match before deployment/,
+  );
+});
+
 test("feature flags reject ambiguous or non-canonical values instead of interpreting them as true", () => {
   assert.throws(
     () => buildCloudflareRuntimeVars({}, { ...valid, GOOGLE_PLAY_BILLING_ENABLED: "yes" }),
     /must be exactly "true" or "false"/,
   );
   assert.throws(
-    () => buildCloudflareRuntimeVars({}, { ...valid, GOOGLE_PLAY_BILLING_ENABLED: "TRUE" }),
+    () => buildCloudflareRuntimeVars({}, { ...valid, GOOGLE_PLAY_BILLING_ENABLED: "TRUE", LUDOPROOF_BILLING_ENABLED: "TRUE" }),
     /must be exactly "true" or "false"/,
   );
 });
