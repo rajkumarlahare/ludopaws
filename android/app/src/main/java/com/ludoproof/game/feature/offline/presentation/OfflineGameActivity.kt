@@ -148,6 +148,7 @@ class OfflineGameActivity : ComponentActivity() {
         } else {
             showSetup()
         }
+        preparePostWinInterstitialAd()
     }
 
     internal fun preparePostWinInterstitialAd() {
