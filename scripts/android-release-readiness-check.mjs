@@ -172,7 +172,7 @@ requireText(
   "MainActivity.kt",
   onlineMain,
   "postWinInterstitialShownForMatchId == matchId",
-  "the same remote win result must not show a second interstitial on the next Back press.",
+  "an already-consumed remote win result must not show another interstitial.",
 );
 requireText(
   "RewardedAdsController.kt",
@@ -199,7 +199,7 @@ requireText(
   "OfflineGameActivity.kt",
   offlineActivity,
   "postWinInterstitialShownForMatchId == matchId",
-  "the same local win result must not show a second interstitial on the next Back press.",
+  "an already-consumed local win result must not show another interstitial.",
 );
 requireText(
   "MainActivity.kt",
