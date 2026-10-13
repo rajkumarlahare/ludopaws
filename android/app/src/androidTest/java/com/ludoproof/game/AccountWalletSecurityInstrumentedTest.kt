@@ -102,13 +102,22 @@ class AccountWalletSecurityInstrumentedTest {
         )
         assertFalse(storedGuestCiphertext.contains(guestRecoveryId))
         assertEquals("GUEST", sessionStore.lastAccountMode())
+        assertTrue(requireNotNull(sessionStore.load()).guestRecoveryEligible)
+
+        val deleteOnlyCode = "ab".repeat(32)
+        val guestSession = requireNotNull(sessionStore.load())
+        sessionStore.save(guestSession.copy(guestDeletionCredential = deleteOnlyCode))
+        assertEquals(deleteOnlyCode, sessionStore.load()?.guestDeletionCredential)
+        val encryptedSession = requireNotNull(sessionPreferences.getString("session_ciphertext", null))
+        assertFalse(encryptedSession.contains(deleteOnlyCode))
 
         val session = requireNotNull(sessionStore.load())
-        sessionStore.save(session.copy(guestRecoveryEligible = false))
+        sessionStore.save(session.copy(guestRecoveryEligible = false, guestDeletionCredential = null))
 
         assertEquals("GOOGLE", sessionStore.lastAccountMode())
         assertFalse(sessionPreferences.contains("guest_request_ciphertext"))
         assertFalse(sessionPreferences.contains("guest_request_iv"))
+        assertEquals(null, sessionStore.load()?.guestDeletionCredential)
     }
 
     @Test
