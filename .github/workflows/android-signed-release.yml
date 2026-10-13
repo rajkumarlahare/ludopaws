@@ -168,6 +168,16 @@ jobs:
             printf 'ADMOB_APP_ID=%s\n' "$APP_ID"
             printf 'ADMOB_REWARDED_AD_UNIT_ID=%s\n' "$REWARDED_ID"
             printf 'PLAY_GAMES_PROJECT_ID=%s\n' "$PLAY_GAMES_ID"
+
+            # Gradle providers.gradleProperty() does not read the plain workflow environment keys.
+            # ORG_GRADLE_PROJECT_* maps the validated release config into actual Gradle project properties.
+            printf 'ORG_GRADLE_PROJECT_LUDOPROOF_API_BASE_URL=%s\n' "$API_BASE"
+            printf 'ORG_GRADLE_PROJECT_LUDOPROOF_BILLING_ENABLED=%s\n' "$APP_BILLING"
+            printf 'ORG_GRADLE_PROJECT_LUDOPROOF_ADS_ENABLED=%s\n' "$APP_ADS"
+            printf 'ORG_GRADLE_PROJECT_ADMOB_APP_ID=%s\n' "$APP_ID"
+            printf 'ORG_GRADLE_PROJECT_ADMOB_REWARDED_AD_UNIT_ID=%s\n' "$REWARDED_ID"
+            printf 'ORG_GRADLE_PROJECT_GOOGLE_SIGN_IN_WEB_CLIENT_ID=%s\n' "$GOOGLE_SIGN_IN_WEB_CLIENT_ID"
+            printf 'ORG_GRADLE_PROJECT_PLAY_GAMES_PROJECT_ID=%s\n' "$PLAY_GAMES_ID"
           } >> "$GITHUB_ENV"
 
       - name: Android unit tests
