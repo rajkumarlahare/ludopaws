@@ -321,10 +321,17 @@ export class PlayerAccount {
         const walletRows = [...this.ctx.storage.sql.exec("SELECT balance FROM wallet WHERE account_id = ? LIMIT 1", accountId)];
         if (!walletRows.length) throw httpError(404, "WALLET_NOT_FOUND", "wallet was not found");
         const balance = Number(walletRows[0].balance);
+        // The configured AdMob unit promises 5 gems. Cosmetic-targeted views also earn
+        // their requested progress, but must not suppress the ad unit's declared reward.
+        const nextBalance = balance + 5;
+        if (!Number.isSafeInteger(nextBalance) || nextBalance < 0 || nextBalance > MAX_BALANCE) {
+          throw httpError(409, "WALLET_BALANCE_LIMIT", "wallet balance cannot safely be updated");
+        }
         const current = Number([...this.ctx.storage.sql.exec("SELECT progress FROM cosmetic_ad_progress WHERE cosmetic_id = ? LIMIT 1", cosmeticId)][0]?.progress ?? 0);
         const next = Math.min(cosmetic.ads, current + 1), now = Date.now();
+        this.ctx.storage.sql.exec("UPDATE wallet SET balance = ?, updated_at = ? WHERE account_id = ?", nextBalance, now, accountId);
         this.ctx.storage.sql.exec("INSERT INTO cosmetic_ad_progress (cosmetic_id, progress, updated_at) VALUES (?, ?, ?) ON CONFLICT(cosmetic_id) DO UPDATE SET progress = excluded.progress, updated_at = excluded.updated_at", cosmeticId, next, now);
-        this.ctx.storage.sql.exec("INSERT INTO wallet_transactions (transaction_id, idempotency_key, payload_hash, kind, delta, balance_after, source_ref_hash, created_at) VALUES (?, ?, ?, 'REWARDED_AD_COSMETIC_PROGRESS', 0, ?, ?, ?)", crypto.randomUUID().toLowerCase(), idempotencyKey, payloadHash, balance, transactionHash, now);
+        this.ctx.storage.sql.exec("INSERT INTO wallet_transactions (transaction_id, idempotency_key, payload_hash, kind, delta, balance_after, source_ref_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", crypto.randomUUID().toLowerCase(), idempotencyKey, payloadHash, "REWARDED_AD_COSMETIC_PROGRESS_AND_GEMS", 5, nextBalance, transactionHash, now);
       });
       return json(200, { ok: true, replay, wallet: this.#walletSnapshot(accountId) });
     }

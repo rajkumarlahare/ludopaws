@@ -45,7 +45,9 @@ Store checkout must remain disabled until the one-time Play Console products are
 
 ## Google AdMob rewarded ads
 
-Rewarded ads use the Google Mobile Ads SDK and UMP consent flow. Production ads remain disabled unless explicitly enabled with real AdMob IDs; Google's sample IDs are allowed only for debug testing. Complete the AdMob app/ad-unit and privacy-message setup in the [Google AdMob rewarded ads instructions](../README.md#google-admob-rewarded-ads) before enabling them. Reward grants are currently device-local and client-callback based, not server-side verified.
+Rewarded ads use the Google Mobile Ads SDK and UMP consent flow. Production ads remain disabled unless explicitly enabled with real AdMob IDs; Google's sample IDs are allowed only for debug testing. Reward grants are server-verified by the Worker through AdMob SSV; the client reward callback only triggers a wallet refresh and never grants value locally.
+
+The currently configured AdMob reward is **5 gems**. A normal Gems-tab ad grants 5 gems; an ad watched toward an eligible cosmetic grants the same 5 gems **plus one server-tracked cosmetic-progress step**. Both effects are idempotent on the signed AdMob transaction ID. Complete the AdMob app/ad-unit and privacy-message setup in the [Google AdMob rewarded ads instructions](../README.md#google-admob-rewarded-ads) before enabling production ads.
 
 ## Required gates before distribution
 
@@ -58,6 +60,7 @@ Rewarded ads use the Google Mobile Ads SDK and UMP consent flow. Production ads 
 7. Emulator instrumentation tests pass.
 8. CodeQL JavaScript and Android Kotlin analyses pass.
 9. Signed workflow verifies APK and AAB signatures.
+10. AdMob UMP consent/privacy options and the signed SSV callback are tested end-to-end for both Gems-tab rewards and cosmetic-progress rewards; each successful callback grants the configured 5 gems, cosmetic progress increments only for an eligible target, and duplicate callbacks do not duplicate either reward.
 
 ## Ruleset V2 rollout sequence
 

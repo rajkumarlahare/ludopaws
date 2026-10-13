@@ -37,7 +37,8 @@ export async function verifyAdMobSsvRequest(request, env, fetchImpl = fetch, now
   }
   const configuredAdUnit = String(env?.LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID ?? "");
   if (!configuredAdUnit || adUnit !== configuredAdUnit) throw ssvError(403, "SSV_AD_UNIT_INVALID", "reward callback came from an unexpected ad unit");
-  if (rewardAmount !== "5" || rewardItem !== String(env?.LUDOPROOF_ADMOB_REWARD_ITEM ?? "gems")) {
+  const configuredRewardItem = String(env?.LUDOPROOF_ADMOB_REWARD_ITEM ?? "gems");
+  if (configuredRewardItem !== "gems" || rewardAmount !== "5" || rewardItem !== "gems") {
     throw ssvError(403, "SSV_REWARD_INVALID", "reward callback does not match the configured reward");
   }
   if (!/^[A-Fa-f0-9]{16,128}$/.test(transactionId)) throw ssvError(400, "SSV_TRANSACTION_INVALID", "reward transaction ID is invalid");

@@ -101,7 +101,8 @@ async function handleAccountRequest(request, env) {
             sessionHmacConfigured,
             playBillingEnabled: googlePlayBillingEnabled(env),
             admobSsvEnabled: env?.LUDOPROOF_ADMOB_SSV_ENABLED === "true" &&
-              Boolean(env?.LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID),
+              Boolean(env?.LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID) &&
+              (env?.LUDOPROOF_ADMOB_REWARD_ITEM == null || env.LUDOPROOF_ADMOB_REWARD_ITEM === "gems"),
           },
         });
       }
@@ -397,7 +398,8 @@ async function handleAccountRequest(request, env) {
           Boolean(env?.LUDOPROOF_ACCOUNT_DIRECTORY) &&
           Boolean(env?.LUDOPROOF_PLAYER_ACCOUNTS);
         const adsReady = env?.LUDOPROOF_ADMOB_SSV_ENABLED === "true" &&
-          Boolean(env?.LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID);
+          Boolean(env?.LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID) &&
+          (env?.LUDOPROOF_ADMOB_REWARD_ITEM == null || env.LUDOPROOF_ADMOB_REWARD_ITEM === "gems");
         return json(200, { ok: true, billingAvailable: billingReady, rewardedAdsAvailable: adsReady });
       }
 
