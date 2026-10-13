@@ -258,7 +258,7 @@ class StoreActivity :
         }
         if (BuildConfig.DEBUG && cosmeticId == null) {
             Log.i("LudoPawsSSVTest", "AdMob SSV User ID for this debug account: ${session.accountId}")
-            Log.i("LudoPawsSSVTest", "AdMob SSV Custom data for Gems: {\\"kind\\":\\"gems\\"}")
+            Log.i("LudoPawsSSVTest", "AdMob SSV Custom data for Gems: {\"kind\":\"gems\"}")
         }
         val customData = JSONObject()
             .put("kind", if (cosmeticId == null) "gems" else "cosmetic")
