@@ -7,8 +7,8 @@ LudoProof is a production-oriented release candidate. The game backend is author
 - Publisher / parent brand: **Rekixo** (`https://rekixo.com`).
 - First-release Android application ID: `com.rekixo.ludopaws`.
 - Game website target: `https://ludopaws.rekixo.com`.
-- API target: `https://api.ludopaws.rekixo.com`.
-- The API hostname remains a target until the Cloudflare zone, Worker Custom Domain, TLS, health/readiness, and game-flow checks are verified. Keep the current Worker name and old hostname as fallback until then.
+- API hostname: `https://api.ludopaws.rekixo.com`.
+- The dedicated API hostname passed HTTPS health, readiness, store-status, and live game-flow checks in Cloudflare production deployment run [#50](https://github.com/rajkumarlahare/ludopaws/actions/runs/38352312575) on 13 October 2026. Keep the `workers.dev` host available as rollback/test fallback, but do not use it silently as the Android default. The game website/account hostname is a separate publisher-gated static-site cutover; keep it gated until policy approval, hosting/DNS/TLS, privacy and account-deletion flows are approved and live.
 - No production deploy, Billing activation, Ads activation, or release during this migration.
 
 ## Release gates

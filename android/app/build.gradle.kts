@@ -5,7 +5,7 @@ plugins {
 
 val ludoProofApiBaseUrl =
     providers.gradleProperty("LUDOPROOF_API_BASE_URL")
-        .orElse("https://ludoproof-game-api.ai-8f3.workers.dev")
+        .orElse("https://api.ludopaws.rekixo.com")
         .get()
 val escapedApiBaseUrl =
     ludoProofApiBaseUrl
