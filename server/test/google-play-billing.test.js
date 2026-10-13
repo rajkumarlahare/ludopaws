@@ -194,6 +194,13 @@ test("verified purchases are consumed, redeemed once, and recover idempotently",
     purchaseLedgerId: await sha256Hex("ludoproof:google-play-purchase:v1:" + purchaseToken),
   });
   assert.equal(calls.filter(({ url }) => url.endsWith(":consume")).length, 1);
+  assert.ok(
+    calls.some(({ url, init }) =>
+      init.method === "GET" &&
+      url.includes("/applications/com.rekixo.ludopaws/purchases/productsv2/tokens/"),
+    ),
+    "Google Play verification must target the final Rekixo Android application ID",
+  );
 
   const recovered = await verifyAndRedeemGooglePlayPurchase(
     env,
