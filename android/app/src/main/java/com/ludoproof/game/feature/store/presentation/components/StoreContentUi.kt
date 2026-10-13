@@ -8,6 +8,7 @@ import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.ludoproof.game.BuildConfig
 import com.ludoproof.game.LudoProofTheme
 import com.ludoproof.game.core.ui.art.plywoodBackground
 import com.ludoproof.game.core.ui.components.AppFocusRing
@@ -135,7 +136,7 @@ private fun StoreActivity.gemsContent():
             )
         }
 
-        if (adsEnabledForBuild) {
+        if (adsEnabledForBuild || BuildConfig.LUDOPROOF_INTERSTITIAL_ADS_ENABLED) {
             addView(
                 TextView(this@gemsContent).apply {
                     text = "Ad privacy options"
