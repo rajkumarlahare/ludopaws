@@ -93,8 +93,10 @@ export class PlayerAccount {
     if ([...this.ctx.storage.sql.exec("SELECT account_id FROM account_deletions WHERE account_id = ? LIMIT 1", accountId)].length) {
       return json(200, { ok: true, deleted: true, purchaseLedgerIds: [] });
     }
-    const sessionId = requireSessionId(body?.sessionId);
-    this.#requireActiveSession(accountId, sessionId);
+    if (body?.guestRecoveryVerified !== true) {
+      const sessionId = requireSessionId(body?.sessionId);
+      this.#requireActiveSession(accountId, sessionId);
+    }
     this.#profileSnapshot(accountId);
     const purchaseLedgerIds = [...this.ctx.storage.sql.exec(
       "SELECT source_ref_hash FROM wallet_transactions WHERE kind IN ('PLAY_GEM_PURCHASE', 'PLAY_REMOVE_ADS') AND source_ref_hash IS NOT NULL",
@@ -107,8 +109,10 @@ export class PlayerAccount {
     if ([...this.ctx.storage.sql.exec("SELECT account_id FROM account_deletions WHERE account_id = ? LIMIT 1", accountId)].length) {
       return json(200, { ok: true, accountId, deleted: true, replay: true });
     }
-    const sessionId = requireSessionId(body?.sessionId);
-    this.#requireActiveSession(accountId, sessionId);
+    if (body?.guestRecoveryVerified !== true) {
+      const sessionId = requireSessionId(body?.sessionId);
+      this.#requireActiveSession(accountId, sessionId);
+    }
     if (body?.confirmation !== "DELETE_MY_ACCOUNT") throw httpError(400, "ACCOUNT_DELETE_CONFIRMATION_REQUIRED", "account deletion confirmation is required");
     this.#profileSnapshot(accountId);
     const deletedAt = Date.now();
