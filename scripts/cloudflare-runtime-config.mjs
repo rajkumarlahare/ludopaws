@@ -28,7 +28,15 @@ export function buildCloudflareRuntimeVars(existingVars, environment) {
   }
 
   const billingEnabled = readBoolean("GOOGLE_PLAY_BILLING_ENABLED", environment.GOOGLE_PLAY_BILLING_ENABLED);
+  const androidBillingEnabled = readBoolean("LUDOPROOF_BILLING_ENABLED", environment.LUDOPROOF_BILLING_ENABLED);
   const adsEnabled = readBoolean("LUDOPROOF_ADMOB_SSV_ENABLED", environment.LUDOPROOF_ADMOB_SSV_ENABLED);
+  const androidAdsEnabled = readBoolean("LUDOPROOF_ADS_ENABLED", environment.LUDOPROOF_ADS_ENABLED);
+  if (billingEnabled !== androidBillingEnabled) {
+    throw new Error("GOOGLE_PLAY_BILLING_ENABLED and LUDOPROOF_BILLING_ENABLED must match before deployment.");
+  }
+  if (adsEnabled !== androidAdsEnabled) {
+    throw new Error("LUDOPROOF_ADMOB_SSV_ENABLED and LUDOPROOF_ADS_ENABLED must match before deployment.");
+  }
 
   const serviceAccountEmail = String(environment.GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL ?? "").trim();
   if (serviceAccountEmail && !GOOGLE_PLAY_SERVICE_ACCOUNT.test(serviceAccountEmail)) {
@@ -46,8 +54,25 @@ export function buildCloudflareRuntimeVars(existingVars, environment) {
   if (rewardItem !== "gems") {
     throw new Error('LUDOPROOF_ADMOB_REWARD_ITEM must be "gems"; the Worker only grants the configured five-gem reward.');
   }
+  const androidRewardedAdUnitId = String(environment.ADMOB_REWARDED_AD_UNIT_ID ?? "").trim();
+  const androidAppId = String(environment.ADMOB_APP_ID ?? "").trim();
+  if (androidRewardedAdUnitId && !ADMOB_REWARDED_UNIT.test(androidRewardedAdUnitId)) {
+    throw new Error("ADMOB_REWARDED_AD_UNIT_ID must be a real AdMob rewarded-unit ID.");
+  }
   if (adsEnabled && !rewardedAdUnitId) {
     throw new Error("AdMob SSV cannot be enabled until LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID is configured.");
+  }
+  if (adsEnabled) {
+    if (!/^ca-app-pub-[0-9]{16}~[0-9]{10}$/.test(androidAppId)) {
+      throw new Error("ADMOB_APP_ID must be a real AdMob app ID before enabling production ads.");
+    }
+    if (!ADMOB_REWARDED_UNIT.test(androidRewardedAdUnitId) || androidRewardedAdUnitId !== rewardedAdUnitId) {
+      throw new Error("Android and Worker AdMob rewarded-unit IDs must both be valid and match.");
+    }
+    if (androidAppId === "ca-app-pub-3940256099942544~3347511713" ||
+        androidRewardedAdUnitId === "ca-app-pub-3940256099942544/5224354917") {
+      throw new Error("Google sample AdMob IDs are not allowed in production configuration.");
+    }
   }
 
   const vars = {
