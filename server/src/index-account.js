@@ -385,6 +385,11 @@ async function handleAccountRequest(request, env) {
         // Apply the shared IP rate gate before parsing/cryptographic verification to limit abuse.
         await rateLimit(env, request, "admob:ssv", 120);
         const verified = await verifyAdMobSsvRequest(request, env);
+        // AdMob's dedicated verification test uses Google's test signing keys.
+        // A valid test callback must return success without ever crediting a wallet.
+        if (verified.isTest === true) {
+          return json(200, { ok: true, verified: true, test: true, rewardGranted: false });
+        }
         return await playerResponse(env, verified.accountId, "/wallet/reward-ad", {
           accountId: verified.accountId,
           transactionId: verified.transactionId,
