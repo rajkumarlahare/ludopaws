@@ -180,6 +180,7 @@ class MainActivity : ComponentActivity() {
     private var friendsVoiceSession: FriendsVoiceChatSession? = null
     private var postWinInterstitialAd: PostWinInterstitialAdController? = null
     private var postWinInterstitialExitGate: PostWinInterstitialExitGate? = null
+    private var postWinInterstitialShownForMatchId: String? = null
 
     @Volatile
     internal var screenStarted =
@@ -761,7 +762,11 @@ class MainActivity : ComponentActivity() {
         ).also { it.prepare() }
     }
 
-    private fun showPostWinInterstitialIfReady(onFinished: () -> Unit): Boolean {
+    private fun showPostWinInterstitialIfReady(
+        matchId: String,
+        onSkipAd: () -> Unit,
+    ): Boolean {
+        if (postWinInterstitialShownForMatchId == matchId) return false
         val interstitial = postWinInterstitialAd ?: return false
         val gate = postWinInterstitialExitGate ?: PostWinInterstitialExitGate(
             activity = this,
@@ -769,7 +774,10 @@ class MainActivity : ComponentActivity() {
             walletStore = GemWalletStore(this),
             interstitial = interstitial,
         ).also { postWinInterstitialExitGate = it }
-        return gate.interceptIfReady(onFinished)
+        return gate.interceptIfReady(
+            onAdDismissed = { postWinInterstitialShownForMatchId = matchId },
+            onSkipAd = onSkipAd,
+        )
     }
 
     private fun requestRemoteExitAfterWinInterstitial() {
@@ -785,10 +793,15 @@ class MainActivity : ComponentActivity() {
         )
         val resultIsAuthoritative =
             uiStateHolder.value.currentStateSource == OnlineStateSource.AUTHORITATIVE
+        val finishedMatchId = state?.matchId
         if (
             resultIsAuthoritative &&
             didCurrentPlayerWin &&
-            showPostWinInterstitialIfReady { requestRemoteExit() }
+            finishedMatchId != null &&
+            showPostWinInterstitialIfReady(
+                matchId = finishedMatchId,
+                onSkipAd = { requestRemoteExit() },
+            )
         ) {
             return
         }
