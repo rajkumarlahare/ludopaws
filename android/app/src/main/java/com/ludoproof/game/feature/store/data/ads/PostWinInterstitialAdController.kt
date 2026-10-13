@@ -154,7 +154,16 @@ internal class PostWinInterstitialAdController(
         )
     }
 
-    private companion object {
-        const val TAG = "LudoPawsPostWinAd"
+    companion object {
+        private const val TAG = "LudoPawsPostWinAd"
+
+        internal fun showPrivacyOptions(activity: Activity, onError: (String) -> Unit) {
+            UserMessagingPlatform.showPrivacyOptionsForm(activity) { error ->
+                if (error != null) {
+                    Log.w(TAG, "Ad privacy options form failed: ${error.message}")
+                    onError(error.message ?: "Ad privacy options could not be opened. Please try again.")
+                }
+            }
+        }
     }
 }
