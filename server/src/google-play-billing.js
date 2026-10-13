@@ -1,6 +1,6 @@
 import { httpError, sha256Hex } from "./crypto.js";
 
-const PACKAGE_NAME = "com.ludoproof.game";
+const PACKAGE_NAME = "com.rekixo.ludopaws";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const PUBLISHER_URL = "https://androidpublisher.googleapis.com/androidpublisher/v3";
 const PUBLISHER_SCOPE = "https://www.googleapis.com/auth/androidpublisher";
