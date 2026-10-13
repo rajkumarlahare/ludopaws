@@ -26,6 +26,8 @@ import com.ludoproof.game.ui.online.*
 import com.ludoproof.game.feature.online.*
 import com.ludoproof.game.feature.online.FriendsVoiceChatSession
 import com.ludoproof.game.feature.store.data.ads.PostWinInterstitialAdController
+import com.ludoproof.game.feature.store.data.ads.PostWinInterstitialExitGate
+import com.ludoproof.game.feature.store.data.local.GemWalletStore
 import com.ludoproof.game.feature.store.domain.PostWinInterstitialPolicy
 
 class MainActivity : ComponentActivity() {
@@ -177,6 +179,7 @@ class MainActivity : ComponentActivity() {
 
     private var friendsVoiceSession: FriendsVoiceChatSession? = null
     private var postWinInterstitialAd: PostWinInterstitialAdController? = null
+    private var postWinInterstitialExitGate: PostWinInterstitialExitGate? = null
 
     @Volatile
     internal var screenStarted =
@@ -746,10 +749,9 @@ class MainActivity : ComponentActivity() {
                     )
                 }
         }
-        preparePostWinInterstitialAd()
     }
 
-    private fun preparePostWinInterstitialAd() {
+    internal fun preparePostWinInterstitialAd() {
         if (!BuildConfig.LUDOPROOF_INTERSTITIAL_ADS_ENABLED || postWinInterstitialAd != null) return
         postWinInterstitialAd = PostWinInterstitialAdController(
             activity = this,
@@ -758,8 +760,16 @@ class MainActivity : ComponentActivity() {
         ).also { it.prepare() }
     }
 
-    private fun showPostWinInterstitialIfReady(onFinished: () -> Unit): Boolean =
-        postWinInterstitialAd?.showIfReady(onFinished) ?: false
+    private fun showPostWinInterstitialIfReady(onFinished: () -> Unit): Boolean {
+        val interstitial = postWinInterstitialAd ?: return false
+        val gate = postWinInterstitialExitGate ?: PostWinInterstitialExitGate(
+            activity = this,
+            accountRepository = (application as LudoProofApplication).accountRepository,
+            walletStore = GemWalletStore(this),
+            interstitial = interstitial,
+        ).also { postWinInterstitialExitGate = it }
+        return gate.interceptIfReady(onFinished)
+    }
 
     private fun requestRemoteExitAfterWinInterstitial() {
         val state = currentState
@@ -772,7 +782,15 @@ class MainActivity : ComponentActivity() {
             winnerTeamId = state?.winnerTeamId,
             playerTeamId = currentPlayer?.teamId,
         )
-        if (didCurrentPlayerWin && showPostWinInterstitialIfReady { requestRemoteExit() }) return
+        val resultIsAuthoritative =
+            uiStateHolder.value.currentStateSource == OnlineStateSource.AUTHORITATIVE
+        if (
+            resultIsAuthoritative &&
+            didCurrentPlayerWin &&
+            showPostWinInterstitialIfReady { requestRemoteExit() }
+        ) {
+            return
+        }
         requestRemoteExit()
     }
 
@@ -834,6 +852,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         stopFriendsVoice("Voice is off")
+        postWinInterstitialExitGate?.close()
+        postWinInterstitialExitGate = null
         postWinInterstitialAd?.close()
         postWinInterstitialAd = null
         mainHandler.removeCallbacksAndMessages(
