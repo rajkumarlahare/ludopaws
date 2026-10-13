@@ -147,7 +147,13 @@ export class AccountDirectory {
   async #registerGuestDeletionCredential(request) {
     const body = await readJson(request);
     const accountId = requireAccountId(body?.accountId);
-    const credentialHash = requireHash(body?.credentialHash, "credentialHash");
+    // The server, not the client, chooses the 256-bit secret. Only its domain-separated
+    // hash is persisted; the plaintext is returned once to the authenticated app session.
+    const bytes = new Uint8Array(32);
+    crypto.getRandomValues(bytes);
+    const credential = [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+    const credentialHash = await sha256Hex("ludoproof:guest-deletion-credential:v1:" + credential);
+
     this.ctx.storage.transactionSync(() => {
       const accounts = [...this.ctx.storage.sql.exec(
         "SELECT account_kind FROM account_registry WHERE account_id = ? LIMIT 1", accountId,
@@ -174,7 +180,7 @@ export class AccountDirectory {
         credentialHash, accountId, Date.now(),
       );
     });
-    return json(200, { ok: true, ready: true });
+    return json(200, { ok: true, ready: true, credential });
   }
 
   async #claimGuestDeletionCredential(request) {
