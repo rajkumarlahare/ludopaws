@@ -81,9 +81,13 @@ test("AdMob SSV only permits the configured gems reward and validates the unit I
   );
 });
 
-test("feature flags reject ambiguous values instead of interpreting them as true", () => {
+test("feature flags reject ambiguous or non-canonical values instead of interpreting them as true", () => {
   assert.throws(
     () => buildCloudflareRuntimeVars({}, { ...valid, GOOGLE_PLAY_BILLING_ENABLED: "yes" }),
+    /must be exactly "true" or "false"/,
+  );
+  assert.throws(
+    () => buildCloudflareRuntimeVars({}, { ...valid, GOOGLE_PLAY_BILLING_ENABLED: "TRUE" }),
     /must be exactly "true" or "false"/,
   );
 });
