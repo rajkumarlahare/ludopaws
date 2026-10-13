@@ -4,6 +4,7 @@ import android.app.Activity
 import android.util.Log
 import com.ludoproof.game.feature.account.data.AccountRepository
 import com.ludoproof.game.feature.store.data.local.GemWalletStore
+import com.ludoproof.game.feature.store.domain.PostWinInterstitialPolicy
 import java.util.concurrent.Executors
 
 /**
@@ -52,7 +53,9 @@ internal class PostWinInterstitialExitGate(
                     check(walletStore.applyServerSnapshot(wallet, session.accountId)) {
                         "The server wallet snapshot could not be applied to the active account."
                     }
-                    !wallet.getBoolean("adsRemoved")
+                    PostWinInterstitialPolicy.shouldShowFillerInterstitial(
+                        adsRemoved = wallet.getBoolean("adsRemoved"),
+                    )
                 } catch (error: Exception) {
                     // Fail open to navigation, not to ads: never show a filler ad if ownership
                     // is stale or the server cannot confirm whether Remove Ads was purchased.
