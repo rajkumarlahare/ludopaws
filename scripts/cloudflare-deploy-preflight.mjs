@@ -130,6 +130,11 @@ if (vars.LUDOPROOF_ADMOB_SSV_ENABLED === "true" &&
   process.exit(2);
 }
 
+if (vars.GOOGLE_PLAY_BILLING_ENABLED !== "false" || vars.LUDOPROOF_ADMOB_SSV_ENABLED !== "false") {
+  console.error("Production deployment is blocked for this initial release until Google Play Billing and AdMob are explicitly kept disabled.");
+  process.exit(2);
+}
+
 const fingerprint =
   String(
     vars.ENTRONEX_SIGNING_KEY_FINGERPRINT ??

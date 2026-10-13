@@ -39,7 +39,7 @@ jobs:
       ADMOB_REWARDED_AD_UNIT_ID: ${{ vars.ADMOB_REWARDED_AD_UNIT_ID }}
       LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID: ${{ vars.LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID }}
       LUDOPROOF_ADMOB_REWARD_ITEM: ${{ vars.LUDOPROOF_ADMOB_REWARD_ITEM }}
-      LUDOPROOF_WORKER_URL: https://ludoproof-game-api.ai-8f3.workers.dev
+      LUDOPROOF_WORKER_URL: https://api.ludopaws.rekixo.com
 
     steps:
       - name: Checkout exact release commit
@@ -272,6 +272,28 @@ jobs:
             }
             console.log("LudoProof production Worker is ready.");
           ' "$body"
+
+      - name: Verify store status route and feature flags
+        shell: bash
+        run: |
+          set -euo pipefail
+          status_file="$(mktemp)"
+          trap 'rm -f "$status_file"' EXIT
+          curl --fail --silent --show-error --retry 6 --retry-delay 5 --retry-all-errors \
+            "$LUDOPROOF_WORKER_URL/api/store/status" > "$status_file"
+          node -e '
+            const fs = require("node:fs");
+            const body = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+            if (body?.ok !== true || typeof body.billingAvailable !== "boolean" || typeof body.rewardedAdsAvailable !== "boolean") {
+              console.error("Branded API /api/store/status response is missing expected boolean feature flags.");
+              process.exit(2);
+            }
+            if (body.billingAvailable !== false || body.rewardedAdsAvailable !== false) {
+              console.error("First-release gate requires Google Play Billing and rewarded Ads to remain disabled.");
+              process.exit(3);
+            }
+            console.log("Branded API store status route is present; Billing and rewarded Ads remain disabled.");
+          ' "$status_file"
 
       - name: Verify live production game flow
         run: node scripts/production-game-smoke.mjs
