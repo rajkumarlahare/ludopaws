@@ -220,6 +220,21 @@ class ProfileActivity : Activity() {
                 },
                 sectionParams(12),
             )
+            content.addView(
+                Button(this).apply {
+                    text = "Replace guest deletion code"
+                    isAllCaps = false
+                    setOnClickListener {
+                        AlertDialog.Builder(this@ProfileActivity)
+                            .setTitle("Replace saved guest deletion code?")
+                            .setMessage("This invalidates all previously saved guest deletion codes for this account. Save the replacement privately before uninstalling.")
+                            .setNegativeButton("Cancel", null)
+                            .setPositiveButton("Replace code") { _, _ -> showGuestDeletionCode(rotateExisting = true) }
+                            .show()
+                    }
+                },
+                sectionParams(8),
+            )
         }
         content.addView(
             Button(this).apply {
@@ -285,14 +300,14 @@ class ProfileActivity : Activity() {
             .show()
     }
 
-    private fun showGuestDeletionCode() {
+    private fun showGuestDeletionCode(rotateExisting: Boolean = false) {
         if (accountAuthInProgress) return
         accountAuthInProgress = true
         accountStatus = "Preparing guest deletion code…"
         renderProfile()
         accountAuthExecutor.execute {
             try {
-                val code = accountRepository.ensureGuestDeletionCredential()
+                val code = accountRepository.ensureGuestDeletionCredential(rotateExisting)
                 runOnUiThread {
                     if (isFinishing || isDestroyed) return@runOnUiThread
                     accountAuthInProgress = false
@@ -302,7 +317,11 @@ class ProfileActivity : Activity() {
                         orientation = LinearLayout.VERTICAL
                         setPadding(dp(24), dp(12), dp(24), dp(4))
                         addView(TextView(this@ProfileActivity).apply {
-                            text = "Save this code somewhere private before uninstalling. On the official Ludo Paws deletion page, it can delete this guest account only; it cannot sign in or restore your account. Never send this code to support or share it with anyone."
+                            text = if (rotateExisting) {
+                                "This new code replaces every previously saved guest deletion code for this account. Save it somewhere private before uninstalling. It can delete this guest account only; it cannot sign in or restore your account. Never send it to support or share it with anyone."
+                            } else {
+                                "Save this code somewhere private before uninstalling. On the official Ludo Paws deletion page, it can delete this guest account only; it cannot sign in or restore your account. Never send this code to support or share it with anyone."
+                            }
                             textSize = 14f
                         })
                         addView(TextView(this@ProfileActivity).apply {
