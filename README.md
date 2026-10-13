@@ -1,5 +1,13 @@
 # Ludo Paws
 
+**Publisher / parent brand:** Rekixo (`https://rekixo.com`)
+
+**Final Android application ID:** `com.rekixo.ludopaws`
+
+**Game website target:** `https://ludopaws.rekixo.com`
+
+**API hostname target:** `https://api.ludopaws.rekixo.com` (activate only after Cloudflare domain and live API checks pass).
+
 **Publisher / parent brand:** Rekixo  
 **Repository:** `ludopaws`
 
@@ -12,7 +20,7 @@ Branding/repository names are separate from compatibility-sensitive runtime iden
 
 The game is built around **verifiable EntroNex dice outcomes**. Current status: **release candidate / evaluation**. The app and game backend are being hardened for production operation, while EntroNex v4 remains pre-independent-audit.
 
-> Migration compatibility note: the Android package, Cloudflare Worker/Durable Object bindings, persisted storage names, proof/ruleset identifiers, and other protocol-sensitive identifiers intentionally keep their historical `ludoproof` / `LudoProof` names during the Ludo Paws migration. Those identifiers are implementation details, not the consumer brand, and must not be renamed casually because doing so can break compatibility, saved state, deployed infrastructure, or proof verification.
+> Migration compatibility note: the final Android `applicationId` is `com.rekixo.ludopaws`. The Kotlin `namespace` and source package declarations remain `com.ludoproof.game` temporarily as an internal implementation detail; they are not the Play Store application ID. Cloudflare Worker/Durable Object bindings, persisted storage names, proof/ruleset identifiers, and other protocol-sensitive identifiers remain unchanged to protect deployed infrastructure and proof verification.
 
 The repository contains:
 
@@ -71,11 +79,13 @@ Blockade/stack restrictions are not yet part of ruleset v1.
 
 ## Android
 
-Compatibility-sensitive package ID:
+Final Play Store application ID:
 
 ```text
-com.ludoproof.game
+com.rekixo.ludopaws
 ```
+
+The current Kotlin source namespace remains `com.ludoproof.game` in this first safe identity change; Google Play uses the application ID above.
 
 The Android MVP now supports:
 
@@ -277,7 +287,7 @@ The same-account Worker binding is preferred over the public `workers.dev` netwo
 The Android profile uses Google Play Games Services v2 for native player sign-in. To enable it:
 
 1. Create/link the Android game in Play Console's Play Games Services setup and use the numeric **Games Services project ID** (not the OAuth client ID).
-2. Add the app's package name (`com.ludoproof.game`) and the SHA-1 signing certificate fingerprints for every build distributed to testers or players. The debug build needs its debug-key SHA-1; store builds need the app-signing certificate SHA-1.
+2. Add the app's package name (`com.rekixo.ludopaws`) and the SHA-1 signing certificate fingerprints for every build distributed to testers or players. The debug build needs its debug-key SHA-1; store builds need the app-signing certificate SHA-1.
 3. Provide the project ID to Gradle without committing it to source:
 
    ```text
@@ -339,7 +349,7 @@ The checkout intentionally stays disabled until both Play Console products and t
    npx --yes wrangler@4.135.0 secret put GOOGLE_PLAY_SERVICE_ACCOUNT_PRIVATE_KEY
    ```
 
-   Paste the PEM private key value when prompted. Never put the private key in Android, `wrangler.json`, source control, build arguments, or chat. The Worker package name is fixed to `com.ludoproof.game`.
+   Paste the PEM private key value when prompted. Never put the private key in Android, `wrangler.json`, source control, build arguments, or chat. The Google Play purchase verifier targets `com.rekixo.ludopaws`.
 4. Deploy the Worker so the `LUDOPROOF_STORE_PURCHASES` Durable Object binding/migration is active. In Cloudflare Worker settings, add the non-secret variable `GOOGLE_PLAY_BILLING_ENABLED=false` while configuring the app and service account.
 5. For internal testing only, set `GOOGLE_PLAY_BILLING_ENABLED=true` in Cloudflare and build with `-PLUDOPROOF_BILLING_ENABLED=true`. Check `GET /api/store/status`; `billingAvailable` must be `true`, and complete a tester purchase/restore/refund test before public release. The Android build flag defaults to `false`; the Worker must independently report billing enabled before checkout is opened.
 
@@ -360,7 +370,7 @@ LUDOPROOF_ADS_USE_TEST_IDS=false
 
 Before enabling ads:
 
-1. Register `com.ludoproof.game` in AdMob and create a rewarded ad unit. Add the real App ID and rewarded ad-unit ID above (these IDs are not secrets).
+1. Register `com.rekixo.ludopaws` in AdMob and create a rewarded ad unit. Add the real App ID and rewarded ad-unit ID above (these IDs are not secrets).
 2. Publish the applicable privacy/consent messages in the AdMob Privacy & messaging settings. Verify the UMP consent and privacy-options flow in the internal test track.
 3. For debug-only SDK integration tests before receiving real IDs, build with Google's sample IDs using `-PLUDOPROOF_ADS_ENABLED=true -PLUDOPROOF_ADS_USE_TEST_IDS=true`. This test-ID mode is automatically disabled in release builds.
 4. Only enable production ads with your real IDs and `LUDOPROOF_ADS_USE_TEST_IDS=false`; the build rejects enabling ads with the default sample IDs in this mode.
