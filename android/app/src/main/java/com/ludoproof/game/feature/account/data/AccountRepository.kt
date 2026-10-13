@@ -234,7 +234,7 @@ class AccountRepository(context: Context) {
     }
 
     @Synchronized
-    fun ensureGuestDeletionCredential(): String {
+    fun ensureGuestDeletionCredential(rotateExisting: Boolean = false): String {
         val session = requireSession()
         if (!session.guestRecoveryEligible) {
             throw AccountApiException(
@@ -244,14 +244,18 @@ class AccountRepository(context: Context) {
             )
         }
 
-        session.guestDeletionCredential?.let { return it }
+        session.guestDeletionCredential?.let { existing ->
+            if (!rotateExisting) return existing
+        }
 
         // AccountDirectory generates the 256-bit secret server-side and stores only its hash.
-        // Save the returned plaintext only inside the encrypted Android Keystore session.
+        // When this installation has no saved code, rotate to invalidate any older lost code;
+        // the explicit replace action does the same while the current saved code still exists.
+        val rotate = rotateExisting || session.guestDeletionCredential == null
         val response = request(
             "POST",
             "/api/account/guest/deletion-code",
-            JSONObject(),
+            JSONObject().put("rotate", rotate),
             session.accessToken,
         )
         val credential = response.optString("credential")
