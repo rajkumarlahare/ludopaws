@@ -99,7 +99,7 @@ const vars =
   wrangler?.vars ?? {};
 
 const oauthClientId = String(vars.GOOGLE_SIGN_IN_WEB_CLIENT_ID ?? "").trim();
-if (!/^[0-9]+-[A-Za-z0-9_-]+\\.apps\\.googleusercontent\\.com$/.test(oauthClientId)) {
+if (!/^[0-9]+-[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$/.test(oauthClientId)) {
   console.error("GOOGLE_SIGN_IN_WEB_CLIENT_ID is missing or malformed in the prepared production Worker config.");
   process.exit(2);
 }
@@ -120,12 +120,12 @@ if (vars.LUDOPROOF_ADMOB_REWARD_ITEM !== "gems") {
   process.exit(2);
 }
 if (vars.GOOGLE_PLAY_BILLING_ENABLED === "true" &&
-    !/^[^@\\s]+@[^@\\s]+\\.iam\\.gserviceaccount\\.com$/.test(String(vars.GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL ?? ""))) {
+    !/^[^@\s]+@[^@\s]+\.iam\.gserviceaccount\.com$/.test(String(vars.GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL ?? ""))) {
   console.error("Billing is enabled but GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL is missing or malformed.");
   process.exit(2);
 }
 if (vars.LUDOPROOF_ADMOB_SSV_ENABLED === "true" &&
-    !/^ca-app-pub-[0-9]{16}\\/[0-9]{10}$/.test(String(vars.LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID ?? ""))) {
+    !/^ca-app-pub-[0-9]{16}\/[0-9]{10}$/.test(String(vars.LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID ?? ""))) {
   console.error("AdMob SSV is enabled but LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID is missing or malformed.");
   process.exit(2);
 }
