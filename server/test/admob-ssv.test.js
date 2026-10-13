@@ -29,7 +29,7 @@ async function signedRequest({ privateKey, keyId, accountId, adUnit, customData,
     "&signature=" + rawToDer(raw).toString("base64url") + "&key_id=" + keyId);
 }
 
-test("AdMob SSV requires valid signature, matching ad unit and configured reward", async () => {
+test("AdMob SSV accepts the numeric ad_unit identifier corresponding to the configured SDK ad unit", async () => {
   const pair = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
   const spki = await crypto.subtle.exportKey("spki", pair.publicKey);
   const keys = { keys: [{ keyId: 129, base64: base64(spki) }] };
@@ -38,7 +38,7 @@ test("AdMob SSV requires valid signature, matching ad unit and configured reward
   const accountId = "0a2c3a83-e0fb-4abc-8ac4-581a6d994fe7";
   const tx = "a1b2c3d4e5f60718293a4b5c6d7e8f90";
   const request = await signedRequest({
-    privateKey: pair.privateKey, keyId: 129, accountId, adUnit: "ca-app-pub-123/456",
+    privateKey: pair.privateKey, keyId: 129, accountId, adUnit: "456",
     customData: JSON.stringify({ kind: "gems" }), timestamp: now, transactionId: tx,
   });
   const result = await verifyAdMobSsvRequest(
@@ -72,11 +72,11 @@ test("AdMob SSV refuses callback from a different configured ad unit", async () 
   const request = await signedRequest({
     privateKey: pair.privateKey, keyId: 130,
     accountId: "0a2c3a83-e0fb-4abc-8ac4-581a6d994fe7",
-    adUnit: "ca-app-pub-123/456", customData: JSON.stringify({ kind: "gems" }), timestamp: now,
+    adUnit: "456", customData: JSON.stringify({ kind: "gems" }), timestamp: now,
     transactionId: "fedcba98765432100123456789abcdef",
   });
   await assert.rejects(
-    verifyAdMobSsvRequest(request, { LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID: "ca-app-pub-999/456" }, fetchImpl, now),
+    verifyAdMobSsvRequest(request, { LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID: "ca-app-pub-999/789" }, fetchImpl, now),
     (error) => error.code === "SSV_AD_UNIT_INVALID",
   );
 });
