@@ -128,6 +128,19 @@ for (const property of [
   );
 }
 
+requireText(
+  ".github/workflows/android-signed-release.yml",
+  signedReleaseWorkflow,
+  "ready.ready !== true || ready.ok !== true",
+  "signed release must verify that the Worker readiness response is actually ready.",
+);
+requireText(
+  ".github/workflows/android-signed-release.yml",
+  signedReleaseWorkflow,
+  "ready.productionClaim !== false",
+  "signed release must fail closed unless the Worker explicitly reports productionClaim=false.",
+);
+
 if (failures.length > 0) {
   console.error("Android RC2 release-readiness gate failed:");
   for (const failure of failures) console.error(`- ${failure}`);
