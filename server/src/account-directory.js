@@ -14,7 +14,8 @@ export class AccountDirectory {
       sql.exec(`CREATE TABLE IF NOT EXISTS account_registry (account_id TEXT PRIMARY KEY, account_kind TEXT NOT NULL, created_at INTEGER NOT NULL)`);
       sql.exec(`CREATE TABLE IF NOT EXISTS guest_requests (client_request_id TEXT PRIMARY KEY, account_id TEXT NOT NULL, created_at INTEGER NOT NULL)`);
       sql.exec(`CREATE TABLE IF NOT EXISTS deleted_guest_requests (client_request_id TEXT PRIMARY KEY, deleted_at INTEGER NOT NULL)`);
-      sql.exec(`CREATE TABLE IF NOT EXISTS guest_deletion_credentials (credential_hash TEXT PRIMARY KEY, account_id TEXT NOT NULL UNIQUE, created_at INTEGER NOT NULL)`);
+      sql.exec(`CREATE TABLE IF NOT EXISTS guest_deletion_credentials (credential_hash TEXT PRIMARY KEY, account_id TEXT NOT NULL, created_at INTEGER NOT NULL)`);
+      sql.exec("CREATE INDEX IF NOT EXISTS idx_guest_deletion_credentials_account ON guest_deletion_credentials(account_id)");
       sql.exec(`CREATE TABLE IF NOT EXISTS guest_deletion_claims (account_id TEXT PRIMARY KEY, credential_hash TEXT NOT NULL UNIQUE, created_at INTEGER NOT NULL)`);
       sql.exec(`CREATE TABLE IF NOT EXISTS deleted_guest_deletion_credentials (credential_hash TEXT PRIMARY KEY, deleted_at INTEGER NOT NULL)`);
       sql.exec(`CREATE TABLE IF NOT EXISTS account_deletion_claims (account_id TEXT PRIMARY KEY, source TEXT NOT NULL, credential_hash TEXT, claimed_at INTEGER NOT NULL)`);
@@ -174,7 +175,6 @@ export class AccountDirectory {
       if (deletionClaim.length || guestClaim.length) {
         throw httpError(409, "ACCOUNT_DELETION_IN_PROGRESS", "this guest account is being deleted");
       }
-      this.ctx.storage.sql.exec("DELETE FROM guest_deletion_credentials WHERE account_id = ?", accountId);
       this.ctx.storage.sql.exec(
         "INSERT INTO guest_deletion_credentials (credential_hash, account_id, created_at) VALUES (?, ?, ?)",
         credentialHash, accountId, Date.now(),
