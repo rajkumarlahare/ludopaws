@@ -3,25 +3,25 @@ name: Offline v4 Conformance
 on:
   push:
     paths:
-      - 'android/app/src/main/java/com/ludoproof/game/feature/proof/domain/core/EntroNexV4Local.kt'
-      - 'android/app/src/main/java/com/ludoproof/game/feature/proof/domain/offline/OfflineLudoV4Binding.kt'
-      - 'android/app/src/main/java/com/ludoproof/game/feature/proof/domain/offline/OfflineRandomnessAudit.kt'
-      - 'android/app/src/main/java/com/ludoproof/game/feature/proof/domain/offline/OfflineFairnessChain.kt'
-      - 'android/app/src/main/java/com/ludoproof/game/feature/offline/domain/engine/OfflineGameEngine.kt'
-      - 'android/app/src/test/java/com/ludoproof/game/EntroNexV4LocalConformanceTest.kt'
-      - 'android/app/src/test/java/com/ludoproof/game/OfflineLudoV4BindingTest.kt'
-      - 'android/app/src/test/java/com/ludoproof/game/OfflineFairnessChainTest.kt'
+      - 'android/app/src/main/java/com/rekixo/ludopaws/feature/proof/domain/core/EntroNexV4Local.kt'
+      - 'android/app/src/main/java/com/rekixo/ludopaws/feature/proof/domain/offline/OfflineLudoV4Binding.kt'
+      - 'android/app/src/main/java/com/rekixo/ludopaws/feature/proof/domain/offline/OfflineRandomnessAudit.kt'
+      - 'android/app/src/main/java/com/rekixo/ludopaws/feature/proof/domain/offline/OfflineFairnessChain.kt'
+      - 'android/app/src/main/java/com/rekixo/ludopaws/feature/offline/domain/engine/OfflineGameEngine.kt'
+      - 'android/app/src/test/java/com/rekixo/ludopaws/EntroNexV4LocalConformanceTest.kt'
+      - 'android/app/src/test/java/com/rekixo/ludopaws/OfflineLudoV4BindingTest.kt'
+      - 'android/app/src/test/java/com/rekixo/ludopaws/OfflineFairnessChainTest.kt'
       - '.github/workflows/offline-v4-conformance.yml'
   pull_request:
     paths:
-      - 'android/app/src/main/java/com/ludoproof/game/feature/proof/domain/core/EntroNexV4Local.kt'
-      - 'android/app/src/main/java/com/ludoproof/game/feature/proof/domain/offline/OfflineLudoV4Binding.kt'
-      - 'android/app/src/main/java/com/ludoproof/game/feature/proof/domain/offline/OfflineRandomnessAudit.kt'
-      - 'android/app/src/main/java/com/ludoproof/game/feature/proof/domain/offline/OfflineFairnessChain.kt'
-      - 'android/app/src/main/java/com/ludoproof/game/feature/offline/domain/engine/OfflineGameEngine.kt'
-      - 'android/app/src/test/java/com/ludoproof/game/EntroNexV4LocalConformanceTest.kt'
-      - 'android/app/src/test/java/com/ludoproof/game/OfflineLudoV4BindingTest.kt'
-      - 'android/app/src/test/java/com/ludoproof/game/OfflineFairnessChainTest.kt'
+      - 'android/app/src/main/java/com/rekixo/ludopaws/feature/proof/domain/core/EntroNexV4Local.kt'
+      - 'android/app/src/main/java/com/rekixo/ludopaws/feature/proof/domain/offline/OfflineLudoV4Binding.kt'
+      - 'android/app/src/main/java/com/rekixo/ludopaws/feature/proof/domain/offline/OfflineRandomnessAudit.kt'
+      - 'android/app/src/main/java/com/rekixo/ludopaws/feature/proof/domain/offline/OfflineFairnessChain.kt'
+      - 'android/app/src/main/java/com/rekixo/ludopaws/feature/offline/domain/engine/OfflineGameEngine.kt'
+      - 'android/app/src/test/java/com/rekixo/ludopaws/EntroNexV4LocalConformanceTest.kt'
+      - 'android/app/src/test/java/com/rekixo/ludopaws/OfflineLudoV4BindingTest.kt'
+      - 'android/app/src/test/java/com/rekixo/ludopaws/OfflineFairnessChainTest.kt'
       - '.github/workflows/offline-v4-conformance.yml'
 
 permissions:
@@ -50,17 +50,17 @@ jobs:
       - name: Frozen EntroNex v4 vector
         run: >
           gradle -p android :app:testDebugUnitTest
-          --tests com.ludoproof.game.EntroNexV4LocalConformanceTest
+          --tests com.rekixo.ludopaws.EntroNexV4LocalConformanceTest
           --stacktrace
       - name: LudoProof offline v4 binding
         run: >
           gradle -p android :app:testDebugUnitTest
-          --tests com.ludoproof.game.OfflineLudoV4BindingTest
+          --tests com.rekixo.ludopaws.OfflineLudoV4BindingTest
           --stacktrace
       - name: Offline fairness chain
         run: >
           gradle -p android :app:testDebugUnitTest
-          --tests com.ludoproof.game.OfflineFairnessChainTest
+          --tests com.rekixo.ludopaws.OfflineFairnessChainTest
           --stacktrace
       - name: Compile debug APK
         run: gradle -p android :app:assembleDebug --stacktrace
