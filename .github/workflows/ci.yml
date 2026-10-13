@@ -214,7 +214,7 @@ jobs:
             if grep -q "^$key=" "$AVD_CONFIG"; then
               sed -i "s|^$key=.*|$setting|" "$AVD_CONFIG"
             else
-              printf '%s\\n' "$setting" >> "$AVD_CONFIG"
+              printf '%s\n' "$setting" >> "$AVD_CONFIG"
             fi
           done
           "$SDK_ROOT/emulator/emulator" -list-avds | tee /tmp/ludopaws-avd-list.txt
