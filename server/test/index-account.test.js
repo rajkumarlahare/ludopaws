@@ -186,6 +186,21 @@ test("account deletion web CORS allows only the configured static-site origin an
   assert.equal(unconfigured.headers.get("access-control-allow-origin"), null);
 });
 
+test("store status disables rewarded ads when configured reward item is not gems", async () => {
+  const response = await accountWorker.fetch(
+    new Request("https://api.example.test/api/store/status"),
+    {
+      LUDOPROOF_ADMOB_SSV_ENABLED: "true",
+      LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID: "ca-app-pub-123/456",
+      LUDOPROOF_ADMOB_REWARD_ITEM: "coins",
+    },
+  );
+  assert.equal(response.status, 200);
+  const status = await response.json();
+  assert.equal(status.rewardedAdsAvailable, false);
+});
+
+
 test("AdMob SSV rate limiting runs before signature/key verification", async () => {
   const env = {
     LUDOPROOF_API_GATE: makeRateGate(false),
