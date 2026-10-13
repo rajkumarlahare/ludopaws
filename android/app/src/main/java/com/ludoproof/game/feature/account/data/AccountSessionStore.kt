@@ -45,6 +45,12 @@ class AccountSessionStore(context: Context) {
             val raw = cipher.doFinal(Base64.decode(cipherText, Base64.NO_WRAP))
                 .toString(Charsets.UTF_8)
             val json = JSONObject(raw)
+            // Older app releases persisted account mode separately before the encrypted
+            // session JSON included guestRecoveryEligible. Use that marker only as a
+            // compatibility hint; the server still verifies that a delete-only code can
+            // be registered only for an unlinked guest account.
+            val legacyGuestMode = prefs.getString(KEY_ACCOUNT_MODE, null) == MODE_GUEST
+            val guestRecoveryEligible = json.optBoolean("guestRecoveryEligible", legacyGuestMode)
             val value = AccountSession(
                 accountId = json.getString("accountId"),
                 sessionId = json.getString("sessionId"),
@@ -54,14 +60,13 @@ class AccountSessionStore(context: Context) {
                 accessExpiresAt = json.getLong("accessExpiresAt"),
                 sessionExpiresAt = json.getLong("sessionExpiresAt"),
                 displayName = json.optString("displayName", "Guest User"),
-                // Missing flags from a pre-release session are treated as non-guest for safety.
-                guestRecoveryEligible = json.optBoolean("guestRecoveryEligible", false),
+                guestRecoveryEligible = guestRecoveryEligible,
                 identityRecoveryPending = json.optBoolean(
                     "identityRecoveryPending",
                     prefs.getString(KEY_IDENTITY_RECOVERY_PENDING_ACCOUNT_ID, null) == json.optString("accountId"),
                 ),
                 guestDeletionCredential = json.optString("guestDeletionCredential")
-                    .takeIf { json.optBoolean("guestRecoveryEligible", false) && GUEST_DELETION_CREDENTIAL.matches(it) },
+                    .takeIf { guestRecoveryEligible && GUEST_DELETION_CREDENTIAL.matches(it) },
             )
             require(ACCOUNT_ID.matches(value.accountId))
             require(ACCOUNT_ID.matches(value.sessionId))
