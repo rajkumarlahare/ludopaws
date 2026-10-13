@@ -18,6 +18,8 @@ import com.ludoproof.game.feature.characters.data.local.CharacterSelectionStore
 import com.ludoproof.game.feature.characters.domain.reaction.LudoPawsFeedbackLedger
 import com.ludoproof.game.feature.offline.data.local.OfflineCharacterSetupStore
 import com.ludoproof.game.feature.store.data.ads.PostWinInterstitialAdController
+import com.ludoproof.game.feature.store.data.ads.PostWinInterstitialExitGate
+import com.ludoproof.game.feature.store.data.local.GemWalletStore
 import com.ludoproof.game.ui.offline.common.*
 import com.ludoproof.game.ui.offline.gameplay.*
 import com.ludoproof.game.ui.offline.setup.*
@@ -119,6 +121,7 @@ class OfflineGameActivity : ComponentActivity() {
     internal lateinit var resultPanel: FrameLayout
     internal lateinit var resultTitleText: TextView
     private var postWinInterstitialAd: PostWinInterstitialAdController? = null
+    private var postWinInterstitialExitGate: PostWinInterstitialExitGate? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -145,7 +148,6 @@ class OfflineGameActivity : ComponentActivity() {
         } else {
             showSetup()
         }
-        preparePostWinInterstitialAd()
     }
 
     internal fun preparePostWinInterstitialAd() {
@@ -157,8 +159,16 @@ class OfflineGameActivity : ComponentActivity() {
         ).also { it.prepare() }
     }
 
-    internal fun showPostWinInterstitialIfReady(onFinished: () -> Unit): Boolean =
-        postWinInterstitialAd?.showIfReady(onFinished) ?: false
+    internal fun showPostWinInterstitialIfReady(onFinished: () -> Unit): Boolean {
+        val interstitial = postWinInterstitialAd ?: return false
+        val gate = postWinInterstitialExitGate ?: PostWinInterstitialExitGate(
+            activity = this,
+            accountRepository = (application as LudoProofApplication).accountRepository,
+            walletStore = GemWalletStore(this),
+            interstitial = interstitial,
+        ).also { postWinInterstitialExitGate = it }
+        return gate.interceptIfReady(onFinished)
+    }
 
     internal fun prepareOfflineUiTransition() {
         handler.removeCallbacksAndMessages(null)
@@ -223,6 +233,8 @@ class OfflineGameActivity : ComponentActivity() {
             ?.dismiss()
         turnHandoffDialog =
             null
+        postWinInterstitialExitGate?.close()
+        postWinInterstitialExitGate = null
         postWinInterstitialAd?.close()
         postWinInterstitialAd = null
         prepareOfflineUiTransition()
