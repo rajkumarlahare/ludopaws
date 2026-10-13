@@ -1,6 +1,6 @@
 import { httpError, sha256Hex } from "./crypto.js";
 
-const PACKAGE_NAME = "com.ludoproof.game";
+const PACKAGE_NAME = "com.rekixo.ludopaws";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const PUBLISHER_URL = "https://androidpublisher.googleapis.com/androidpublisher/v3";
 const PUBLISHER_SCOPE = "https://www.googleapis.com/auth/androidpublisher";
@@ -117,6 +117,8 @@ export async function verifyAndRedeemGooglePlayPurchase(
       purchase?.obfuscatedExternalAccountId !== accountId
     ) ||
     purchase?.purchaseState !== 0 ||
+    ![0, 1].includes(purchase?.consumptionState) ||
+    ![0, 1].includes(purchase?.acknowledgementState) ||
     (
       purchase?.quantity != null &&
       purchase.quantity !== 1
@@ -184,21 +186,37 @@ export async function verifyAndRedeemGooglePlayPurchase(
 
 async function getPlayPurchase(env, productId, purchaseToken, fetchImpl) {
   const accessToken = await googleAccessToken(env, fetchImpl);
-  const url =
+  const applicationPath =
     PUBLISHER_URL +
     "/applications/" +
-    encodeURIComponent(PACKAGE_NAME) +
-    "/purchases/products/" +
-    encodeURIComponent(productId) +
-    "/tokens/" +
-    encodeURIComponent(purchaseToken);
+    encodeURIComponent(PACKAGE_NAME);
+  const tokenPath = "/tokens/" + encodeURIComponent(purchaseToken);
+  const modernUrl =
+    applicationPath + "/purchases/productsv2" + tokenPath;
   let response;
+  let legacyResponse = false;
   try {
-    response = await fetchImpl(url, {
+    response = await fetchImpl(modernUrl, {
       method: "GET",
       headers: { authorization: "Bearer " + accessToken },
       signal: AbortSignal.timeout(10_000),
     });
+    // The current One-time products model is verified through purchases.productsv2.
+    // Keep a 404-only fallback for legacy in-app products already created under the
+    // old catalog model. Never fall back for permission/authentication/API failures.
+    if (response.status === 404) {
+      const legacyUrl =
+        applicationPath +
+        "/purchases/products/" +
+        encodeURIComponent(productId) +
+        tokenPath;
+      response = await fetchImpl(legacyUrl, {
+        method: "GET",
+        headers: { authorization: "Bearer " + accessToken },
+        signal: AbortSignal.timeout(10_000),
+      });
+      legacyResponse = true;
+    }
   } catch {
     throw httpError(
       503,
@@ -216,8 +234,9 @@ async function getPlayPurchase(env, productId, purchaseToken, fetchImpl) {
       "Google Play could not verify this purchase",
     );
   }
+  let payload;
   try {
-    return await response.json();
+    payload = await response.json();
   } catch {
     throw httpError(
       502,
@@ -225,6 +244,44 @@ async function getPlayPurchase(env, productId, purchaseToken, fetchImpl) {
       "Google Play returned an invalid purchase response",
     );
   }
+  return legacyResponse ? payload : normalizeProductPurchaseV2(payload);
+}
+
+function normalizeProductPurchaseV2(payload) {
+  const lineItems = payload?.productLineItem;
+  if (!Array.isArray(lineItems) || lineItems.length !== 1) {
+    return { productId: null, purchaseState: -1, obfuscatedExternalAccountId: payload?.obfuscatedExternalAccountId };
+  }
+  const item = lineItems[0];
+  const offer = item?.productOfferDetails ?? {};
+  const purchaseStates = {
+    PURCHASED: 0,
+    CANCELLED: 1,
+    PENDING: 2,
+  };
+  const consumptionStates = {
+    CONSUMPTION_STATE_YET_TO_BE_CONSUMED: 0,
+    CONSUMPTION_STATE_CONSUMED: 1,
+  };
+  const acknowledgementStates = {
+    ACKNOWLEDGEMENT_STATE_PENDING: 0,
+    ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED: 1,
+  };
+  const state = payload?.purchaseStateContext?.purchaseState;
+  return {
+    productId: item?.productId ?? null,
+    purchaseState: Object.prototype.hasOwnProperty.call(purchaseStates, state)
+      ? purchaseStates[state]
+      : -1,
+    quantity: offer.quantity ?? 1,
+    consumptionState: Object.prototype.hasOwnProperty.call(consumptionStates, offer.consumptionState)
+      ? consumptionStates[offer.consumptionState]
+      : -1,
+    acknowledgementState: Object.prototype.hasOwnProperty.call(acknowledgementStates, payload?.acknowledgementState)
+      ? acknowledgementStates[payload.acknowledgementState]
+      : -1,
+    obfuscatedExternalAccountId: payload?.obfuscatedExternalAccountId,
+  };
 }
 
 async function runPublisherAction(

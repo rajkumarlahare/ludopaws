@@ -90,6 +90,11 @@ class MainActivity : ComponentActivity() {
     internal lateinit var statusText: TextView
     internal val connectionTexts = mutableListOf<TextView>()
     internal lateinit var boardView: LudoBoardView
+    // Test seam for state-contract instrumentation: these tests exercise authoritative
+    // state retention and action gating, not the GL-heavy board/portrait presentation.
+    // Production leaves this null and always uses OnlineLudoPawsPresentation.
+    internal var onlinePresentationRendererOverrideForTests:
+        ((MatchSnapshot?, MatchSnapshot) -> Unit)? = null
     internal lateinit var diceView: DiceView
     internal lateinit var findMatchButton: LinearLayout
     internal lateinit var cancelMatchmakingButton: Button

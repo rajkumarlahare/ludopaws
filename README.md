@@ -1,10 +1,26 @@
 # Ludo Paws
 
+**Publisher / parent brand:** Rekixo (`https://rekixo.com`)
+
+**Final Android application ID:** `com.rekixo.ludopaws`
+
+**Game website target:** `https://ludopaws.rekixo.com`
+
+**API hostname target:** `https://api.ludopaws.rekixo.com` (activate only after Cloudflare domain and live API checks pass).
+
+**Publisher / parent brand:** Rekixo  
+**Repository:** `ludopaws`
+
+Rekixo is the publisher/parent brand for Ludo Paws. The intended public-domain layout is `rekixo.com` for the company site, `ludopaws.rekixo.com` for the game site, and `api.ludopaws.rekixo.com` for the game API. These are target names only: configure DNS, GitHub Pages, OAuth origins, and Cloudflare custom domains only after the domains and hosting are verified.
+
+Branding/repository names are separate from compatibility-sensitive runtime identifiers. Keep the existing Android application ID, Cloudflare Worker and Durable Object names, persisted storage names, proof/ruleset identifiers, and protocol values unchanged until a separately tested migration plan explicitly authorizes changes. Repository rename does not require renaming those runtime identifiers.
+
+
 **Ludo Paws** is the consumer-facing name of this Android Ludo game. The working store title is **Ludo Paws: Talking Animals** and the product tagline is **Roll. Race. Roar!**
 
 The game is built around **verifiable EntroNex dice outcomes**. Current status: **release candidate / evaluation**. The app and game backend are being hardened for production operation, while EntroNex v4 remains pre-independent-audit.
 
-> Migration compatibility note: the Android package, Cloudflare Worker/Durable Object bindings, persisted storage names, proof/ruleset identifiers, and other protocol-sensitive identifiers intentionally keep their historical `ludoproof` / `LudoProof` names during the Ludo Paws migration. Those identifiers are implementation details, not the consumer brand, and must not be renamed casually because doing so can break compatibility, saved state, deployed infrastructure, or proof verification.
+> Migration compatibility note: the final Android `applicationId` is `com.rekixo.ludopaws`. The Kotlin `namespace` and source package declarations remain `com.ludoproof.game` temporarily as an internal implementation detail; they are not the Play Store application ID. Cloudflare Worker/Durable Object bindings, persisted storage names, proof/ruleset identifiers, and other protocol-sensitive identifiers remain unchanged to protect deployed infrastructure and proof verification.
 
 The repository contains:
 
@@ -63,11 +79,13 @@ Blockade/stack restrictions are not yet part of ruleset v1.
 
 ## Android
 
-Compatibility-sensitive package ID:
+Final Play Store application ID:
 
 ```text
-com.ludoproof.game
+com.rekixo.ludopaws
 ```
+
+The current Kotlin source namespace remains `com.ludoproof.game` in this first safe identity change; Google Play uses the application ID above.
 
 The Android MVP now supports:
 
@@ -269,7 +287,7 @@ The same-account Worker binding is preferred over the public `workers.dev` netwo
 The Android profile uses Google Play Games Services v2 for native player sign-in. To enable it:
 
 1. Create/link the Android game in Play Console's Play Games Services setup and use the numeric **Games Services project ID** (not the OAuth client ID).
-2. Add the app's package name (`com.ludoproof.game`) and the SHA-1 signing certificate fingerprints for every build distributed to testers or players. The debug build needs its debug-key SHA-1; store builds need the app-signing certificate SHA-1.
+2. Add the app's package name (`com.rekixo.ludopaws`) and the SHA-1 signing certificate fingerprints for every build distributed to testers or players. The debug build needs its debug-key SHA-1; store builds need the app-signing certificate SHA-1.
 3. Provide the project ID to Gradle without committing it to source:
 
    ```text
@@ -298,6 +316,24 @@ The account Worker owns profile display name, gem balance, Remove Ads entitlemen
 
 Local match history and profile progression statistics remain device-local and are scoped to the active account; this does **not** automatically upload all historical stats. Play Games Services sign-in remains a separate feature from the Ludo Paws account identity.
 
+## Production configuration source of truth
+
+The production deploy workflow materializes the following **non-secret GitHub Actions repository Variables** into `server/wrangler.json` in its ephemeral runner before dry-run/deploy. This is intentional: Wrangler treats its config as the source of truth for ordinary vars and may override vars configured only in the Cloudflare dashboard. The deployed values must therefore be reviewed in the repository's Actions Variables, not only in Cloudflare's dashboard.
+
+Required before any production Worker deployment:
+
+- `GOOGLE_SIGN_IN_WEB_CLIENT_ID`: the Google **Web** OAuth client ID used by Android and the account-deletion site.
+- `LUDOPROOF_ACCOUNT_WEB_ORIGIN`: target origin `https://ludopaws.rekixo.com` (use only after the branded site is configured and approved).
+- Keep `GOOGLE_PLAY_BILLING_ENABLED=false` and `LUDOPROOF_ADMOB_SSV_ENABLED=false` until each integration has passed internal-track end-to-end tests.
+
+Optional store variables, which remain fail-closed unless enabled explicitly:
+
+- `GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL`: set only after the Play Console service account exists. Its private key is a **Cloudflare Worker secret** named `GOOGLE_PLAY_SERVICE_ACCOUNT_PRIVATE_KEY`, never a GitHub Variable, source file, Android build property, or chat message.
+- `GOOGLE_PLAY_BILLING_ENABLED`: Worker-side checkout flag; default false.
+- `LUDOPROOF_ADMOB_SSV_ENABLED`, `LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID`, `LUDOPROOF_ADMOB_REWARD_ITEM=gems`: server-side rewarded-ad configuration; default disabled, configured reward fixed at five gems.
+
+The signed Android release workflow reads these repository Variables: `GOOGLE_SIGN_IN_WEB_CLIENT_ID`, `LUDOPROOF_API_BASE_URL` (optional; defaults to the production Worker), `LUDOPROOF_BILLING_ENABLED`, `LUDOPROOF_ADS_ENABLED`, `ADMOB_APP_ID`, `ADMOB_REWARDED_AD_UNIT_ID`, and `PLAY_GAMES_PROJECT_ID` (optional). The Android Billing/Ads flags must match their Worker counterparts; the workflow checks `/ready` and `/api/store/status` before building the signed artifacts. Ads remain disabled unless you deliberately configure matching real IDs on both sides. Do not set a flag to true until the associated Google/AdMob setup and end-to-end tests are finished.
+
 ## Google Play Billing
 
 Digital gems and Remove Ads purchases use the native Google Play Billing Library. A client purchase callback only produces a pending transaction; the Worker verifies it through the Google Play Developer API, checks the obfuscated account ID, and reserves/redeems the purchase token through a Durable Object ledger. Only after verification does the per-account wallet transaction grant gems or set Remove Ads. Pending purchase tokens are encrypted with Android Keystore AES-GCM in private, backup-disabled app storage for retry; older plaintext recovery records are migrated in place. The canonical balance and inventory are held by the server and can be restored on another device after the same Google-linked account is restored.
@@ -313,7 +349,7 @@ The checkout intentionally stays disabled until both Play Console products and t
    npx --yes wrangler@4.135.0 secret put GOOGLE_PLAY_SERVICE_ACCOUNT_PRIVATE_KEY
    ```
 
-   Paste the PEM private key value when prompted. Never put the private key in Android, `wrangler.json`, source control, build arguments, or chat. The Worker package name is fixed to `com.ludoproof.game`.
+   Paste the PEM private key value when prompted. Never put the private key in Android, `wrangler.json`, source control, build arguments, or chat. The Google Play purchase verifier targets `com.rekixo.ludopaws`.
 4. Deploy the Worker so the `LUDOPROOF_STORE_PURCHASES` Durable Object binding/migration is active. In Cloudflare Worker settings, add the non-secret variable `GOOGLE_PLAY_BILLING_ENABLED=false` while configuring the app and service account.
 5. For internal testing only, set `GOOGLE_PLAY_BILLING_ENABLED=true` in Cloudflare and build with `-PLUDOPROOF_BILLING_ENABLED=true`. Check `GET /api/store/status`; `billingAvailable` must be `true`, and complete a tester purchase/restore/refund test before public release. The Android build flag defaults to `false`; the Worker must independently report billing enabled before checkout is opened.
 
@@ -334,10 +370,10 @@ LUDOPROOF_ADS_USE_TEST_IDS=false
 
 Before enabling ads:
 
-1. Register `com.ludoproof.game` in AdMob and create a rewarded ad unit. Add the real App ID and rewarded ad-unit ID above (these IDs are not secrets).
+1. Register `com.rekixo.ludopaws` in AdMob and create a rewarded ad unit. Add the real App ID and rewarded ad-unit ID above (these IDs are not secrets).
 2. Publish the applicable privacy/consent messages in the AdMob Privacy & messaging settings. Verify the UMP consent and privacy-options flow in the internal test track.
 3. For debug-only SDK integration tests before receiving real IDs, build with Google's sample IDs using `-PLUDOPROOF_ADS_ENABLED=true -PLUDOPROOF_ADS_USE_TEST_IDS=true`. This test-ID mode is automatically disabled in release builds.
 4. Only enable production ads with your real IDs and `LUDOPROOF_ADS_USE_TEST_IDS=false`; the build rejects enabling ads with the default sample IDs in this mode.
-5. In the AdMob rewarded ad unit's server-side verification/reward settings, set the reward amount to **5** and reward item to **gems**. In Cloudflare, set `LUDOPROOF_ADMOB_SSV_ENABLED=true`, `LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID` to the exact real rewarded ad unit, and `LUDOPROOF_ADMOB_REWARD_ITEM=gems`. Keep SSV disabled until the public HTTPS callback `https://ludoproof-game-api.ai-8f3.workers.dev/api/admob/ssv` is configured in AdMob and an end-to-end test confirms that signed callbacks reach the matching account. The Worker independently requires amount `5`, item `gems`, the expected ad unit, a recent timestamp, and a valid AdMob signature before crediting anything.
+5. In the AdMob rewarded ad unit's server-side verification/reward settings, set the reward amount to **5** and reward item to **gems**. In Cloudflare, set `LUDOPROOF_ADMOB_SSV_ENABLED=true`, `LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID` to the exact real rewarded ad unit, and `LUDOPROOF_ADMOB_REWARD_ITEM=gems`. Keep SSV disabled until the public HTTPS callback `https://api.ludopaws.rekixo.com/api/admob/ssv` is configured in AdMob and an end-to-end test confirms that signed callbacks reach the matching account. The Worker independently requires amount `5`, item `gems`, the expected ad unit, a recent timestamp, and a valid AdMob signature before crediting anything.
 
 A missing or mismatched SSV configuration disables server reward fulfillment. The configured reward is **5 gems**: an ad watched from the Gems tab grants 5 gems, and an ad watched toward an eligible cosmetic grants 5 gems plus one server-tracked cosmetic-progress step. The client callback only refreshes the server wallet; it does not grant either reward locally. Before enabling production ads, run end-to-end tests for both paths, callback delays, duplicate SSV transactions, and a mismatched ad unit/reward configuration. Follow Google AdMob's consent, child-directed treatment, and Families-policy requirements for the app's actual audience before serving production ads.

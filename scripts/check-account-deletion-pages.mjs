@@ -13,6 +13,7 @@ function matches(source, pattern, label) {
   assert.match(source, pattern, label + " is missing or malformed");
 }
 
+const landingPage = read("../docs/landing-page.html");
 const page = read("../docs/account-deletion.html");
 const policy = read("../docs/privacy-policy.html");
 const worker = read("../server/src/index-account.js");
@@ -27,7 +28,10 @@ has(page, 'post("/api/account/guest/delete"', "guest deletion API request");
 has(page, 'post("/api/account/delete"', "Google-linked deletion API request");
 has(page, 'credentials: "omit"', "credential-free cross-origin fetch mode");
 has(page, 'cache: "no-store"', "no-store fetch caching");
-has(page, 'connect-src \'self\' https://ludoproof-game-api.ai-8f3.workers.dev', "account API Content Security Policy allowlist");
+has(landingPage, 'href="./account-deletion.html"', "landing-page account-deletion link");
+has(landingPage, 'href="./privacy-policy.html"', "landing-page privacy-policy link");
+has(landingPage, "https://rekixo.com", "publisher website link");
+has(page, 'connect-src \'self\' https://api.ludopaws.rekixo.com', "account API Content Security Policy allowlist");
 assert.doesNotMatch(page, /localStorage|sessionStorage/, "the page must not persist session or deletion credentials in browser storage");
 assert.doesNotMatch(page, /console\.(log|debug|info|warn|error)\s*\(/, "the page must not log credential-bearing UI state");
 
@@ -45,6 +49,10 @@ has(pagesWorkflow, "LUDOPROOF_POLICY_RELEASE_APPROVED", "publisher approval gate
 has(pagesWorkflow, "GOOGLE_SIGN_IN_WEB_CLIENT_ID", "Google OAuth Web Client ID release gate");
 has(pagesWorkflow, "LUDOPROOF_SUPPORT_EMAIL", "monitored support contact release gate");
 has(pagesWorkflow, "LUDOPROOF_ACCOUNT_WEB_ORIGIN", "account-site CORS origin release gate");
+has(pagesWorkflow, "site/CNAME", "custom-domain CNAME artifact");
+has(pagesWorkflow, "https://ludopaws.rekixo.com", "Rekixo site origin");
+has(pagesWorkflow, "https://api.ludopaws.rekixo.com", "Rekixo API origin");
+has(pagesWorkflow, "cp docs/landing-page.html site/index.html", "landing page publication mapping");
 has(pagesWorkflow, "actions/deploy-pages", "explicit Pages publishing step");
 
 console.log("Account-deletion source checks passed. Public publication remains gated by publisher/legal, OAuth, support and origin configuration.");

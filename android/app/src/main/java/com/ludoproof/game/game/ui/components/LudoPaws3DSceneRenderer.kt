@@ -61,8 +61,8 @@ internal class LudoPaws3DSceneRenderer {
         )
         program =
             createProgram(
-                VERTEX_SHADER,
-                FRAGMENT_SHADER,
+                VERTEX_SHADER.trimIndent(),
+                FRAGMENT_SHADER.trimIndent(),
             )
         uMvpLocation = GLES30.glGetUniformLocation(program, "uMvp")
         uColorLocation = GLES30.glGetUniformLocation(program, "uColor")
@@ -86,11 +86,9 @@ internal class LudoPaws3DSceneRenderer {
     }
 
     /**
-     * Initializes a dedicated portrait renderer. The raw shader constants retain
-     * their historical formatting for the live gameplay renderer, so normalize
-     * them only for the off-screen portrait context where strict ES3 drivers
-     * require #version to be the first source line. The board render path remains
-     * unchanged.
+     * Initializes the dedicated portrait renderer. Both gameplay and portrait
+     * render paths normalize the shared GLSL constants so strict ES3 drivers see
+     * the #version directive at the beginning of the source.
      */
     fun onPortraitSurfaceCreated() {
         GLES30.glClearColor(0f, 0f, 0f, 0f)
@@ -1688,12 +1686,12 @@ internal class LudoPaws3DSceneRenderer {
         val vertex =
             compileShader(
                 GLES30.GL_VERTEX_SHADER,
-                vertexSource,
+                normalizeShaderSource(vertexSource),
             )
         val fragment =
             compileShader(
                 GLES30.GL_FRAGMENT_SHADER,
-                fragmentSource,
+                normalizeShaderSource(fragmentSource),
             )
         return GLES30.glCreateProgram().also { created ->
             GLES30.glAttachShader(created, vertex)
@@ -1712,6 +1710,15 @@ internal class LudoPaws3DSceneRenderer {
             GLES30.glDeleteShader(vertex)
             GLES30.glDeleteShader(fragment)
         }
+    }
+
+    private fun normalizeShaderSource(source: String): String {
+        // Some GLES drivers reject any empty/indented prefix before #version.
+        // Find the directive explicitly instead of relying on multiline-string
+        // indentation behavior, and make it the first character passed to GLES.
+        val versionIndex = source.indexOf("#version")
+        check(versionIndex >= 0) { "3D pawn shader is missing its #version directive" }
+        return source.substring(versionIndex).trimStart()
     }
 
     private fun compileShader(

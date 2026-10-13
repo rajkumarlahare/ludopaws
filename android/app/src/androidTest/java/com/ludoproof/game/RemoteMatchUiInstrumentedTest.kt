@@ -106,18 +106,27 @@ class RemoteMatchUiInstrumentedTest {
         }
     }
 
-    private fun launchTeamUp(): ActivityScenario<MainActivity> =
-        ActivityScenario.launch(
-            Intent(context, MainActivity::class.java)
-                .putExtra(
-                    GameModeIntent.EXTRA_GAME_MODE,
-                    GameMode.TEAM_UP.wireValue,
-                )
-                .putExtra(
-                    GameModeIntent.EXTRA_RESUME_SAVED_MATCH,
-                    false,
-                ),
-        )
+    private fun launchTeamUp(): ActivityScenario<MainActivity> {
+        val scenario: ActivityScenario<MainActivity> =
+            ActivityScenario.launch<MainActivity>(
+                Intent(context, MainActivity::class.java)
+                    .putExtra(
+                        GameModeIntent.EXTRA_GAME_MODE,
+                        GameMode.TEAM_UP.wireValue,
+                    )
+                    .putExtra(
+                        GameModeIntent.EXTRA_RESUME_SAVED_MATCH,
+                        false,
+                    ),
+            )
+        scenario.onActivity { activity: MainActivity ->
+            // These tests verify authoritative-state handling and action gating.
+            // Skip the GL-heavy board/portrait composition so headless SwiftShader
+            // load cannot turn a UI contract test into an emulator stability test.
+            activity.onlinePresentationRendererOverrideForTests = { _, _ -> }
+        }
+        return scenario
+    }
 
     private fun validTeamUpEnvelope(): JSONObject {
         val players =

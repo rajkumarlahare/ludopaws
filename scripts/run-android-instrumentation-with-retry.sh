@@ -20,6 +20,20 @@ boot_emulator() {
   sleep 2
   rm -f "$AVD_HOME/$AVD_NAME.avd"/*.lock
 
+  # Keep the retry AVD's software-rendered framebuffer aligned with the
+  # lower-load settings configured by the workflow's initial boot.
+  local config_file="$AVD_HOME/$AVD_NAME.avd/config.ini"
+  if [[ -f "$config_file" ]]; then
+    for setting in "hw.lcd.width=720" "hw.lcd.height=1600" "hw.lcd.density=320"; do
+      local key="${setting%%=*}"
+      if grep -q "^$key=" "$config_file"; then
+        sed -i "s|^$key=.*|$setting|" "$config_file"
+      else
+        printf '%s\n' "$setting" >> "$config_file"
+      fi
+    done
+  fi
+
   # Pin the SwiftShader backend rather than the generic software selector.
   # Emulator 37.2.12 selected swangle/lavapipe with -gpu software and
   # segfaulted mid-suite on the hosted Linux runner.
@@ -92,37 +106,57 @@ boot_emulator() {
 }
 
 run_instrumentation() {
-  gradle -p android :app:connectedDebugAndroidTest --stacktrace
+  gradle -p android :app:connectedDebugAndroidTest --stacktrace "$@"
 }
 
-set +e
-run_instrumentation
-first_status=$?
-set -e
+run_with_transport_retry() {
+  local phase="$1"
+  shift
+  local first_status
+  local retry_log="/tmp/ludopaws-emulator-retry-${phase//[^a-zA-Z0-9]/-}.log"
 
-if [[ "$first_status" -eq 0 ]]; then
-  exit 0
-fi
+  echo "=== Instrumentation phase: $phase ==="
+  set +e
+  run_instrumentation "$@"
+  first_status=$?
+  set -e
 
-# Only recover from an emulator transport loss. If the device still responds,
-# preserve real assertion/build failures instead of retrying or masking them.
-if adb get-state 2>/dev/null | grep -q '^device$'; then
-  echo "Instrumentation failed while the emulator is still connected; not retrying." >&2
-  exit "$first_status"
-fi
+  if [[ "$first_status" -eq 0 ]]; then
+    return 0
+  fi
 
-echo "Instrumentation failed after the emulator disappeared from ADB; restarting a clean emulator and retrying once." >&2
-if [[ -f "$PID_FILE" ]]; then
-  old_pid="$(cat "$PID_FILE")"
-  kill "$old_pid" >/dev/null 2>&1 || true
-  for attempt in $(seq 1 10); do
-    if ! kill -0 "$old_pid" 2>/dev/null; then
-      break
-    fi
-    sleep 1
-  done
-  kill -9 "$old_pid" >/dev/null 2>&1 || true
-fi
+  # If the emulator is still alive, preserve the actual assertion/build failure
+  # rather than retrying and obscuring the useful first failure.
+  if adb get-state 2>/dev/null | grep -q '^device$'; then
+    echo "Instrumentation phase '$phase' failed while the emulator is still connected; not retrying." >&2
+    return "$first_status"
+  fi
 
-boot_emulator true /tmp/ludopaws-emulator-retry.log
-run_instrumentation
+  echo "Instrumentation phase '$phase' lost its emulator; restarting a clean emulator and retrying this phase once." >&2
+  if [[ -f "$PID_FILE" ]]; then
+    local old_pid
+    old_pid="$(cat "$PID_FILE")"
+    kill "$old_pid" >/dev/null 2>&1 || true
+    for attempt in $(seq 1 10); do
+      if ! kill -0 "$old_pid" 2>/dev/null; then
+        break
+      fi
+      sleep 1
+    done
+    kill -9 "$old_pid" >/dev/null 2>&1 || true
+  fi
+
+  boot_emulator true "$retry_log"
+  run_instrumentation "$@"
+}
+
+# Run the activity-heavy remote match tests against a fresh emulator before the
+# full suite's long offline match simulation can build up emulator/GPU pressure.
+# Then run all other instrumentation tests without repeating this class.
+run_with_transport_retry \
+  "remote-ui-focused" \
+  "-Pandroid.testInstrumentationRunnerArguments.class=com.ludoproof.game.RemoteMatchUiInstrumentedTest"
+
+run_with_transport_retry \
+  "remaining-suite" \
+  "-Pandroid.testInstrumentationRunnerArguments.notClass=com.ludoproof.game.RemoteMatchUiInstrumentedTest"

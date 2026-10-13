@@ -133,15 +133,15 @@ test("account deletion web CORS allows only the configured static-site origin an
     new Request("https://api.example.test/api/account/delete", {
       method: "OPTIONS",
       headers: {
-        origin: "https://rajkumarlahare.github.io",
+        origin: "https://ludopaws.rekixo.com",
         "access-control-request-method": "POST",
         "access-control-request-headers": "authorization,content-type",
       },
     }),
-    { LUDOPROOF_ACCOUNT_WEB_ORIGIN: "https://rajkumarlahare.github.io" },
+    { LUDOPROOF_ACCOUNT_WEB_ORIGIN: "https://ludopaws.rekixo.com" },
   );
   assert.equal(allowed.status, 204);
-  assert.equal(allowed.headers.get("access-control-allow-origin"), "https://rajkumarlahare.github.io");
+  assert.equal(allowed.headers.get("access-control-allow-origin"), "https://ludopaws.rekixo.com");
   assert.equal(allowed.headers.get("access-control-allow-methods"), "POST, OPTIONS");
 
   const denied = await accountWorker.fetch(
@@ -153,7 +153,7 @@ test("account deletion web CORS allows only the configured static-site origin an
         "access-control-request-headers": "authorization,content-type",
       },
     }),
-    { LUDOPROOF_ACCOUNT_WEB_ORIGIN: "https://rajkumarlahare.github.io" },
+    { LUDOPROOF_ACCOUNT_WEB_ORIGIN: "https://ludopaws.rekixo.com" },
   );
   assert.equal(denied.status, 403);
   assert.equal(denied.headers.get("access-control-allow-origin"), null);
@@ -162,12 +162,12 @@ test("account deletion web CORS allows only the configured static-site origin an
     new Request("https://api.example.test/api/account/delete", {
       method: "OPTIONS",
       headers: {
-        origin: "https://rajkumarlahare.github.io",
+        origin: "https://ludopaws.rekixo.com",
         "access-control-request-method": "POST",
         "access-control-request-headers": "authorization,x-not-allowed",
       },
     }),
-    { LUDOPROOF_ACCOUNT_WEB_ORIGIN: "https://rajkumarlahare.github.io" },
+    { LUDOPROOF_ACCOUNT_WEB_ORIGIN: "https://ludopaws.rekixo.com" },
   );
   assert.equal(unexpectedHeader.status, 403);
 
@@ -175,7 +175,7 @@ test("account deletion web CORS allows only the configured static-site origin an
     new Request("https://api.example.test/api/account/delete", {
       method: "OPTIONS",
       headers: {
-        origin: "https://rajkumarlahare.github.io",
+        origin: "https://ludopaws.rekixo.com",
         "access-control-request-method": "POST",
         "access-control-request-headers": "authorization,content-type",
       },

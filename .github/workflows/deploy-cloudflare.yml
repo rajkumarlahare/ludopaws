@@ -1,14 +1,10 @@
 name: LudoProof Cloudflare Production
 
+# Production deploys require an explicit operator dispatch; merges and variable changes
+# CLOUDFLARE_DEPLOY_ENABLED does not opt into automatic pushes; workflow_dispatch is required.
+# must never automatically publish code to the live Cloudflare Worker.
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - 'server/**'
-      - 'scripts/cloudflare-deploy-preflight.mjs'
-      - 'scripts/production-game-smoke.mjs'
-      - '.github/workflows/deploy-cloudflare.yml'
 
 permissions:
   contents: read
@@ -19,7 +15,7 @@ concurrency:
 
 jobs:
   deploy:
-    if: ${{ github.event_name == 'workflow_dispatch' || vars.CLOUDFLARE_DEPLOY_ENABLED == 'true' || contains(github.event.head_commit.message, '[deploy-production]') }}
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: production
@@ -28,7 +24,18 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: 8f31060fbcfee2b3e9309138cad7f12f
       ENTRONEX_API_TOKEN: ${{ secrets.ENTRONEX_API_TOKEN }}
       LUDOPROOF_SESSION_HMAC_KEY: ${{ secrets.LUDOPROOF_SESSION_HMAC_KEY }}
-      LUDOPROOF_WORKER_URL: https://ludoproof-game-api.ai-8f3.workers.dev
+      GOOGLE_SIGN_IN_WEB_CLIENT_ID: ${{ vars.GOOGLE_SIGN_IN_WEB_CLIENT_ID }}
+      LUDOPROOF_ACCOUNT_WEB_ORIGIN: ${{ vars.LUDOPROOF_ACCOUNT_WEB_ORIGIN }}
+      GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL: ${{ vars.GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL }}
+      GOOGLE_PLAY_BILLING_ENABLED: ${{ vars.GOOGLE_PLAY_BILLING_ENABLED }}
+      LUDOPROOF_BILLING_ENABLED: ${{ vars.LUDOPROOF_BILLING_ENABLED }}
+      LUDOPROOF_ADMOB_SSV_ENABLED: ${{ vars.LUDOPROOF_ADMOB_SSV_ENABLED }}
+      LUDOPROOF_ADS_ENABLED: ${{ vars.LUDOPROOF_ADS_ENABLED }}
+      ADMOB_APP_ID: ${{ vars.ADMOB_APP_ID }}
+      ADMOB_REWARDED_AD_UNIT_ID: ${{ vars.ADMOB_REWARDED_AD_UNIT_ID }}
+      LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID: ${{ vars.LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID }}
+      LUDOPROOF_ADMOB_REWARD_ITEM: ${{ vars.LUDOPROOF_ADMOB_REWARD_ITEM }}
+      LUDOPROOF_WORKER_URL: https://api.ludopaws.rekixo.com
 
     steps:
       - name: Checkout exact release commit
@@ -38,6 +45,12 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
+
+      - name: Prepare explicit Cloudflare runtime variables
+        run: node scripts/prepare-cloudflare-runtime-config.mjs
+
+      - name: Test Cloudflare runtime configuration
+        run: node --test scripts/cloudflare-runtime-config.test.mjs
 
       - name: Prepare EntroNex customer credential
         working-directory: server
@@ -121,6 +134,25 @@ jobs:
 
       - name: Validate production configuration
         run: node scripts/cloudflare-deploy-preflight.mjs
+
+      - name: Verify Google Play service-account secret when Billing is enabled
+        if: ${{ vars.GOOGLE_PLAY_BILLING_ENABLED == 'true' }}
+        working-directory: server
+        shell: bash
+        run: |
+          set -euo pipefail
+          secret_file="$(mktemp)"
+          trap 'rm -f "$secret_file"' EXIT
+          npx --yes wrangler@4.135.0 secret list --format json > "$secret_file"
+          node -e '
+            const fs = require("node:fs");
+            const parsed = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+            const list = Array.isArray(parsed) ? parsed : (parsed.secrets ?? []);
+            if (!list.some((item) => item?.name === "GOOGLE_PLAY_SERVICE_ACCOUNT_PRIVATE_KEY")) {
+              console.error("Billing is enabled but GOOGLE_PLAY_SERVICE_ACCOUNT_PRIVATE_KEY is missing in Cloudflare.");
+              process.exit(2);
+            }
+          ' "$secret_file"
 
       - name: Repository security gate
         run: node scripts/security-check.mjs
@@ -236,6 +268,28 @@ jobs:
             }
             console.log("LudoProof production Worker is ready.");
           ' "$body"
+
+      - name: Verify store status route and feature flags
+        shell: bash
+        run: |
+          set -euo pipefail
+          status_file="$(mktemp)"
+          trap 'rm -f "$status_file"' EXIT
+          curl --fail --silent --show-error --retry 6 --retry-delay 5 --retry-all-errors \
+            "$LUDOPROOF_WORKER_URL/api/store/status" > "$status_file"
+          node -e '
+            const fs = require("node:fs");
+            const body = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+            if (body?.ok !== true || typeof body.billingAvailable !== "boolean" || typeof body.rewardedAdsAvailable !== "boolean") {
+              console.error("Branded API /api/store/status response is missing expected boolean feature flags.");
+              process.exit(2);
+            }
+            if (body.billingAvailable !== false || body.rewardedAdsAvailable !== false) {
+              console.error("First-release gate requires Google Play Billing and rewarded Ads to remain disabled.");
+              process.exit(3);
+            }
+            console.log("Branded API store status route is present; Billing and rewarded Ads remain disabled.");
+          ' "$status_file"
 
       - name: Verify live production game flow
         run: node scripts/production-game-smoke.mjs

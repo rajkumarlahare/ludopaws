@@ -28,12 +28,14 @@ internal fun MainActivity.applyResponse(
             GameJson.envelope(response)
         } catch (error: GameSchemaException) {
             diceView.stopRolling()
-            showStatus(
-                "Server state validation failed. Your last verified state was kept; refresh to retry.",
-            )
             currentState?.let { safeState ->
                 updateControls(safeState)
             }
+            // Refresh action controls from the last known-good snapshot first,
+            // then leave the validation warning visible as the final UI status.
+            showStatus(
+                "Server state validation failed. Your last verified state was kept; refresh to retry.",
+            )
             updateRollButton()
             return
         }
@@ -128,11 +130,16 @@ internal fun MainActivity.applyResponse(
     )
 
     boardView.bind(state, playerId)
-    OnlineLudoPawsPresentation.render(
-        activity = this,
-        previous = previousState,
-        current = state,
-    )
+    val presentationOverride = onlinePresentationRendererOverrideForTests
+    if (presentationOverride != null) {
+        presentationOverride(previousState, state)
+    } else {
+        OnlineLudoPawsPresentation.render(
+            activity = this,
+            previous = previousState,
+            current = state,
+        )
+    }
 
     matchInfoText.text =
         buildString {

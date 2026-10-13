@@ -115,7 +115,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.ludoproof.game"
+        applicationId = "com.rekixo.ludopaws"
         minSdk = 28
         targetSdk = 36
         versionCode = 2

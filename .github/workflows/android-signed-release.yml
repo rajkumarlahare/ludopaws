@@ -15,6 +15,17 @@ jobs:
       LUDOPROOF_RELEASE_STORE_PASSWORD: ${{ secrets.LUDOPROOF_ANDROID_STORE_PASSWORD }}
       LUDOPROOF_RELEASE_KEY_ALIAS: ${{ secrets.LUDOPROOF_ANDROID_KEY_ALIAS }}
       LUDOPROOF_RELEASE_KEY_PASSWORD: ${{ secrets.LUDOPROOF_ANDROID_KEY_PASSWORD }}
+      LUDOPROOF_API_BASE_URL: ${{ vars.LUDOPROOF_API_BASE_URL }}
+      GOOGLE_SIGN_IN_WEB_CLIENT_ID: ${{ vars.GOOGLE_SIGN_IN_WEB_CLIENT_ID }}
+      LUDOPROOF_BILLING_ENABLED: ${{ vars.LUDOPROOF_BILLING_ENABLED }}
+      GOOGLE_PLAY_BILLING_ENABLED: ${{ vars.GOOGLE_PLAY_BILLING_ENABLED }}
+      LUDOPROOF_ADS_ENABLED: ${{ vars.LUDOPROOF_ADS_ENABLED }}
+      LUDOPROOF_ADMOB_SSV_ENABLED: ${{ vars.LUDOPROOF_ADMOB_SSV_ENABLED }}
+      LUDOPROOF_ADMOB_REWARD_ITEM: ${{ vars.LUDOPROOF_ADMOB_REWARD_ITEM }}
+      ADMOB_APP_ID: ${{ vars.ADMOB_APP_ID }}
+      ADMOB_REWARDED_AD_UNIT_ID: ${{ vars.ADMOB_REWARDED_AD_UNIT_ID }}
+      LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID: ${{ vars.LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID }}
+      PLAY_GAMES_PROJECT_ID: ${{ vars.PLAY_GAMES_PROJECT_ID }}
 
     steps:
       - name: Checkout exact release commit
@@ -59,6 +70,115 @@ jobs:
 
       - name: RC2 release-readiness gate
         run: node scripts/android-release-readiness-check.mjs
+
+      - name: Validate release OAuth, feature flags and production API
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "$GOOGLE_SIGN_IN_WEB_CLIENT_ID" ]; then
+            echo "Set the GOOGLE_SIGN_IN_WEB_CLIENT_ID repository variable before creating a signed release." >&2
+            exit 2
+          fi
+          if ! printf '%s' "$GOOGLE_SIGN_IN_WEB_CLIENT_ID" | grep -Eq '^[0-9]+-[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$'; then
+            echo "GOOGLE_SIGN_IN_WEB_CLIENT_ID is not a valid Google Web OAuth client ID." >&2
+            exit 2
+          fi
+
+          API_BASE="$LUDOPROOF_API_BASE_URL"
+          if [ -z "$API_BASE" ]; then API_BASE="https://ludoproof-game-api.ai-8f3.workers.dev"; fi
+          case "$API_BASE" in https://*) ;; *) echo "LUDOPROOF_API_BASE_URL must use HTTPS." >&2; exit 2 ;; esac
+
+          APP_BILLING="$LUDOPROOF_BILLING_ENABLED"
+          SERVER_BILLING="$GOOGLE_PLAY_BILLING_ENABLED"
+          APP_ADS="$LUDOPROOF_ADS_ENABLED"
+          SERVER_ADS="$LUDOPROOF_ADMOB_SSV_ENABLED"
+          [ -n "$APP_BILLING" ] || APP_BILLING="false"
+          [ -n "$SERVER_BILLING" ] || SERVER_BILLING="false"
+          [ -n "$APP_ADS" ] || APP_ADS="false"
+          [ -n "$SERVER_ADS" ] || SERVER_ADS="false"
+
+          for flag in "$APP_BILLING" "$SERVER_BILLING" "$APP_ADS" "$SERVER_ADS"; do
+            case "$flag" in
+              true|false) ;;
+              *) echo "Store feature flags must be true or false." >&2; exit 2 ;;
+            esac
+          done
+          if [ "$APP_BILLING" != "$SERVER_BILLING" ]; then
+            echo "Android Billing flag must match Worker GOOGLE_PLAY_BILLING_ENABLED." >&2
+            exit 2
+          fi
+          if [ "$APP_ADS" != "$SERVER_ADS" ]; then
+            echo "Android Ads flag must match Worker LUDOPROOF_ADMOB_SSV_ENABLED." >&2
+            exit 2
+          fi
+
+          if [ "$APP_ADS" = "true" ]; then
+            if [ -z "$ADMOB_APP_ID" ] || [ -z "$ADMOB_REWARDED_AD_UNIT_ID" ]; then
+              echo "Set real ADMOB_APP_ID and ADMOB_REWARDED_AD_UNIT_ID before enabling production ads." >&2
+              exit 2
+            fi
+            if ! printf '%s' "$ADMOB_APP_ID" | grep -Eq '^ca-app-pub-[0-9]{16}~[0-9]{10}$'; then
+              echo "ADMOB_APP_ID is malformed." >&2
+              exit 2
+            fi
+            if ! printf '%s' "$ADMOB_REWARDED_AD_UNIT_ID" | grep -Eq '^ca-app-pub-[0-9]{16}/[0-9]{10}$'; then
+              echo "ADMOB_REWARDED_AD_UNIT_ID is malformed." >&2
+              exit 2
+            fi
+            if [ "$ADMOB_REWARDED_AD_UNIT_ID" != "$LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID" ]; then
+              echo "Android and Worker AdMob rewarded-unit IDs must match." >&2
+              exit 2
+            fi
+            if [ "$LUDOPROOF_ADMOB_REWARD_ITEM" != "gems" ]; then
+              echo 'LUDOPROOF_ADMOB_REWARD_ITEM must be gems.' >&2
+              exit 2
+            fi
+            if [ "$ADMOB_APP_ID" = "ca-app-pub-3940256099942544~3347511713" ] ||
+               [ "$ADMOB_REWARDED_AD_UNIT_ID" = "ca-app-pub-3940256099942544/5224354917" ]; then
+              echo "Google sample AdMob IDs are not allowed in a release build." >&2
+              exit 2
+            fi
+          fi
+
+          curl --fail --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors "$API_BASE/ready" >/dev/null
+          status_json="$(curl --fail --silent --show-error "$API_BASE/api/store/status")"
+          node -e '
+            const status = JSON.parse(process.argv[1]);
+            const billing = process.argv[2] === "true";
+            const ads = process.argv[3] === "true";
+            if (status.billingAvailable !== billing || status.rewardedAdsAvailable !== ads) {
+              console.error("Worker store-status flags do not match the signed Android build configuration.");
+              process.exit(2);
+            }
+            console.log("Production Worker readiness and store feature flags match the requested Android release.");
+          ' "$status_json" "$APP_BILLING" "$APP_ADS"
+
+          APP_ID="$ADMOB_APP_ID"
+          REWARDED_ID="$ADMOB_REWARDED_AD_UNIT_ID"
+          PLAY_GAMES_ID="$PLAY_GAMES_PROJECT_ID"
+          [ -n "$APP_ID" ] || APP_ID="ca-app-pub-3940256099942544~3347511713"
+          [ -n "$REWARDED_ID" ] || REWARDED_ID="ca-app-pub-3940256099942544/5224354917"
+          [ -n "$PLAY_GAMES_ID" ] || PLAY_GAMES_ID="0"
+          {
+            printf 'LUDOPROOF_API_BASE_URL=%s\n' "$API_BASE"
+            printf 'LUDOPROOF_BILLING_ENABLED=%s\n' "$APP_BILLING"
+            printf 'GOOGLE_PLAY_BILLING_ENABLED=%s\n' "$SERVER_BILLING"
+            printf 'LUDOPROOF_ADS_ENABLED=%s\n' "$APP_ADS"
+            printf 'LUDOPROOF_ADMOB_SSV_ENABLED=%s\n' "$SERVER_ADS"
+            printf 'ADMOB_APP_ID=%s\n' "$APP_ID"
+            printf 'ADMOB_REWARDED_AD_UNIT_ID=%s\n' "$REWARDED_ID"
+            printf 'PLAY_GAMES_PROJECT_ID=%s\n' "$PLAY_GAMES_ID"
+
+            # Gradle providers.gradleProperty() does not read the plain workflow environment keys.
+            # ORG_GRADLE_PROJECT_* maps the validated release config into actual Gradle project properties.
+            printf 'ORG_GRADLE_PROJECT_LUDOPROOF_API_BASE_URL=%s\n' "$API_BASE"
+            printf 'ORG_GRADLE_PROJECT_LUDOPROOF_BILLING_ENABLED=%s\n' "$APP_BILLING"
+            printf 'ORG_GRADLE_PROJECT_LUDOPROOF_ADS_ENABLED=%s\n' "$APP_ADS"
+            printf 'ORG_GRADLE_PROJECT_ADMOB_APP_ID=%s\n' "$APP_ID"
+            printf 'ORG_GRADLE_PROJECT_ADMOB_REWARDED_AD_UNIT_ID=%s\n' "$REWARDED_ID"
+            printf 'ORG_GRADLE_PROJECT_GOOGLE_SIGN_IN_WEB_CLIENT_ID=%s\n' "$GOOGLE_SIGN_IN_WEB_CLIENT_ID"
+            printf 'ORG_GRADLE_PROJECT_PLAY_GAMES_PROJECT_ID=%s\n' "$PLAY_GAMES_ID"
+          } >> "$GITHUB_ENV"
 
       - name: Android unit tests
         run: gradle -p android :app:testDebugUnitTest --stacktrace
