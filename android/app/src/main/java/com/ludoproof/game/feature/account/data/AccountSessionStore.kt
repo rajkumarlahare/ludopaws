@@ -93,6 +93,7 @@ class AccountSessionStore(context: Context) {
             .put("accessExpiresAt", session.accessExpiresAt)
             .put("sessionExpiresAt", session.sessionExpiresAt)
             .put("displayName", session.displayName.take(24))
+            .put("guestRecoveryEligible", session.guestRecoveryEligible)
         if (session.guestRecoveryEligible && session.guestDeletionCredential != null) {
             require(GUEST_DELETION_CREDENTIAL.matches(session.guestDeletionCredential))
             json.put("guestDeletionCredential", session.guestDeletionCredential)
