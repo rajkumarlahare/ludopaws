@@ -5,6 +5,12 @@ package com.ludoproof.game.feature.store.domain
  * Active-match exits, unfinished games, and losses never qualify.
  */
 internal object PostWinInterstitialPolicy {
+    /**
+     * Remove Ads suppresses only unsolicited interstitial placements.
+     * Explicit user-requested rewarded ads are handled by RewardedAdsController independently.
+     */
+    fun shouldShowFillerInterstitial(adsRemoved: Boolean): Boolean = !adsRemoved
+
     fun shouldShowOffline(
         matchStatus: String?,
         winnerPlayerId: String?,
