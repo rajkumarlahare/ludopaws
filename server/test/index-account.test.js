@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import accountWorker from "../src/index-account.js";
 import { issueAccessToken } from "../src/account-security.js";
+import { sha256Hex } from "../src/crypto.js";
 
 const ACCOUNT_A = "0a2c3a83-e0fb-4abc-8ac4-581a6d994fe7";
 const ACCOUNT_B = "1b3d4b94-e1f0-4bc9-9cd5-592b7e0a1f21";
@@ -588,4 +589,135 @@ test("linked account deletion retries safely after each injected downstream fail
     assert.ok(lastIndex(callForStage.leaderboard) < lastIndex(callForStage.player), "Linked cleanup must precede PlayerAccount tombstoning");
     assert.ok(lastIndex(callForStage.player) < lastIndex(callForStage.directory), "PlayerAccount tombstone must precede directory unlink");
   }
+});
+
+
+function makeGuestDeletionApiEnv(expectedCredentialHash, { directoryDeleteFailures = 0 } = {}) {
+  const calls = [];
+  let playerDeleted = false;
+  let directoryDeleted = false;
+  let remainingDirectoryDeleteFailures = directoryDeleteFailures;
+
+  const player = {
+    idFromName(name) { return name; },
+    get(accountId) {
+      return {
+        async fetch(request) {
+          const path = new URL(request.url).pathname;
+          const body = await request.json();
+          calls.push("player:" + path);
+          if (path === "/account/delete-preview") {
+            assert.equal(body.guestRecoveryVerified, true);
+            return Response.json({ ok: true, deleted: playerDeleted, purchaseLedgerIds: [] });
+          }
+          if (path === "/account/delete") {
+            assert.equal(body.guestRecoveryVerified, true);
+            assert.equal(body.confirmation, "DELETE_MY_ACCOUNT");
+            const replay = playerDeleted;
+            playerDeleted = true;
+            return Response.json({ ok: true, deleted: true, replay });
+          }
+          return Response.json({ error: "NOT_FOUND" }, { status: 404 });
+        },
+      };
+    },
+  };
+
+  const directory = {
+    idFromName(name) { return name; },
+    get(name) {
+      return {
+        async fetch(request) {
+          const path = new URL(request.url).pathname;
+          const body = await request.json();
+          calls.push("directory:" + path);
+          if (path === "/guest-deletion/claim") {
+            assert.equal(body.credentialHash, expectedCredentialHash, "only the domain-separated code hash should be sent to AccountDirectory");
+            return directoryDeleted
+              ? Response.json({ ok: true, deleted: true, replay: true })
+              : Response.json({ ok: true, accountId: ACCOUNT_A, deleted: false, replay: false });
+          }
+          if (path === "/identity/list") {
+            return Response.json({
+              ok: true, accountId: ACCOUNT_A, googleLinked: false,
+              friendId: null, leaderboardProfileId: null,
+            });
+          }
+          if (path === "/account/delete") {
+            if (remainingDirectoryDeleteFailures > 0) {
+              remainingDirectoryDeleteFailures -= 1;
+              return Response.json(
+                { error: "ACCOUNT_DIRECTORY_UNAVAILABLE", message: "injected directory failure" },
+                { status: 503 },
+              );
+            }
+            directoryDeleted = true;
+            return Response.json({ ok: true, deleted: true });
+          }
+          return Response.json({ error: "NOT_FOUND" }, { status: 404 });
+        },
+      };
+    },
+  };
+
+  const env = {
+    LUDOPROOF_SESSION_HMAC_KEY: SECRET,
+    LUDOPROOF_API_GATE: makeRateGate(),
+    LUDOPROOF_PLAYER_ACCOUNTS: player,
+    LUDOPROOF_ACCOUNT_DIRECTORY: directory,
+  };
+  return {
+    env,
+    calls,
+    state: () => ({ playerDeleted, directoryDeleted, remainingDirectoryDeleteFailures }),
+  };
+}
+
+test("guest delete-only code is required and never returns account data on an invalid code", async () => {
+  const code = "ab".repeat(32);
+  const expectedHash = await sha256Hex("ludoproof:guest-deletion-credential:v1:" + code);
+  const fixture = makeGuestDeletionApiEnv(expectedHash);
+  const response = await accountWorker.fetch(
+    new Request("https://api.example.test/api/account/guest/delete", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ credential: "cd".repeat(32), confirmation: "DELETE_MY_ACCOUNT" }),
+    }),
+    fixture.env,
+  );
+  assert.equal(response.status, 404);
+  assert.equal((await response.json()).error, "GUEST_DELETION_CODE_INVALID");
+  assert.deepEqual(fixture.state(), {
+    playerDeleted: false, directoryDeleted: false, remainingDirectoryDeleteFailures: 0,
+  });
+  assert.equal(fixture.calls.some(call => call.startsWith("player:")), false);
+});
+
+test("guest delete-only code completes uninstalled guest deletion and retries after directory failure", async () => {
+  const code = "ef".repeat(32);
+  const credentialHash = await sha256Hex("ludoproof:guest-deletion-credential:v1:" + code);
+  const fixture = makeGuestDeletionApiEnv(credentialHash, { directoryDeleteFailures: 1 });
+  const submit = () => accountWorker.fetch(
+    new Request("https://api.example.test/api/account/guest/delete", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ credential: code, confirmation: "DELETE_MY_ACCOUNT" }),
+    }),
+    fixture.env,
+  );
+
+  const first = await submit();
+  assert.equal(first.status, 503);
+  assert.deepEqual(fixture.state(), {
+    playerDeleted: true, directoryDeleted: false, remainingDirectoryDeleteFailures: 0,
+  });
+  assert.ok(fixture.calls.indexOf("player:/account/delete") > fixture.calls.indexOf("player:/account/delete-preview"));
+  assert.ok(fixture.calls.indexOf("directory:/account/delete") > fixture.calls.indexOf("player:/account/delete"));
+
+  const retry = await submit();
+  assert.equal(retry.status, 200);
+  assert.deepEqual(await retry.json(), { ok: true, deleted: true, replay: true });
+  assert.deepEqual(fixture.state(), {
+    playerDeleted: true, directoryDeleted: true, remainingDirectoryDeleteFailures: 0,
+  });
 });
