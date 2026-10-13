@@ -134,10 +134,12 @@ jobs:
           SERVER_BILLING="${GOOGLE_PLAY_BILLING_ENABLED:-false}"
           APP_ADS="${LUDOPROOF_ADS_ENABLED:-false}"
           SERVER_ADS="${LUDOPROOF_ADMOB_SSV_ENABLED:-false}"
-          case "$APP_BILLING:$SERVER_BILLING:$APP_ADS:$SERVER_ADS" in
-            (true|false):(true|false):(true|false):(true|false)) ;;
-            *) echo "Store feature flags must be true or false." >&2; exit 2 ;;
-          esac
+          for flag in "$APP_BILLING" "$SERVER_BILLING" "$APP_ADS" "$SERVER_ADS"; do
+            case "$flag" in
+              true|false) ;;
+              *) echo "Store feature flags must be true or false." >&2; exit 2 ;;
+            esac
+          done
           if [ "$APP_BILLING" != "$SERVER_BILLING" ]; then
             echo "Android Billing flag must match Worker GOOGLE_PLAY_BILLING_ENABLED." >&2
             exit 2
