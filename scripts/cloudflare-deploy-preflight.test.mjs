@@ -12,7 +12,7 @@ const preflightScript = path.join(repoRoot, "scripts", "cloudflare-deploy-prefli
 const adUnit = "ca-app-pub-1234567890123456/1234567890";
 const appId = "ca-app-pub-1234567890123456~1234567890";
 
-function runPreflight({ adsEnabled, billingEnabled = false }) {
+function runPreflight({ adsEnabled, billingEnabled = false, routeConfigured = true }) {
   const baseConfig = JSON.parse(fs.readFileSync(path.join(repoRoot, "server", "wrangler.json"), "utf8"));
   const runtimeEnvironment = {
     GOOGLE_SIGN_IN_WEB_CLIENT_ID: "1234567890-exampleclient.apps.googleusercontent.com",
@@ -33,6 +33,7 @@ function runPreflight({ adsEnabled, billingEnabled = false }) {
     ...baseConfig,
     vars: buildCloudflareRuntimeVars(baseConfig.vars ?? {}, runtimeEnvironment),
   };
+  if (!routeConfigured) delete preparedConfig.routes;
   const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "ludopaws-cloudflare-preflight-"));
   try {
     fs.mkdirSync(path.join(temporaryRoot, "server"), { recursive: true });
@@ -68,4 +69,10 @@ test("production preflight still blocks Google Play Billing", () => {
   const result = runPreflight({ adsEnabled: true, billingEnabled: true });
   assert.notEqual(result.status, 0, "stdout: " + result.stdout + " stderr: " + result.stderr);
   assert.match(result.stderr, /keeps Google Play Billing disabled/);
+});
+
+test("production preflight requires the API hostname to target the deployed Worker", () => {
+  const result = runPreflight({ adsEnabled: true, routeConfigured: false });
+  assert.notEqual(result.status, 0, "stdout: " + result.stdout + " stderr: " + result.stderr);
+  assert.match(result.stderr, /must explicitly route api\.ludopaws\.rekixo\.com/);
 });
