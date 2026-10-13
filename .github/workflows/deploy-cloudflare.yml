@@ -266,7 +266,14 @@ jobs:
               console.error("Worker readiness response is not ready.");
               process.exit(2);
             }
-            console.log("LudoProof production Worker is ready.");
+            // Operational readiness is not independent certification. Until
+            // the repository's independent-review gate is deliberately changed,
+            // require an explicit false claim (missing is not good enough).
+            if (body.productionClaim !== false) {
+              console.error("Worker readiness must explicitly report productionClaim=false until independent review is completed.");
+              process.exit(3);
+            }
+            console.log("LudoProof Worker is operationally ready; productionClaim=false.");
           ' "$body"
 
       - name: Verify store status route and feature flags
