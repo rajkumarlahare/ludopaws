@@ -28,10 +28,14 @@ internal class PostWinInterstitialExitGate(
     private var closed = false
 
     /**
-     * Returns true when an eligible, loaded interstitial exit check has been accepted.
-     * Returns false when callers should navigate immediately (disabled or no ad ready).
+     * Returns true when an eligible, loaded interstitial check has been accepted.
+     * Dismissal leaves the result screen visible; a second Back action navigates away.
+     * If an ad is skipped or fails to show, onSkipAd performs normal navigation.
      */
-    fun interceptIfReady(onExit: () -> Unit): Boolean {
+    fun interceptIfReady(
+        onAdDismissed: () -> Unit,
+        onSkipAd: () -> Unit,
+    ): Boolean {
         if (!interstitial.isReady() || activity.isFinishing || activity.isDestroyed) return false
         synchronized(this) {
             if (closed) return false
@@ -67,10 +71,16 @@ internal class PostWinInterstitialExitGate(
                     synchronized(this) { pending = false }
                     if (closed || activity.isFinishing || activity.isDestroyed) return@runOnUiThread
 
-                    if (mayShowInterstitial && interstitial.showIfReady(onExit)) {
+                    if (
+                        mayShowInterstitial &&
+                        interstitial.showIfReady(
+                            onAdDismissed = onAdDismissed,
+                            onFailedToShow = onSkipAd,
+                        )
+                    ) {
                         return@runOnUiThread
                     }
-                    onExit()
+                    onSkipAd()
                 }
             }
         } catch (error: Exception) {
