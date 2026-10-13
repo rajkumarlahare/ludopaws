@@ -1,14 +1,9 @@
 name: LudoProof Cloudflare Production
 
+# Production deploys require an explicit operator dispatch; merges and variable changes
+# must never automatically publish code to the live Cloudflare Worker.
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - 'server/**'
-      - 'scripts/cloudflare-deploy-preflight.mjs'
-      - 'scripts/production-game-smoke.mjs'
-      - '.github/workflows/deploy-cloudflare.yml'
 
 permissions:
   contents: read
@@ -19,7 +14,7 @@ concurrency:
 
 jobs:
   deploy:
-    if: ${{ github.event_name == 'workflow_dispatch' || vars.CLOUDFLARE_DEPLOY_ENABLED == 'true' || contains(github.event.head_commit.message, '[deploy-production]') }}
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: production
