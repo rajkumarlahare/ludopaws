@@ -1,6 +1,7 @@
 name: LudoProof Cloudflare Production
 
 # Production deploys require an explicit operator dispatch; merges and variable changes
+# CLOUDFLARE_DEPLOY_ENABLED does not opt into automatic pushes; workflow_dispatch is required.
 # must never automatically publish code to the live Cloudflare Worker.
 on:
   workflow_dispatch:
