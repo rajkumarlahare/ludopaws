@@ -418,13 +418,38 @@ async function handleAccountRequest(request, env) {
           accountId: obfuscatedAccountId,
         });
         const purchaseTokenHash = await sha256Hex("ludoproof:google-play-wallet-token:v1:" + purchaseToken);
-        const grant = await playerRequest(env, session.accountId, "/wallet/play-purchase", {
-          accountId: session.accountId,
-          sessionId: session.sessionId,
-          productId,
-          purchaseTokenHash,
-          purchaseLedgerId: verified.purchaseLedgerId,
-        });
+        let grant;
+        try {
+          grant = await playerRequest(env, session.accountId, "/wallet/play-purchase", {
+            accountId: session.accountId,
+            sessionId: session.sessionId,
+            productId,
+            purchaseTokenHash,
+            purchaseLedgerId: verified.purchaseLedgerId,
+          });
+        } catch (error) {
+          // Verification may have started before an account-deletion claim was acquired.
+          // If PlayerAccount rejects the final grant because deletion has begun, remove the
+          // now-orphaned owner-bound ledger record as part of that deletion race.
+          if (["ACCOUNT_DELETION_IN_PROGRESS", "ACCOUNT_DELETED"].includes(error?.code)) {
+            try {
+              if (!env?.LUDOPROOF_STORE_PURCHASES || typeof verified.purchaseLedgerId !== "string") {
+                throw httpError(503, "STORE_LEDGER_CLEANUP_FAILED", "purchase ledger cleanup is unavailable after deletion began");
+              }
+              const ledger = env.LUDOPROOF_STORE_PURCHASES.get(
+                env.LUDOPROOF_STORE_PURCHASES.idFromName(verified.purchaseLedgerId),
+              );
+              await parseInternalResponse(await ledger.fetch(new Request("https://store-purchase-ledger/delete", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ accountId: obfuscatedAccountId }),
+              })), "STORE_LEDGER_CLEANUP_FAILED");
+            } catch {
+              throw httpError(503, "STORE_LEDGER_CLEANUP_FAILED", "purchase ledger cleanup failed while account deletion was in progress");
+            }
+          }
+          throw error;
+        }
         return json(200, {
           ok: true,
           verified: true,
