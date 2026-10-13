@@ -471,8 +471,8 @@ class StoreActivity :
                 renderStore()
                 showStoreMessage(
                     if (changed) {
-                        if (cosmeticId == null) "Your rewarded-ad gems were verified by the server."
-                        else "The rewarded-ad progress for this item was verified by the server."
+                        if (cosmeticId == null) "Your +5 rewarded-ad gems were verified by the server."
+                        else "Your +5 gems and rewarded-ad progress for this item were verified by the server."
                     } else {
                         "The ad finished, but the server reward has not arrived yet. No local reward was granted; the store will update when verification completes."
                     },
