@@ -42,10 +42,24 @@ export async function verifyAdMobSsvRequest(request, env, fetchImpl = fetch, now
   // every other unit identifier before verifying a reward.
   const configuredAdUnitId = configuredAdUnit.split("/").at(-1);
   if (!configuredAdUnit || ![configuredAdUnit, configuredAdUnitId].includes(adUnit)) {
+    // Log only non-sensitive identifiers needed to diagnose AdMob's generic HTTP 403.
+    // Never log user_id, custom_data, signature, or the complete callback URL.
+    console.warn("admob-ssv-rejected", {
+      code: "SSV_AD_UNIT_INVALID",
+      receivedAdUnit: adUnit,
+      configuredAdUnitId,
+    });
     throw ssvError(403, "SSV_AD_UNIT_INVALID", "reward callback came from an unexpected ad unit");
   }
   const configuredRewardItem = String(env?.LUDOPROOF_ADMOB_REWARD_ITEM ?? "gems");
   if (configuredRewardItem !== "gems" || rewardAmount !== "5" || rewardItem !== "gems") {
+    // These values are non-sensitive; omit the account identifier and callback payload.
+    console.warn("admob-ssv-rejected", {
+      code: "SSV_REWARD_INVALID",
+      configuredRewardItem,
+      receivedRewardAmount: rewardAmount,
+      receivedRewardItem: rewardItem,
+    });
     throw ssvError(403, "SSV_REWARD_INVALID", "reward callback does not match the configured reward");
   }
   if (!/^[A-Fa-f0-9]{16,128}$/.test(transactionId)) throw ssvError(400, "SSV_TRANSACTION_INVALID", "reward transaction ID is invalid");
