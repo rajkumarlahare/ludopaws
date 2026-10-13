@@ -310,7 +310,7 @@ jobs:
             android/app/build/outputs/androidTest-results/connected/**
             /tmp/ludopaws-avd-list.txt
             /tmp/ludopaws-emulator.log
-            /tmp/ludopaws-emulator-retry.log
+            /tmp/ludopaws-emulator-retry-*.log
             /tmp/emu-crash-*.db
             /tmp/ludopaws-logcat.txt
             /tmp/ludopaws-activities.txt
