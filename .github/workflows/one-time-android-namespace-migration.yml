@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - refactor/rekixo-android-namespace
+    paths:
+      - .github/workflows/one-time-android-namespace-migration.yml
 
 permissions:
   contents: write
@@ -32,6 +34,9 @@ jobs:
           new_package = "com.rekixo.ludopaws"
           source_root = Path("android/app/src")
           package_dirs = list(source_root.glob("*/java/com/ludoproof/game"))
+          if not package_dirs and len(list(source_root.glob("*/java/com/rekixo/ludopaws"))) == 3:
+              print("Package migration has already completed; no action needed.")
+              raise SystemExit(0)
           if len(package_dirs) != 3:
               raise SystemExit(
                   f"Expected main, test and androidTest source package roots; found {len(package_dirs)}"
@@ -61,7 +66,7 @@ jobs:
               ("com\\ludoproof\\game", "com\\rekixo\\ludopaws"),
           )
           for path in Path(".").rglob("*"):
-              if not path.is_file() or ".git" in path.parts:
+              if not path.is_file() or ".git" in path.parts or path.parts[:2] == (".github", "workflows"):
                   continue
               if path.suffix.lower() not in text_extensions and path.name not in {".gitignore", ".editorconfig"}:
                   continue
@@ -102,9 +107,6 @@ jobs:
               doc = doc.replace(anchor, record + "\n" + anchor, 1)
           migration_doc.write_text(doc, encoding="utf-8", newline="")
 
-          temporary_workflow = Path(".github/workflows/one-time-android-namespace-migration.yml")
-          temporary_workflow.unlink(missing_ok=True)
-
           new_package_dirs = list(source_root.glob("*/java/com/rekixo/ludopaws"))
           new_source_file_count = sum(
               1 for package_dir in new_package_dirs
@@ -126,7 +128,7 @@ jobs:
           old_ref = re.compile(r"com\.ludoproof\.game|com/ludoproof/game|com\\ludoproof\\game")
           remaining = []
           for path in Path(".").rglob("*"):
-              if not path.is_file() or ".git" in path.parts:
+              if not path.is_file() or ".git" in path.parts or path.parts[:2] == (".github", "workflows"):
                   continue
               try:
                   text = path.read_text(encoding="utf-8")
