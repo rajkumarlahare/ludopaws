@@ -29,6 +29,12 @@ val ludoProofAdsUseTestIds =
         .get()
         .toBooleanStrictOrNull()
         ?: false
+val ludoProofInterstitialAdsEnabled =
+    providers.gradleProperty("LUDOPROOF_INTERSTITIAL_ADS_ENABLED")
+        .orElse("false")
+        .get()
+        .toBooleanStrictOrNull()
+        ?: false
 val admobAppId =
     providers.gradleProperty("ADMOB_APP_ID")
         .orElse("ca-app-pub-3940256099942544~3347511713")
@@ -37,11 +43,18 @@ val admobRewardedAdUnitId =
     providers.gradleProperty("ADMOB_REWARDED_AD_UNIT_ID")
         .orElse("ca-app-pub-3940256099942544/5224354917")
         .get()
+val admobInterstitialAdUnitId =
+    providers.gradleProperty("ADMOB_INTERSTITIAL_AD_UNIT_ID")
+        .orElse("ca-app-pub-3940256099942544/1033173712")
+        .get()
 require(admobAppId.isNotBlank()) {
     "ADMOB_APP_ID must not be blank."
 }
 require(admobRewardedAdUnitId.isNotBlank()) {
     "ADMOB_REWARDED_AD_UNIT_ID must not be blank."
+}
+require(admobInterstitialAdUnitId.isNotBlank()) {
+    "ADMOB_INTERSTITIAL_AD_UNIT_ID must not be blank."
 }
 if (ludoProofAdsEnabled && !ludoProofAdsUseTestIds) {
     require(
@@ -51,6 +64,18 @@ if (ludoProofAdsEnabled && !ludoProofAdsUseTestIds) {
         "Set your real AdMob IDs or enable LUDOPROOF_ADS_USE_TEST_IDS for debug testing."
     }
 }
+if (ludoProofInterstitialAdsEnabled && !ludoProofAdsUseTestIds) {
+    require(Regex("^ca-app-pub-[0-9]{16}/[0-9]{10}$").matches(admobInterstitialAdUnitId)) {
+        "ADMOB_INTERSTITIAL_AD_UNIT_ID must be a valid AdMob interstitial unit ID."
+    }
+    require(
+        admobAppId != "ca-app-pub-3940256099942544~3347511713" &&
+            admobInterstitialAdUnitId != "ca-app-pub-3940256099942544/1033173712",
+    ) {
+        "Set your real AdMob app and interstitial IDs before enabling production interstitial ads."
+    }
+}
+
 val googleSignInWebClientId =
     providers.gradleProperty("GOOGLE_SIGN_IN_WEB_CLIENT_ID")
         .orElse("")
@@ -139,6 +164,11 @@ android {
         )
         buildConfigField(
             "boolean",
+            "LUDOPROOF_INTERSTITIAL_ADS_ENABLED",
+            ludoProofInterstitialAdsEnabled.toString(),
+        )
+        buildConfigField(
+            "boolean",
             "LUDOPROOF_ADS_USE_TEST_IDS",
             ludoProofAdsUseTestIds.toString(),
         )
@@ -146,6 +176,11 @@ android {
             "String",
             "ADMOB_REWARDED_AD_UNIT_ID",
             "\"${admobRewardedAdUnitId.replace("\\", "\\\\").replace("\"", "\\\"")}\"",
+        )
+        buildConfigField(
+            "String",
+            "ADMOB_INTERSTITIAL_AD_UNIT_ID",
+            admobInterstitialAdUnitId.let { "\"$it\"" },
         )
         manifestPlaceholders["ADMOB_APP_ID"] = admobAppId
         buildConfigField(
