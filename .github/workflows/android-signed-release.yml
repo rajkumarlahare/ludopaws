@@ -20,10 +20,12 @@ jobs:
       LUDOPROOF_BILLING_ENABLED: ${{ vars.LUDOPROOF_BILLING_ENABLED }}
       GOOGLE_PLAY_BILLING_ENABLED: ${{ vars.GOOGLE_PLAY_BILLING_ENABLED }}
       LUDOPROOF_ADS_ENABLED: ${{ vars.LUDOPROOF_ADS_ENABLED }}
+      LUDOPROOF_INTERSTITIAL_ADS_ENABLED: ${{ vars.LUDOPROOF_INTERSTITIAL_ADS_ENABLED }}
       LUDOPROOF_ADMOB_SSV_ENABLED: ${{ vars.LUDOPROOF_ADMOB_SSV_ENABLED }}
       LUDOPROOF_ADMOB_REWARD_ITEM: ${{ vars.LUDOPROOF_ADMOB_REWARD_ITEM }}
       ADMOB_APP_ID: ${{ vars.ADMOB_APP_ID }}
       ADMOB_REWARDED_AD_UNIT_ID: ${{ vars.ADMOB_REWARDED_AD_UNIT_ID }}
+      ADMOB_INTERSTITIAL_AD_UNIT_ID: ${{ vars.ADMOB_INTERSTITIAL_AD_UNIT_ID }}
       LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID: ${{ vars.LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID }}
       PLAY_GAMES_PROJECT_ID: ${{ vars.PLAY_GAMES_PROJECT_ID }}
 
@@ -91,13 +93,15 @@ jobs:
           APP_BILLING="$LUDOPROOF_BILLING_ENABLED"
           SERVER_BILLING="$GOOGLE_PLAY_BILLING_ENABLED"
           APP_ADS="$LUDOPROOF_ADS_ENABLED"
+          INTERSTITIAL_ADS="$LUDOPROOF_INTERSTITIAL_ADS_ENABLED"
           SERVER_ADS="$LUDOPROOF_ADMOB_SSV_ENABLED"
           [ -n "$APP_BILLING" ] || APP_BILLING="false"
           [ -n "$SERVER_BILLING" ] || SERVER_BILLING="false"
           [ -n "$APP_ADS" ] || APP_ADS="false"
+          [ -n "$INTERSTITIAL_ADS" ] || INTERSTITIAL_ADS="false"
           [ -n "$SERVER_ADS" ] || SERVER_ADS="false"
 
-          for flag in "$APP_BILLING" "$SERVER_BILLING" "$APP_ADS" "$SERVER_ADS"; do
+          for flag in "$APP_BILLING" "$SERVER_BILLING" "$APP_ADS" "$INTERSTITIAL_ADS" "$SERVER_ADS"; do
             case "$flag" in
               true|false) ;;
               *) echo "Store feature flags must be true or false." >&2; exit 2 ;;
@@ -140,6 +144,26 @@ jobs:
             fi
           fi
 
+          if [ "$INTERSTITIAL_ADS" = "true" ]; then
+            if [ -z "$ADMOB_APP_ID" ] || [ -z "$ADMOB_INTERSTITIAL_AD_UNIT_ID" ]; then
+              echo "Set real ADMOB_APP_ID and ADMOB_INTERSTITIAL_AD_UNIT_ID before enabling post-win interstitial ads." >&2
+              exit 2
+            fi
+            if ! printf '%s' "$ADMOB_APP_ID" | grep -Eq '^ca-app-pub-[0-9]{16}~[0-9]{10}$'; then
+              echo "ADMOB_APP_ID is malformed." >&2
+              exit 2
+            fi
+            if ! printf '%s' "$ADMOB_INTERSTITIAL_AD_UNIT_ID" | grep -Eq '^ca-app-pub-[0-9]{16}/[0-9]{10}$'; then
+              echo "ADMOB_INTERSTITIAL_AD_UNIT_ID is malformed." >&2
+              exit 2
+            fi
+            if [ "$ADMOB_APP_ID" = "ca-app-pub-3940256099942544~3347511713" ] ||
+               [ "$ADMOB_INTERSTITIAL_AD_UNIT_ID" = "ca-app-pub-3940256099942544/1033173712" ]; then
+              echo "Google sample AdMob IDs are not allowed when release interstitial ads are enabled." >&2
+              exit 2
+            fi
+          fi
+
           ready_json="$(curl --fail --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors "$API_BASE/ready")"
           node -e '
             const ready = JSON.parse(process.argv[1]);
@@ -169,18 +193,22 @@ jobs:
 
           APP_ID="$ADMOB_APP_ID"
           REWARDED_ID="$ADMOB_REWARDED_AD_UNIT_ID"
+          INTERSTITIAL_ID="$ADMOB_INTERSTITIAL_AD_UNIT_ID"
           PLAY_GAMES_ID="$PLAY_GAMES_PROJECT_ID"
           [ -n "$APP_ID" ] || APP_ID="ca-app-pub-3940256099942544~3347511713"
           [ -n "$REWARDED_ID" ] || REWARDED_ID="ca-app-pub-3940256099942544/5224354917"
+          [ -n "$INTERSTITIAL_ID" ] || INTERSTITIAL_ID="ca-app-pub-3940256099942544/1033173712"
           [ -n "$PLAY_GAMES_ID" ] || PLAY_GAMES_ID="0"
           {
             printf 'LUDOPROOF_API_BASE_URL=%s\n' "$API_BASE"
             printf 'LUDOPROOF_BILLING_ENABLED=%s\n' "$APP_BILLING"
             printf 'GOOGLE_PLAY_BILLING_ENABLED=%s\n' "$SERVER_BILLING"
             printf 'LUDOPROOF_ADS_ENABLED=%s\n' "$APP_ADS"
+            printf 'LUDOPROOF_INTERSTITIAL_ADS_ENABLED=%s\\n' "$INTERSTITIAL_ADS"
             printf 'LUDOPROOF_ADMOB_SSV_ENABLED=%s\n' "$SERVER_ADS"
             printf 'ADMOB_APP_ID=%s\n' "$APP_ID"
             printf 'ADMOB_REWARDED_AD_UNIT_ID=%s\n' "$REWARDED_ID"
+            printf 'ADMOB_INTERSTITIAL_AD_UNIT_ID=%s\\n' "$INTERSTITIAL_ID"
             printf 'PLAY_GAMES_PROJECT_ID=%s\n' "$PLAY_GAMES_ID"
 
             # Gradle providers.gradleProperty() does not read the plain workflow environment keys.
@@ -188,8 +216,10 @@ jobs:
             printf 'ORG_GRADLE_PROJECT_LUDOPROOF_API_BASE_URL=%s\n' "$API_BASE"
             printf 'ORG_GRADLE_PROJECT_LUDOPROOF_BILLING_ENABLED=%s\n' "$APP_BILLING"
             printf 'ORG_GRADLE_PROJECT_LUDOPROOF_ADS_ENABLED=%s\n' "$APP_ADS"
+            printf 'ORG_GRADLE_PROJECT_LUDOPROOF_INTERSTITIAL_ADS_ENABLED=%s\\n' "$INTERSTITIAL_ADS"
             printf 'ORG_GRADLE_PROJECT_ADMOB_APP_ID=%s\n' "$APP_ID"
             printf 'ORG_GRADLE_PROJECT_ADMOB_REWARDED_AD_UNIT_ID=%s\n' "$REWARDED_ID"
+            printf 'ORG_GRADLE_PROJECT_ADMOB_INTERSTITIAL_AD_UNIT_ID=%s\\n' "$INTERSTITIAL_ID"
             printf 'ORG_GRADLE_PROJECT_GOOGLE_SIGN_IN_WEB_CLIENT_ID=%s\n' "$GOOGLE_SIGN_IN_WEB_CLIENT_ID"
             printf 'ORG_GRADLE_PROJECT_PLAY_GAMES_PROJECT_ID=%s\n' "$PLAY_GAMES_ID"
           } >> "$GITHUB_ENV"
