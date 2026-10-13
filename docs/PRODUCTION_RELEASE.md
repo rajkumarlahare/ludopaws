@@ -25,6 +25,12 @@ A release must not be promoted unless all of these are true:
 17. Keep Google Play Billing disabled until the exact product IDs and displayed quantities/prices match between the Android catalog, backend verifier and Play Console; the service account has only the required Play Console permissions; and licensed internal tests pass for purchase, acknowledgement/consumption, restore, duplicate/retry and refund behavior.
 18. Keep AdMob disabled until real App/Rewarded-unit IDs, UMP consent/privacy options and the signed SSV callback are configured and tested end-to-end. With the configured single reward unit, every successful callback must grant 5 gems; cosmetic-targeted ads additionally increment eligible cosmetic progress. Client callbacks must never grant value locally, and duplicate SSV transaction IDs must not duplicate rewards.
 
+## Configuration source of truth
+
+The production deployment now prepares a complete runtime-variable set in the workflow runner before Wrangler dry-run/deploy. Set the required non-secret repository Actions Variables `GOOGLE_SIGN_IN_WEB_CLIENT_ID` and `LUDOPROOF_ACCOUNT_WEB_ORIGIN=https://rajkumarlahare.github.io` first. Optional runtime variables include `GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL`, `GOOGLE_PLAY_BILLING_ENABLED`, `LUDOPROOF_ADMOB_SSV_ENABLED`, `LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID`, and `LUDOPROOF_ADMOB_REWARD_ITEM=gems`. Missing feature flags default to false; an invalid OAuth ID/origin or enabled feature without its required configuration blocks deployment.
+
+Wrangler configuration is authoritative for plain vars, so do not rely on dashboard-only values surviving deployment. The deployment workflow injects these non-secret values into the ephemeral config; it does not commit runtime IDs or credentials. Keep `GOOGLE_PLAY_SERVICE_ACCOUNT_PRIVATE_KEY` in Cloudflare Worker Secrets only, and enable Billing only after that secret exists and internal purchase/restore/refund tests pass. Signed Android release generation uses the same OAuth ID and requires the Android Billing/Ads flags to match the Worker flags and live `/api/store/status`.
+
 ## Cloudflare
 
 Worker:
