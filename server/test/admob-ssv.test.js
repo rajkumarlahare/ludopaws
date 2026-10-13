@@ -82,20 +82,22 @@ test("AdMob SSV refuses callback from a different configured ad unit", async () 
 });
 
 
-test("AdMob signed verification test accepts Google's test key and never treats it as a production reward", async () => {
+test("AdMob test signature wins over a colliding production key ID and never grants a production reward", async () => {
   const productionPair = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
   const testPair = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
   const productionSpki = await crypto.subtle.exportKey("spki", productionPair.publicKey);
   const testSpki = await crypto.subtle.exportKey("spki", testPair.publicKey);
   const fetchImpl = async (url) => {
     const isTest = String(url).includes("verifier-keys-test.json");
+    // Intentionally collide key IDs to model production and test key sets where
+    // the incoming ID exists in both: only signature verification identifies the signer.
     return Response.json({
-      keys: [{ keyId: isTest ? 131 : 999, base64: base64(isTest ? testSpki : productionSpki) }],
+      keys: [{ keyId: 3335741209, base64: base64(isTest ? testSpki : productionSpki) }],
     }, { headers: { "cache-control": "public, max-age=3600" } });
   };
   const now = Date.now();
   const request = await signedRequest({
-    privateKey: testPair.privateKey, keyId: 131,
+    privateKey: testPair.privateKey, keyId: 3335741209,
     accountId: "0a2c3a83-e0fb-4abc-8ac4-581a6d994fe7",
     adUnit: "1234567890", customData: JSON.stringify({ kind: "gems" }), timestamp: now,
     transactionId: "123456789",
@@ -107,7 +109,7 @@ test("AdMob signed verification test accepts Google's test key and never treats 
   assert.equal(result.kind, "gems");
   assert.equal(result.transactionId, "123456789");
   const malformedProductionRequest = await signedRequest({
-    privateKey: productionPair.privateKey, keyId: 999,
+    privateKey: productionPair.privateKey, keyId: 3335741209,
     accountId: "0a2c3a83-e0fb-4abc-8ac4-581a6d994fe7",
     adUnit: "456", customData: JSON.stringify({ kind: "gems" }), timestamp: now,
     transactionId: "123456789",
