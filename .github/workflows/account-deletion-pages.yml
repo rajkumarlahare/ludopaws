@@ -64,6 +64,7 @@ jobs:
             echo "LUDOPROOF_ACCOUNT_WEB_ORIGIN must match the GitHub Pages origin: https://rajkumarlahare.github.io" >&2
             exit 2
           fi
+          node scripts/check-account-deletion-pages.mjs
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b
