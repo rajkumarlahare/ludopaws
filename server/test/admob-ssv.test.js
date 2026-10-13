@@ -98,12 +98,23 @@ test("AdMob signed verification test accepts Google's test key and never treats 
     privateKey: testPair.privateKey, keyId: 131,
     accountId: "0a2c3a83-e0fb-4abc-8ac4-581a6d994fe7",
     adUnit: "1234567890", customData: JSON.stringify({ kind: "gems" }), timestamp: now,
-    transactionId: "0123456789abcdef0123456789abcdef",
+    transactionId: "123456789",
   });
   const result = await verifyAdMobSsvRequest(
     request, { LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID: "ca-app-pub-123/456" }, fetchImpl, now,
   );
   assert.equal(result.isTest, true);
   assert.equal(result.kind, "gems");
-  assert.equal(result.transactionId, "0123456789abcdef0123456789abcdef");
+  assert.equal(result.transactionId, "123456789");
+  const malformedProductionRequest = await signedRequest({
+    privateKey: productionPair.privateKey, keyId: 999,
+    accountId: "0a2c3a83-e0fb-4abc-8ac4-581a6d994fe7",
+    adUnit: "456", customData: JSON.stringify({ kind: "gems" }), timestamp: now,
+    transactionId: "123456789",
+  });
+  await assert.rejects(
+    verifyAdMobSsvRequest(malformedProductionRequest,
+      { LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID: "ca-app-pub-123/456" }, fetchImpl, now),
+    (error) => error.code === "SSV_TRANSACTION_INVALID",
+  );
 });
