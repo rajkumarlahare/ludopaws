@@ -1,7 +1,7 @@
 const GOOGLE_WEB_CLIENT_ID = /^[0-9]+-[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$/;
 const GOOGLE_PLAY_SERVICE_ACCOUNT = /^[^@\s]+@[^@\s]+\.iam\.gserviceaccount\.com$/;
 const ADMOB_REWARDED_UNIT = /^ca-app-pub-[0-9]{16}\/[0-9]{10}$/;
-export const ACCOUNT_WEB_ORIGIN = "https://rajkumarlahare.github.io";
+export const ACCOUNT_WEB_ORIGIN = "https://ludopaws.rekixo.com";
 
 function readBoolean(name, raw) {
   const value = String(raw ?? "").trim();
@@ -24,7 +24,7 @@ export function buildCloudflareRuntimeVars(existingVars, environment) {
 
   const accountOrigin = String(environment.LUDOPROOF_ACCOUNT_WEB_ORIGIN ?? "").trim();
   if (accountOrigin !== ACCOUNT_WEB_ORIGIN) {
-    throw new Error(`LUDOPROOF_ACCOUNT_WEB_ORIGIN must be exactly ${ACCOUNT_WEB_ORIGIN} for the current GitHub Pages account/deletion site.`);
+    throw new Error(`LUDOPROOF_ACCOUNT_WEB_ORIGIN must be exactly ${ACCOUNT_WEB_ORIGIN} for the Rekixo landing and account site.`);
   }
 
   const billingEnabled = readBoolean("GOOGLE_PLAY_BILLING_ENABLED", environment.GOOGLE_PLAY_BILLING_ENABLED);

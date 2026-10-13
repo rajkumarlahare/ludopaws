@@ -103,8 +103,8 @@ if (!/^[0-9]+-[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$/.test(oauthClientId)
   console.error("GOOGLE_SIGN_IN_WEB_CLIENT_ID is missing or malformed in the prepared production Worker config.");
   process.exit(2);
 }
-if (vars.LUDOPROOF_ACCOUNT_WEB_ORIGIN !== "https://rajkumarlahare.github.io") {
-  console.error("LUDOPROOF_ACCOUNT_WEB_ORIGIN must match the public GitHub Pages account site.");
+if (vars.LUDOPROOF_ACCOUNT_WEB_ORIGIN !== "https://ludopaws.rekixo.com") {
+  console.error("LUDOPROOF_ACCOUNT_WEB_ORIGIN must match the Rekixo landing/account site origin.");
   process.exit(2);
 }
 if (!["true", "false"].includes(String(vars.GOOGLE_PLAY_BILLING_ENABLED))) {
