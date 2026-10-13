@@ -323,7 +323,7 @@ The production deploy workflow materializes the following **non-secret GitHub Ac
 Required before any production Worker deployment:
 
 - `GOOGLE_SIGN_IN_WEB_CLIENT_ID`: the Google **Web** OAuth client ID used by Android and the account-deletion site.
-- `LUDOPROOF_ACCOUNT_WEB_ORIGIN`: currently exactly `https://rajkumarlahare.github.io`.
+- `LUDOPROOF_ACCOUNT_WEB_ORIGIN`: target origin `https://ludopaws.rekixo.com` (use only after the branded site is configured and approved).
 - Keep `GOOGLE_PLAY_BILLING_ENABLED=false` and `LUDOPROOF_ADMOB_SSV_ENABLED=false` until each integration has passed internal-track end-to-end tests.
 
 Optional store variables, which remain fail-closed unless enabled explicitly:
@@ -374,6 +374,6 @@ Before enabling ads:
 2. Publish the applicable privacy/consent messages in the AdMob Privacy & messaging settings. Verify the UMP consent and privacy-options flow in the internal test track.
 3. For debug-only SDK integration tests before receiving real IDs, build with Google's sample IDs using `-PLUDOPROOF_ADS_ENABLED=true -PLUDOPROOF_ADS_USE_TEST_IDS=true`. This test-ID mode is automatically disabled in release builds.
 4. Only enable production ads with your real IDs and `LUDOPROOF_ADS_USE_TEST_IDS=false`; the build rejects enabling ads with the default sample IDs in this mode.
-5. In the AdMob rewarded ad unit's server-side verification/reward settings, set the reward amount to **5** and reward item to **gems**. In Cloudflare, set `LUDOPROOF_ADMOB_SSV_ENABLED=true`, `LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID` to the exact real rewarded ad unit, and `LUDOPROOF_ADMOB_REWARD_ITEM=gems`. Keep SSV disabled until the public HTTPS callback `https://ludoproof-game-api.ai-8f3.workers.dev/api/admob/ssv` is configured in AdMob and an end-to-end test confirms that signed callbacks reach the matching account. The Worker independently requires amount `5`, item `gems`, the expected ad unit, a recent timestamp, and a valid AdMob signature before crediting anything.
+5. In the AdMob rewarded ad unit's server-side verification/reward settings, set the reward amount to **5** and reward item to **gems**. In Cloudflare, set `LUDOPROOF_ADMOB_SSV_ENABLED=true`, `LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID` to the exact real rewarded ad unit, and `LUDOPROOF_ADMOB_REWARD_ITEM=gems`. Keep SSV disabled until the public HTTPS callback `https://api.ludopaws.rekixo.com/api/admob/ssv` is configured in AdMob and an end-to-end test confirms that signed callbacks reach the matching account. The Worker independently requires amount `5`, item `gems`, the expected ad unit, a recent timestamp, and a valid AdMob signature before crediting anything.
 
 A missing or mismatched SSV configuration disables server reward fulfillment. The configured reward is **5 gems**: an ad watched from the Gems tab grants 5 gems, and an ad watched toward an eligible cosmetic grants 5 gems plus one server-tracked cosmetic-progress step. The client callback only refreshes the server wallet; it does not grant either reward locally. Before enabling production ads, run end-to-end tests for both paths, callback delays, duplicate SSV transactions, and a mismatched ad unit/reward configuration. Follow Google AdMob's consent, child-directed treatment, and Families-policy requirements for the app's actual audience before serving production ads.
