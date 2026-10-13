@@ -41,6 +41,9 @@ const storeActivity = read(
 const offlineExit = read(
   "android/app/src/main/java/com/ludoproof/game/feature/offline/presentation/common/OfflineExitDialogUi.kt",
 );
+const offlineActivity = read(
+  "android/app/src/main/java/com/ludoproof/game/feature/offline/presentation/OfflineGameActivity.kt",
+);
 const onlineMain = read(
   "android/app/src/main/java/com/ludoproof/game/feature/online/presentation/MainActivity.kt",
 );
@@ -156,8 +159,20 @@ requireText(
 requireText(
   "PostWinInterstitialExitGate.kt",
   interstitialExitGate,
-  "if (mayShowInterstitial && interstitial.showIfReady(onExit))",
-  "entitlement checks must complete before showing a post-win interstitial.",
+  "onAdDismissed = onAdDismissed",
+  "the app must retain the win result after the ad is dismissed.",
+);
+requireText(
+  "PostWinInterstitialExitGate.kt",
+  interstitialExitGate,
+  "onFailedToShow = onSkipAd",
+  "failed-to-show or suppressed interstitials must continue normal back navigation.",
+);
+requireText(
+  "MainActivity.kt",
+  onlineMain,
+  "postWinInterstitialShownForMatchId == matchId",
+  "the same remote win result must not show a second interstitial on the next Back press.",
 );
 requireText(
   "RewardedAdsController.kt",
@@ -179,6 +194,12 @@ requireText(
   offlineExit,
   "showPostWinInterstitialIfReady",
   "local-game interstitial must be attached to result-screen exit only.",
+);
+requireText(
+  "OfflineGameActivity.kt",
+  offlineActivity,
+  "postWinInterstitialShownForMatchId == matchId",
+  "the same local win result must not show a second interstitial on the next Back press.",
 );
 requireText(
   "MainActivity.kt",
