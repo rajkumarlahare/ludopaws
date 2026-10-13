@@ -380,6 +380,11 @@ function makeDeletionSagaEnv({ directoryDeleteFailures = 0, failureStage = null,
         async fetch(request) {
           const path = new URL(request.url).pathname;
           calls.push("directory:" + path);
+          if (path === "/account/delete-prepare") {
+            const body = await request.clone().json();
+            assert.equal(body.source, "SESSION");
+            return Response.json({ ok: true, claimed: true, replay: false });
+          }
           if (path === "/identity/list") {
             return Response.json({
               ok: true,
@@ -639,6 +644,11 @@ function makeGuestDeletionApiEnv(expectedCredentialHash, { directoryDeleteFailur
             return directoryDeleted
               ? Response.json({ ok: true, deleted: true, replay: true })
               : Response.json({ ok: true, accountId: ACCOUNT_A, deleted: false, replay: false });
+          }
+          if (path === "/account/delete-prepare") {
+            assert.equal(body.source, "GUEST_CODE");
+            assert.equal(body.credentialHash, expectedCredentialHash);
+            return Response.json({ ok: true, claimed: true, replay: false });
           }
           if (path === "/identity/list") {
             return Response.json({
