@@ -249,9 +249,8 @@ class AccountRepository(context: Context) {
         }
 
         // AccountDirectory generates the 256-bit secret server-side and stores only its hash.
-        // When this installation has no saved code, rotate to invalidate any older lost code;
-        // the explicit replace action does the same while the current saved code still exists.
-        val rotate = rotateExisting || session.guestDeletionCredential == null
+        // Keep other installations' saved codes valid unless the owner explicitly replaces them.
+        val rotate = rotateExisting
         val response = request(
             "POST",
             "/api/account/guest/deletion-code",
