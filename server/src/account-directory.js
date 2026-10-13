@@ -148,6 +148,7 @@ export class AccountDirectory {
   async #registerGuestDeletionCredential(request) {
     const body = await readJson(request);
     const accountId = requireAccountId(body?.accountId);
+    const rotate = body?.rotate === true;
     // The server, not the client, chooses the 256-bit secret. Only its domain-separated
     // hash is persisted; the plaintext is returned once to the authenticated app session.
     const bytes = new Uint8Array(32);
@@ -174,6 +175,10 @@ export class AccountDirectory {
       )];
       if (deletionClaim.length || guestClaim.length) {
         throw httpError(409, "ACCOUNT_DELETION_IN_PROGRESS", "this guest account is being deleted");
+      }
+      if (rotate) {
+        // Explicit rotation revokes every previously saved code for this guest account.
+        this.ctx.storage.sql.exec("DELETE FROM guest_deletion_credentials WHERE account_id = ?", accountId);
       }
       this.ctx.storage.sql.exec(
         "INSERT INTO guest_deletion_credentials (credential_hash, account_id, created_at) VALUES (?, ?, ?)",
