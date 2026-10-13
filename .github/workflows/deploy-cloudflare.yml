@@ -291,11 +291,20 @@ jobs:
               console.error("Branded API /api/store/status response is missing expected boolean feature flags.");
               process.exit(2);
             }
-            if (body.billingAvailable !== false || body.rewardedAdsAvailable !== false) {
-              console.error("First-release gate requires Google Play Billing and rewarded Ads to remain disabled.");
+            const expectedRewardedAds = process.env.LUDOPROOF_ADMOB_SSV_ENABLED === "true";
+            const androidRewardedAds = process.env.LUDOPROOF_ADS_ENABLED === "true";
+            if (
+              body.billingAvailable !== false ||
+              body.rewardedAdsAvailable !== expectedRewardedAds ||
+              androidRewardedAds !== expectedRewardedAds
+            ) {
+              console.error("Production store status does not match validated feature configuration. Billing must remain disabled, and Android/Worker Rewarded Ads flags must match.");
               process.exit(3);
             }
-            console.log("Branded API store status route is present; Billing and rewarded Ads remain disabled.");
+            console.log(
+              "Branded API store status verified; Billing disabled, Rewarded Ads " +
+                (expectedRewardedAds ? "enabled by explicit validated configuration." : "disabled.")
+            );
           ' "$status_file"
 
       - name: Verify live production game flow
