@@ -15,7 +15,7 @@ const appId = "ca-app-pub-1234567890123456~1234567890";
 function runPreflight({ adsEnabled, billingEnabled = false }) {
   const baseConfig = JSON.parse(fs.readFileSync(path.join(repoRoot, "server", "wrangler.json"), "utf8"));
   const runtimeEnvironment = {
-    GOOGLE_SIGN_IN_WEB_CLIENT_ID: baseConfig.vars.GOOGLE_SIGN_IN_WEB_CLIENT_ID,
+    GOOGLE_SIGN_IN_WEB_CLIENT_ID: "1234567890-exampleclient.apps.googleusercontent.com",
     LUDOPROOF_ACCOUNT_WEB_ORIGIN: ACCOUNT_WEB_ORIGIN,
     GOOGLE_PLAY_BILLING_ENABLED: String(billingEnabled),
     LUDOPROOF_BILLING_ENABLED: String(billingEnabled),
