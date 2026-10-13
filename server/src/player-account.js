@@ -205,6 +205,7 @@ export class PlayerAccount {
     // rotated the token after an earlier read; in that case accept only the exact same
     // request ID + old token + deterministically derived next token.
     this.ctx.storage.transactionSync(() => {
+      this.#requireAccountNotDeleting(accountId);
       const currentRows = [...this.ctx.storage.sql.exec(
         "SELECT refresh_token_hash, previous_refresh_hash, last_refresh_request_id, expires_at, revoked_at FROM account_sessions WHERE session_id = ? LIMIT 1",
         sessionId,
