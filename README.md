@@ -1,10 +1,18 @@
 # Ludo Paws
 
+**Publisher / parent brand:** Rekixo (`https://rekixo.com`)
+
+**Final Android application ID for the first Play Store release:** `com.rekixo.ludopaws`
+
+**Planned game website:** `https://ludopaws.rekixo.com`
+
+**Planned API hostname:** `https://api.ludopaws.rekixo.com` (do not switch clients until Cloudflare custom-domain/TLS and live API smoke tests pass).
+
 **Ludo Paws** is the consumer-facing name of this Android Ludo game. The working store title is **Ludo Paws: Talking Animals** and the product tagline is **Roll. Race. Roar!**
 
 The game is built around **verifiable EntroNex dice outcomes**. Current status: **release candidate / evaluation**. The app and game backend are being hardened for production operation, while EntroNex v4 remains pre-independent-audit.
 
-> Migration compatibility note: the Android package, Cloudflare Worker/Durable Object bindings, persisted storage names, proof/ruleset identifiers, and other protocol-sensitive identifiers intentionally keep their historical `ludoproof` / `LudoProof` names during the Ludo Paws migration. Those identifiers are implementation details, not the consumer brand, and must not be renamed casually because doing so can break compatibility, saved state, deployed infrastructure, or proof verification.
+> Migration compatibility note: the final Android `applicationId` is `com.rekixo.ludopaws`. The Kotlin `namespace` and source package declarations remain `com.ludoproof.game` temporarily as an internal implementation detail; they are not the Play Store application ID. Cloudflare Worker/Durable Object bindings, persisted storage names, proof/ruleset identifiers, and other protocol-sensitive identifiers remain unchanged to protect deployed infrastructure and proof verification.
 
 The repository contains:
 
@@ -63,11 +71,13 @@ Blockade/stack restrictions are not yet part of ruleset v1.
 
 ## Android
 
-Compatibility-sensitive package ID:
+Final Play Store application ID:
 
 ```text
-com.ludoproof.game
+com.rekixo.ludopaws
 ```
+
+The current Kotlin source namespace remains `com.ludoproof.game` in this first safe identity change; the application ID above is the identifier Google Play uses.
 
 The Android MVP now supports:
 
