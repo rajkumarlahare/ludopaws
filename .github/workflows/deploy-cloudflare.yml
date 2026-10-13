@@ -266,7 +266,17 @@ jobs:
               console.error("Worker readiness response is not ready.");
               process.exit(2);
             }
-            console.log("LudoProof production Worker is ready.");
+            // EntroNex v4 is still an evaluation candidate. Readiness is an
+            // operational check, not evidence of independent certification.
+            if (body.entronex === "v4-evaluation" && body.productionClaim !== false) {
+              console.error("EntroNex v4 evaluation readiness must explicitly keep productionClaim=false.");
+              process.exit(3);
+            }
+            if (body.productionClaim === true) {
+              console.error("Worker asserted a production claim before the independent review gate was cleared.");
+              process.exit(4);
+            }
+            console.log("LudoProof Worker is operationally ready; no production-certification claim is asserted.");
           ' "$body"
 
       - name: Verify store status route and feature flags
