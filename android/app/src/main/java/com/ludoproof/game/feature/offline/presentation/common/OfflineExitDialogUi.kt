@@ -6,6 +6,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import com.ludoproof.game.LudoProofTheme
 import com.ludoproof.game.OfflineGameActivity
+import com.ludoproof.game.feature.store.domain.PostWinInterstitialPolicy
 import com.ludoproof.game.ui.dialogs.baseDialog
 import com.ludoproof.game.ui.dialogs.dialogPanel
 import com.ludoproof.game.ui.dialogs.fullWidthParams
@@ -25,15 +26,25 @@ internal fun OfflineGameActivity.requestOfflineExit() {
         exitConfirmationDialog =
             null
 
-        if (
-            snapshot?.status ==
-            "FINISHED"
-        ) {
+        val shouldShowPostWinAd = PostWinInterstitialPolicy.shouldShowOffline(
+            matchStatus = snapshot?.status,
+            winnerPlayerId = snapshot?.winnerPlayerId,
+            humanPlayerId = session.localPlayerId(),
+            isComputerMode = isComputerMode,
+        )
+
+        if (snapshot?.status == "FINISHED") {
             session.clear()
         }
 
-        prepareOfflineUiTransition()
-        finish()
+        val finishExit: () -> Unit = {
+            prepareOfflineUiTransition()
+            finish()
+        }
+        if (shouldShowPostWinAd && showPostWinInterstitialIfReady(finishExit)) {
+            return
+        }
+        finishExit()
         return
     }
 
