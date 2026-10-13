@@ -6,6 +6,7 @@ class FakeAccountSql {
   constructor() {
     this.accountMeta = new Map();
     this.deletedAccounts = new Map();
+    this.deletionClaims = new Map();
     this.wallet = new Map();
     this.sessions = new Map();
     this.ownedCosmetics = new Map();
@@ -20,6 +21,17 @@ class FakeAccountSql {
 
     if (sql.startsWith("SELECT account_id FROM account_deletions WHERE account_id = ?")) {
       return this.deletedAccounts.has(params[0]) ? [{ account_id: params[0] }] : [];
+    }
+    if (sql.startsWith("SELECT account_id FROM account_deletion_claims WHERE account_id = ?")) {
+      return this.deletionClaims.has(params[0]) ? [{ account_id: params[0] }] : [];
+    }
+    if (sql.startsWith("INSERT OR IGNORE INTO account_deletion_claims")) {
+      if (!this.deletionClaims.has(params[0])) this.deletionClaims.set(params[0], { claimed_at: params[1] });
+      return { rowsWritten: 1 };
+    }
+    if (sql.startsWith("DELETE FROM account_deletion_claims WHERE account_id = ?")) {
+      this.deletionClaims.delete(params[0]);
+      return { rowsWritten: 1 };
     }
     if (sql.startsWith("SELECT source_ref_hash FROM wallet_transactions WHERE kind IN")) {
       return [...this.walletTransactions.values()].filter(row => ["PLAY_GEM_PURCHASE", "PLAY_REMOVE_ADS"].includes(row.kind) && row.source_ref_hash).map(row => ({ source_ref_hash: row.source_ref_hash }));
@@ -327,4 +339,51 @@ test("refresh-token retries with the same request ID return the same rotated tok
   assert.equal(retry.replay, true);
   assert.equal(retry.refreshToken, first.refreshToken);
   assert.equal(retry.sessionExpiresAt, first.sessionExpiresAt);
+});
+
+test("deletion preview locks account mutations until the deletion saga commits or retries", async () => {
+  const { account, sql } = makeAccount();
+  const accountId = "0a2c3a83-e0fb-4abc-8ac4-581a6d994fe7";
+  const createdResponse = await post(account, "/session/create", { accountId, displayName: "Delete Me" });
+  assert.equal(createdResponse.status, 200);
+  const session = await createdResponse.json();
+  const before = sql.wallet.get(accountId).balance;
+
+  const preview = await post(account, "/account/delete-preview", {
+    accountId, sessionId: session.sessionId,
+  });
+  assert.equal(preview.status, 200);
+  const previewBody = await preview.json();
+  assert.equal(previewBody.deleted, false);
+  assert.equal(previewBody.deletionPending, true);
+  assert.equal(sql.deletionClaims.has(accountId), true);
+
+  const wallet = await post(account, "/wallet/get", { accountId, sessionId: session.sessionId });
+  assert.equal(wallet.status, 409);
+  assert.equal((await wallet.json()).error, "ACCOUNT_DELETION_IN_PROGRESS");
+
+  const profile = await post(account, "/profile/update", {
+    accountId, sessionId: session.sessionId, displayName: "Changed during deletion",
+  });
+  assert.equal(profile.status, 409);
+  assert.equal((await profile.json()).error, "ACCOUNT_DELETION_IN_PROGRESS");
+  assert.equal(sql.wallet.get(accountId).balance, before);
+  assert.equal(sql.accountMeta.get(accountId).display_name, "Delete Me");
+
+  const normalSessionCheck = await post(account, "/session/check", { accountId, sessionId: session.sessionId });
+  assert.equal(normalSessionCheck.status, 409);
+  assert.equal((await normalSessionCheck.json()).error, "ACCOUNT_DELETION_IN_PROGRESS");
+
+  const deletionRouteSessionCheck = await post(account, "/session/check", {
+    accountId, sessionId: session.sessionId, allowDeletionPending: true,
+  });
+  assert.equal(deletionRouteSessionCheck.status, 200);
+
+  const deletion = await post(account, "/account/delete", {
+    accountId, sessionId: session.sessionId, confirmation: "DELETE_MY_ACCOUNT",
+  });
+  assert.equal(deletion.status, 200);
+  assert.equal((await deletion.json()).deleted, true);
+  assert.equal(sql.deletionClaims.has(accountId), false);
+  assert.equal(sql.deletedAccounts.has(accountId), true);
 });
