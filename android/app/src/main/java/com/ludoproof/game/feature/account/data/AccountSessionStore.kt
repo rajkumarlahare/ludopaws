@@ -23,6 +23,7 @@ data class AccountSession(
     val displayName: String,
     val guestRecoveryEligible: Boolean = false,
     val identityRecoveryPending: Boolean = false,
+    val guestDeletionCredential: String? = null,
 )
 
 class AccountSessionStore(context: Context) {
@@ -59,6 +60,8 @@ class AccountSessionStore(context: Context) {
                     "identityRecoveryPending",
                     prefs.getString(KEY_IDENTITY_RECOVERY_PENDING_ACCOUNT_ID, null) == json.optString("accountId"),
                 ),
+                guestDeletionCredential = json.optString("guestDeletionCredential")
+                    .takeIf { json.optBoolean("guestRecoveryEligible", false) && GUEST_DELETION_CREDENTIAL.matches(it) },
             )
             require(ACCOUNT_ID.matches(value.accountId))
             require(ACCOUNT_ID.matches(value.sessionId))
@@ -90,6 +93,10 @@ class AccountSessionStore(context: Context) {
             .put("accessExpiresAt", session.accessExpiresAt)
             .put("sessionExpiresAt", session.sessionExpiresAt)
             .put("displayName", session.displayName.take(24))
+        if (session.guestRecoveryEligible && session.guestDeletionCredential != null) {
+            require(GUEST_DELETION_CREDENTIAL.matches(session.guestDeletionCredential))
+            json.put("guestDeletionCredential", session.guestDeletionCredential)
+        }
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, secretKey())
         cipher.updateAAD(SESSION_AAD)
@@ -257,6 +264,7 @@ class AccountSessionStore(context: Context) {
         val ACCOUNT_ID = Regex("^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
         val UUID_V4 = ACCOUNT_ID
         val OPAQUE_BILLING_ID = Regex("^[a-f0-9]{64}$")
+        val GUEST_DELETION_CREDENTIAL = Regex("^[a-f0-9]{64}$")
         val REFRESH_TOKEN = Regex("^lpr_[A-Za-z0-9_-]{43}$")
     }
 }
