@@ -597,7 +597,7 @@ test("linked account deletion retries safely after each injected downstream fail
 });
 
 
-function makeGuestDeletionApiEnv(expectedCredentialHash, { directoryDeleteFailures = 0 } = {}) {
+function makeGuestDeletionApiEnv(expectedCredentialHash, { directoryDeleteFailures = 0, serverGeneratedCredential = "12".repeat(32) } = {}) {
   const calls = [];
   let playerDeleted = false;
   let directoryDeleted = false;
@@ -611,6 +611,13 @@ function makeGuestDeletionApiEnv(expectedCredentialHash, { directoryDeleteFailur
           const path = new URL(request.url).pathname;
           const body = await request.json();
           calls.push("player:" + path);
+          if (path === "/session/check") {
+            return Response.json({
+              ok: true,
+              accountId,
+              profile: { accountId, displayName: "Guest Player" },
+            });
+          }
           if (path === "/account/delete-preview") {
             assert.equal(body.guestRecoveryVerified, true);
             return Response.json({ ok: true, deleted: playerDeleted, purchaseLedgerIds: [] });
@@ -636,6 +643,11 @@ function makeGuestDeletionApiEnv(expectedCredentialHash, { directoryDeleteFailur
           const path = new URL(request.url).pathname;
           const body = await request.json();
           calls.push("directory:" + path);
+          if (path === "/guest-deletion/register") {
+            assert.equal(body.accountId, ACCOUNT_A);
+            assert.equal(Object.hasOwn(body, "credentialHash"), false, "client must not choose the deletion code or its hash");
+            return Response.json({ ok: true, ready: true, credential: serverGeneratedCredential });
+          }
           if (path === "/guest-deletion/claim") {
             assert.match(body.credentialHash, /^[a-f0-9]{64}$/, "only a credential hash should be sent to AccountDirectory");
             if (body.credentialHash !== expectedCredentialHash) {
@@ -733,4 +745,32 @@ test("guest delete-only code completes uninstalled guest deletion and retries af
   assert.deepEqual(fixture.state(), {
     playerDeleted: true, directoryDeleted: true, remainingDirectoryDeleteFailures: 0,
   });
+});
+
+test("guest deletion code endpoint returns a server-generated code to an active session only", async () => {
+  const code = "ab".repeat(32);
+  const hash = await sha256Hex("ludoproof:guest-deletion-credential:v1:" + code);
+  const fixture = makeGuestDeletionApiEnv(hash, { serverGeneratedCredential: code });
+  const unauthorized = await accountWorker.fetch(
+    new Request("https://api.example.test/api/account/guest/deletion-code", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    }),
+    fixture.env,
+  );
+  assert.equal(unauthorized.status, 401);
+  assert.equal((await unauthorized.json()).error, "AUTH_REQUIRED");
+
+  const token = await issueAccessToken(fixture.env, ACCOUNT_A, SESSION_A, Date.now());
+  const response = await accountWorker.fetch(
+    new Request("https://api.example.test/api/account/guest/deletion-code", {
+      method: "POST",
+      headers: { authorization: "Bearer " + token, "content-type": "application/json" },
+      body: JSON.stringify({}),
+    }),
+    fixture.env,
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { ok: true, ready: true, credential: code });
 });
