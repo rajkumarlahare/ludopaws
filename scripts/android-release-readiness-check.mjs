@@ -160,7 +160,7 @@ requireText(
   "PostWinInterstitialExitGate.kt",
   interstitialExitGate,
   "onAdDismissed = onAdDismissed",
-  "the app must retain the win result after the ad is dismissed.",
+  "the exit gate must pass the ad-dismissed callback to the activity.",
 );
 requireText(
   "PostWinInterstitialExitGate.kt",
@@ -206,6 +206,18 @@ requireText(
   onlineMain,
   "requestRemoteExitAfterWinInterstitial",
   "remote-game back actions must route through the win-only placement policy.",
+);
+requirePattern(
+  "OfflineGameActivity.kt",
+  offlineActivity,
+  /onAdDismissed\s*=\s*\{\s*postWinInterstitialShownForMatchId = matchId\s*onSkipAd\(\)\s*\}/,
+  "closing the interstitial after a local win must automatically navigate home.",
+);
+requirePattern(
+  "MainActivity.kt",
+  onlineMain,
+  /onAdDismissed\s*=\s*\{\s*postWinInterstitialShownForMatchId = matchId\s*onSkipAd\(\)\s*\}/,
+  "closing the interstitial after a remote win must automatically navigate home.",
 );
 
 for (const policyToken of [
