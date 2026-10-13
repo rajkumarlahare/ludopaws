@@ -63,7 +63,7 @@ function listSourceFiles(directory) {
   for (const entry of fs.readdirSync(path.join(repoRoot, directory), { withFileTypes: true })) {
     const relative = path.join(directory, entry.name);
     if (entry.isDirectory()) files.push(...listSourceFiles(relative));
-    else if (entry.isFile() && /\\.(kt|java)$/.test(entry.name)) files.push(relative);
+    else if (entry.isFile() && /\.(kt|java)$/.test(entry.name)) files.push(relative);
   }
   return files;
 }
@@ -86,7 +86,7 @@ if (androidSourceFiles.length === 0) {
 }
 for (const relativePath of androidSourceFiles) {
   const source = read(relativePath);
-  if (!/^package com\\.rekixo\\.ludopaws(?:\\.|$)/m.test(source)) {
+  if (!/^package com\.rekixo\.ludopaws(?:\.|$)/m.test(source)) {
     failures.push(`${relativePath}: Kotlin/Java package declaration must be under com.rekixo.ludopaws.`);
   }
 }
