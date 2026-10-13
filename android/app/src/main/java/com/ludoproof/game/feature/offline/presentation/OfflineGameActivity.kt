@@ -17,6 +17,7 @@ import androidx.activity.OnBackPressedCallback
 import com.ludoproof.game.feature.characters.data.local.CharacterSelectionStore
 import com.ludoproof.game.feature.characters.domain.reaction.LudoPawsFeedbackLedger
 import com.ludoproof.game.feature.offline.data.local.OfflineCharacterSetupStore
+import com.ludoproof.game.feature.store.data.ads.PostWinInterstitialAdController
 import com.ludoproof.game.ui.offline.common.*
 import com.ludoproof.game.ui.offline.gameplay.*
 import com.ludoproof.game.ui.offline.setup.*
@@ -117,6 +118,7 @@ class OfflineGameActivity : ComponentActivity() {
     internal var quickReactionLastShownAtMs: Long? = null
     internal lateinit var resultPanel: FrameLayout
     internal lateinit var resultTitleText: TextView
+    private var postWinInterstitialAd: PostWinInterstitialAdController? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -143,7 +145,20 @@ class OfflineGameActivity : ComponentActivity() {
         } else {
             showSetup()
         }
+        preparePostWinInterstitialAd()
     }
+
+    internal fun preparePostWinInterstitialAd() {
+        if (!BuildConfig.LUDOPROOF_INTERSTITIAL_ADS_ENABLED || postWinInterstitialAd != null) return
+        postWinInterstitialAd = PostWinInterstitialAdController(
+            activity = this,
+            enabled = true,
+            adUnitId = BuildConfig.ADMOB_INTERSTITIAL_AD_UNIT_ID,
+        ).also { it.prepare() }
+    }
+
+    internal fun showPostWinInterstitialIfReady(onFinished: () -> Unit): Boolean =
+        postWinInterstitialAd?.showIfReady(onFinished) ?: false
 
     internal fun prepareOfflineUiTransition() {
         handler.removeCallbacksAndMessages(null)
@@ -208,6 +223,8 @@ class OfflineGameActivity : ComponentActivity() {
             ?.dismiss()
         turnHandoffDialog =
             null
+        postWinInterstitialAd?.close()
+        postWinInterstitialAd = null
         prepareOfflineUiTransition()
         super.onDestroy()
     }
