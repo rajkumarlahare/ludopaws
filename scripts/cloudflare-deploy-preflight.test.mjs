@@ -1,0 +1,71 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { ACCOUNT_WEB_ORIGIN, buildCloudflareRuntimeVars } from "./cloudflare-runtime-config.mjs";
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const preflightScript = path.join(repoRoot, "scripts", "cloudflare-deploy-preflight.mjs");
+const adUnit = "ca-app-pub-1234567890123456/1234567890";
+const appId = "ca-app-pub-1234567890123456~1234567890";
+
+function runPreflight({ adsEnabled, billingEnabled = false }) {
+  const baseConfig = JSON.parse(fs.readFileSync(path.join(repoRoot, "server", "wrangler.json"), "utf8"));
+  const runtimeEnvironment = {
+    GOOGLE_SIGN_IN_WEB_CLIENT_ID: baseConfig.vars.GOOGLE_SIGN_IN_WEB_CLIENT_ID,
+    LUDOPROOF_ACCOUNT_WEB_ORIGIN: ACCOUNT_WEB_ORIGIN,
+    GOOGLE_PLAY_BILLING_ENABLED: String(billingEnabled),
+    LUDOPROOF_BILLING_ENABLED: String(billingEnabled),
+    LUDOPROOF_ADMOB_SSV_ENABLED: String(adsEnabled),
+    LUDOPROOF_ADS_ENABLED: String(adsEnabled),
+    LUDOPROOF_ADMOB_REWARD_ITEM: "gems",
+    ADMOB_APP_ID: appId,
+    ADMOB_REWARDED_AD_UNIT_ID: adsEnabled ? adUnit : "",
+    LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID: adsEnabled ? adUnit : "",
+    GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL: billingEnabled
+      ? "ludopaws-test@ludopaws-test.iam.gserviceaccount.com"
+      : "",
+  };
+  const preparedConfig = {
+    ...baseConfig,
+    vars: buildCloudflareRuntimeVars(baseConfig.vars ?? {}, runtimeEnvironment),
+  };
+  const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "ludopaws-cloudflare-preflight-"));
+  try {
+    fs.mkdirSync(path.join(temporaryRoot, "server"), { recursive: true });
+    fs.writeFileSync(
+      path.join(temporaryRoot, "server", "wrangler.json"),
+      JSON.stringify(preparedConfig, null, 2),
+      "utf8",
+    );
+    return spawnSync(process.execPath, [preflightScript], {
+      cwd: temporaryRoot,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        CLOUDFLARE_API_TOKEN: "test-token-not-used-by-preflight",
+        CLOUDFLARE_ACCOUNT_ID: "8f31060fbcfee2b3e9309138cad7f12f",
+        ENTRONEX_TOKEN_MODE: "preserve",
+        ENTRONEX_API_TOKEN: "",
+        LUDOPROOF_SESSION_HMAC_KEY: "",
+      },
+    });
+  } finally {
+    fs.rmSync(temporaryRoot, { recursive: true, force: true });
+  }
+}
+
+test("production preflight permits explicitly enabled, validated AdMob SSV while Billing stays off", () => {
+  const result = runPreflight({ adsEnabled: true, billingEnabled: false });
+  assert.equal(result.status, 0, "stdout: " + result.stdout + " stderr: " + result.stderr);
+  assert.match(result.stdout, /Cloudflare production deploy preflight passed/);
+});
+
+test("production preflight still blocks Google Play Billing", () => {
+  const result = runPreflight({ adsEnabled: true, billingEnabled: true });
+  assert.notEqual(result.status, 0, "stdout: " + result.stdout + " stderr: " + result.stderr);
+  assert.match(result.stderr, /keeps Google Play Billing disabled/);
+});
