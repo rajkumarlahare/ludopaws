@@ -5,8 +5,8 @@ import android.util.Log
 import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.FullScreenContentCallback
-import com.google.android.gms.ads.InterstitialAd
-import com.google.android.gms.ads.InterstitialAdLoadCallback
+import com.google.android.gms.ads.interstitial.InterstitialAd
+import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.MobileAds
 import com.google.android.ump.ConsentInformation
@@ -66,6 +66,9 @@ internal class PostWinInterstitialAdController(
      * Returns true only when an already-loaded ad was shown. The caller should finish
      * immediately when false; there is no wait screen or delayed navigation for ad loading.
      */
+    fun isReady(): Boolean =
+        enabled && !closed && !showConsumed && !showing && interstitialAd != null
+
     fun showIfReady(onFinished: () -> Unit): Boolean {
         if (!enabled || closed || showConsumed || showing) return false
         val ad = interstitialAd ?: return false
