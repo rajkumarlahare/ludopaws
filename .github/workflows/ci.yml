@@ -32,6 +32,9 @@ jobs:
       - name: Cloudflare production runtime config tests
         working-directory: .
         run: node --test scripts/cloudflare-runtime-config.test.mjs
+      - name: Cloudflare production deploy preflight tests
+        working-directory: .
+        run: node --test scripts/cloudflare-deploy-preflight.test.mjs
       - name: Account deletion page source checks
         working-directory: .
         run: node scripts/check-account-deletion-pages.mjs
