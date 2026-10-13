@@ -130,11 +130,16 @@ internal fun MainActivity.applyResponse(
     )
 
     boardView.bind(state, playerId)
-    OnlineLudoPawsPresentation.render(
-        activity = this,
-        previous = previousState,
-        current = state,
-    )
+    val presentationOverride = onlinePresentationRendererOverrideForTests
+    if (presentationOverride != null) {
+        presentationOverride(previousState, state)
+    } else {
+        OnlineLudoPawsPresentation.render(
+            activity = this,
+            previous = previousState,
+            current = state,
+        )
+    }
 
     matchInfoText.text =
         buildString {
