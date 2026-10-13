@@ -12,6 +12,7 @@ class FakeSql {
     this.guestDeletionCredentials = new Map();
     this.guestDeletionClaims = new Map();
     this.deletedGuestDeletionCredentials = new Map();
+    this.accountDeletionClaims = new Map();
   }
 
   exec(statement, ...params) {
@@ -22,6 +23,30 @@ class FakeSql {
     }
     if (sql.startsWith("SELECT credential_hash FROM deleted_guest_deletion_credentials")) {
       return this.deletedGuestDeletionCredentials.has(params[0]) ? [{ credential_hash: params[0] }] : [];
+    }
+    if (sql.startsWith("SELECT account_id FROM account_deletion_claims WHERE account_id = ?")) {
+      return this.accountDeletionClaims.has(params[0]) ? [{ account_id: params[0] }] : [];
+    }
+    if (sql.startsWith("SELECT source, credential_hash FROM account_deletion_claims WHERE account_id = ?")) {
+      const row = this.accountDeletionClaims.get(params[0]);
+      return row ? [{ source: row.source, credential_hash: row.credentialHash }] : [];
+    }
+    if (sql.startsWith("INSERT INTO account_deletion_claims")) {
+      const [accountId, source, credentialHash, claimedAt] = params;
+      this.accountDeletionClaims.set(accountId, { source, credentialHash, claimedAt });
+      return { rowsWritten: 1 };
+    }
+    if (sql.startsWith("INSERT OR IGNORE INTO account_deletion_claims")) {
+      if (!this.accountDeletionClaims.has(params[0])) {
+        this.accountDeletionClaims.set(params[0], {
+          source: "GUEST_CODE", credentialHash: params[1], claimedAt: params[2],
+        });
+      }
+      return { rowsWritten: 1 };
+    }
+    if (sql.startsWith("DELETE FROM account_deletion_claims WHERE account_id = ?")) {
+      this.accountDeletionClaims.delete(params[0]);
+      return { rowsWritten: 1 };
     }
     if (sql.startsWith("SELECT account_kind FROM account_registry WHERE account_id = ?")) {
       const row = this.accounts.get(params[0]);
@@ -266,4 +291,72 @@ test("guest deletion codes are unavailable for Google-linked accounts", async ()
   assert.equal(response.status, 409);
   assert.equal((await response.json()).error, "GUEST_DELETION_CODE_NOT_AVAILABLE");
   assert.equal(sql.guestDeletionCredentials.size, 0);
+});
+
+test("AccountDirectory prepare locks identity changes and is safely idempotent", async () => {
+  const { directory, sql } = makeDirectory();
+  const requestId = "924e7f90-68e5-4c30-8fb8-c5a7b0f0f811";
+  const createdResponse = await guestRequest(directory, requestId);
+  assert.equal(createdResponse.status, 200);
+  const created = await createdResponse.json();
+
+  const prepare = () => directory.fetch(new Request("https://account-directory/account/delete-prepare", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ accountId: created.accountId, source: "SESSION" }),
+  }));
+  const first = await prepare();
+  assert.equal(first.status, 200);
+  assert.deepEqual(await first.json(), { ok: true, claimed: true, replay: false });
+  assert.deepEqual(sql.accountDeletionClaims.get(created.accountId), {
+    source: "SESSION", credentialHash: null, claimedAt: sql.accountDeletionClaims.get(created.accountId).claimedAt,
+  });
+
+  const repeat = await prepare();
+  assert.equal(repeat.status, 200);
+  assert.deepEqual(await repeat.json(), { ok: true, claimed: true, replay: true });
+
+  const createCode = await directory.fetch(new Request("https://account-directory/guest-deletion/register", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ accountId: created.accountId, credentialHash: "12".repeat(32) }),
+  }));
+  assert.equal(createCode.status, 409);
+  assert.equal((await createCode.json()).error, "ACCOUNT_DELETION_IN_PROGRESS");
+
+  const linking = await directory.fetch(new Request("https://account-directory/google/link", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ accountId: created.accountId, subjectHash: "34".repeat(32) }),
+  }));
+  assert.equal(linking.status, 409);
+  assert.equal((await linking.json()).error, "ACCOUNT_DELETION_IN_PROGRESS");
+
+  const externalLink = await directory.fetch(new Request("https://account-directory/identity/link", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      accountId: created.accountId,
+      identityType: "friend",
+      externalId: "LPF-ABCD-EFGH-IJKL",
+    }),
+  }));
+  assert.equal(externalLink.status, 409);
+  assert.equal((await externalLink.json()).error, "ACCOUNT_DELETION_IN_PROGRESS");
+
+  const differentSource = await directory.fetch(new Request("https://account-directory/account/delete-prepare", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ accountId: created.accountId, source: "GUEST_CODE", credentialHash: "56".repeat(32) }),
+  }));
+  assert.equal(differentSource.status, 409);
+  assert.equal((await differentSource.json()).error, "ACCOUNT_DELETION_IN_PROGRESS");
+
+  const deleted = await directory.fetch(new Request("https://account-directory/account/delete", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ accountId: created.accountId }),
+  }));
+  assert.equal(deleted.status, 200);
+  assert.equal(sql.accountDeletionClaims.has(created.accountId), false);
 });
