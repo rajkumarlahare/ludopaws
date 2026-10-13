@@ -86,9 +86,8 @@ class FakeSql {
     }
     if (sql.startsWith("INSERT INTO guest_deletion_credentials")) {
       const [credentialHash, accountId, createdAt] = params;
-      for (const [existingHash, value] of this.guestDeletionCredentials.entries()) {
-        if (value.accountId === accountId || existingHash === credentialHash) this.guestDeletionCredentials.delete(existingHash);
-      }
+      const existing = this.guestDeletionCredentials.get(credentialHash);
+      if (existing && existing.accountId !== accountId) throw new Error("UNIQUE constraint failed: guest_deletion_credentials.credential_hash");
       this.guestDeletionCredentials.set(credentialHash, { accountId, createdAt });
       return { rowsWritten: 1 };
     }
@@ -236,6 +235,19 @@ test("guest deletion codes are stored as hashes, block Google linking after clai
   assert.equal(sql.guestDeletionCredentials.has(credentialHash), true);
   assert.equal(sql.guestDeletionCredentials.has(credential), false);
 
+  const secondRegistration = await directory.fetch(new Request("https://account-directory/guest-deletion/register", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ accountId: created.accountId }),
+  }));
+  assert.equal(secondRegistration.status, 200);
+  const secondCredential = (await secondRegistration.json()).credential;
+  assert.match(secondCredential, /^[a-f0-9]{64}$/);
+  assert.notEqual(secondCredential, credential);
+  const secondCredentialHash = await sha256Hex("ludoproof:guest-deletion-credential:v1:" + secondCredential);
+  assert.equal(sql.guestDeletionCredentials.has(credentialHash), true, "registering a replacement-device code must not revoke the previously saved code");
+  assert.equal(sql.guestDeletionCredentials.has(secondCredentialHash), true);
+
   const claimedResponse = await directory.fetch(new Request("https://account-directory/guest-deletion/claim", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -267,8 +279,10 @@ test("guest deletion codes are stored as hashes, block Google linking after clai
   }));
   assert.equal(removed.status, 200);
   assert.equal(sql.guestDeletionCredentials.has(credentialHash), false);
+  assert.equal(sql.guestDeletionCredentials.has(secondCredentialHash), false);
   assert.equal(sql.guestDeletionClaims.has(created.accountId), false);
   assert.equal(sql.deletedGuestDeletionCredentials.has(credentialHash), true);
+  assert.equal(sql.deletedGuestDeletionCredentials.has(secondCredentialHash), true);
 
   const replay = await directory.fetch(new Request("https://account-directory/guest-deletion/claim", {
     method: "POST",
