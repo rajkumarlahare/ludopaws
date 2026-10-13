@@ -7,7 +7,6 @@ import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
-import java.security.SecureRandom
 import java.util.UUID
 
 class AccountRepository(context: Context) {
@@ -236,7 +235,7 @@ class AccountRepository(context: Context) {
 
     @Synchronized
     fun ensureGuestDeletionCredential(): String {
-        var session = requireSession()
+        val session = requireSession()
         if (!session.guestRecoveryEligible) {
             throw AccountApiException(
                 409,
@@ -244,32 +243,34 @@ class AccountRepository(context: Context) {
                 "A delete-only code is available only while this account is a guest. Use Google sign-in for a linked account.",
             )
         }
-        var credential = session.guestDeletionCredential
-        if (credential == null) {
-            val bytes = ByteArray(32)
-            SecureRandom().nextBytes(bytes)
-            val alphabet = "0123456789abcdef"
-            credential = buildString(bytes.size * 2) {
-                for (byte in bytes) {
-                    val value = byte.toInt() and 0xff
-                    append(alphabet[value ushr 4])
-                    append(alphabet[value and 0x0f])
-                }
-            }
-            sessions.save(session.copy(guestDeletionCredential = credential))
-        }
-        // Re-register on every open: this makes a retry idempotent if the previous response
-        // was lost and ensures the code was not only saved locally.
-        session = requireSession()
-        if (!session.guestRecoveryEligible) {
-            throw AccountApiException(409, "GUEST_DELETION_CODE_NOT_AVAILABLE", "this account is no longer a guest account")
-        }
-        request(
+
+        session.guestDeletionCredential?.let { return it }
+
+        // AccountDirectory generates the 256-bit secret server-side and stores only its hash.
+        // Save the returned plaintext only inside the encrypted Android Keystore session.
+        val response = request(
             "POST",
             "/api/account/guest/deletion-code",
-            JSONObject().put("credential", credential),
+            JSONObject(),
             session.accessToken,
         )
+        val credential = response.optString("credential")
+        if (!Regex("^[a-f0-9]{64}$").matches(credential)) {
+            throw AccountApiException(
+                503,
+                "GUEST_DELETION_CODE_RESPONSE_INVALID",
+                "The account service did not return a valid guest deletion code.",
+            )
+        }
+        val latest = requireSession()
+        if (latest.accountId != session.accountId || !latest.guestRecoveryEligible) {
+            throw AccountApiException(
+                409,
+                "GUEST_DELETION_CODE_NOT_AVAILABLE",
+                "This account is no longer an eligible guest account.",
+            )
+        }
+        sessions.save(latest.copy(guestDeletionCredential = credential))
         return credential
     }
 
