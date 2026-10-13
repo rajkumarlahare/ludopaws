@@ -1,4 +1,5 @@
 const KEY_URL = "https://www.gstatic.com/admob/reward/verifier-keys.json";
+const TEST_KEY_URL = "https://www.gstatic.com/admob/reward/verifier-keys-test.json";
 const keyCache = new WeakMap();
 const MAX_KEY_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -35,22 +36,6 @@ export async function verifyAdMobSsvRequest(request, env, fetchImpl = fetch, now
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(accountId)) {
     throw ssvError(400, "SSV_ACCOUNT_INVALID", "reward account is invalid");
   }
-  const configuredAdUnit = String(env?.LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID ?? "").trim();
-  // The SDK is configured with the full ca-app-pub-.../<numeric-unit-id> value,
-  // while AdMob SSV callbacks report the numeric ad_unit identifier.
-  // Accept the exact configured value as well for compatibility, but reject
-  // every other unit identifier before verifying a reward.
-  const configuredAdUnitId = configuredAdUnit.split("/").at(-1);
-  if (!configuredAdUnit || ![configuredAdUnit, configuredAdUnitId].includes(adUnit)) {
-    // Log only non-sensitive identifiers needed to diagnose AdMob's generic HTTP 403.
-    // Never log user_id, custom_data, signature, or the complete callback URL.
-    console.warn("admob-ssv-rejected", {
-      code: "SSV_AD_UNIT_INVALID",
-      receivedAdUnit: adUnit,
-      configuredAdUnitId,
-    });
-    throw ssvError(403, "SSV_AD_UNIT_INVALID", "reward callback came from an unexpected ad unit");
-  }
   const configuredRewardItem = String(env?.LUDOPROOF_ADMOB_REWARD_ITEM ?? "gems");
   if (configuredRewardItem !== "gems" || rewardAmount !== "5" || rewardItem !== "gems") {
     // These values are non-sensitive; omit the account identifier and callback payload.
@@ -79,12 +64,58 @@ export async function verifyAdMobSsvRequest(request, env, fetchImpl = fetch, now
     throw ssvError(400, "SSV_CUSTOM_DATA_INVALID", "reward callback data is invalid");
   }
 
-  const keys = await getKeys(fetchImpl, nowMs, false);
-  let keyInfo = keys.find((key) => Number(key.keyId) === keyId);
-  if (!keyInfo) keyInfo = (await getKeys(fetchImpl, nowMs, true)).find((key) => Number(key.keyId) === keyId);
+  let isTest = false;
+  let keyInfo = (await getKeys(fetchImpl, nowMs, false, KEY_URL)).find((key) => Number(key.keyId) === keyId);
+  if (!keyInfo) {
+    keyInfo = (await getKeys(fetchImpl, nowMs, false, TEST_KEY_URL)).find((key) => Number(key.keyId) === keyId);
+    isTest = Boolean(keyInfo);
+  }
+  if (!keyInfo) {
+    keyInfo = (await getKeys(fetchImpl, nowMs, true, KEY_URL)).find((key) => Number(key.keyId) === keyId);
+    if (!keyInfo) {
+      keyInfo = (await getKeys(fetchImpl, nowMs, true, TEST_KEY_URL)).find((key) => Number(key.keyId) === keyId);
+      isTest = Boolean(keyInfo);
+    }
+  }
   if (!keyInfo || typeof keyInfo.base64 !== "string") throw ssvError(401, "SSV_KEY_UNKNOWN", "reward signing key was not recognized");
 
-  let verified = false;
+  const verified = await verifySignature(keyInfo, signature, signedContent);
+  if (!verified) throw ssvError(401, "SSV_SIGNATURE_INVALID", "reward callback signature is invalid");
+
+  if (!isTest) {
+    const configuredAdUnit = String(env?.LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID ?? "").trim();
+    // AdMob sends the numeric ad unit identifier, while the SDK setting includes
+    // the publisher prefix. Only production-signed callbacks reach the wallet.
+    const configuredAdUnitId = configuredAdUnit.split("/").at(-1);
+    if (!configuredAdUnit || ![configuredAdUnit, configuredAdUnitId].includes(adUnit)) {
+      console.warn("admob-ssv-rejected", { code: "SSV_AD_UNIT_INVALID", receivedAdUnit: adUnit, configuredAdUnitId });
+      throw ssvError(403, "SSV_AD_UNIT_INVALID", "reward callback came from an unexpected ad unit");
+    }
+  }
+
+  return { accountId, transactionId, kind: customData.kind, cosmeticId: customData.cosmeticId ?? null, timestamp: timestampMs, ...(isTest ? { isTest: true } : {}) };
+}
+
+async function getKeys(fetchImpl, nowMs, refresh, keyUrl = KEY_URL) {
+  let cache = keyCache.get(fetchImpl);
+  if (!cache) { cache = new Map(); keyCache.set(fetchImpl, cache); }
+  const cached = cache.get(keyUrl);
+  if (!refresh && cached && cached.expiresAt > nowMs) return cached.keys;
+  let response;
+  try { response = await fetchImpl(keyUrl, { method: "GET", headers: { accept: "application/json" }, signal: AbortSignal.timeout(8000) }); }
+  catch { throw ssvError(503, "SSV_KEYS_UNAVAILABLE", "reward verification keys are temporarily unavailable"); }
+  if (!response.ok) throw ssvError(503, "SSV_KEYS_UNAVAILABLE", "reward verification keys are temporarily unavailable");
+  let data;
+  try { data = await response.json(); }
+  catch { throw ssvError(503, "SSV_KEYS_INVALID", "reward verification keys are invalid"); }
+  if (!Array.isArray(data?.keys) || data.keys.length < 1 || data.keys.length > 32) throw ssvError(503, "SSV_KEYS_INVALID", "reward verification keys are invalid");
+  const match = (response.headers.get("cache-control") ?? "").match(/(?:^|,)\s*max-age=(\d+)/i);
+  const requested = match ? Number(match[1]) * 1000 : 60 * 60 * 1000;
+  cache.set(keyUrl, { keys: data.keys, expiresAt: nowMs + Math.min(MAX_KEY_TTL_MS, Math.max(60_000, requested)) });
+  return data.keys;
+}
+
+async function verifySignature(keyInfo, signature, signedContent) {
   try {
     const keyBytes = decodeBase64(keyInfo.base64);
     let publicKey, partLength;
@@ -96,28 +127,8 @@ export async function verifyAdMobSsvRequest(request, env, fetchImpl = fetch, now
       partLength = 48;
     }
     const rawSignature = derEcdsaToRaw(decodeSignature(signature), partLength);
-    verified = await crypto.subtle.verify({ name: "ECDSA", hash: "SHA-256" }, publicKey, rawSignature, new TextEncoder().encode(signedContent));
-  } catch { verified = false; }
-  if (!verified) throw ssvError(401, "SSV_SIGNATURE_INVALID", "reward callback signature is invalid");
-
-  return { accountId, transactionId, kind: customData.kind, cosmeticId: customData.cosmeticId ?? null, timestamp: timestampMs };
-}
-
-async function getKeys(fetchImpl, nowMs, refresh) {
-  const cached = keyCache.get(fetchImpl);
-  if (!refresh && cached && cached.expiresAt > nowMs) return cached.keys;
-  let response;
-  try { response = await fetchImpl(KEY_URL, { method: "GET", headers: { accept: "application/json" }, signal: AbortSignal.timeout(8000) }); }
-  catch { throw ssvError(503, "SSV_KEYS_UNAVAILABLE", "reward verification keys are temporarily unavailable"); }
-  if (!response.ok) throw ssvError(503, "SSV_KEYS_UNAVAILABLE", "reward verification keys are temporarily unavailable");
-  let data;
-  try { data = await response.json(); }
-  catch { throw ssvError(503, "SSV_KEYS_INVALID", "reward verification keys are invalid"); }
-  if (!Array.isArray(data?.keys) || data.keys.length < 1 || data.keys.length > 32) throw ssvError(503, "SSV_KEYS_INVALID", "reward verification keys are invalid");
-  const match = (response.headers.get("cache-control") ?? "").match(/(?:^|,)\s*max-age=(\d+)/i);
-  const requested = match ? Number(match[1]) * 1000 : 60 * 60 * 1000;
-  keyCache.set(fetchImpl, { keys: data.keys, expiresAt: nowMs + Math.min(MAX_KEY_TTL_MS, Math.max(60_000, requested)) });
-  return data.keys;
+    return await crypto.subtle.verify({ name: "ECDSA", hash: "SHA-256" }, publicKey, rawSignature, new TextEncoder().encode(signedContent));
+  } catch { return false; }
 }
 
 function derEcdsaToRaw(der, partLength) {

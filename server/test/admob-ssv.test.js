@@ -80,3 +80,30 @@ test("AdMob SSV refuses callback from a different configured ad unit", async () 
     (error) => error.code === "SSV_AD_UNIT_INVALID",
   );
 });
+
+
+test("AdMob signed verification test accepts Google's test key and never treats it as a production reward", async () => {
+  const productionPair = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
+  const testPair = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
+  const productionSpki = await crypto.subtle.exportKey("spki", productionPair.publicKey);
+  const testSpki = await crypto.subtle.exportKey("spki", testPair.publicKey);
+  const fetchImpl = async (url) => {
+    const isTest = String(url).includes("verifier-keys-test.json");
+    return Response.json({
+      keys: [{ keyId: isTest ? 131 : 999, base64: base64(isTest ? testSpki : productionSpki) }],
+    }, { headers: { "cache-control": "public, max-age=3600" } });
+  };
+  const now = Date.now();
+  const request = await signedRequest({
+    privateKey: testPair.privateKey, keyId: 131,
+    accountId: "0a2c3a83-e0fb-4abc-8ac4-581a6d994fe7",
+    adUnit: "1234567890", customData: JSON.stringify({ kind: "gems" }), timestamp: now,
+    transactionId: "0123456789abcdef0123456789abcdef",
+  });
+  const result = await verifyAdMobSsvRequest(
+    request, { LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID: "ca-app-pub-123/456" }, fetchImpl, now,
+  );
+  assert.equal(result.isTest, true);
+  assert.equal(result.kind, "gems");
+  assert.equal(result.transactionId, "0123456789abcdef0123456789abcdef");
+});
