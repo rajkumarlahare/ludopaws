@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.Application
 import android.os.Bundle
 import com.google.android.gms.games.PlayGamesSdk
+import com.rekixo.ludopaws.core.audio.UiClickSoundInstaller
 import com.rekixo.ludopaws.feature.characters.data.local.CharacterSelectionStore
 import com.rekixo.ludopaws.feature.account.data.AccountRepository
 import java.util.concurrent.Executors
@@ -45,6 +46,8 @@ class LudoProofApplication :
         // OEMs may restore system bars after app switches, transient overlays,
         // or window-focus changes. Reassert the game presentation on resume.
         ImmersiveGameWindow.restore(activity)
+        // Apply the shared click SFX to this screen's interactive UI controls.
+        UiClickSoundInstaller.install(activity)
 
         resumedActivities += 1
         if (resumedActivities == 1) {
