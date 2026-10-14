@@ -111,11 +111,8 @@ object StoreCatalog {
             ),
         )
 
-    val playProductIds:
-        List<String> =
-        products.map {
-            it.productId
-        }
+    // Play billing is intentionally limited to one-time INAPP products.
+    val playProductIds: List<String> = products.map { it.productId }
 
     fun find(
         productId: String,
