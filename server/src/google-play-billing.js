@@ -91,7 +91,7 @@ export function googlePlaySubscriptionsEnabled(env) {
     typeof env?.GOOGLE_PLAY_RTDN_AUDIENCE === "string" &&
     /^https:\/\//.test(env.GOOGLE_PLAY_RTDN_AUDIENCE) &&
     typeof env?.GOOGLE_PLAY_RTDN_EMAIL === "string" &&
-    env.GOOGLE_PLAY_RTDN_EMAIL.includes("@") && !env.GOOGLE_PLAY_RTDN_EMAIL.includes(" ")
+    /^[^@\s]+@[^@\s]+\.iam\.gserviceaccount\.com$/.test(env.GOOGLE_PLAY_RTDN_EMAIL)
   );
 }
 
@@ -184,9 +184,22 @@ export async function verifyAndSyncGooglePlaySubscription(
   if (!SUBSCRIPTION_STATES.has(state) || state === "SUBSCRIPTION_STATE_UNSPECIFIED") {
     throw httpError(502, "PLAY_SUBSCRIPTION_STATE_INVALID", "Google Play returned an unrecognized subscription state");
   }
-  const expiryTimeMs = Date.parse(String(lineItem?.expiryTime ?? ""));
-  if (!Number.isFinite(expiryTimeMs) || expiryTimeMs <= 0) {
-    throw httpError(502, "PLAY_SUBSCRIPTION_EXPIRY_INVALID", "Google Play returned an invalid subscription expiry time");
+  const parsedExpiryTimeMs = Date.parse(String(lineItem?.expiryTime ?? ""));
+  const needsKnownExpiry = [
+    "SUBSCRIPTION_STATE_ACTIVE",
+    "SUBSCRIPTION_STATE_IN_GRACE_PERIOD",
+    "SUBSCRIPTION_STATE_CANCELED",
+  ].includes(state);
+  const expiryTimeMs = Number.isFinite(parsedExpiryTimeMs) && parsedExpiryTimeMs > 0
+    ? parsedExpiryTimeMs
+    : needsKnownExpiry && priorSubscription?.purchaseTokenHash === purchaseTokenHash &&
+        Number.isSafeInteger(priorSubscription?.expiryTimeMs) && priorSubscription.expiryTimeMs > 0
+      ? priorSubscription.expiryTimeMs
+      : needsKnownExpiry
+        ? 0
+        : nowMs;
+  if (expiryTimeMs <= 0) {
+    throw httpError(502, "PLAY_SUBSCRIPTION_EXPIRY_INVALID", "Google Play did not provide a reliable subscription expiry time");
   }
   const entitlementState =
     ["SUBSCRIPTION_STATE_ACTIVE", "SUBSCRIPTION_STATE_IN_GRACE_PERIOD", "SUBSCRIPTION_STATE_CANCELED"].includes(state) &&
