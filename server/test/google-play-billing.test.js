@@ -477,6 +477,7 @@ function mockSubscriptionApi({ accountId, state = "SUBSCRIPTION_STATE_ACTIVE", e
         externalAccountIdentifiers: { obfuscatedExternalAccountId: accountId },
         lineItems: [{
           productId: "paws_plus",
+          offerDetails: { basePlanId: "monthly-auto" },
           expiryTime: new Date(expiryTime).toISOString(),
           latestSuccessfulOrderId: "GPA.subscription.order",
           autoRenewingPlan: { autoRenewEnabled },
