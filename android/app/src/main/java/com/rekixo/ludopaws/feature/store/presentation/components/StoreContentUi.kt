@@ -14,6 +14,7 @@ import com.rekixo.ludopaws.core.ui.art.plywoodBackground
 import com.rekixo.ludopaws.core.ui.components.AppFocusRing
 import com.rekixo.ludopaws.feature.store.domain.StoreCatalog
 import com.rekixo.ludopaws.feature.store.domain.model.StoreProduct
+import com.rekixo.ludopaws.feature.store.domain.model.StoreProductKind
 import com.rekixo.ludopaws.feature.store.domain.model.StoreTab
 import com.rekixo.ludopaws.feature.store.presentation.StoreActivity
 import com.rekixo.ludopaws.feature.store.presentation.art.GemClusterView
@@ -66,11 +67,24 @@ private fun StoreActivity.gemsContent():
             },
         )
 
+        addView(
+            pawsPlusCard(
+                requireNotNull(StoreCatalog.find(StoreCatalog.PAWS_PLUS)),
+            ),
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                topMargin = dp(6)
+                bottomMargin = dp(8)
+            },
+        )
+
         val packs =
             StoreCatalog
                 .products
                 .filter {
-                    !it.featured
+                    it.kind == StoreProductKind.CONSUMABLE_GEMS
                 }
 
         packs.chunked(
@@ -167,6 +181,96 @@ private fun StoreActivity.gemsContent():
                     dp(16)
             },
         )
+    }
+
+private fun StoreActivity.pawsPlusCard(
+    product: StoreProduct,
+): LinearLayout =
+    LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(dp(14), dp(12), dp(14), dp(12))
+        background = plywoodBackground(
+            context = this@pawsPlusCard,
+            cornerRadiusDp = 15f,
+        )
+        elevation = dp(2).toFloat()
+
+        addView(
+            TextView(this@pawsPlusCard).apply {
+                text = if (pawsPlusActiveForUi) "PAWS PLUS · ACTIVE" else "PAWS PLUS · MONTHLY"
+                textSize = 15f
+                setTypeface(Typeface.DEFAULT_BOLD)
+                setTextColor(0xFFFFE6A4.toInt())
+                gravity = Gravity.CENTER
+                maxLines = 1
+            },
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ),
+        )
+        addView(
+            TextView(this@pawsPlusCard).apply {
+                text = "Suppresses forced post-win ads. Rewarded ads remain optional."
+                textSize = 11.5f
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER
+                setPadding(dp(4), dp(5), dp(4), dp(8))
+            },
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ),
+        )
+        val price = priceFor(product.productId, "Not configured")
+        addView(
+            Button(this@pawsPlusCard).apply {
+                text = when {
+                    pawsPlusActiveForUi -> "MANAGE SUBSCRIPTION"
+                    pawsPlusSubscriptionsConfigured && price != "UNAVAILABLE" ->
+                        "SUBSCRIBE · $price / month"
+                    else -> "MONTHLY PLAN NOT AVAILABLE"
+                }
+                textSize = 14f
+                setTypeface(Typeface.DEFAULT_BOLD)
+                setTextColor(Color.WHITE)
+                isEnabled = pawsPlusActiveForUi || pawsPlusSubscriptionsConfigured
+                background = GradientDrawable(
+                    GradientDrawable.Orientation.TOP_BOTTOM,
+                    if (pawsPlusActiveForUi) {
+                        intArrayOf(0xFF4FAF7C.toInt(), 0xFF28724D.toInt())
+                    } else {
+                        intArrayOf(0xFF477DD0.toInt(), 0xFF284C91.toInt())
+                    },
+                ).apply {
+                    cornerRadius = dp(10).toFloat()
+                }
+                setOnClickListener {
+                    if (pawsPlusActiveForUi) managePawsPlusSubscription()
+                    else requestPurchase(product.productId)
+                }
+                AppFocusRing.apply(this, cornerRadiusDp = 10f)
+            },
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(46),
+            ),
+        )
+        if (!pawsPlusSubscriptionsConfigured && !pawsPlusActiveForUi) {
+            addView(
+                TextView(this@pawsPlusCard).apply {
+                    text = "Checkout stays disabled until Play Console and server verification are configured."
+                    textSize = 10f
+                    setTextColor(0xFFEED9B7.toInt())
+                    gravity = Gravity.CENTER
+                    setPadding(dp(4), dp(7), dp(4), 0)
+                },
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ),
+            )
+        }
     }
 
 private fun StoreActivity.featuredRemoveAdsCard(
