@@ -574,6 +574,34 @@ test("catalog-managed rewarded ads verify current eligibility and can progress t
   assert.ok((await purchase.json()).wallet.ownedCosmetics.includes("paw_reward_01"));
 });
 
+test("archived dynamic cosmetic cannot be equipped but prior ownership is retained", async () => {
+  const paw = catalogItem();
+  const catalog = makeCatalogNamespace([paw]);
+  const { account, sql } = makeAccount({ LUDOPROOF_STORE_CATALOG: catalog });
+  const accountId = "0a2c3a83-e0fb-4abc-8ac4-581a6d994fe7";
+  const created = await (await post(account, "/session/create", { accountId, displayName: "Catalog Player" })).json();
+  sql.wallet.get(accountId).balance = 200;
+
+  const bought = await post(account, "/wallet/cosmetic/purchase", {
+    accountId, sessionId: created.sessionId, cosmeticId: "paw_safari_01",
+    clientRequestId: "afc2b41d-9f61-47b1-9732-0b4890ff3d42", catalogCountry: "IN",
+  });
+  assert.equal(bought.status, 200);
+  assert.ok((await bought.json()).wallet.ownedCosmetics.includes("paw_safari_01"));
+
+  // The namespace is a test double over current state; archive after ownership exists.
+  paw.status = "ARCHIVED";
+  const select = await post(account, "/wallet/cosmetic/select", {
+    accountId, sessionId: created.sessionId, cosmeticId: "paw_safari_01", catalogCountry: "IN",
+  });
+  assert.equal(select.status, 400);
+  assert.equal((await select.json()).error, "COSMETIC_UNAVAILABLE");
+
+  const wallet = await post(account, "/wallet/get", { accountId, sessionId: created.sessionId });
+  assert.equal(wallet.status, 200);
+  assert.ok((await wallet.json()).wallet.ownedCosmetics.includes("paw_safari_01"));
+});
+
 test("catalog service outage fails closed for purchase and does not use the legacy table", async () => {
   const { account, sql } = makeAccount({
     LUDOPROOF_STORE_CATALOG: makeCatalogNamespace([], { fail: true }),
