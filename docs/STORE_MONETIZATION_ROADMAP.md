@@ -130,6 +130,15 @@ EntroNex usage is an important unknown: the repository identifies the current v4
 `monthly upstream cost = verified billable API calls × contract price per call`.
 A robust monthly operating model must include Workers, Durable Objects, R2, EntroNex, store fees/tax, customer support, privacy/legal operations and release monitoring. Advertising revenue is variable and should not be assumed to cover API expense until actual eCPM and fill rates are measured.
 
+## Main-branch audit findings recorded for implementation
+- `StoreCatalog.kt` currently defines `remove_ads` as `NON_CONSUMABLE_REMOVE_ADS`; the Worker grants a persistent `ads_removed` boolean. Keep that ID's existing behavior for compatibility and create a new subscription ID for monthly Paws Plus.
+- `server/src/google-play-billing.js` currently verifies one-time `INAPP` purchases via products APIs and its hard-coded `GOOGLE_PLAY_PRODUCTS` map. Subscription purchase tokens, subscription status, acknowledgement, renewals and expiry are not implemented in that verifier yet.
+- `server/src/player-account.js` has a hard-coded `COSMETICS` map and wallet/ad progress tables. Existing channels include FREE, GEMS and REWARDED_ADS, but new server-owned catalogue entries and arbitrary direct-purchase cosmetics require a catalog authority and SKU-to-item mapping.
+- `server/src/index-account.js` exposes wallet, cosmetic purchase/select, one-time purchase verification, store status and SSV routes, but no catalog-management/admin routes or subscription lifecycle routes.
+- Current ad SSV grants 5 Gems on a cosmetic-targeted rewarded view as well as one unit of that item's ad progress. Product design must preserve this explicitly or migrate it only with tests and clear UI disclosure.
+- `server/wrangler.json` currently binds no R2 bucket. R2 upload/delivery requires adding a new explicit binding and deployment configuration; this plan does not modify Worker routing yet.
+- The repository contains a Store tab and category catalog, but its local cosmetic metadata is not yet a remote, operator-editable published catalog. The proposed admin workflow must not claim dynamic publishing until catalog persistence/API and Android fetch/cache are implemented.
+
 ## Not in scope for this planning baseline
 
 No code behavior, Google Play product, feature flag, secret, production deployment, production billing or ad activation has been changed by this plan. These require the phase-specific implementation and acceptance checks above.
