@@ -29,6 +29,10 @@ data class StoreCosmetic(
     val characterPackId: String? = null,
     val eventKey: String? = null,
     val contentAvailable: Boolean = true,
+    val remoteManaged: Boolean = false,
+    val unlockChannels: List<CosmeticUnlockKind> = emptyList(),
+    val catalogVersion: Int = 0,
+    val backendCategory: String? = null,
 )
 
 enum class CosmeticAcquireResult {
