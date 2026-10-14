@@ -107,14 +107,16 @@ object StoreCatalogParser {
         val gems = unlock.optJSONObject("gems")
         val rewardedAds = unlock.optJSONObject("rewardedAds")
         if (CosmeticUnlockKind.GEMS in channels) {
+            val gemPrice = gems?.optInt("price", 0) ?: 0
             require(gems?.optBoolean("enabled", false) == true) { "Catalog Gem unlock is not enabled." }
-            require(gems.optInt("price", 0) in 1..MAX_GEM_PRICE) { "Catalog Gem price is invalid." }
+            require(gemPrice in 1..MAX_GEM_PRICE) { "Catalog Gem price is invalid." }
         }
         if (CosmeticUnlockKind.REWARDED_ADS in channels) {
+            val completedAds = rewardedAds?.optInt("requiredCompletedAds", 0) ?: 0
             require(rewardedAds?.optBoolean("enabled", false) == true) {
                 "Catalog rewarded-ad unlock is not enabled."
             }
-            require(rewardedAds.optInt("requiredCompletedAds", 0) in 1..MAX_REWARDED_ADS) {
+            require(completedAds in 1..MAX_REWARDED_ADS) {
                 "Catalog rewarded-ad target is invalid."
             }
         }
