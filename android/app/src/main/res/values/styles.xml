@@ -13,8 +13,12 @@
          render its full-screen branded WebP layout without the launcher icon. -->
     <style name="Theme.LudoPaws.Starting" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">#03153F</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_transparent_icon</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ludo_paws_home_hero</item>
         <item name="windowSplashScreenAnimationDuration">0</item>
-        <item name="postSplashScreenTheme">@style/Theme.LudoPaws</item>
+        <item name="postSplashScreenTheme">@style/Theme.LudoPaws.SplashContent</item>
+    </style>
+    <!-- Keep the launch window artwork visible until SplashActivity draws its live layout. -->
+    <style name="Theme.LudoPaws.SplashContent" parent="@style/Theme.LudoPaws">
+        <item name="android:windowBackground">@drawable/ludo_paws_splash_window_background</item>
     </style>
 </resources>
