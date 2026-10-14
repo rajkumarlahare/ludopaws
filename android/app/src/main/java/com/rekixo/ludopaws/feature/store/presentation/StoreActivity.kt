@@ -681,7 +681,7 @@ class StoreActivity :
                 BuildConfig
                     .LUDOPROOF_BILLING_ENABLED
             ) {
-                "UNAVAILABLE"
+                "Price unavailable"
             } else {
                 fallback
             }
