@@ -19,6 +19,8 @@ jobs:
       GOOGLE_SIGN_IN_WEB_CLIENT_ID: ${{ vars.GOOGLE_SIGN_IN_WEB_CLIENT_ID }}
       LUDOPROOF_BILLING_ENABLED: ${{ vars.LUDOPROOF_BILLING_ENABLED }}
       GOOGLE_PLAY_BILLING_ENABLED: ${{ vars.GOOGLE_PLAY_BILLING_ENABLED }}
+      LUDOPROOF_SUBSCRIPTIONS_ENABLED: ${{ vars.LUDOPROOF_SUBSCRIPTIONS_ENABLED }}
+      GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED: ${{ vars.GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED }}
       LUDOPROOF_ADS_ENABLED: ${{ vars.LUDOPROOF_ADS_ENABLED }}
       LUDOPROOF_INTERSTITIAL_ADS_ENABLED: ${{ vars.LUDOPROOF_INTERSTITIAL_ADS_ENABLED }}
       LUDOPROOF_ADMOB_SSV_ENABLED: ${{ vars.LUDOPROOF_ADMOB_SSV_ENABLED }}
@@ -95,13 +97,17 @@ jobs:
           APP_ADS="$LUDOPROOF_ADS_ENABLED"
           INTERSTITIAL_ADS="$LUDOPROOF_INTERSTITIAL_ADS_ENABLED"
           SERVER_ADS="$LUDOPROOF_ADMOB_SSV_ENABLED"
+          APP_SUBSCRIPTIONS="$LUDOPROOF_SUBSCRIPTIONS_ENABLED"
+          SERVER_SUBSCRIPTIONS="$GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED"
           [ -n "$APP_BILLING" ] || APP_BILLING="false"
           [ -n "$SERVER_BILLING" ] || SERVER_BILLING="false"
+          [ -n "$APP_SUBSCRIPTIONS" ] || APP_SUBSCRIPTIONS="false"
+          [ -n "$SERVER_SUBSCRIPTIONS" ] || SERVER_SUBSCRIPTIONS="false"
           [ -n "$APP_ADS" ] || APP_ADS="false"
           [ -n "$INTERSTITIAL_ADS" ] || INTERSTITIAL_ADS="false"
           [ -n "$SERVER_ADS" ] || SERVER_ADS="false"
 
-          for flag in "$APP_BILLING" "$SERVER_BILLING" "$APP_ADS" "$INTERSTITIAL_ADS" "$SERVER_ADS"; do
+          for flag in "$APP_BILLING" "$SERVER_BILLING" "$APP_SUBSCRIPTIONS" "$SERVER_SUBSCRIPTIONS" "$APP_ADS" "$INTERSTITIAL_ADS" "$SERVER_ADS"; do
             case "$flag" in
               true|false) ;;
               *) echo "Store feature flags must be true or false." >&2; exit 2 ;;
@@ -109,6 +115,14 @@ jobs:
           done
           if [ "$APP_BILLING" != "$SERVER_BILLING" ]; then
             echo "Android Billing flag must match Worker GOOGLE_PLAY_BILLING_ENABLED." >&2
+            exit 2
+          fi
+          if [ "$APP_SUBSCRIPTIONS" != "$SERVER_SUBSCRIPTIONS" ]; then
+            echo "Android subscription flag must match Worker GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED." >&2
+            exit 2
+          fi
+          if [ "$APP_SUBSCRIPTIONS" = "true" ] && [ "$APP_BILLING" != "true" ]; then
+            echo "Paws Plus subscriptions cannot be enabled unless Billing is enabled." >&2
             exit 2
           fi
           if [ "$APP_ADS" != "$SERVER_ADS" ]; then
@@ -184,12 +198,18 @@ jobs:
             const status = JSON.parse(process.argv[1]);
             const billing = process.argv[2] === "true";
             const ads = process.argv[3] === "true";
-            if (status.billingAvailable !== billing || status.rewardedAdsAvailable !== ads) {
+            const subscriptions = process.argv[4] === "true";
+            if (
+              status.billingAvailable !== billing ||
+              status.rewardedAdsAvailable !== ads ||
+              status.subscriptionsAvailable !== subscriptions ||
+              (subscriptions && !billing)
+            ) {
               console.error("Worker store-status flags do not match the signed Android build configuration.");
               process.exit(2);
             }
             console.log("Production Worker readiness and store feature flags match the requested Android release.");
-          ' "$status_json" "$APP_BILLING" "$APP_ADS"
+          ' "$status_json" "$APP_BILLING" "$APP_ADS" "$APP_SUBSCRIPTIONS"
 
           APP_ID="$ADMOB_APP_ID"
           REWARDED_ID="$ADMOB_REWARDED_AD_UNIT_ID"
