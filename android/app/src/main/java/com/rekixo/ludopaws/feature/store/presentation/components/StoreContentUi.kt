@@ -413,7 +413,7 @@ private fun StoreActivity.pawsPlusSubscriptionCard(): LinearLayout =
             setTextColor(Color.WHITE)
         })
         addView(TextView(this@pawsPlusSubscriptionCard).apply {
-            text = "No forced ads while active. Optional rewarded ads stay available. Includes ongoing access for each paid month."
+            text = "Auto-renews monthly until canceled in Google Play. Forced ads stay off while active; optional rewarded ads remain available."
             textSize = 12f
             setTextColor(0xFFEED9B7.toInt())
             setPadding(0, dp(4), 0, dp(6))
