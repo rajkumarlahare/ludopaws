@@ -24,7 +24,10 @@ async function signedRequest({ privateKey, keyId, accountId, adUnit, customData,
   params.append("transaction_id", transactionId);
   params.append("user_id", accountId);
   const content = params.toString();
-  const raw = new Uint8Array(await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, privateKey, new TextEncoder().encode(content)));
+  // Google’s reference verifier signs the decoded query component (URI.getQuery),
+  // not the percent-encoded URL representation. JSON custom_data exercises this path.
+  const signedContent = decodeURIComponent(content);
+  const raw = new Uint8Array(await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, privateKey, new TextEncoder().encode(signedContent)));
   return new Request("https://api.example.test/api/admob/ssv?" + content +
     "&signature=" + rawToDer(raw).toString("base64url") + "&key_id=" + keyId);
 }
