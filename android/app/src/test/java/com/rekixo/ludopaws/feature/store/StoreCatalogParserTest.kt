@@ -117,6 +117,34 @@ class StoreCatalogParserTest {
     }
 
     @Test
+    fun rejectsPublishedItemsWithMalformedAssetMetadata() {
+        val invalidDigest = catalogItem("dice_heart", "DICE", "HEART", arrayOf("GEMS"), gemPrice = 100)
+            .put(
+                "asset",
+                JSONObject()
+                    .put("thumbnail", "r2://published/dice_heart/v1/thumbnail.png")
+                    .put("manifest", "r2://published/dice_heart/v1/manifest.json")
+                    .put("version", 1)
+                    .put("sha256", "not-a-sha")
+                    .put("format", "BUILT_IN"),
+            )
+        org.junit.Assert.assertThrows(IllegalArgumentException::class.java) {
+            StoreCatalogParser.parse(catalogResponse(items = arrayOf(invalidDigest)))
+        }
+
+        val unsupportedFormat = catalogItem("dice_other", "DICE", "OTHER", arrayOf("FREE"))
+            .put("asset", JSONObject()
+                .put("thumbnail", "r2://published/dice_other/v1/thumbnail.png")
+                .put("manifest", "r2://published/dice_other/v1/manifest.json")
+                .put("version", 1)
+                .put("sha256", "b".repeat(64))
+                .put("format", "EXE"))
+        org.junit.Assert.assertThrows(IllegalArgumentException::class.java) {
+            StoreCatalogParser.parse(catalogResponse(items = arrayOf(unsupportedFormat)))
+        }
+    }
+
+    @Test
     fun staleCacheCanBeMarkedDisplayOnlyByCaller() {
         val parsed = StoreCatalogParser.parse(
             catalogResponse(
