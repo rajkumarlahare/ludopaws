@@ -200,6 +200,16 @@ export class StoreCatalogStore {
     if (!snapshot) return json(404, { error: "CATALOG_VERSION_NOT_FOUND", message: "requested catalog version is not retained" });
     const nextVersion = state.publishedVersion + 1;
     const items = clone(snapshot.items);
+    const restoredIds = new Set(items.map((item) => item.id));
+    // A rollback must not erase IDs introduced after the target snapshot. Keep
+    // those records as archived tombstones so their ownership remains stable and
+    // stale clients cannot fall through to a legacy ID with the same value.
+    for (const current of state.items) {
+      if (!restoredIds.has(current.id)) {
+        items.push({ ...clone(current), status: "ARCHIVED", catalogVersion: nextVersion });
+        restoredIds.add(current.id);
+      }
+    }
     const validation = validateCatalog(items, { playProducts: [] });
     if (!validation.valid) {
       return json(409, { error: "CATALOG_ROLLBACK_INVALID", message: "saved catalog version failed current validation", details: validation.errors });
