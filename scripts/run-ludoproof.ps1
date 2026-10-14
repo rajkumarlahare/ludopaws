@@ -122,7 +122,7 @@ function Ensure-AndroidSdkProperties(
 ) {
     $localProperties = Join-Path $androidDir "local.properties"
     $portableSdkPath = $sdkRoot -replace '\\', '/'
-    $desired = "sdk.dir=$portableSdkPath"
+    $desired = "sdk.dir=$portableSdkPath".Replace(":", "\:")
 
     $current =
         if (Test-Path $localProperties) {

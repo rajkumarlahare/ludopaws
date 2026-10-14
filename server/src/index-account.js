@@ -381,21 +381,21 @@ async function handleAccountRequest(request, env) {
         if (env?.LUDOPROOF_ADMOB_SSV_ENABLED !== "true" || !env?.LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID) {
           throw httpError(503, "ADMOB_SSV_NOT_ENABLED", "server-verified ad rewards are not enabled");
         }
-        // Signed callbacks still consume CPU and may refresh Google's public verification keys.
-        // Apply the shared IP rate gate before parsing/cryptographic verification to limit abuse.
+        // The outer account-handler catch logs only safe SSV error code/status on failure.
         await rateLimit(env, request, "admob:ssv", 120);
         const verified = await verifyAdMobSsvRequest(request, env);
-        // AdMob's dedicated verification test uses Google's test signing keys.
-        // A valid test callback must return success without ever crediting a wallet.
+        // AdMob console URL verification must succeed without granting production value.
         if (verified.isTest === true) {
           return json(200, { ok: true, verified: true, test: true, rewardGranted: false });
         }
-        return await playerResponse(env, verified.accountId, "/wallet/reward-ad", {
+        const response = await playerResponse(env, verified.accountId, "/wallet/reward-ad", {
           accountId: verified.accountId,
           transactionId: verified.transactionId,
           kind: verified.kind,
           cosmeticId: verified.cosmeticId,
         });
+        console.info("admob-ssv-reward-accepted", { kind: verified.kind, status: response.status });
+        return response;
       }
 
       if (url.pathname === "/api/store/status" && request.method === "GET") {

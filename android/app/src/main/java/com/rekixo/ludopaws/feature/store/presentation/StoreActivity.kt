@@ -59,6 +59,10 @@ class StoreActivity :
         Executors.newSingleThreadExecutor { runnable ->
             Thread(runnable, "LudoPawsStoreBilling")
         }
+    private val rewardVerificationExecutor =
+        Executors.newSingleThreadExecutor { runnable ->
+            Thread(runnable, "LudoPawsRewardVerification")
+        }
     private val pendingPurchases by lazy {
         PendingStorePurchaseStore(this)
     }
@@ -67,12 +71,8 @@ class StoreActivity :
     }
     internal val adsEnabledForBuild: Boolean
         get() =
-            BuildConfig.LUDOPROOF_ADS_ENABLED &&
-                rewardedAdsEnabledByServer &&
-                (
-                    !BuildConfig.LUDOPROOF_ADS_USE_TEST_IDS ||
-                        BuildConfig.DEBUG
-                    )
+            rewardedAdsEnabledByServer &&
+                BuildConfig.LUDOPROOF_ADS_ENABLED
     private val rewardedAds by lazy {
         rewardedAdsWasCreated = true
         RewardedAdsController(
@@ -202,6 +202,7 @@ class StoreActivity :
         if (billingWasCreated) billing.close()
         if (rewardedAdsWasCreated) rewardedAds.close()
         billingExecutor.shutdownNow()
+        rewardVerificationExecutor.shutdownNow()
         super.onDestroy()
     }
 
@@ -247,7 +248,7 @@ class StoreActivity :
         cosmeticId: String? = null,
     ) {
         if (!adsEnabledForBuild) {
-            showStoreMessage("Server-verified rewarded ads are not configured for this build. No reward was requested.")
+            showStoreMessage("Rewarded ads are temporarily unavailable. Please try again shortly.")
             return
         }
         val session = try {
@@ -255,10 +256,6 @@ class StoreActivity :
         } catch (error: Exception) {
             showStoreMessage(error.message ?: "Connect to the account service before requesting a reward.")
             return
-        }
-        if (BuildConfig.DEBUG && cosmeticId == null) {
-            Log.i("LudoPawsSSVTest", "AdMob SSV User ID for this debug account: ${session.accountId}")
-            Log.i("LudoPawsSSVTest", "AdMob SSV Custom data for Gems: {\"kind\":\"gems\"}")
         }
         val customData = JSONObject()
             .put("kind", if (cosmeticId == null) "gems" else "cosmetic")
@@ -440,10 +437,10 @@ class StoreActivity :
         cosmeticId: String?,
         initialProgress: Int,
     ) {
-        billingExecutor.execute {
+        rewardVerificationExecutor.execute {
             var latest: JSONObject? = null
             var changed = false
-            for (attempt in 0 until 5) {
+            for (attempt in 0 until 30) {
                 try {
                     val session = accountRepository.requireSession()
                     if (session.accountId != accountId) break
@@ -461,7 +458,7 @@ class StoreActivity :
                 } catch (error: Exception) {
                     Log.w(TAG, "Waiting for server-verified ad reward", error)
                 }
-                if (attempt < 4) Thread.sleep(1500)
+                if (attempt < 29) Thread.sleep(2000)
             }
             val snapshot = latest
             runOnUiThread {
@@ -479,7 +476,7 @@ class StoreActivity :
                         if (cosmeticId == null) "Your +5 rewarded-ad gems were verified by the server."
                         else "Your +5 gems and rewarded-ad progress for this item were verified by the server."
                     } else {
-                        "The ad finished, but the server reward has not arrived yet. No local reward was granted; the store will update when verification completes."
+                        "Reward verification is still pending. No local Gems were granted; reopen the store shortly to refresh the server wallet."
                     },
                 )
             }

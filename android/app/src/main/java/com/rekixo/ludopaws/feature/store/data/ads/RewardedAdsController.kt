@@ -66,7 +66,7 @@ internal class RewardedAdsController(
         onRewardEarned: () -> Unit,
     ): Boolean {
         if (!enabled || closed) {
-            onMessage("Rewarded ads are not enabled in this build.")
+            onMessage("Rewarded ads are temporarily unavailable. Please try again shortly.")
             return false
         }
         if (
