@@ -31,7 +31,7 @@ import com.rekixo.ludopaws.feature.store.presentation.StoreActivity
 
 internal fun ProfileActivity.profileTopBar(): FrameLayout =
     FrameLayout(this).apply {
-        // Place the title at the true center of the whole top bar, independent of the Back button.
+        // Keep the title centered independently of the two symmetric action buttons.
         addView(
             TextView(this@profileTopBar).apply {
                 text = "Profile"
@@ -54,11 +54,30 @@ internal fun ProfileActivity.profileTopBar(): FrameLayout =
                 contentDescription = "Back",
                 iconName = AppIconName.CHEVRON_LEFT,
                 sizeDp = 50,
-            ) { finish() }.apply {
-                // Keep the Back button circular while using the shared plywood texture.
+                onClick = { this@profileTopBar.finish() },
+            ).apply {
+                // Keep both navigation controls on the same circular plywood skin.
                 background = plywoodBackground(this@profileTopBar, cornerRadiusDp = 25f)
             },
             FrameLayout.LayoutParams(dp(50), dp(50), Gravity.START or Gravity.CENTER_VERTICAL),
+        )
+
+        val menuButton =
+            appIconActionButton(
+                context = this@profileTopBar,
+                contentDescription = "Open profile menu",
+                iconName = AppIconName.MENU,
+                sizeDp = 50,
+                onClick = {},
+            ).apply {
+                background = plywoodBackground(this@profileTopBar, cornerRadiusDp = 25f)
+            }
+        menuButton.setOnClickListener {
+            this@profileTopBar.showProfileMenu(menuButton)
+        }
+        addView(
+            menuButton,
+            FrameLayout.LayoutParams(dp(50), dp(50), Gravity.END or Gravity.CENTER_VERTICAL),
         )
     }
 
