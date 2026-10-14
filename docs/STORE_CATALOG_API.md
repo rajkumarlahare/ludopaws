@@ -83,7 +83,7 @@ Each object is sent as the request body to its matching /api/admin/store/catalog
 
 ## Read caching and availability
 
-The client read returns a quoted ETag derived from the published catalog version and Cloudflare country code. Clients can send If-None-Match; an unchanged catalog returns 304 Not Modified. Responses are private-cacheable for 60 seconds and vary by CF-IPCountry. Only PUBLISHED, content-ready items inside their start/end schedule and country rules are returned.
+The client read returns a quoted ETag derived from the published catalog version, Cloudflare country code, and visible item IDs. Clients can send If-None-Match; an unchanged catalog returns 304 Not Modified. Responses are private-cacheable for 60 seconds and vary by CF-IPCountry. Only PUBLISHED, content-ready items inside their start/end schedule and country rules are returned. The response also contains `suppressedIds`: opaque stable IDs for canonical catalog entries that are currently not visible (for example, archived, scheduled for the future, or region-blocked). This ID-only list lets Android hide matching bundled legacy offers without disclosing hidden item metadata.
 
 The ETag version changes only when the published catalog changes. Draft edits advance the admin revision but do not change the public catalog version.
 
