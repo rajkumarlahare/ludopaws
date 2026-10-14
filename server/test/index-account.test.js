@@ -969,3 +969,57 @@ test("guest deletion code endpoint returns a server-generated code to an active 
   assert.equal(replacement.status, 200);
   assert.deepEqual(await replacement.json(), { ok: true, ready: true, credential: "34".repeat(32) });
 });
+
+
+test("Paws Plus subscription route is unavailable unless subscription verification is explicitly enabled", async () => {
+  const response = await accountWorker.fetch(
+    new Request("https://api.example.test/api/store/subscriptions/verify", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        productId: "paws_plus",
+        purchaseToken: "paws-plus-unconfigured-token",
+      }),
+    }),
+    {
+      GOOGLE_PLAY_BILLING_ENABLED: "false",
+      GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED: "false",
+    },
+  );
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).error, "PLAY_SUBSCRIPTIONS_NOT_ENABLED");
+});
+
+test("Google Play RTDN endpoint rejects unauthenticated Pub/Sub push requests", async () => {
+  const response = await accountWorker.fetch(
+    new Request("https://api.example.test/api/google-play/rtdn", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ message: { messageId: "test-message", data: "e30=" } }),
+    }),
+    {
+      GOOGLE_PLAY_BILLING_ENABLED: "true",
+      GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED: "true",
+      GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL: "ludo-publisher@ludo-project.iam.gserviceaccount.com",
+      GOOGLE_PLAY_SERVICE_ACCOUNT_PRIVATE_KEY: "-----BEGIN PRIVATE KEY----- test key -----END PRIVATE KEY-----",
+      GOOGLE_PLAY_RTDN_AUDIENCE: "https://api.example.test/api/google-play/rtdn",
+      GOOGLE_PLAY_RTDN_EMAIL: "ludo-rtdn@ludo-project.iam.gserviceaccount.com",
+      LUDOPROOF_STORE_PURCHASES: { get() { throw new Error("should not be reached without OIDC token"); } },
+    },
+  );
+  assert.equal(response.status, 401);
+  assert.equal((await response.json()).error, "RTDN_AUTH_REQUIRED");
+});
+
+test("store status reports subscriptions as unavailable unless fully configured", async () => {
+  const response = await accountWorker.fetch(
+    new Request("https://api.example.test/api/store/status"),
+    {},
+  );
+  assert.deepEqual(await response.json(), {
+    ok: true,
+    billingAvailable: false,
+    subscriptionsAvailable: false,
+    rewardedAdsAvailable: false,
+  });
+});
