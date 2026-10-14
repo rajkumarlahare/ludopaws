@@ -68,6 +68,33 @@ test("rejects invalid country codes and invalid availability windows", () => {
   assert.ok(result.errors.some((error) => error.includes("end must be later")));
 });
 
+test("rejects malformed schedule timestamps even when only one bound is set", () => {
+  const baseline = item().availability;
+  const cases = [
+    {
+      availability: { ...baseline, startsAt: "not-a-date", endsAt: null },
+      error: "availability.startsAt must be a valid ISO 8601 date-time or null",
+    },
+    {
+      availability: { ...baseline, startsAt: null, endsAt: "not-a-date" },
+      error: "availability.endsAt must be a valid ISO 8601 date-time or null",
+    },
+    {
+      availability: { ...baseline, startsAt: "2026-10-14", endsAt: null },
+      error: "availability.startsAt must be a valid ISO 8601 date-time or null",
+    },
+    {
+      availability: { ...baseline, startsAt: "2026-02-30T12:00:00Z", endsAt: null },
+      error: "availability.startsAt must be a valid ISO 8601 date-time or null",
+    },
+  ];
+
+  for (const scenario of cases) {
+    const result = validateCatalogItem(item({ availability: scenario.availability }));
+    assert.ok(result.errors.includes(scenario.error), result.errors.join("; "));
+  }
+});
+
 test("publishes only complete, validated catalog records", () => {
   const published = assertCatalogCanPublish(item(), { playProducts: ["paw_safari_01"] });
   assert.equal(published.status, "PUBLISHED");
