@@ -14,6 +14,7 @@ import com.rekixo.ludopaws.BuildConfig
 import com.rekixo.ludopaws.LudoProofApplication
 import com.rekixo.ludopaws.LudoProofTheme
 import com.rekixo.ludopaws.feature.store.data.ads.PostWinInterstitialAdController
+import com.rekixo.ludopaws.feature.store.data.StoreCatalogRepository
 import com.rekixo.ludopaws.feature.store.data.ads.RewardedAdsController
 import com.rekixo.ludopaws.feature.store.data.billing.GooglePlayBillingGateway
 import com.rekixo.ludopaws.feature.store.data.billing.PendingStorePurchase
@@ -61,6 +62,13 @@ class StoreActivity :
         Executors.newSingleThreadExecutor { runnable ->
             Thread(runnable, "LudoPawsStoreBilling")
         }
+    private val catalogExecutor =
+        Executors.newSingleThreadExecutor { runnable ->
+            Thread(runnable, "LudoPawsStoreCatalog")
+        }
+    private val storeCatalogRepository by lazy {
+        StoreCatalogRepository(this, accountRepository)
+    }
     private val rewardVerificationExecutor =
         Executors.newSingleThreadExecutor { runnable ->
             Thread(runnable, "LudoPawsRewardVerification")
@@ -123,6 +131,28 @@ class StoreActivity :
     override fun onStart() {
         super.onStart()
         billingAvailable = false
+
+        // Refresh catalog off the UI thread. Stale cached offers are display-only and
+        // locked; all purchase/equip requests still go to the authoritative server.
+        catalogExecutor.execute {
+            try {
+                accountRepository.ensureGuestSession()
+                val snapshot = storeCatalogRepository.refresh()
+                StoreCosmeticCatalog.replaceRemoteCatalog(snapshot.items, snapshot.suppressedIds)
+                if (snapshot.stale) {
+                    Log.i(
+                        TAG,
+                        "Using stale locked catalog display data (version=\${snapshot.catalogVersion}, itemCount=\${snapshot.items.size}).",
+                    )
+                }
+                runOnUiThread {
+                    if (canRenderStoreUi()) renderStore()
+                }
+            } catch (error: Exception) {
+                Log.w(TAG, "Remote catalog refresh failed: \${safeErrorSummary(error)}")
+            }
+        }
+
         rewardedAdsStatusLoaded = false
         rewardedAdsStatusError = null
 
@@ -229,6 +259,7 @@ class StoreActivity :
         if (billingWasCreated) billing.close()
         if (rewardedAdsWasCreated) rewardedAds.close()
         billingExecutor.shutdownNow()
+        catalogExecutor.shutdownNow()
         rewardVerificationExecutor.shutdownNow()
         rewardedAdRequestExecutor.shutdownNow()
         super.onDestroy()
