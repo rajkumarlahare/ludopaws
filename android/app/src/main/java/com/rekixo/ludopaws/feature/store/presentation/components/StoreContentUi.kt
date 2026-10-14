@@ -52,6 +52,18 @@ private fun StoreActivity.gemsContent():
                     ),
             )
 
+        // Keep the one-time Remove Ads SKU separate from the monthly subscription.
+        addView(
+            pawsPlusSubscriptionCard(),
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                topMargin = dp(6)
+                bottomMargin = dp(6)
+            },
+        )
+
         // Feature Remove Ads before the six gem price cards.
         addView(
             featuredRemoveAdsCard(
@@ -385,6 +397,34 @@ private fun StoreActivity.featuredRemoveAdsCard(
                 dp(52),
             ),
         )
+    }
+
+private fun StoreActivity.pawsPlusSubscriptionCard(): LinearLayout =
+    LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        background = plywoodBackground(context = this@pawsPlusSubscriptionCard, cornerRadiusDp = 15f)
+        setPadding(dp(14), dp(12), dp(14), dp(12))
+        addView(TextView(this@pawsPlusSubscriptionCard).apply {
+            text = "Paws Plus Monthly"
+            textSize = 17f
+            setTypeface(Typeface.DEFAULT_BOLD)
+            setTextColor(Color.WHITE)
+        })
+        addView(TextView(this@pawsPlusSubscriptionCard).apply {
+            text = "No forced ads while active. Optional rewarded ads stay available. Includes ongoing access for each paid month."
+            textSize = 12f
+            setTextColor(0xFFEED9B7.toInt())
+            setPadding(0, dp(4), 0, dp(6))
+        })
+        addView(Button(this@pawsPlusSubscriptionCard).apply {
+            val price = liveProducts[StoreCatalog.PAWS_PLUS]?.formattedPrice
+            text = if (price.isNullOrBlank()) "Subscribe — price shown by Google Play" else "Subscribe · $price / month"
+            isAllCaps = false
+            setOnClickListener { requestPurchase(StoreCatalog.PAWS_PLUS) }
+        }, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+        ))
     }
 
 private fun StoreActivity.rewardedAdCard():
