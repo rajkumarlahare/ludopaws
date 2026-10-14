@@ -59,6 +59,10 @@ class StoreActivity :
         Executors.newSingleThreadExecutor { runnable ->
             Thread(runnable, "LudoPawsStoreBilling")
         }
+    private val rewardVerificationExecutor =
+        Executors.newSingleThreadExecutor { runnable ->
+            Thread(runnable, "LudoPawsRewardVerification")
+        }
     private val pendingPurchases by lazy {
         PendingStorePurchaseStore(this)
     }
@@ -198,6 +202,7 @@ class StoreActivity :
         if (billingWasCreated) billing.close()
         if (rewardedAdsWasCreated) rewardedAds.close()
         billingExecutor.shutdownNow()
+        rewardVerificationExecutor.shutdownNow()
         super.onDestroy()
     }
 
@@ -243,7 +248,7 @@ class StoreActivity :
         cosmeticId: String? = null,
     ) {
         if (!adsEnabledForBuild) {
-            showStoreMessage("Server-verified rewarded ads are not configured for this build. No reward was requested.")
+            showStoreMessage("Rewarded ads are temporarily unavailable. Please try again shortly.")
             return
         }
         val session = try {
@@ -432,7 +437,7 @@ class StoreActivity :
         cosmeticId: String?,
         initialProgress: Int,
     ) {
-        billingExecutor.execute {
+        rewardVerificationExecutor.execute {
             var latest: JSONObject? = null
             var changed = false
             for (attempt in 0 until 30) {
