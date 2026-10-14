@@ -65,6 +65,119 @@ export function googlePlayBillingEnabled(env) {
   );
 }
 
+export async function verifyGooglePlaySubscription(
+  env,
+  { purchaseToken, accountId },
+  fetchImpl = fetch,
+) {
+  if (
+    typeof purchaseToken !== "string" ||
+    purchaseToken.length < 8 ||
+    purchaseToken.length > MAX_TOKEN_LENGTH ||
+    !/^[a-f0-9]{64}$/.test(String(accountId ?? ""))
+  ) {
+    throw httpError(400, "INVALID_SUBSCRIPTION", "subscription information is invalid");
+  }
+  if (!googlePlayBillingEnabled(env)) {
+    throw httpError(503, "PLAY_BILLING_NOT_ENABLED", "Google Play checkout is not enabled by the server");
+  }
+
+  const accessToken = await googleAccessToken(env, fetchImpl);
+  const url = PUBLISHER_URL + "/applications/" + encodeURIComponent(PACKAGE_NAME) +
+    "/purchases/subscriptionsv2/tokens/" + encodeURIComponent(purchaseToken);
+  let response;
+  try {
+    response = await fetchImpl(url, {
+      method: "GET",
+      headers: { authorization: "Bearer " + accessToken },
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch {
+    throw httpError(503, "PLAY_SUBSCRIPTION_UNAVAILABLE", "Google Play subscription status is temporarily unavailable");
+  }
+  if (response.status === 404) {
+    throw httpError(400, "PLAY_SUBSCRIPTION_NOT_FOUND", "Google Play subscription was not found");
+  }
+  if (!response.ok) {
+    throw httpError(
+      response.status === 401 || response.status === 403 ? 503 : 502,
+      "PLAY_SUBSCRIPTION_LOOKUP_FAILED",
+      "Google Play could not verify this subscription",
+    );
+  }
+
+  let payload;
+  try {
+    payload = await response.json();
+  } catch {
+    throw httpError(502, "PLAY_SUBSCRIPTION_BAD_RESPONSE", "Google Play returned an invalid subscription response");
+  }
+
+  const externalAccountId = payload?.externalAccountIdentifiers?.obfuscatedExternalAccountId;
+  const lineItems = payload?.lineItems;
+  if (
+    externalAccountId !== accountId ||
+    !Array.isArray(lineItems) ||
+    lineItems.length !== 1 ||
+    lineItems[0]?.productId !== "paws_plus" ||
+    lineItems[0]?.offerDetails?.basePlanId !== "monthly-auto"
+  ) {
+    throw httpError(400, "PLAY_SUBSCRIPTION_NOT_VALID", "Google Play did not confirm this subscription for this app account");
+  }
+
+  const expiryTime = Date.parse(lineItems[0]?.expiryTime ?? "");
+  if (!Number.isFinite(expiryTime)) {
+    throw httpError(502, "PLAY_SUBSCRIPTION_BAD_EXPIRY", "Google Play returned an invalid subscription expiry");
+  }
+
+  const state = String(payload?.subscriptionState ?? "");
+  const activeState = ["SUBSCRIPTION_STATE_ACTIVE", "SUBSCRIPTION_STATE_IN_GRACE_PERIOD"].includes(state) ||
+    (state === "SUBSCRIPTION_STATE_CANCELED" && expiryTime > Date.now());
+  const acknowledgementState = String(payload?.acknowledgementState ?? "");
+  if (state === "SUBSCRIPTION_STATE_PENDING" || state === "SUBSCRIPTION_STATE_PENDING_PURCHASE_CANCELED") {
+    throw httpError(409, "PLAY_SUBSCRIPTION_PENDING", "Google Play has not completed this subscription purchase");
+  }
+
+  if (acknowledgementState === "ACKNOWLEDGEMENT_STATE_PENDING") {
+    const acknowledgeUrl = PUBLISHER_URL + "/applications/" + encodeURIComponent(PACKAGE_NAME) +
+      "/purchases/subscriptions/" + encodeURIComponent("paws_plus") +
+      "/tokens/" + encodeURIComponent(purchaseToken) + ":acknowledge";
+    let acknowledged;
+    try {
+      acknowledged = await fetchImpl(acknowledgeUrl, {
+        method: "POST",
+        headers: { authorization: "Bearer " + accessToken, "content-type": "application/json" },
+        body: JSON.stringify({}),
+        signal: AbortSignal.timeout(10_000),
+      });
+    } catch {
+      throw httpError(503, "PLAY_SUBSCRIPTION_ACK_UNAVAILABLE", "Google Play could not acknowledge this subscription yet");
+    }
+    if (!acknowledged.ok && acknowledged.status !== 409) {
+      throw httpError(
+        acknowledged.status === 401 || acknowledged.status === 403 ? 503 : 502,
+        "PLAY_SUBSCRIPTION_ACK_FAILED",
+        "Google Play could not acknowledge this subscription yet",
+      );
+    }
+  } else if (acknowledgementState !== "ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED") {
+    throw httpError(502, "PLAY_SUBSCRIPTION_BAD_ACKNOWLEDGEMENT", "Google Play returned an unknown subscription acknowledgement state");
+  }
+
+  return {
+    verified: true,
+    productId: "paws_plus",
+    subscriptionState: state,
+    active: activeState && expiryTime > Date.now(),
+    expiryTime,
+    autoRenewEnabled: lineItems[0]?.autoRenewingPlan?.autoRenewEnabled === true,
+    purchaseTokenHash: await sha256Hex("ludopaws:google-play-subscription-token:v1:" + purchaseToken),
+    latestOrderId: typeof lineItems[0]?.latestSuccessfulOrderId === "string"
+      ? lineItems[0].latestSuccessfulOrderId
+      : null,
+  };
+}
+
 export async function verifyAndRedeemGooglePlayPurchase(
   env,
   { productId, purchaseToken, accountId },

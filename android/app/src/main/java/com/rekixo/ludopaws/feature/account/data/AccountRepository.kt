@@ -176,9 +176,14 @@ class AccountRepository(context: Context) {
 
     fun verifyPlayPurchase(productId: String, purchaseToken: String): JSONObject {
         val session = requireSession()
+        val path = if (productId == "paws_plus") {
+            "/api/store/subscription/verify"
+        } else {
+            "/api/store/purchases/verify"
+        }
         return request(
             "POST",
-            "/api/store/purchases/verify",
+            path,
             JSONObject()
                 .put("productId", productId)
                 .put("purchaseToken", purchaseToken),

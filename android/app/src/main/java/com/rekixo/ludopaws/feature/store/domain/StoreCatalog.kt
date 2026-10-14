@@ -6,6 +6,8 @@ import com.rekixo.ludopaws.feature.store.domain.model.StoreProductKind
 object StoreCatalog {
     const val REMOVE_ADS =
         "remove_ads"
+    const val PAWS_PLUS =
+        "paws_plus"
     const val GEMS_300 =
         "gems_300"
     const val GEMS_1500 =
@@ -18,6 +20,15 @@ object StoreCatalog {
         "gems_40000"
     const val GEMS_200000 =
         "gems_200000"
+
+    val pawsPlus = StoreProduct(
+        productId = PAWS_PLUS,
+        title = "Paws Plus Monthly",
+        gemAmount = 0,
+        kind = StoreProductKind.SUBSCRIPTION,
+        fallbackPrice = "Monthly price from Google Play",
+        featured = true,
+    )
 
     val products =
         listOf(
