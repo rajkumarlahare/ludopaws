@@ -364,6 +364,8 @@ async function handleAccountRequest(request, env) {
           sessionId: session.sessionId,
           cosmeticId: body.cosmeticId,
           clientRequestId: body.clientRequestId,
+          ...(body.unlockChannel != null ? { unlockChannel: body.unlockChannel } : {}),
+          catalogCountry: requestCatalogCountry(request),
         });
       }
 
@@ -375,6 +377,7 @@ async function handleAccountRequest(request, env) {
           accountId: session.accountId,
           sessionId: session.sessionId,
           cosmeticId: body.cosmeticId,
+          catalogCountry: requestCatalogCountry(request),
         });
       }
 
@@ -394,6 +397,7 @@ async function handleAccountRequest(request, env) {
           transactionId: verified.transactionId,
           kind: verified.kind,
           cosmeticId: verified.cosmeticId,
+          catalogCountry: requestCatalogCountry(request),
         });
         console.info("admob-ssv-reward-accepted", { kind: verified.kind, status: response.status });
         return response;
