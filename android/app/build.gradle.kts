@@ -19,7 +19,7 @@ val ludoProofBillingEnabled =
         ?: false
 val ludoProofAdsEnabled =
     providers.gradleProperty("LUDOPROOF_ADS_ENABLED")
-        .orElse("true")
+        .orElse("false")
         .get()
         .toBooleanStrictOrNull()
         ?: false
