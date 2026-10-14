@@ -31,7 +31,7 @@ object StoreCatalog {
                 kind =
                     StoreProductKind.NON_CONSUMABLE_REMOVE_ADS,
                 fallbackPrice =
-                    "Price set by Google Play",
+                    "Price unavailable",
                 featured =
                     true,
             ),
