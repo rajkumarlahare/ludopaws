@@ -19,6 +19,7 @@ import java.util.concurrent.ConcurrentHashMap
 class GooglePlayBillingGateway(
     private val activity: Activity,
     private val enabled: Boolean,
+    private val subscriptionsEnabled: Boolean = false,
     accountId: String,
     private val listener: Listener,
 ) : PurchasesUpdatedListener {
@@ -168,29 +169,29 @@ class GooglePlayBillingGateway(
             return
         }
 
-        val offer =
-            details
-                .oneTimePurchaseOfferDetailsList
-                ?.firstOrNull()
-
-        if (offer == null) {
-            listener
-                .onBillingUnavailable(
-                    "No eligible Google Play offer is available for this product.",
-                )
+        val isSubscription = productId in StoreCatalog.subscriptionProductIds
+        if (isSubscription && !subscriptionsEnabled) {
+            listener.onBillingUnavailable("Paws Plus subscriptions are not enabled for this build and server yet.")
             return
         }
-
-        val offerToken =
-            offer.offerToken
-        if (
-            offerToken ==
-            null
-        ) {
-            listener
-                .onBillingUnavailable(
-                    "Google Play did not provide a usable offer token for this product.",
-                )
+        val offerToken = if (isSubscription) {
+            details.subscriptionOfferDetails
+                ?.firstOrNull { it.basePlanId == StoreCatalog.PAWS_PLUS_BASE_PLAN_ID && it.offerId == null }
+                ?.offerToken
+                ?: details.subscriptionOfferDetails
+                    ?.firstOrNull { it.basePlanId == StoreCatalog.PAWS_PLUS_BASE_PLAN_ID }
+                    ?.offerToken
+        } else {
+            details.oneTimePurchaseOfferDetailsList?.firstOrNull()?.offerToken
+        }
+        if (offerToken.isNullOrBlank()) {
+            listener.onBillingUnavailable(
+                if (isSubscription) {
+                    "Google Play has no eligible monthly Paws Plus offer. Check the paws_plus / monthly-auto Play Console product."
+                } else {
+                    "No eligible Google Play one-time offer is available for this product."
+                },
+            )
             return
         }
 
@@ -288,65 +289,87 @@ class GooglePlayBillingGateway(
     }
 
     private fun queryExistingPurchases() {
-        if (closed || !billingClient.isReady) return
-        billingClient.queryPurchasesAsync(
-            QueryPurchasesParams
-                .newBuilder()
-                .setProductType(BillingClient.ProductType.INAPP)
-                .build(),
-        ) { billingResult, purchases ->
-            if (closed) return@queryPurchasesAsync
-            if (
-                billingResult.responseCode !=
-                BillingClient.BillingResponseCode.OK
-            ) {
-                listener.onBillingUnavailable(
-                            billingResult.debugMessage.ifBlank {
-                                "Google Play could not reload previous purchases."
-                            },
-                )
-                return@queryPurchasesAsync
+        queryExistingPurchases(
+            productType = BillingClient.ProductType.INAPP,
+            isSubscription = false,
+        ) {
+            if (subscriptionsEnabled && !closed) {
+                queryExistingPurchases(
+                    productType = BillingClient.ProductType.SUBS,
+                    isSubscription = true,
+                ) {}
             }
-            processPurchases(purchases)
         }
     }
 
-    private fun processPurchases(purchases: List<Purchase>) {
+    private fun queryExistingPurchases(
+        productType: String,
+        isSubscription: Boolean,
+        onFinished: () -> Unit,
+    ) {
+        if (closed || !billingClient.isReady) {
+            onFinished()
+            return
+        }
+        billingClient.queryPurchasesAsync(
+            QueryPurchasesParams.newBuilder().setProductType(productType).build(),
+        ) { billingResult, purchases ->
+            if (closed) {
+                onFinished()
+                return@queryPurchasesAsync
+            }
+            if (billingResult.responseCode != BillingClient.BillingResponseCode.OK) {
+                listener.onBillingUnavailable(
+                    billingResult.debugMessage.ifBlank {
+                        if (isSubscription) {
+                            "Google Play could not restore Paws Plus subscriptions."
+                        } else {
+                            "Google Play could not reload previous purchases."
+                        }
+                    },
+                )
+                onFinished()
+                return@queryPurchasesAsync
+            }
+            processPurchases(purchases, isSubscription)
+            onFinished()
+        }
+    }
+
+    private fun processPurchases(
+        purchases: List<Purchase>,
+        isSubscription: Boolean = false,
+    ) {
         purchases.forEach { purchase ->
             when (purchase.purchaseState) {
                 Purchase.PurchaseState.PURCHASED -> {
-                    val purchaseAccountId =
-                        purchase.accountIdentifiers
-                            ?.obfuscatedAccountId
+                    val productId = purchase.products.singleOrNull()
+                    val isPawsPlus = productId == StoreCatalog.PAWS_PLUS
+                    if (purchase.products.size != 1 || (isSubscription && !isPawsPlus) || (!isSubscription && isPawsPlus)) {
+                        listener.onBillingUnavailable(
+                            "A Google Play purchase has an unsupported product shape; no entitlement was granted.",
+                        )
+                        return@forEach
+                    }
+                    val purchaseAccountId = purchase.accountIdentifiers?.obfuscatedAccountId
                     val restorableNonConsumable =
-                        purchase.products.singleOrNull()
-                            ?.let(StoreCatalog::find)
-                            ?.kind ==
+                        !isSubscription &&
+                            productId?.let(StoreCatalog::find)?.kind ==
                             StoreProductKind.NON_CONSUMABLE_REMOVE_ADS
-                    val validPurchaseAccountId =
-                        purchaseAccountId?.takeIf(OBFUSCATED_ACCOUNT_ID_REGEX::matches)
-                    if (
-                        purchaseAccountId == null &&
-                        restorableNonConsumable
-                    ) {
+                    val validPurchaseAccountId = purchaseAccountId?.takeIf(OBFUSCATED_ACCOUNT_ID_REGEX::matches)
+                    if (purchaseAccountId == null && restorableNonConsumable) {
                         listener.onBillingUnavailable(
                             "This Remove Ads purchase has no recoverable Ludo Paws account binding. Restore the account that made the purchase; no entitlement was granted.",
                         )
                         return@forEach
                     }
-                    if (
-                        purchaseAccountId != currentBillingAccountId &&
-                        !restorableNonConsumable
-                    ) {
+                    if (purchaseAccountId != currentBillingAccountId && !restorableNonConsumable) {
                         listener.onBillingUnavailable(
-                            "A Play purchase could not be matched to this app installation; no content was granted.",
+                            "A Play purchase could not be matched to this app account; no content was granted.",
                         )
                         return@forEach
                     }
-                    if (
-                        validPurchaseAccountId == null ||
-                        !processingPurchaseTokens.add(purchase.purchaseToken)
-                    ) {
+                    if (validPurchaseAccountId == null || !processingPurchaseTokens.add(purchase.purchaseToken)) {
                         if (validPurchaseAccountId == null) {
                             listener.onBillingUnavailable(
                                 "This Play purchase has an invalid Ludo Paws account binding. No content was granted.",
@@ -354,20 +377,18 @@ class GooglePlayBillingGateway(
                         }
                         return@forEach
                     }
-                    if (purchase.products.size != 1) {
-                        processingPurchaseTokens.remove(purchase.purchaseToken)
-                        listener.onBillingUnavailable(
-                            "This purchase contains an unsupported number of products; no content was granted.",
-                        )
-                        return@forEach
-                    }
-                    purchase.products.forEach { productId ->
-                        listener.onPurchaseRequiresVerification(
-                            productId = productId,
+                    if (isSubscription) {
+                        listener.onSubscriptionRequiresVerification(
+                            productId = StoreCatalog.PAWS_PLUS,
                             purchaseToken = purchase.purchaseToken,
-                            // Preserve the account encoded by Google Play. For a Remove Ads
-                            // purchase from another account, the server must wait until that
-                            // exact Ludo Paws account is restored; never relabel the purchase.
+                            accountId = validPurchaseAccountId,
+                        ) {
+                            processingPurchaseTokens.remove(purchase.purchaseToken)
+                        }
+                    } else {
+                        listener.onPurchaseRequiresVerification(
+                            productId = requireNotNull(productId),
+                            purchaseToken = purchase.purchaseToken,
                             accountId = validPurchaseAccountId,
                         ) {
                             processingPurchaseTokens.remove(purchase.purchaseToken)
@@ -386,106 +407,76 @@ class GooglePlayBillingGateway(
     }
 
     private fun queryProducts() {
-        if (
-            closed
-        ) {
+        if (closed) return
+        productDetails.clear()
+        queryProductType(
+            productIds = StoreCatalog.playProductIds,
+            productType = BillingClient.ProductType.INAPP,
+        ) { oneTimeProducts ->
+            val combined = linkedMapOf<String, StoreBillingProduct>().apply {
+                putAll(oneTimeProducts)
+            }
+            if (!subscriptionsEnabled || closed) {
+                listener.onCatalogLoaded(combined)
+                return@queryProductType
+            }
+            queryProductType(
+                productIds = StoreCatalog.subscriptionProductIds,
+                productType = BillingClient.ProductType.SUBS,
+            ) { subscriptionProducts ->
+                combined.putAll(subscriptionProducts)
+                if (!closed) listener.onCatalogLoaded(combined)
+            }
+        }
+    }
+
+    private fun queryProductType(
+        productIds: List<String>,
+        productType: String,
+        onComplete: (Map<String, StoreBillingProduct>) -> Unit,
+    ) {
+        if (closed || productIds.isEmpty()) {
+            onComplete(emptyMap())
             return
         }
-
-        val products =
-            StoreCatalog
-                .playProductIds
-                .map {
-                        productId ->
-                    QueryProductDetailsParams
-                        .Product
-                        .newBuilder()
-                        .setProductId(
-                            productId,
-                        )
-                        .setProductType(
-                            BillingClient
-                                .ProductType
-                                .INAPP,
-                        )
-                        .build()
-                }
-
-        val params =
-            QueryProductDetailsParams
-                .newBuilder()
-                .setProductList(
-                    products,
-                )
+        val products = productIds.map { productId ->
+            QueryProductDetailsParams.Product.newBuilder()
+                .setProductId(productId)
+                .setProductType(productType)
                 .build()
-
-        billingClient
-            .queryProductDetailsAsync(
-                params,
-            ) {
-                    billingResult,
-                    result ->
-                if (
-                    closed
-                ) {
-                    return@queryProductDetailsAsync
-                }
-
-                if (
-                    billingResult.responseCode !=
-                    BillingClient
-                        .BillingResponseCode
-                        .OK
-                ) {
-                    listener
-                        .onBillingUnavailable(
-                            billingResult
-                                .debugMessage
-                                .ifBlank {
-                                    "Google Play catalog could not be loaded."
-                                },
-                        )
-                    return@queryProductDetailsAsync
-                }
-
-                productDetails
-                    .clear()
-
-                val mapped =
-                    linkedMapOf<
-                        String,
-                        StoreBillingProduct,
-                        >()
-
-                result
-                    .productDetailsList
-                    .forEach {
-                            details ->
-                        val offer =
-                            details
-                                .oneTimePurchaseOfferDetailsList
-                                ?.firstOrNull()
-                                ?: return@forEach
-                        productDetails[
-                            details.productId
-                        ] =
-                            details
-                        mapped[
-                            details.productId
-                        ] =
-                            StoreBillingProduct(
-                                productId =
-                                    details.productId,
-                                formattedPrice =
-                                    offer.formattedPrice,
-                            )
-                    }
-
-                listener
-                    .onCatalogLoaded(
-                        mapped,
-                    )
+        }
+        val params = QueryProductDetailsParams.newBuilder()
+            .setProductList(products)
+            .build()
+        billingClient.queryProductDetailsAsync(params) { billingResult, result ->
+            if (closed) return@queryProductDetailsAsync
+            if (billingResult.responseCode != BillingClient.BillingResponseCode.OK) {
+                listener.onBillingUnavailable(
+                    billingResult.debugMessage.ifBlank { "Google Play catalog could not be loaded." },
+                )
+                onComplete(emptyMap())
+                return@queryProductDetailsAsync
             }
+            val mapped = linkedMapOf<String, StoreBillingProduct>()
+            result.productDetailsList.forEach { details ->
+                val formattedPrice = if (productType == BillingClient.ProductType.SUBS) {
+                    val matchingOffers = details.subscriptionOfferDetails
+                        .orEmpty()
+                        .filter { it.basePlanId == StoreCatalog.PAWS_PLUS_BASE_PLAN_ID }
+                    val offer = matchingOffers.firstOrNull { it.offerId == null }
+                        ?: matchingOffers.firstOrNull()
+                    offer?.pricingPhases?.pricingPhaseList?.lastOrNull()?.formattedPrice
+                } else {
+                    details.oneTimePurchaseOfferDetailsList?.firstOrNull()?.formattedPrice
+                } ?: return@forEach
+                productDetails[details.productId] = details
+                mapped[details.productId] = StoreBillingProduct(
+                    productId = details.productId,
+                    formattedPrice = formattedPrice,
+                )
+            }
+            onComplete(mapped)
+        }
     }
 
     private companion object {
@@ -502,6 +493,13 @@ class GooglePlayBillingGateway(
         )
 
         fun onPurchaseRequiresVerification(
+            productId: String,
+            purchaseToken: String,
+            accountId: String,
+            onFinished: () -> Unit,
+        )
+
+        fun onSubscriptionRequiresVerification(
             productId: String,
             purchaseToken: String,
             accountId: String,
