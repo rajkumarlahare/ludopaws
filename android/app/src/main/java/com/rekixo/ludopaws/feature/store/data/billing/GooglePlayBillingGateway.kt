@@ -269,7 +269,18 @@ class GooglePlayBillingGateway(
             BillingClient
                 .BillingResponseCode
                 .OK -> {
-                processPurchases(purchases.orEmpty())
+                val (subscriptionPurchases, oneTimePurchases) =
+                    purchases.orEmpty().partition { purchase ->
+                        StoreCatalog.PAWS_PLUS in purchase.products
+                    }
+                processPurchases(oneTimePurchases, isSubscription = false)
+                if (subscriptionPurchases.isNotEmpty()) {
+                    if (subscriptionsEnabled) {
+                        processPurchases(subscriptionPurchases, isSubscription = true)
+                    } else {
+                        listener.onBillingUnavailable("Paws Plus subscription verification is not enabled for this build.")
+                    }
+                }
             }
             BillingClient
                 .BillingResponseCode
