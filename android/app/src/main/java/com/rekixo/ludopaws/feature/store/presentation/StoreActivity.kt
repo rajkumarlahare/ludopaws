@@ -23,6 +23,7 @@ import com.rekixo.ludopaws.feature.store.data.local.CosmeticInventoryStore
 import com.rekixo.ludopaws.feature.store.data.local.GemWalletStore
 import com.rekixo.ludopaws.feature.profile.data.local.ProfileStore
 import com.rekixo.ludopaws.feature.store.domain.StoreCosmeticCatalog
+import com.rekixo.ludopaws.feature.store.domain.StoreCatalog
 import com.rekixo.ludopaws.feature.store.domain.model.StoreBillingProduct
 import com.rekixo.ludopaws.feature.store.domain.model.StoreTab
 import com.rekixo.ludopaws.feature.store.presentation.components.storeContent
@@ -51,6 +52,8 @@ class StoreActivity :
             > =
         emptyMap()
     private var billingAvailable = false
+    private var billingProductCatalogLoaded = false
+    private var pendingAutoPurchaseProductId: String? = null
     private var rewardedAdsEnabledByServer = false
     private var rewardedAdsStatusLoaded = false
     private var rewardedAdsStatusError: Exception? = null
@@ -126,12 +129,17 @@ class StoreActivity :
         selectedTab =
             requestedInitialTab()
                 ?: StoreTab.GEMS
+        pendingAutoPurchaseProductId =
+            intent
+                .getStringExtra(EXTRA_PURCHASE_PRODUCT_ID)
+                ?.takeIf { it == StoreCatalog.REMOVE_ADS }
         renderStore()
     }
 
     override fun onStart() {
         super.onStart()
         billingAvailable = false
+        billingProductCatalogLoaded = false
 
         // Refresh catalog off the UI thread. Stale cached offers are display-only and
         // locked; all purchase/equip requests still go to the authoritative server.
@@ -220,6 +228,16 @@ class StoreActivity :
             runOnUiThread {
                 if (!canRenderStoreUi()) return@runOnUiThread
                 billingAvailable = available
+
+                val requestedProduct = pendingAutoPurchaseProductId
+                if (
+                    requestedProduct == StoreCatalog.REMOVE_ADS &&
+                    wallet.adsRemoved()
+                ) {
+                    pendingAutoPurchaseProductId = null
+                    showStoreMessage("Remove Ads is already active for this account.")
+                }
+
                 if (BuildConfig.LUDOPROOF_BILLING_ENABLED && billingAvailable) {
                     val binding = activeBillingAccountId
                     if (binding.isNullOrBlank()) {
@@ -228,7 +246,14 @@ class StoreActivity :
                     }
                     billing.updateAccountId(binding)
                     billing.connect()
-                } else if (BuildConfig.LUDOPROOF_BILLING_ENABLED) {
+                } else if (pendingAutoPurchaseProductId != null) {
+                    val productId = pendingAutoPurchaseProductId
+                    pendingAutoPurchaseProductId = null
+                    requestPurchase(productId)
+                } else if (
+                    BuildConfig.LUDOPROOF_BILLING_ENABLED &&
+                    requestedProduct == null
+                ) {
                     val message = availabilityError?.message
                         ?: "Google Play payments are not configured yet."
                     showStoreMessage(message)
@@ -389,8 +414,33 @@ class StoreActivity :
             }
             liveProducts =
                 products
+            billingProductCatalogLoaded = true
             renderStore()
+            launchPendingAutoPurchaseIfReady()
         }
+    }
+
+    private fun launchPendingAutoPurchaseIfReady() {
+        if (
+            !canRenderStoreUi() ||
+            !billingProductCatalogLoaded ||
+            !BuildConfig.LUDOPROOF_BILLING_ENABLED ||
+            !billingAvailable
+        ) {
+            return
+        }
+
+        val productId = pendingAutoPurchaseProductId ?: return
+        pendingAutoPurchaseProductId = null
+
+        if (productId == StoreCatalog.REMOVE_ADS && wallet.adsRemoved()) {
+            showStoreMessage("Remove Ads is already active for this account.")
+            return
+        }
+
+        // Called only after Google Play has returned the product catalog, so this opens
+        // the native Google Play purchase sheet rather than merely showing the Store page.
+        requestPurchase(productId)
     }
 
     override fun onPurchaseRequiresVerification(
@@ -869,6 +919,8 @@ class StoreActivity :
     companion object {
         const val EXTRA_INITIAL_TAB =
             "ludo_paws_store_initial_tab"
+        const val EXTRA_PURCHASE_PRODUCT_ID =
+            "ludo_paws_store_purchase_product_id"
         private const val TAG = "StoreBilling"
     }
 }
