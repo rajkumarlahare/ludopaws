@@ -223,7 +223,7 @@ export async function verifyAndSyncGooglePlaySubscription(
     pawsPlusActive: entitlementState,
     purchaseTokenHash,
     subscriptionLedgerId: purchaseTokenHash,
-    replay: synced.created === false,
+    replay: synced.replay === true,
   };
 }
 
