@@ -57,7 +57,7 @@ export function buildCloudflareRuntimeVars(existingVars, environment) {
 
   const rtdnAudience = String(environment.GOOGLE_PLAY_RTDN_AUDIENCE ?? "").trim();
   const rtdnEmail = String(environment.GOOGLE_PLAY_RTDN_EMAIL ?? "").trim();
-  const validRtdnEmail = /^[^@\\s]+@[^@\\s]+\\.iam\\.gserviceaccount\\.com$/.test(rtdnEmail);
+  const validRtdnEmail = /^[^@\s]+@[^@\s]+\.iam\.gserviceaccount\.com$/.test(rtdnEmail);
   if (subscriptionsEnabled) {
     if (rtdnAudience !== GOOGLE_PLAY_RTDN_AUDIENCE) {
       throw new Error("GOOGLE_PLAY_RTDN_AUDIENCE must exactly match the production subscription RTDN endpoint.");
