@@ -804,8 +804,10 @@ class StoreActivity :
             LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(0, dp(12), 0, dp(8))
-                clipChildren = false
-                clipToPadding = false
+                // The scrolling catalog must never draw outside its allocated viewport
+                // and over the pinned navigation/Remove Ads area.
+                clipChildren = true
+                clipToPadding = true
             }
         host.addView(
             page,
@@ -818,8 +820,10 @@ class StoreActivity :
         val fixedHeader =
             LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
-                clipChildren = false
-                clipToPadding = false
+                clipChildren = true
+                clipToPadding = true
+                // Keep the pinned header above the catalog if a child has an elevation shadow.
+                elevation = dp(6).toFloat()
             }
         page.addView(
             fixedHeader,
@@ -859,7 +863,10 @@ class StoreActivity :
             ScrollView(this).apply {
                 isFillViewport = true
                 overScrollMode = View.OVER_SCROLL_NEVER
-                clipToPadding = false
+                // Clip card artwork/elevation shadows at the scroll viewport edge.
+                clipChildren = true
+                clipToPadding = true
+                elevation = 0f
             }
         page.addView(
             scroll,
@@ -872,7 +879,11 @@ class StoreActivity :
             },
         )
 
-        val scrollContentHost = FrameLayout(this)
+        val scrollContentHost =
+            FrameLayout(this).apply {
+                clipChildren = true
+                clipToPadding = true
+            }
         scroll.addView(
             scrollContentHost,
             FrameLayout.LayoutParams(
