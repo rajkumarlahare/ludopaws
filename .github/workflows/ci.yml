@@ -173,6 +173,34 @@ jobs:
         uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a
         with:
           gradle-version: "8.11.1"
+      - name: Free disk space for Android emulator
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          echo "Disk usage before Android emulator cleanup:"
+          df -h /tmp
+          # The hosted runner image preinstalls large SDKs/toolchains that this Android
+          # instrumentation job does not use. Remove only those unrelated directories.
+          sudo rm -rf \
+            /opt/microsoft \
+            /opt/az \
+            /opt/ghc \
+            /opt/hostedtoolcache/CodeQL \
+            /usr/share/miniconda \
+            /usr/share/dotnet \
+            /usr/share/az* \
+            /usr/local/share/chromium \
+            /usr/local/share/powershell \
+            /usr/local/share/boost
+          docker image prune --all --force || true
+          docker builder prune --all --force || true
+          echo "Disk usage after Android emulator cleanup:"
+          df -h /tmp
+          available_kb="$(df -Pk /tmp | awk 'NR == 2 { print $4 }')"
+          if [[ ! "$available_kb" =~ ^[0-9]+$ ]] || (( available_kb < 8 * 1024 * 1024 )); then
+            echo "Expected at least 8 GiB of free space on /tmp after cleanup." >&2
+            exit 1
+          fi
       - name: Install emulator and Android SDK
         shell: bash
         run: |
@@ -212,9 +240,7 @@ jobs:
           # on headless SwiftShader during long instrumentation runs. Keep the
           # same 3:~7 aspect ratio while reducing software-rendering pressure.
           AVD_CONFIG="$ANDROID_AVD_HOME/ludopaws-ci.avd/config.ini"
-          # The hosted runner has ~6.8 GB available for this AVD; the Pixel 6 default asks for ~7.2 GB.
-          # Cap userdata to 4 GB so the emulator fits while retaining ample app/test space.
-          for setting in "hw.lcd.width=720" "hw.lcd.height=1600" "hw.lcd.density=320" "disk.dataPartition.size=4096m"; do
+          for setting in "hw.lcd.width=720" "hw.lcd.height=1600" "hw.lcd.density=320"; do
             key="${setting%%=*}"
             if grep -q "^$key=" "$AVD_CONFIG"; then
               sed -i "s|^$key=.*|$setting|" "$AVD_CONFIG"
