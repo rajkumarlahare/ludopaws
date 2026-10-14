@@ -247,6 +247,35 @@ test("archive excludes an item, and rollback restores a prior snapshot as a new 
   assert.equal(history.body.versions[0].rolledBackFromVersion, 1);
 });
 
+test("rollback preserves newer item IDs as archived tombstones", async () => {
+  const { store } = createStore();
+  await call(store, "/catalog/draft/save", mutation({ item: item() }));
+  await call(store, "/catalog/publish", mutation({
+    expectedRevision: 1, itemId: "paw_safari_01",
+  }));
+
+  const later = item({ id: "paw_newer_01", name: "Newer Paw" });
+  await call(store, "/catalog/draft/save", mutation({
+    expectedRevision: 2, item: later,
+  }));
+  await call(store, "/catalog/publish", mutation({
+    expectedRevision: 3, itemId: "paw_newer_01",
+  }));
+
+  const rolledBack = await call(store, "/catalog/rollback", mutation({
+    expectedRevision: 4, targetVersion: 1, reason: "Restore initial catalog",
+  }));
+  assert.equal(rolledBack.response.status, 200);
+  assert.equal(rolledBack.body.catalogVersion, 3);
+
+  const current = await call(store, "/catalog/current", null, "GET");
+  assert.equal(current.body.items.length, 2);
+  assert.equal(current.body.items.find(entry => entry.id === "paw_safari_01").status, "PUBLISHED");
+  const retained = current.body.items.find(entry => entry.id === "paw_newer_01");
+  assert.equal(retained.status, "ARCHIVED");
+  assert.equal(retained.catalogVersion, 3);
+});
+
 test("requires audit reason, authenticated actor identity, and a valid rollback target", async () => {
   const { store } = createStore();
   const noReason = await call(store, "/catalog/draft/save", mutation({ item: item(), reason: " " }));
