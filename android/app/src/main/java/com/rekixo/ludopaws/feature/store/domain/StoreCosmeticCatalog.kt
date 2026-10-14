@@ -14,7 +14,7 @@ object StoreCosmeticCatalog {
     const val DEFAULT_CHARACTER_PACK =
         "character_pack_starter_paws"
 
-    val boards =
+    private val builtInBoards =
         listOf(
             cosmetic(
                 id = "board_classic",
@@ -117,7 +117,7 @@ object StoreCosmeticCatalog {
             ),
         )
 
-    val dice =
+    private val builtInDice =
         listOf(
             cosmetic("dice_classic","CLASSIC",CosmeticCategory.DICE,CosmeticUnlockKind.FREE,"⚄",0xFFF7F7F7.toInt(),0xFF1B2838.toInt()),
             cosmetic("dice_pumpkin","PUMPKIN",CosmeticCategory.DICE,CosmeticUnlockKind.FREE,"1",0xFFD9802F.toInt(),0xFF6A351C.toInt()),
@@ -129,7 +129,7 @@ object StoreCosmeticCatalog {
             cosmetic("dice_heart","HEART",CosmeticCategory.DICE,CosmeticUnlockKind.GEMS,"♥",0xFFF8F8F8.toInt(),0xFFD82E3D.toInt(),gems=250),
         )
 
-    val avatars =
+    private val builtInAvatars =
         listOf(
             cosmetic("avatar_9","Avatar 9",CosmeticCategory.AVATAR,CosmeticUnlockKind.FREE,"A9",0xFF1E91E8.toInt(),0xFF073F97.toInt()),
             cosmetic("avatar_4","Avatar 4",CosmeticCategory.AVATAR,CosmeticUnlockKind.FREE,"A4",0xFF1E91E8.toInt(),0xFF073F97.toInt()),
@@ -149,7 +149,7 @@ object StoreCosmeticCatalog {
      * but cannot consume gems/progress or become selected until their complete
      * art/reaction/animation/voice pack is registered in the character catalog.
      */
-    val characterPacks =
+    private val builtInCharacterPacks =
         listOf(
             cosmetic(
                 id = DEFAULT_CHARACTER_PACK,
@@ -235,41 +235,111 @@ object StoreCosmeticCatalog {
             ),
         )
 
-    val all =
-        boards +
-            dice +
-            avatars +
-            characterPacks
+    @Volatile
+    private var remoteItemsById: Map<String, StoreCosmetic> = emptyMap()
 
-    val defaultOwnedIds =
-        all
-            .filter {
-                it.unlockKind ==
-                    CosmeticUnlockKind.FREE &&
-                    it.contentAvailable
-            }
-            .map {
-                it.id
-            }
+    @Volatile
+    private var suppressedLegacyIds: Set<String> = emptySet()
+
+    val boards: List<StoreCosmetic>
+        get() = mergedForCategory(CosmeticCategory.BOARD)
+
+    val dice: List<StoreCosmetic>
+        get() = mergedForCategory(CosmeticCategory.DICE)
+
+    val avatars: List<StoreCosmetic>
+        get() = mergedForCategory(CosmeticCategory.AVATAR)
+
+    val characterPacks: List<StoreCosmetic>
+        get() = mergedForCategory(CosmeticCategory.CHARACTER_PACK)
+
+    val all: List<StoreCosmetic>
+        get() = boards + dice + avatars + characterPacks
+
+    // Only shipped, locally renderable defaults are granted at account creation.
+    // Remote FREE offers never become locally owned merely by appearing in a catalog.
+    val defaultOwnedIds: Set<String>
+        get() = (builtInBoards + builtInDice + builtInAvatars + builtInCharacterPacks)
+            .filter { it.unlockKind == CosmeticUnlockKind.FREE && it.contentAvailable }
+            .map { it.id }
             .toSet()
+
+    fun replaceRemoteCatalog(
+        items: List<StoreCosmetic>,
+        suppressedIds: Set<String>,
+    ) {
+        val safeItems = items
+            .filter { it.remoteManaged && ID_PATTERN.matches(it.id) }
+            .distinctBy { it.id }
+            .associateBy { it.id }
+        remoteItemsById = safeItems
+        // A published item always takes precedence over suppression metadata for the same ID.
+        suppressedLegacyIds = suppressedIds
+            .filter(ID_PATTERN::matches)
+            .toSet() - safeItems.keys
+    }
+
+    fun clearRemoteCatalog() {
+        remoteItemsById = emptyMap()
+        suppressedLegacyIds = emptySet()
+    }
+
+    fun findBuiltIn(id: String): StoreCosmetic? =
+        (builtInBoards + builtInDice + builtInAvatars + builtInCharacterPacks)
+            .firstOrNull { it.id == id }
 
     fun find(
         id: String,
     ): StoreCosmetic? =
         all.firstOrNull {
-            it.id ==
-                id
+            it.id == id
         }
 
     fun forCategory(
         category: CosmeticCategory,
     ): List<StoreCosmetic> =
-        when (category) {
-            CosmeticCategory.BOARD -> boards
-            CosmeticCategory.DICE -> dice
-            CosmeticCategory.AVATAR -> avatars
-            CosmeticCategory.CHARACTER_PACK -> characterPacks
+        mergedForCategory(category)
+
+    private fun mergedForCategory(
+        category: CosmeticCategory,
+    ): List<StoreCosmetic> {
+        val builtIns = when (category) {
+            CosmeticCategory.BOARD -> builtInBoards
+            CosmeticCategory.DICE -> builtInDice
+            CosmeticCategory.AVATAR -> builtInAvatars
+            CosmeticCategory.CHARACTER_PACK -> builtInCharacterPacks
         }
+        val hiddenIds = suppressedLegacyIds
+        val remote = remoteItemsById
+        val visibleBuiltIns = builtIns
+            .filterNot { builtIn ->
+                val serverItem = remote[builtIn.id]
+                builtIn.id in hiddenIds ||
+                    (serverItem != null && serverItem.category != builtIn.category)
+            }
+            .map { builtIn ->
+                val serverItem = remote[builtIn.id]
+                if (serverItem == null) {
+                    builtIn
+                } else {
+                    serverItem.copy(
+                        previewSymbol = builtIn.previewSymbol,
+                        previewPrimary = builtIn.previewPrimary,
+                        previewSecondary = builtIn.previewSecondary,
+                        characterPackId = builtIn.characterPackId,
+                        eventKey = builtIn.eventKey,
+                        // Server availability is necessary, but the app must also have a
+                        // matching local renderer/complete content pack before enabling taps.
+                        contentAvailable = builtIn.contentAvailable && serverItem.contentAvailable,
+                    )
+                }
+            }
+        val builtInIds = builtIns.map { it.id }.toSet()
+        val newRemoteItems = remote.values
+            .filter { it.category == category && it.id !in builtInIds }
+            .map { it.copy(contentAvailable = false) }
+        return visibleBuiltIns + newRemoteItems
+    }
 
     fun defaultId(
         category: CosmeticCategory,
@@ -280,6 +350,8 @@ object StoreCosmeticCatalog {
             CosmeticCategory.AVATAR -> DEFAULT_AVATAR
             CosmeticCategory.CHARACTER_PACK -> DEFAULT_CHARACTER_PACK
         }
+
+    private val ID_PATTERN = Regex("^[a-z0-9][a-z0-9_-]{2,63}$")
 
     private fun cosmetic(
         id: String,

@@ -59,6 +59,10 @@
       {
         "name": "LUDOPROOF_PLAYER_ACCOUNTS",
         "class_name": "PlayerAccount"
+      },
+      {
+        "name": "LUDOPROOF_STORE_CATALOG",
+        "class_name": "StoreCatalogStore"
       }
     ]
   },
@@ -128,6 +132,12 @@
       "tag": "v11-player-accounts",
       "new_sqlite_classes": [
         "PlayerAccount"
+      ]
+    },
+    {
+      "tag": "v12-store-catalog",
+      "new_sqlite_classes": [
+        "StoreCatalogStore"
       ]
     }
   ],

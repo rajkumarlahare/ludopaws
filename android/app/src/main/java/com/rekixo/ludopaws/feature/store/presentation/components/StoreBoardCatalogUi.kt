@@ -111,6 +111,7 @@ private fun StoreActivity.boardPanel(
         isFocusable = !locked
         contentDescription =
             when {
+                locked && board.remoteManaged -> "${board.title}, not available in this app build yet"
                 locked -> "$LOCKED_BOARD_TITLE, locked, coming soon"
                 !owned -> "${board.title}, available to unlock"
                 else -> "${board.title}, unlocked" + if (selected) ", selected" else ""
@@ -118,7 +119,7 @@ private fun StoreActivity.boardPanel(
 
         addView(
             TextView(this@boardPanel).apply {
-                text = if (locked) LOCKED_BOARD_TITLE else board.title
+                text = if (locked && !board.remoteManaged) LOCKED_BOARD_TITLE else board.title
                 textSize = 14.5f
                 setTypeface(Typeface.DEFAULT_BOLD)
                 setTextColor(Color.WHITE)

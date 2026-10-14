@@ -1,6 +1,6 @@
 # Ludo Paws — Configurable Store & Monetization Roadmap
 
-Status: planning baseline only. This document does not enable billing, rewarded ads, or production deployment.
+Status: Phase 2 catalog API and initial Phase 4 Android discovery/cache integration are implemented on feat/ludopaws-production-readiness. The Worker is not production-deployed, the catalog starts empty, and no dynamic asset bundle is uploaded. This roadmap does not enable billing, rewarded ads, or production deployment.
 
 ## Objective
 
@@ -46,6 +46,8 @@ Acceptance: schema validation and tests reject duplicate IDs, invalid prices, in
 - All purchase/unlock requests re-check item status, content readiness, eligibility and prices on the server.
 - Use ETags/version numbers, caching and rollback of catalog versions.
 - Acceptance: stale clients cannot unlock archived/unavailable items; changing metadata does not delete ownership.
+
+Initial feature-branch implementation adds authenticated catalog reads with ETag/country availability filtering, account-allowlisted draft/publish/archive/rollback routes, optimistic revision checks, audit events, a versioned Durable Object store, and rollback tombstones that preserve stable item IDs. PlayerAccount reads catalog state before catalog-managed purchase/equip and cosmetic-ad reward progress, uses server-authored channel/pricing, blocks archived/unavailable items, fails closed when catalog storage cannot be read, and now blocks purchase/equip/reward actions for catalog IDs without an installed available server-side renderer/entitlement mapping. Android fetches the authenticated catalog off the UI thread, validates IDs/categories/channels/prices/assets, caches the last good response, locks stale cached items, merges metadata for matching installed renderers, suppresses bundled legacy IDs when the canonical catalog marks them unavailable, and shows unknown item titles as locked previews. A multi-channel chooser is wired for compatible renderable items; Play-product, Level and Event unlock actions remain disabled. The Worker remains undeployed, catalogue starts empty, unknown/new assets are not loaded at runtime, and physical-device acceptance remains open. See docs/STORE_CATALOG_API.md.
 
 ### Phase 3 — Admin Studio and asset pipeline
 Target host: `studio.ludopaws.rekixo.com`, only after DNS/TLS and authentication setup.

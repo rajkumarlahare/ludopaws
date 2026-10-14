@@ -169,6 +169,11 @@ class AccountRepository(context: Context) {
 
     fun storeStatus(): JSONObject = request("GET", "/api/store/status")
 
+    fun storeCatalog(): JSONObject {
+        val session = requireSession()
+        return request("GET", "/api/store/catalog", token = session.accessToken)
+    }
+
     fun verifyPlayPurchase(productId: String, purchaseToken: String): JSONObject {
         val session = requireSession()
         return request(
@@ -181,14 +186,16 @@ class AccountRepository(context: Context) {
         )
     }
 
-    fun purchaseCosmetic(cosmeticId: String): JSONObject {
+    fun purchaseCosmetic(cosmeticId: String, unlockChannel: String? = null): JSONObject {
         val session = requireSession()
+        val body = JSONObject()
+            .put("cosmeticId", cosmeticId)
+            .put("clientRequestId", UUID.randomUUID().toString().lowercase())
+        if (unlockChannel != null) body.put("unlockChannel", unlockChannel)
         return request(
             "POST",
             "/api/wallet/cosmetics/purchase",
-            JSONObject()
-                .put("cosmeticId", cosmeticId)
-                .put("clientRequestId", UUID.randomUUID().toString().lowercase()),
+            body,
             session.accessToken,
         )
     }

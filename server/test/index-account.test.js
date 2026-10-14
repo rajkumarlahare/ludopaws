@@ -66,6 +66,33 @@ function makePlayerNamespace() {
   };
 }
 
+function makeCatalogNamespace(defaultResponse, calls = []) {
+  return {
+    idFromName(name) { return name; },
+    get(name) {
+      return {
+        async fetch(request) {
+          const url = new URL(request.url);
+          let requestBody = null;
+          if (request.method === "POST") requestBody = await request.json();
+          calls.push({ name, method: request.method, path: url.pathname, search: url.search, body: requestBody });
+          if (url.pathname === "/catalog/draft/save" && requestBody) {
+            return Response.json({ ok: true, revision: requestBody.expectedRevision + 1, catalogVersion: 0, draft: requestBody.item });
+          }
+          if (url.pathname === "/catalog/current") return Response.json(defaultResponse);
+          if (url.pathname === "/catalog/admin-state") return Response.json({
+            ...defaultResponse, drafts: {}, audit: [],
+          });
+          if (url.pathname === "/catalog/history") return Response.json({
+            ...defaultResponse, versions: [], audit: [],
+          });
+          return Response.json({ ok: true, received: requestBody });
+        },
+      };
+    },
+  };
+}
+
 test("account wallet API derives the account from the verified bearer token, not URL input", async () => {
   const player = makePlayerNamespace();
   const env = {
@@ -92,6 +119,117 @@ test("account wallet API derives the account from the verified bearer token, not
   assert.ok(player.calls.every((call) => call.body.accountId === ACCOUNT_A));
   assert.ok(player.calls.some((call) => call.path === "/session/check"));
   assert.ok(player.calls.some((call) => call.path === "/wallet/get"));
+});
+
+test("catalog read requires a session and filters by status, schedule, and region with ETag support", async () => {
+  const now = Date.now();
+  const entry = (id, overrides = {}) => ({
+    id, status: "PUBLISHED", contentReady: true,
+    availability: { worldwide: true, allowedCountries: [], blockedCountries: [], startsAt: null, endsAt: null },
+    ...overrides,
+  });
+  const state = {
+    revision: 5,
+    catalogVersion: 7,
+    updatedAt: new Date(now).toISOString(),
+    items: [
+      entry("paw_global_01"),
+      entry("paw_draft_01", { status: "DRAFT" }),
+      entry("paw_archived_01", { status: "ARCHIVED" }),
+      entry("paw_future_01", { availability: {
+        worldwide: true, allowedCountries: [], blockedCountries: [],
+        startsAt: new Date(now + 60_000).toISOString(), endsAt: null,
+      } }),
+      entry("paw_india_01", { availability: {
+        worldwide: false, allowedCountries: ["IN"], blockedCountries: [],
+        startsAt: null, endsAt: null,
+      } }),
+    ],
+  };
+  const catalog = makeCatalogNamespace(state);
+  const env = {
+    LUDOPROOF_SESSION_HMAC_KEY: SECRET,
+    LUDOPROOF_API_GATE: makeRateGate(),
+    LUDOPROOF_PLAYER_ACCOUNTS: makePlayerNamespace(),
+    LUDOPROOF_STORE_CATALOG: catalog,
+  };
+  const token = await issueAccessToken(env, ACCOUNT_A, SESSION_A, Date.now());
+  const response = await accountWorker.fetch(new Request("https://api.example.test/api/store/catalog", {
+    headers: { authorization: "Bearer " + token, "cf-ipcountry": "IN" },
+  }), env);
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.deepEqual(body.items.map(item => item.id).sort(), ["paw_global_01", "paw_india_01"]);
+  assert.deepEqual(body.suppressedIds, ["paw_archived_01", "paw_draft_01", "paw_future_01"]);
+  const etag = response.headers.get("etag");
+  assert.match(etag, /ludopaws-catalog-v7-IN-/);
+  assert.equal(response.headers.get("cache-control"), "private, max-age=60, must-revalidate");
+
+  const cached = await accountWorker.fetch(new Request("https://api.example.test/api/store/catalog", {
+    headers: {
+      authorization: "Bearer " + token,
+      "cf-ipcountry": "IN",
+      "if-none-match": etag,
+    },
+  }), env);
+  assert.equal(cached.status, 304);
+});
+
+test("catalog administration fails closed without an allowlist and denies non-admin accounts", async () => {
+  const env = {
+    LUDOPROOF_SESSION_HMAC_KEY: SECRET,
+    LUDOPROOF_API_GATE: makeRateGate(),
+    LUDOPROOF_PLAYER_ACCOUNTS: makePlayerNamespace(),
+  };
+  const tokenA = await issueAccessToken(env, ACCOUNT_A, SESSION_A, Date.now());
+  const missingAllowlist = await accountWorker.fetch(new Request("https://api.example.test/api/admin/store/catalog", {
+    headers: { authorization: "Bearer " + tokenA },
+  }), env);
+  assert.equal(missingAllowlist.status, 503);
+  assert.equal((await missingAllowlist.json()).error, "CATALOG_ADMIN_NOT_CONFIGURED");
+
+  env.LUDOPROOF_CATALOG_ADMIN_ACCOUNT_IDS = ACCOUNT_B;
+  const forbidden = await accountWorker.fetch(new Request("https://api.example.test/api/admin/store/catalog", {
+    headers: { authorization: "Bearer " + tokenA },
+  }), env);
+  assert.equal(forbidden.status, 403);
+  assert.equal((await forbidden.json()).error, "CATALOG_ADMIN_FORBIDDEN");
+});
+
+test("admin draft route binds the audit actor to the verified account, not body-supplied identity", async () => {
+  const calls = [];
+  const catalog = makeCatalogNamespace({ revision: 0, catalogVersion: 0, items: [], updatedAt: null }, calls);
+  const env = {
+    LUDOPROOF_SESSION_HMAC_KEY: SECRET,
+    LUDOPROOF_API_GATE: makeRateGate(),
+    LUDOPROOF_PLAYER_ACCOUNTS: makePlayerNamespace(),
+    LUDOPROOF_STORE_CATALOG: catalog,
+    LUDOPROOF_CATALOG_ADMIN_ACCOUNT_IDS: ACCOUNT_A,
+  };
+  const token = await issueAccessToken(env, ACCOUNT_A, SESSION_A, Date.now());
+  const item = {
+    id: "paw_admin_01", category: "PAW", name: "Admin Paw", description: "",
+    status: "DRAFT", contentReady: false,
+    asset: { thumbnail: "r2://staging/a.png", manifest: "r2://staging/m.json", version: 1, sha256: "a".repeat(64), format: "GLB" },
+    unlock: { channels: ["GEMS"], gems: { enabled: true, price: 50 } },
+    availability: { worldwide: true, allowedCountries: [], blockedCountries: [], startsAt: null, endsAt: null },
+    catalogVersion: 1,
+  };
+  const response = await accountWorker.fetch(new Request("https://api.example.test/api/admin/store/catalog/items/paw_admin_01", {
+    method: "PUT",
+    headers: { authorization: "Bearer " + token, "content-type": "application/json" },
+    body: JSON.stringify({
+      expectedRevision: 0,
+      reason: "Add admin draft",
+      actorId: ACCOUNT_B,
+      item,
+    }),
+  }), env);
+  assert.equal(response.status, 200);
+  const call = calls.find(entry => entry.path === "/catalog/draft/save");
+  assert.ok(call);
+  assert.equal(call.body.actorId, ACCOUNT_A);
+  assert.notEqual(call.body.actorId, ACCOUNT_B);
 });
 
 test("account wallet API rejects requests without a verified bearer token", async () => {

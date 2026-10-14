@@ -169,6 +169,39 @@ requireText(
   'providers.gradleProperty("LUDOPROOF_INTERSTITIAL_ADS_ENABLED")',
   "the post-win interstitial placement must remain independently configurable and default-off.",
 );
+
+for (const [property, variable] of [
+  ["LUDOPROOF_BILLING_ENABLED", "ludoProofBillingEnabled"],
+  ["LUDOPROOF_ADS_ENABLED", "ludoProofAdsEnabled"],
+  ["LUDOPROOF_INTERSTITIAL_ADS_ENABLED", "ludoProofInterstitialAdsEnabled"],
+]) {
+  requirePattern(
+    "android/app/build.gradle.kts",
+    appBuild,
+    new RegExp(
+      `val\\s+${variable}\\s*=\\s*providers\\.gradleProperty\\("${property}"\\)\\s*\\.orElse\\("false"\\)\\s*\\.get\\(\\)\\s*\\.toBooleanStrictOrNull\\(\\)\\s*\\?:\\s*false`,
+    ),
+    `${property} must default to false and malformed values must fail closed.`,
+  );
+}
+
+for (const [marker, message] of [
+  ['[ -n "$APP_BILLING" ] || APP_BILLING="false"', "Android Billing must default off when release configuration is omitted."],
+  ['[ -n "$SERVER_BILLING" ] || SERVER_BILLING="false"', "Worker Billing must default off when release configuration is omitted."],
+  ['[ -n "$APP_ADS" ] || APP_ADS="false"', "Android ads must default off when release configuration is omitted."],
+  ['[ -n "$INTERSTITIAL_ADS" ] || INTERSTITIAL_ADS="false"', "Interstitial ads must default off when release configuration is omitted."],
+  ['[ -n "$SERVER_ADS" ] || SERVER_ADS="false"', "Worker SSV/rewarded ads must default off when release configuration is omitted."],
+  ['if [ "$APP_BILLING" != "$SERVER_BILLING" ]; then', "Signed release must block mismatched Android/Worker Billing flags."],
+  ['if [ "$APP_ADS" != "$SERVER_ADS" ]; then', "Signed release must block mismatched Android/Worker Ads flags."],
+]) {
+  requireText(
+    ".github/workflows/android-signed-release.yml",
+    signedReleaseWorkflow,
+    marker,
+    message,
+  );
+}
+
 requireText(
   "PostWinInterstitialAdController.kt",
   interstitialController,

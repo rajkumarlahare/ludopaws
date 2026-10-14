@@ -1,6 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { assertCatalogCanPublish, validateCatalog, validateCatalogItem } from "./store-catalog.js";
+
+const ownDir = path.dirname(fileURLToPath(import.meta.url));
+const schema = JSON.parse(await readFile(path.resolve(ownDir, "../../docs/STORE_CATALOG_SCHEMA.json"), "utf8"));
 
 const item = (overrides = {}) => ({
   id: "paw_safari_01",
@@ -25,6 +31,11 @@ const item = (overrides = {}) => ({
   availability: { worldwide: true, allowedCountries: [], blockedCountries: ["KP"], startsAt: null, endsAt: null },
   catalogVersion: 1,
   ...overrides,
+});
+
+test("validator schema ID stays aligned with the canonical JSON Schema", () => {
+  const result = validateCatalogItem(item(), { playProducts: ["paw_safari_01"] });
+  assert.equal(result.schemaId, schema.$id);
 });
 
 test("accepts a draft item with independently enabled rewarded ads, Gems and direct purchase", () => {
@@ -66,6 +77,33 @@ test("rejects invalid country codes and invalid availability windows", () => {
   }}));
   assert.ok(result.errors.some((error) => error.includes("country codes")));
   assert.ok(result.errors.some((error) => error.includes("end must be later")));
+});
+
+test("rejects malformed schedule timestamps even when only one bound is set", () => {
+  const baseline = item().availability;
+  const cases = [
+    {
+      availability: { ...baseline, startsAt: "not-a-date", endsAt: null },
+      error: "availability.startsAt must be a valid ISO 8601 date-time or null",
+    },
+    {
+      availability: { ...baseline, startsAt: null, endsAt: "not-a-date" },
+      error: "availability.endsAt must be a valid ISO 8601 date-time or null",
+    },
+    {
+      availability: { ...baseline, startsAt: "2026-10-14", endsAt: null },
+      error: "availability.startsAt must be a valid ISO 8601 date-time or null",
+    },
+    {
+      availability: { ...baseline, startsAt: "2026-02-30T12:00:00Z", endsAt: null },
+      error: "availability.startsAt must be a valid ISO 8601 date-time or null",
+    },
+  ];
+
+  for (const scenario of cases) {
+    const result = validateCatalogItem(item({ availability: scenario.availability }));
+    assert.ok(result.errors.includes(scenario.error), result.errors.join("; "));
+  }
 });
 
 test("publishes only complete, validated catalog records", () => {

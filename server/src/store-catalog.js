@@ -1,10 +1,6 @@
-import { readFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
-import path from "node:path";
-
-const ownDir = path.dirname(fileURLToPath(import.meta.url));
-const schemaPath = path.resolve(ownDir, "../../docs/STORE_CATALOG_SCHEMA.json");
-const SCHEMA = JSON.parse(await readFile(schemaPath, "utf8"));
+// Keep this validator usable in both Node-based tests and the Cloudflare Worker runtime.
+// The canonical JSON Schema lives in docs/STORE_CATALOG_SCHEMA.json; its ID is mirrored here.
+const SCHEMA_ID = "https://ludopaws.rekixo.com/schemas/store-catalog-item.schema.json";
 
 const VALID_CHANNELS = new Set(["FREE", "REWARDED_ADS", "GEMS", "PLAY_PRODUCT", "LEVEL", "EVENT"]);
 const VALID_CATEGORIES = new Set(["PAW", "DICE", "BOARD", "AVATAR", "BUNDLE"]);
@@ -14,6 +10,23 @@ const COUNTRY_CODE = /^[A-Z]{2}$/;
 const ITEM_ID = /^[a-z0-9][a-z0-9_-]{2,63}$/;
 const PRODUCT_ID = /^[a-z][a-z0-9_]{2,63}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
+
+const ISO_DATE_TIME =
+  /^(\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])T([01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/;
+
+function parseAvailabilityDateTime(value) {
+  if (typeof value !== "string") return Number.NaN;
+  const match = value.match(ISO_DATE_TIME);
+  if (!match) return Number.NaN;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const daysByMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  if (day > daysByMonth[month - 1]) return Number.NaN;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : Number.NaN;
+}
 
 /**
  * Lightweight dependency-free validator for the operational invariants in
@@ -99,10 +112,16 @@ export function validateCatalogItem(item, { playProducts = [], requirePublished 
         new Set(availability[field]).size === availability[field].length,
       `availability.${field} must contain unique ISO-style uppercase two-letter country codes`);
     }
-    add(!(availability.startsAt != null && availability.endsAt != null) ||
-      (Number.isFinite(Date.parse(availability.startsAt)) && Number.isFinite(Date.parse(availability.endsAt)) &&
-       Date.parse(availability.startsAt) < Date.parse(availability.endsAt)),
-    "availability end must be later than start");
+    const startsAt = availability.startsAt == null ? null : parseAvailabilityDateTime(availability.startsAt);
+    const endsAt = availability.endsAt == null ? null : parseAvailabilityDateTime(availability.endsAt);
+    add(availability.startsAt == null || Number.isFinite(startsAt),
+      "availability.startsAt must be a valid ISO 8601 date-time or null");
+    add(availability.endsAt == null || Number.isFinite(endsAt),
+      "availability.endsAt must be a valid ISO 8601 date-time or null");
+    if (availability.startsAt != null && availability.endsAt != null &&
+        Number.isFinite(startsAt) && Number.isFinite(endsAt)) {
+      add(startsAt < endsAt, "availability end must be later than start");
+    }
     add(!(availability.worldwide && Array.isArray(availability.allowedCountries) && availability.allowedCountries.length > 0),
       "worldwide availability cannot be combined with an allowlist; use blockedCountries instead");
   }
@@ -114,7 +133,7 @@ export function validateCatalogItem(item, { playProducts = [], requirePublished 
     add(isRecord(unlock) && Array.isArray(unlock.channels) && unlock.channels.length > 0, "published items require at least one unlock channel");
   }
 
-  return { valid: errors.length === 0, errors, schemaId: SCHEMA.$id };
+  return { valid: errors.length === 0, errors, schemaId: SCHEMA_ID };
 }
 
 export function validateCatalog(items, options = {}) {

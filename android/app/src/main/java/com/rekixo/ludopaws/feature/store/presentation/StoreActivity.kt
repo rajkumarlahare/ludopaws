@@ -14,6 +14,7 @@ import com.rekixo.ludopaws.BuildConfig
 import com.rekixo.ludopaws.LudoProofApplication
 import com.rekixo.ludopaws.LudoProofTheme
 import com.rekixo.ludopaws.feature.store.data.ads.PostWinInterstitialAdController
+import com.rekixo.ludopaws.feature.store.data.StoreCatalogRepository
 import com.rekixo.ludopaws.feature.store.data.ads.RewardedAdsController
 import com.rekixo.ludopaws.feature.store.data.billing.GooglePlayBillingGateway
 import com.rekixo.ludopaws.feature.store.data.billing.PendingStorePurchase
@@ -61,6 +62,13 @@ class StoreActivity :
         Executors.newSingleThreadExecutor { runnable ->
             Thread(runnable, "LudoPawsStoreBilling")
         }
+    private val catalogExecutor =
+        Executors.newSingleThreadExecutor { runnable ->
+            Thread(runnable, "LudoPawsStoreCatalog")
+        }
+    private val storeCatalogRepository by lazy {
+        StoreCatalogRepository(this, accountRepository)
+    }
     private val rewardVerificationExecutor =
         Executors.newSingleThreadExecutor { runnable ->
             Thread(runnable, "LudoPawsRewardVerification")
@@ -123,6 +131,28 @@ class StoreActivity :
     override fun onStart() {
         super.onStart()
         billingAvailable = false
+
+        // Refresh catalog off the UI thread. Stale cached offers are display-only and
+        // locked; all purchase/equip requests still go to the authoritative server.
+        catalogExecutor.execute {
+            try {
+                accountRepository.ensureGuestSession()
+                val snapshot = storeCatalogRepository.refresh()
+                StoreCosmeticCatalog.replaceRemoteCatalog(snapshot.items, snapshot.suppressedIds)
+                if (snapshot.stale) {
+                    Log.i(
+                        TAG,
+                        "Using stale locked catalog display data (version=${snapshot.catalogVersion}, itemCount=${snapshot.items.size}).",
+                    )
+                }
+                runOnUiThread {
+                    if (canRenderStoreUi()) renderStore()
+                }
+            } catch (error: Exception) {
+                Log.w(TAG, "Remote catalog refresh failed: ${safeErrorSummary(error)}")
+            }
+        }
+
         rewardedAdsStatusLoaded = false
         rewardedAdsStatusError = null
 
@@ -229,6 +259,7 @@ class StoreActivity :
         if (billingWasCreated) billing.close()
         if (rewardedAdsWasCreated) rewardedAds.close()
         billingExecutor.shutdownNow()
+        catalogExecutor.shutdownNow()
         rewardVerificationExecutor.shutdownNow()
         rewardedAdRequestExecutor.shutdownNow()
         super.onDestroy()
@@ -448,13 +479,76 @@ class StoreActivity :
     }
 
     internal fun purchaseOrSelectCosmetic(cosmetic: com.rekixo.ludopaws.feature.store.domain.model.StoreCosmetic) {
+        val owned = cosmetics.isOwned(cosmetic.id)
+        if (!owned && cosmetic.remoteManaged && cosmetic.unlockChannels.size > 1) {
+            val channels = cosmetic.unlockChannels
+            val labels = channels.map { channel ->
+                when (channel) {
+                    com.rekixo.ludopaws.feature.store.domain.model.CosmeticUnlockKind.FREE ->
+                        "Free"
+                    com.rekixo.ludopaws.feature.store.domain.model.CosmeticUnlockKind.GEMS ->
+                        "${cosmetic.gemPrice} Gems"
+                    com.rekixo.ludopaws.feature.store.domain.model.CosmeticUnlockKind.REWARDED_ADS ->
+                        "Watch ${cosmetic.requiredAdViews} rewarded ads"
+                    com.rekixo.ludopaws.feature.store.domain.model.CosmeticUnlockKind.LEVEL ->
+                        "Reach level ${cosmetic.requiredLevel}"
+                    com.rekixo.ludopaws.feature.store.domain.model.CosmeticUnlockKind.EVENT ->
+                        "Event unlock"
+                    com.rekixo.ludopaws.feature.store.domain.model.CosmeticUnlockKind.PLAY_PRODUCT ->
+                        "Google Play purchase (not available yet)"
+                }
+            }
+            AlertDialog.Builder(this)
+                .setTitle("Unlock ${cosmetic.title}")
+                .setItems(labels.toTypedArray()) { _, index ->
+                    val channel = channels.getOrNull(index) ?: return@setItems
+                    if (channel == com.rekixo.ludopaws.feature.store.domain.model.CosmeticUnlockKind.REWARDED_ADS &&
+                        cosmetics.rewardedAdProgress(cosmetic.id) < cosmetic.requiredAdViews
+                    ) {
+                        requestRewardedAd(cosmetic.id)
+                    } else {
+                        performCosmeticPurchaseOrSelect(cosmetic, channel.name)
+                    }
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+            return
+        }
+
+        val unlockChannel = if (cosmetic.remoteManaged && cosmetic.unlockChannels.size == 1) {
+            cosmetic.unlockChannels.single().name
+        } else {
+            null
+        }
+        performCosmeticPurchaseOrSelect(cosmetic, unlockChannel)
+    }
+
+    private fun performCosmeticPurchaseOrSelect(
+        cosmetic: com.rekixo.ludopaws.feature.store.domain.model.StoreCosmetic,
+        unlockChannel: String?,
+    ) {
+        if (unlockChannel == "PLAY_PRODUCT" || unlockChannel == "LEVEL" || unlockChannel == "EVENT") {
+            showStoreMessage(
+                "This unlock method is not available yet. No Gems or entitlements were changed.",
+            )
+            return
+        }
+        if (unlockChannel == "REWARDED_ADS" &&
+            cosmetics.rewardedAdProgress(cosmetic.id) < cosmetic.requiredAdViews
+        ) {
+            requestRewardedAd(cosmetic.id)
+            return
+        }
         billingExecutor.execute {
             try {
                 val session = accountRepository.requireSession()
                 val response = if (cosmetics.isOwned(cosmetic.id)) {
                     accountRepository.selectCosmetic(cosmetic.id)
                 } else {
-                    accountRepository.purchaseCosmetic(cosmetic.id)
+                    accountRepository.purchaseCosmetic(
+                        cosmetic.id,
+                        unlockChannel = if (cosmetic.remoteManaged) unlockChannel else null,
+                    )
                 }
                 val serverWallet = response.optJSONObject("wallet") ?: accountRepository.wallet()
                 check(wallet.applyServerSnapshot(serverWallet, session.accountId)) {
@@ -479,6 +573,10 @@ class StoreActivity :
                     "INSUFFICIENT_GEMS" -> "You do not have enough gems to buy ${cosmetic.title}."
                     "COSMETIC_NOT_OWNED" -> "This item is not owned by the signed-in account."
                     "COSMETIC_UNAVAILABLE" -> "This item is not available yet."
+                    "COSMETIC_UNLOCK_CHANNEL_REQUIRED" -> "Choose an unlock method before continuing."
+                    "COSMETIC_UNLOCK_CHANNEL_UNAVAILABLE" -> "That unlock method is no longer available."
+                    "CATALOG_PLAY_PURCHASE_NOT_READY" -> "Direct Play purchases for cosmetic items are not available yet."
+                    "STORE_CATALOG_UNAVAILABLE" -> "The store catalog could not be verified. Try again when connected."
                     "PROFILE_PROGRESSION_NOT_SERVER_AUTHORITATIVE" ->
                         "This unlock needs server-verified profile progression before it can be purchased."
                     else -> error.message ?: "The store could not update your account. Try again when connected."

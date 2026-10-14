@@ -221,13 +221,59 @@ class FakeAccountSql {
   }
 }
 
-function makeAccount() {
+function makeCatalogNamespace(items, { fail = false } = {}) {
+  return {
+    idFromName(name) {
+      assert.equal(name, "GLOBAL:V1");
+      return name;
+    },
+    get() {
+      return {
+        async fetch(request) {
+          assert.equal(new URL(request.url).pathname, "/catalog/current");
+          if (fail) return Response.json({ error: "UNAVAILABLE" }, { status: 503 });
+          return Response.json({ revision: 1, catalogVersion: 1, items, updatedAt: "2026-10-14T00:00:00.000Z" });
+        },
+      };
+    },
+  };
+}
+
+function catalogItem(overrides = {}) {
+  return {
+    id: "paw_safari_01",
+    category: "PAW",
+    name: "Safari Paw",
+    description: "A catalog-managed cosmetic",
+    status: "PUBLISHED",
+    contentReady: true,
+    asset: {
+      thumbnail: "r2://published/paw_safari_01/v1/thumbnail.png",
+      manifest: "r2://published/paw_safari_01/v1/manifest.json",
+      version: 1,
+      sha256: "a".repeat(64),
+      format: "GLB",
+    },
+    unlock: { channels: ["GEMS"], gems: { enabled: true, price: 125 } },
+    availability: {
+      worldwide: true, allowedCountries: [], blockedCountries: [],
+      startsAt: null, endsAt: null,
+    },
+    catalogVersion: 1,
+    ...overrides,
+  };
+}
+
+function makeAccount(envOverrides = {}) {
   const sql = new FakeAccountSql();
   const ctx = {
     storage: { sql, transactionSync: (callback) => callback() },
     blockConcurrencyWhile: (callback) => callback(),
   };
-  const env = { LUDOPROOF_SESSION_HMAC_KEY: "test-session-hmac-key-that-is-long-enough-123456" };
+  const env = {
+    LUDOPROOF_SESSION_HMAC_KEY: "test-session-hmac-key-that-is-long-enough-123456",
+    ...envOverrides,
+  };
   return { account: new PlayerAccount(ctx, env), sql };
 }
 
@@ -403,6 +449,204 @@ test("cosmetic-targeted AdMob view grants the configured 5 gems and progress exa
   assert.equal(sql.walletTransactions.size, 1);
 });
 
+
+test("catalog-managed purchases use the current server price and grant the catalog category", async () => {
+  const { account, sql } = makeAccount({
+    LUDOPROOF_STORE_CATALOG: makeCatalogNamespace([
+      catalogItem({ id: "dice_heart", category: "DICE", name: "Heart Festival" }),
+    ]),
+  });
+  const accountId = "0a2c3a83-e0fb-4abc-8ac4-581a6d994fe7";
+  const created = await (await post(account, "/session/create", { accountId, displayName: "Catalog Player" })).json();
+  sql.wallet.get(accountId).balance = 200;
+
+  const response = await post(account, "/wallet/cosmetic/purchase", {
+    accountId, sessionId: created.sessionId, cosmeticId: "dice_heart",
+    clientRequestId: "d47ddef4-9c33-44da-9187-5d774267a3c5",
+    catalogCountry: "IN",
+    // A client has no price field here; the DO takes its price from published catalog state.
+  });
+  assert.equal(response.status, 200);
+  const result = await response.json();
+  assert.equal(result.wallet.balance, 75);
+  assert.ok(result.wallet.ownedCosmetics.includes("dice_heart"));
+  assert.equal(result.wallet.selectedCosmetics.DICE, "dice_heart");
+  assert.equal(sql.walletTransactions.size, 1);
+});
+
+test("archived catalog entry cannot bypass its status by falling back to the legacy cosmetic ID", async () => {
+  const archived = catalogItem({
+    id: "dice_heart",
+    category: "DICE",
+    name: "Archived Heart",
+    status: "ARCHIVED",
+    unlock: { channels: ["GEMS"], gems: { enabled: true, price: 1 } },
+  });
+  const { account, sql } = makeAccount({
+    LUDOPROOF_STORE_CATALOG: makeCatalogNamespace([archived]),
+  });
+  const accountId = "0a2c3a83-e0fb-4abc-8ac4-581a6d994fe7";
+  const created = await (await post(account, "/session/create", { accountId, displayName: "Catalog Player" })).json();
+  sql.wallet.get(accountId).balance = 500;
+
+  const response = await post(account, "/wallet/cosmetic/purchase", {
+    accountId, sessionId: created.sessionId, cosmeticId: "dice_heart",
+    clientRequestId: "e25b0212-af25-44ef-b9f4-c280c9d32e31",
+  });
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).error, "COSMETIC_UNAVAILABLE");
+  assert.equal(sql.wallet.get(accountId).balance, 500);
+  assert.equal(sql.walletTransactions.size, 0);
+});
+
+test("catalog-managed multi-channel purchase requires an explicit enabled channel and respects country rules", async () => {
+  const multi = catalogItem({
+    id: "dice_heart",
+    category: "DICE",
+    name: "Multi-channel Heart",
+    unlock: {
+      channels: ["GEMS", "REWARDED_ADS"],
+      gems: { enabled: true, price: 90 },
+      rewardedAds: { enabled: true, requiredCompletedAds: 2 },
+    },
+    availability: {
+      worldwide: false, allowedCountries: ["IN"], blockedCountries: [],
+      startsAt: null, endsAt: null,
+    },
+  });
+  const { account, sql } = makeAccount({
+    LUDOPROOF_STORE_CATALOG: makeCatalogNamespace([multi]),
+  });
+  const accountId = "0a2c3a83-e0fb-4abc-8ac4-581a6d994fe7";
+  const created = await (await post(account, "/session/create", { accountId, displayName: "Catalog Player" })).json();
+  sql.wallet.get(accountId).balance = 150;
+
+  const wrongCountry = await post(account, "/wallet/cosmetic/purchase", {
+    accountId, sessionId: created.sessionId, cosmeticId: "dice_heart",
+    clientRequestId: "b6b07c67-7c13-4a54-83ab-37e79d097d6f", catalogCountry: "US",
+  });
+  assert.equal(wrongCountry.status, 400);
+  assert.equal((await wrongCountry.json()).error, "COSMETIC_UNAVAILABLE");
+
+  const ambiguous = await post(account, "/wallet/cosmetic/purchase", {
+    accountId, sessionId: created.sessionId, cosmeticId: "dice_heart",
+    clientRequestId: "8cc64312-e42b-4d4d-a6b2-3cfd16c3f098", catalogCountry: "IN",
+  });
+  assert.equal(ambiguous.status, 400);
+  assert.equal((await ambiguous.json()).error, "COSMETIC_UNLOCK_CHANNEL_REQUIRED");
+  assert.equal(sql.wallet.get(accountId).balance, 150);
+
+  const selectedChannel = await post(account, "/wallet/cosmetic/purchase", {
+    accountId, sessionId: created.sessionId, cosmeticId: "dice_heart", unlockChannel: "GEMS",
+    clientRequestId: "c0e51f8e-2663-4d35-a0d1-248eaf508282", catalogCountry: "IN",
+  });
+  assert.equal(selectedChannel.status, 200);
+  assert.equal((await selectedChannel.json()).wallet.balance, 60);
+});
+
+test("catalog-managed rewarded ads verify current eligibility and can progress to ownership", async () => {
+  const rewardItem = catalogItem({
+    id: "dice_diwali",
+    category: "DICE",
+    name: "Diwali Dice",
+    unlock: {
+      channels: ["REWARDED_ADS"],
+      rewardedAds: { enabled: true, requiredCompletedAds: 2 },
+    },
+  });
+  const { account, sql } = makeAccount({
+    LUDOPROOF_STORE_CATALOG: makeCatalogNamespace([rewardItem]),
+  });
+  const accountId = "0a2c3a83-e0fb-4abc-8ac4-581a6d994fe7";
+  const created = await post(account, "/session/create", { accountId, displayName: "Reward Player" });
+  assert.equal(created.status, 200);
+
+  for (const transactionId of [
+    "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+    "b1c2d3e4f5a60718293a4b5c6d7e8f90",
+  ]) {
+    const reward = await post(account, "/wallet/reward-ad", {
+      accountId, transactionId, kind: "cosmetic", cosmeticId: "dice_diwali", catalogCountry: "IN",
+    });
+    assert.equal(reward.status, 200);
+  }
+  assert.equal(sql.wallet.get(accountId).balance, 10);
+  assert.equal(sql.adProgress.get("dice_diwali"), 2);
+
+  const purchase = await post(account, "/wallet/cosmetic/purchase", {
+    accountId, sessionId: (await created.json()).sessionId, cosmeticId: "dice_diwali",
+    clientRequestId: "7ab6933e-2465-4b01-9cd2-aa33b2020605", catalogCountry: "IN",
+  });
+  assert.equal(purchase.status, 200);
+  assert.ok((await purchase.json()).wallet.ownedCosmetics.includes("dice_diwali"));
+});
+
+test("new catalog IDs stay unpurchasable until server renderer and entitlement support ship", async () => {
+  const { account, sql } = makeAccount({
+    LUDOPROOF_STORE_CATALOG: makeCatalogNamespace([
+      catalogItem({ id: "paw_safari_01", category: "PAW", name: "Safari Paw" }),
+    ]),
+  });
+  const accountId = "0a2c3a83-e0fb-4abc-8ac4-581a6d994fe7";
+  const created = await (await post(account, "/session/create", { accountId, displayName: "Locked Catalog Player" })).json();
+  sql.wallet.get(accountId).balance = 500;
+
+  const purchase = await post(account, "/wallet/cosmetic/purchase", {
+    accountId, sessionId: created.sessionId, cosmeticId: "paw_safari_01",
+    clientRequestId: "d45b3bf6-099e-4c23-8d71-e2e5170a5c6a", catalogCountry: "IN",
+  });
+  assert.equal(purchase.status, 400);
+  assert.equal((await purchase.json()).error, "COSMETIC_UNAVAILABLE");
+  assert.equal(sql.wallet.get(accountId).balance, 500);
+  assert.equal(sql.walletTransactions.size, 0);
+  assert.equal(sql.ownedCosmetics.has("paw_safari_01"), false);
+});
+
+test("archived dynamic cosmetic cannot be equipped but prior ownership is retained", async () => {
+  const paw = catalogItem({ id: "dice_heart", category: "DICE", name: "Heart Festival" });
+  const catalog = makeCatalogNamespace([paw]);
+  const { account, sql } = makeAccount({ LUDOPROOF_STORE_CATALOG: catalog });
+  const accountId = "0a2c3a83-e0fb-4abc-8ac4-581a6d994fe7";
+  const created = await (await post(account, "/session/create", { accountId, displayName: "Catalog Player" })).json();
+  sql.wallet.get(accountId).balance = 200;
+
+  const bought = await post(account, "/wallet/cosmetic/purchase", {
+    accountId, sessionId: created.sessionId, cosmeticId: "dice_heart",
+    clientRequestId: "afc2b41d-9f61-47b1-9732-0b4890ff3d42", catalogCountry: "IN",
+  });
+  assert.equal(bought.status, 200);
+  assert.ok((await bought.json()).wallet.ownedCosmetics.includes("dice_heart"));
+
+  // The namespace is a test double over current state; archive after ownership exists.
+  paw.status = "ARCHIVED";
+  const select = await post(account, "/wallet/cosmetic/select", {
+    accountId, sessionId: created.sessionId, cosmeticId: "dice_heart", catalogCountry: "IN",
+  });
+  assert.equal(select.status, 400);
+  assert.equal((await select.json()).error, "COSMETIC_UNAVAILABLE");
+
+  const wallet = await post(account, "/wallet/get", { accountId, sessionId: created.sessionId });
+  assert.equal(wallet.status, 200);
+  assert.ok((await wallet.json()).wallet.ownedCosmetics.includes("dice_heart"));
+});
+
+test("catalog service outage fails closed for purchase and does not use the legacy table", async () => {
+  const { account, sql } = makeAccount({
+    LUDOPROOF_STORE_CATALOG: makeCatalogNamespace([], { fail: true }),
+  });
+  const accountId = "0a2c3a83-e0fb-4abc-8ac4-581a6d994fe7";
+  const created = await (await post(account, "/session/create", { accountId, displayName: "Outage Player" })).json();
+  sql.wallet.get(accountId).balance = 500;
+
+  const response = await post(account, "/wallet/cosmetic/purchase", {
+    accountId, sessionId: created.sessionId, cosmeticId: "dice_heart",
+    clientRequestId: "d6c8e7f9-8251-48c7-93b8-60d532f78626",
+  });
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).error, "STORE_CATALOG_UNAVAILABLE");
+  assert.equal(sql.wallet.get(accountId).balance, 500);
+  assert.equal(sql.walletTransactions.size, 0);
+});
 
 test("deletion preview locks account mutations until the deletion saga commits or retries", async () => {
   const { account, sql } = makeAccount();

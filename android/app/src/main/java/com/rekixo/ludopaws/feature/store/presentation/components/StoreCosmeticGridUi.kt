@@ -382,6 +382,10 @@ private fun StoreActivity.cosmeticActionText(
             CosmeticUnlockKind.EVENT ->
             "EVENT"
 
+        cosmetic.unlockKind ==
+            CosmeticUnlockKind.PLAY_PRODUCT ->
+            "UNAVAILABLE"
+
         else ->
             "FREE"
     }
