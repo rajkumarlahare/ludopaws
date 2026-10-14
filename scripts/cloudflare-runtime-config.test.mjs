@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ACCOUNT_WEB_ORIGIN, buildCloudflareRuntimeVars } from "./cloudflare-runtime-config.mjs";
+import { ACCOUNT_WEB_ORIGIN, GOOGLE_PLAY_RTDN_AUDIENCE, buildCloudflareRuntimeVars } from "./cloudflare-runtime-config.mjs";
 
 const valid = {
   GOOGLE_SIGN_IN_WEB_CLIENT_ID: "1234567890-exampleclient.apps.googleusercontent.com",
@@ -18,6 +18,9 @@ test("runtime vars require a valid Google Web OAuth client and the account-site 
 test("runtime store flags fail closed when GitHub variables are unset", () => {
   const vars = buildCloudflareRuntimeVars({}, valid);
   assert.equal(vars.GOOGLE_PLAY_BILLING_ENABLED, "false");
+  assert.equal(vars.GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED, "false");
+  assert.equal("GOOGLE_PLAY_RTDN_AUDIENCE" in vars, false);
+  assert.equal("GOOGLE_PLAY_RTDN_EMAIL" in vars, false);
   assert.equal(vars.LUDOPROOF_ADMOB_SSV_ENABLED, "false");
   assert.equal(vars.LUDOPROOF_ADMOB_REWARD_ITEM, "gems");
   assert.equal("GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL" in vars, false);
@@ -36,6 +39,49 @@ test("account-site origin mismatch is rejected", () => {
     () => buildCloudflareRuntimeVars({}, { ...valid, LUDOPROOF_ACCOUNT_WEB_ORIGIN: "https://example.com" }),
     /must be exactly/,
   );
+});
+
+test("Paws Plus subscriptions default off and require matching Android/server flags", () => {
+  const vars = buildCloudflareRuntimeVars({}, valid);
+  assert.equal(vars.GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED, "false");
+  assert.throws(
+    () => buildCloudflareRuntimeVars({}, {
+      ...valid,
+      GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED: "true",
+    }),
+    /must match before deployment/,
+  );
+});
+
+test("Paws Plus cannot be enabled without Billing and authenticated RTDN configuration", () => {
+  const base = {
+    ...valid,
+    GOOGLE_PLAY_BILLING_ENABLED: "true",
+    LUDOPROOF_BILLING_ENABLED: "true",
+    GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED: "true",
+    LUDOPROOF_SUBSCRIPTIONS_ENABLED: "true",
+    GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL: "ludoproof-play@ludoproof-prod.iam.gserviceaccount.com",
+  };
+  assert.throws(
+    () => buildCloudflareRuntimeVars({}, base),
+    /RTDN_AUDIENCE must exactly match/,
+  );
+  assert.throws(
+    () => buildCloudflareRuntimeVars({}, {
+      ...base,
+      GOOGLE_PLAY_RTDN_AUDIENCE: GOOGLE_PLAY_RTDN_AUDIENCE,
+      GOOGLE_PLAY_RTDN_EMAIL: "not-an-authentication-identity",
+    }),
+    /GOOGLE_PLAY_RTDN_EMAIL must be/,
+  );
+  const vars = buildCloudflareRuntimeVars({}, {
+    ...base,
+    GOOGLE_PLAY_RTDN_AUDIENCE,
+    GOOGLE_PLAY_RTDN_EMAIL: "ludo-rtdn@ludoproof-prod.iam.gserviceaccount.com",
+  });
+  assert.equal(vars.GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED, "true");
+  assert.equal(vars.GOOGLE_PLAY_RTDN_AUDIENCE, GOOGLE_PLAY_RTDN_AUDIENCE);
+  assert.equal(vars.GOOGLE_PLAY_RTDN_EMAIL, "ludo-rtdn@ludoproof-prod.iam.gserviceaccount.com");
 });
 
 test("Billing cannot be enabled without the Google Play service-account email", () => {
