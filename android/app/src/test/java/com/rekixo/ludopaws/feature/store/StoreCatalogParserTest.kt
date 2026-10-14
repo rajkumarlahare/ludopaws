@@ -38,6 +38,30 @@ class StoreCatalogParserTest {
     }
 
     @Test
+    fun starterPawMapsToExistingCharacterPackRenderer() {
+        val snapshot = StoreCatalogParser.parse(
+            catalogResponse(
+                items = arrayOf(
+                    catalogItem(
+                        id = "character_pack_starter_paws",
+                        category = "PAW",
+                        name = "STARTER PAWS",
+                        channels = arrayOf("FREE"),
+                    ),
+                ),
+            ),
+        )
+
+        val item = snapshot.items.single()
+        assertEquals(
+            com.rekixo.ludopaws.feature.store.domain.model.CosmeticCategory.CHARACTER_PACK,
+            item.category,
+        )
+        assertEquals("PAW", item.backendCategory)
+        assertTrue(item.contentAvailable)
+    }
+
+    @Test
     fun unknownPublishedItemsAreDiscoverableButRemainLockedWithoutALocalRenderer() {
         val snapshot = StoreCatalogParser.parse(
             catalogResponse(
