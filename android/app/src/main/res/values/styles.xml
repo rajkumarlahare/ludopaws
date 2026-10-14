@@ -9,8 +9,7 @@
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
     </style>
-    <!-- Dedicated native launch theme. The transparent icon lets SplashActivity
-         render its full-screen branded WebP layout without the launcher icon. -->
+    <!-- Dedicated native launch theme: show the Home hero instead of a blank screen or launcher icon. -->
     <style name="Theme.LudoPaws.Starting" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">#03153F</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/ludo_paws_home_hero</item>
