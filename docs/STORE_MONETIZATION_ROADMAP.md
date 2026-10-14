@@ -79,7 +79,7 @@ Optional LEVEL/EVENT methods require server-authoritative progression/event evid
 
 - Keep `remove_ads` as a non-consumable Google Play one-time product; do not use recurring billing.
 - A successful, server-verified purchase permanently sets the account's `ads_removed` entitlement. Optional rewarded ads remain available for players who choose to watch them for rewards.
-- Set the US base price to US$1.00 in Play Console if that exact price point is accepted; otherwise choose the nearest supported price point and make the final choice explicit. Use Play Console's localized country prices, taxes and pricing patterns. Refresh generated exchange-rate prices when appropriate; never calculate foreign prices in the app.
+- Set the source price to exactly US$1.00 in the Remove Ads purchase option in Play Console and apply Google's localized conversion to all intended distribution regions. If Play Console rejects that amount for this product, stop and check the supported price setup rather than silently substituting a different price. Review the generated local prices, taxes and regional pricing patterns, and refresh converted prices when appropriate; never calculate foreign prices in the app.
 - Android must show the localized `ProductDetails` price. Do not display a hard-coded INR or USD price as if it were the live checkout price.
 - Acceptance: license testers verify purchase, permanent entitlement, restore/re-query, duplicate callback idempotency, refund/revocation behavior, and matching of the displayed localized price to Google Play checkout.
 
@@ -111,7 +111,7 @@ Rollout: internal license testers → small closed/limited test cohort → stage
 
 ## Remove Ads pricing recommendation
 
-Offer `remove_ads` as a permanent, non-consumable one-time product. Use a US$1.00 base price in Play Console where supported, then review the generated local prices for all intended distribution countries. Google Play applies supported local currency, tax and country-specific pricing patterns; the exchange conversion is not a live client-side calculation. The app must display the formatted price returned by Google Play and must not invent exchange rates or promise an exact local conversion.
+Offer `remove_ads` as a permanent, non-consumable one-time product at a US$1.00 source price in Play Console. Apply localized prices to all intended distribution regions, then review Google's generated amounts. Google Play uses a one-off conversion for the regions selected; it does not recalculate every user's price from a live exchange rate during each purchase. The app must display the formatted price returned by Google Play and must not invent exchange rates or promise a live FX conversion.
 
 Keep opt-in rewarded ads available even after Remove Ads is purchased, and disclose this clearly before checkout.
 
