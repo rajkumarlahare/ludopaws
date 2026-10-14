@@ -83,6 +83,27 @@ class StoreCosmeticCatalogTest {
     }
 
     @Test
+    fun contentReadyPaidOrRewardedCosmeticsDoNotUseClientOnlyLevelProgress() {
+        val unlockable = StoreCosmeticCatalog.all.filter {
+            it.contentAvailable &&
+                it.unlockKind in setOf(CosmeticUnlockKind.GEMS, CosmeticUnlockKind.REWARDED_ADS)
+        }
+        assertTrue(unlockable.isNotEmpty())
+        assertTrue(unlockable.all { it.requiredLevel == 0 })
+    }
+
+    @Test
+    fun classicAndPumpkinDiceRemainFreeContentReadyStyles() {
+        val classic = requireNotNull(StoreCosmeticCatalog.find("dice_classic"))
+        val pumpkin = requireNotNull(StoreCosmeticCatalog.find("dice_pumpkin"))
+        assertTrue(classic.contentAvailable)
+        assertTrue(pumpkin.contentAvailable)
+        assertEquals(CosmeticUnlockKind.FREE, classic.unlockKind)
+        assertEquals(CosmeticUnlockKind.FREE, pumpkin.unlockKind)
+        assertTrue("dice_pumpkin" in StoreCosmeticCatalog.defaultOwnedIds)
+    }
+
+    @Test
     fun starterPawsHasSixReservedFuturePacksThatRemainLocked() {
         val futurePacks =
             StoreCosmeticCatalog.characterPacks.filter {

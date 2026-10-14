@@ -32,19 +32,9 @@ internal fun StoreActivity.boardCatalogContent(): LinearLayout =
     LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
 
-        val catalogBoards = StoreCosmeticCatalog.boards
-        val classicBoard =
-            catalogBoards.first {
-                it.id == StoreCosmeticCatalog.DEFAULT_BOARD
-            }
-        // Show Classic plus five locked placeholders until future board artwork and names are ready.
-        val lockedBoards =
-            catalogBoards
-                .filterNot {
-                    it.id == StoreCosmeticCatalog.DEFAULT_BOARD
-                }
-                .take(5)
-        val panels = listOf(classicBoard) + lockedBoards
+        // Render the full catalog. Draft content stays non-clickable until its
+        // renderer/artwork gate is explicitly enabled in the catalog.
+        val panels = StoreCosmeticCatalog.boards
 
         // Use the same two-card row rhythm as Paws so every board preview gets more room.
         panels.chunked(2).forEachIndexed { rowIndex, rowBoards ->
@@ -94,14 +84,15 @@ private fun StoreActivity.boardPanel(
         gravity = Gravity.CENTER
         setPadding(dp(6), dp(8), dp(6), dp(8))
 
-        val locked = board.id != StoreCosmeticCatalog.DEFAULT_BOARD
+        val locked = !board.contentAvailable
+        val owned = cosmetics.isOwned(board.id)
         val selected =
-            !locked &&
+            owned &&
                 cosmetics.selectedId(board.category) == board.id
 
         // Only the timber panel is used. No blue/purple arcade face or coloured icon well.
         background =
-            if (locked) {
+            if (locked || !owned) {
                 plywoodBackground(this@boardPanel, cornerRadiusDp = 13f)
             } else {
                 playerCountSelectionBackground(
@@ -119,10 +110,10 @@ private fun StoreActivity.boardPanel(
         isClickable = !locked
         isFocusable = !locked
         contentDescription =
-            if (locked) {
-                "$LOCKED_BOARD_TITLE, locked, coming soon"
-            } else {
-                "Classic board, unlocked" + if (selected) ", selected" else ""
+            when {
+                locked -> "$LOCKED_BOARD_TITLE, locked, coming soon"
+                !owned -> "${board.title}, available to unlock"
+                else -> "${board.title}, unlocked" + if (selected) ", selected" else ""
             }
 
         addView(
@@ -158,7 +149,7 @@ private fun StoreActivity.boardPanel(
             // A passive Classic-only miniature mirrors the production board geometry and colors.
             // It deliberately has no touch handling, so taps continue to reach the whole panel.
             addView(
-                ClassicBoardIconView(this@boardPanel).apply {
+                ClassicBoardIconView(this@boardPanel, board.id).apply {
                     isClickable = false
                     isFocusable = false
                     importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
@@ -175,7 +166,7 @@ private fun StoreActivity.boardPanel(
         }
 
         addView(
-            boardStatusBadge(locked = locked, selected = selected),
+            boardStatusBadge(board = board, locked = locked, owned = owned, selected = selected),
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -209,18 +200,28 @@ private fun StoreActivity.boardPanel(
     }
 
 private fun StoreActivity.boardStatusBadge(
+    board: StoreCosmetic,
     locked: Boolean,
+    owned: Boolean,
     selected: Boolean,
 ): TextView =
     TextView(this).apply {
-        text = if (locked) "🔒 LOCKED" else "🔓 UNLOCKED"
+        text = when {
+            locked -> "🔒 COMING SOON"
+            selected -> "✓ EQUIPPED"
+            owned -> "🔓 UNLOCKED"
+            board.gemPrice > 0 -> "${board.gemPrice} GEMS"
+            board.requiredAdViews > 0 -> "${board.requiredAdViews} ADS"
+            else -> "GET"
+        }
         textSize = 9.5f
         setTypeface(Typeface.DEFAULT_BOLD)
         setTextColor(
             when {
                 locked -> 0xFF65421E.toInt()
                 selected -> 0xFF67430F.toInt()
-                else -> 0xFF104B29.toInt()
+                owned -> 0xFF104B29.toInt()
+                else -> 0xFF235A86.toInt()
             },
         )
         gravity = Gravity.CENTER
@@ -260,10 +261,13 @@ private fun StoreActivity.boardStatusBadge(
  * the selected cosmetic theme and no touch handling. Keep TRACK/HOME_LANES in sync with the
  * production board's locked layout if that layout is ever deliberately changed.
  */
-private class ClassicBoardIconView(context: android.content.Context) : View(context) {
+private class ClassicBoardIconView(
+    context: android.content.Context,
+    private val previewThemeId: String,
+) : View(context) {
     private val surfacePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
-        color = Color.rgb(248, 248, 248)
+        color = themeSurfaceColor()
     }
     private val yardTexturePaint = createYardTexturePaint()
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -314,7 +318,7 @@ private class ClassicBoardIconView(context: android.content.Context) : View(cont
             boundary(col + 6, cell),
             boundary(row + 6, cell),
         )
-        fillPaint.color = color
+        fillPaint.color = themeColor(color)
         canvas.drawRect(yard, fillPaint)
         canvas.drawRect(yard, yardTexturePaint)
 
@@ -403,20 +407,20 @@ private class ClassicBoardIconView(context: android.content.Context) : View(cont
     private fun drawTrack(canvas: Canvas, cell: Float) {
         TRACK.forEachIndexed { index, coord ->
             val color = when (index) {
-                0 -> RED
-                13 -> GREEN
-                26 -> YELLOW
-                39 -> BLUE
-                else -> Color.WHITE
+                0 -> themeColor(RED)
+                13 -> themeColor(GREEN)
+                26 -> themeColor(YELLOW)
+                39 -> themeColor(BLUE)
+                else -> themeNeutralCellColor()
             }
             drawCell(canvas, cell, coord.first, coord.second, color)
             if (index in SAFE_GLOBAL_CELLS) {
                 val starColor = when (index) {
-                    0 -> RED
-                    13 -> GREEN
-                    26 -> YELLOW
-                    39 -> BLUE
-                    else -> Color.rgb(45, 138, 204)
+                    0 -> themeColor(RED)
+                    13 -> themeColor(GREEN)
+                    26 -> themeColor(YELLOW)
+                    39 -> themeColor(BLUE)
+                    else -> themeColor(Color.rgb(45, 138, 204))
                 }
                 drawStar(
                     canvas,
@@ -432,7 +436,7 @@ private class ClassicBoardIconView(context: android.content.Context) : View(cont
     private fun drawHomeLanes(canvas: Canvas, cell: Float) {
         HOME_LANES.forEach { (color, lane) ->
             lane.forEach { (row, col) ->
-                drawCell(canvas, cell, row, col, color)
+                drawCell(canvas, cell, row, col, themeColor(color))
             }
         }
     }
@@ -444,10 +448,10 @@ private class ClassicBoardIconView(context: android.content.Context) : View(cont
         val bottom = boundary(9, cell)
         val cx = (left + right) / 2f
         val cy = (top + bottom) / 2f
-        drawTriangle(canvas, RED, left, top, left, bottom, cx, cy)
-        drawTriangle(canvas, GREEN, left, top, right, top, cx, cy)
-        drawTriangle(canvas, YELLOW, right, top, right, bottom, cx, cy)
-        drawTriangle(canvas, BLUE, left, bottom, right, bottom, cx, cy)
+        drawTriangle(canvas, themeColor(RED), left, top, left, bottom, cx, cy)
+        drawTriangle(canvas, themeColor(GREEN), left, top, right, top, cx, cy)
+        drawTriangle(canvas, themeColor(YELLOW), right, top, right, bottom, cx, cy)
+        drawTriangle(canvas, themeColor(BLUE), left, bottom, right, bottom, cx, cy)
     }
 
     private fun drawCell(canvas: Canvas, cell: Float, row: Int, col: Int, color: Int) {
@@ -495,6 +499,56 @@ private class ClassicBoardIconView(context: android.content.Context) : View(cont
         path.close()
         fillPaint.color = color
         canvas.drawPath(path, fillPaint)
+    }
+
+    private fun themeSurfaceColor(): Int =
+        when (previewThemeId) {
+            "board_checkers" -> 0xFFF5EEE2.toInt()
+            "board_chess" -> 0xFFF1E3C4.toInt()
+            "board_diwali" -> 0xFFFFE7A0.toInt()
+            "board_denim" -> 0xFFD8EEFA.toInt()
+            "board_neon" -> 0xFF10131C.toInt()
+            "board_pirate" -> 0xFFE8D5A9.toInt()
+            "board_alien" -> 0xFF18243B.toInt()
+            "board_penguin" -> 0xFFE5F8FF.toInt()
+            else -> 0xFFF8F8F8.toInt()
+        }
+
+    private fun themeNeutralCellColor(): Int =
+        when (previewThemeId) {
+            "board_neon" -> 0xFF1E2638.toInt()
+            "board_alien" -> 0xFF24324A.toInt()
+            "board_diwali" -> 0xFFFFF6DC.toInt()
+            "board_pirate" -> 0xFFFFF2D2.toInt()
+            "board_penguin" -> 0xFFF5FCFF.toInt()
+            else -> Color.WHITE
+        }
+
+    private fun themeColor(color: Int): Int =
+        when (previewThemeId) {
+            "board_diwali" -> brighten(color, 1.08f)
+            "board_denim" -> mixWith(color, 0xFF2D83C5.toInt(), 0.20f)
+            "board_neon" -> brighten(color, 1.22f)
+            "board_pirate" -> mixWith(color, 0xFFC9A86A.toInt(), 0.18f)
+            "board_alien" -> mixWith(color, 0xFF4EDA73.toInt(), 0.20f)
+            "board_penguin" -> mixWith(color, 0xFFBDEBFF.toInt(), 0.24f)
+            else -> color
+        }
+
+    private fun brighten(color: Int, factor: Float): Int =
+        Color.rgb(
+            (Color.red(color) * factor).toInt().coerceIn(0, 255),
+            (Color.green(color) * factor).toInt().coerceIn(0, 255),
+            (Color.blue(color) * factor).toInt().coerceIn(0, 255),
+        )
+
+    private fun mixWith(color: Int, target: Int, ratio: Float): Int {
+        val inverse = 1f - ratio
+        return Color.rgb(
+            (Color.red(color) * inverse + Color.red(target) * ratio).toInt().coerceIn(0, 255),
+            (Color.green(color) * inverse + Color.green(target) * ratio).toInt().coerceIn(0, 255),
+            (Color.blue(color) * inverse + Color.blue(target) * ratio).toInt().coerceIn(0, 255),
+        )
     }
 
     private fun boundary(index: Int, cell: Float): Float {

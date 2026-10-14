@@ -82,11 +82,12 @@ class CharacterPackStoreCatalogTest {
         assertTrue(future.isNotEmpty())
         future.forEach { offer ->
             assertFalse(offer.contentAvailable)
-            assertTrue(
-                LudoPawsCharacterCatalog.pack(
-                    requireNotNull(offer.characterPackId),
-                ) == null,
-            )
+            // Registered content may exist for a Debug-only preview while its offer stays locked.
+            val packId = requireNotNull(offer.characterPackId)
+            val registeredPack = LudoPawsCharacterCatalog.pack(packId)
+            if (registeredPack != null) {
+                assertTrue(LudoPawsCharacterCatalog.charactersForPack(packId).isNotEmpty())
+            }
         }
     }
 

@@ -23,20 +23,9 @@ internal fun StoreActivity.diceCatalogContent(): LinearLayout =
     LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
 
-        val catalogDice = StoreCosmeticCatalog.dice
-        val classicDice =
-            catalogDice.first {
-                it.id == StoreCosmeticCatalog.DEFAULT_DICE
-            }
-        // Follow the Board Store: Classic plus five locked placeholders until new dice
-        // have their own approved, gameplay-supported designs.
-        val lockedDice =
-            catalogDice
-                .filterNot {
-                    it.id == StoreCosmeticCatalog.DEFAULT_DICE
-                }
-                .take(5)
-        val panels = listOf(classicDice) + lockedDice
+        // Render every catalog item. Content availability controls previews; account ownership
+        // controls whether an item is equipped or presented as an unlock offer.
+        val panels = StoreCosmeticCatalog.dice
 
         panels.chunked(2).forEachIndexed { rowIndex, rowDice ->
             val row =
@@ -85,14 +74,15 @@ private fun StoreActivity.dicePanel(
         gravity = Gravity.CENTER
         setPadding(dp(6), dp(8), dp(6), dp(8))
 
-        val locked = dice.id != StoreCosmeticCatalog.DEFAULT_DICE
+        val locked = !dice.contentAvailable
+        val owned = cosmetics.isOwned(dice.id)
         val selected =
-            !locked &&
+            owned &&
                 cosmetics.selectedId(dice.category) == dice.id
 
         // Keep the same plywood and selected-check styling as Board Store.
         background =
-            if (locked) {
+            if (locked || !owned) {
                 plywoodBackground(this@dicePanel, cornerRadiusDp = 13f)
             } else {
                 playerCountSelectionBackground(
@@ -110,10 +100,10 @@ private fun StoreActivity.dicePanel(
         isClickable = !locked
         isFocusable = !locked
         contentDescription =
-            if (locked) {
-                "$LOCKED_DICE_TITLE, locked, coming soon"
-            } else {
-                "Classic dice, unlocked" + if (selected) ", selected" else ""
+            when {
+                locked -> "$LOCKED_DICE_TITLE, locked, coming soon"
+                !owned -> "${dice.title}, available to unlock"
+                else -> "${dice.title}, unlocked" + if (selected) ", selected" else ""
             }
 
         addView(
@@ -148,7 +138,8 @@ private fun StoreActivity.dicePanel(
         } else {
             addView(
                 DiceView(this@dicePanel).apply {
-                    // Use the actual gameplay die, held on a clear six-face preview.
+                    // Preview this offer's actual renderer palette without equipping it.
+                    setPreviewStyle(dice.id)
                     showOutcome(6, animate = false)
                     setPlayerTeamColor(null)
                     isClickable = false
@@ -167,7 +158,7 @@ private fun StoreActivity.dicePanel(
         }
 
         addView(
-            diceStatusBadge(locked = locked, selected = selected),
+            diceStatusBadge(dice = dice, locked = locked, owned = owned, selected = selected),
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -201,18 +192,28 @@ private fun StoreActivity.dicePanel(
     }
 
 private fun StoreActivity.diceStatusBadge(
+    dice: StoreCosmetic,
     locked: Boolean,
+    owned: Boolean,
     selected: Boolean,
 ): TextView =
     TextView(this).apply {
-        text = if (locked) "🔒 LOCKED" else "🔓 UNLOCKED"
+        text = when {
+            locked -> "🔒 COMING SOON"
+            selected -> "✓ EQUIPPED"
+            owned -> "🔓 UNLOCKED"
+            dice.gemPrice > 0 -> "${dice.gemPrice} GEMS"
+            dice.requiredAdViews > 0 -> "${dice.requiredAdViews} ADS"
+            else -> "GET"
+        }
         textSize = 9.5f
         setTypeface(Typeface.DEFAULT_BOLD)
         setTextColor(
             when {
                 locked -> 0xFF65421E.toInt()
                 selected -> 0xFF67430F.toInt()
-                else -> 0xFF104B29.toInt()
+                owned -> 0xFF104B29.toInt()
+                else -> 0xFF235A86.toInt()
             },
         )
         gravity = Gravity.CENTER
