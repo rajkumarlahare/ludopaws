@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import { StorePurchaseLedger } from "../src/store-purchase-ledger.js";
 import {
   GOOGLE_PLAY_PRODUCTS,
+  GOOGLE_PLAY_SUBSCRIPTIONS,
+  googlePlaySubscriptionsEnabled,
   verifyAndRedeemGooglePlayPurchase,
+  verifyAndSyncGooglePlaySubscription,
 } from "../src/google-play-billing.js";
 import worker from "../src/index.js";
 import { sha256Hex } from "../src/crypto.js";
@@ -138,6 +141,62 @@ async function makeEnv() {
     GOOGLE_PLAY_SERVICE_ACCOUNT_PRIVATE_KEY:
       await serviceAccountKey(),
     LUDOPROOF_STORE_PURCHASES: makeLedgerNamespace(),
+  };
+}
+
+async function makeSubscriptionEnv() {
+  return {
+    ...await makeEnv(),
+    GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED: "true",
+    GOOGLE_PLAY_RTDN_AUDIENCE: "https://api.example.test/api/google-play/rtdn",
+    GOOGLE_PLAY_RTDN_EMAIL: "ludo-rtdn@ludo-project.iam.gserviceaccount.com",
+  };
+}
+
+function mockSubscriptionApi({
+  accountId,
+  state = "SUBSCRIPTION_STATE_ACTIVE",
+  expiryTime = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+  acknowledgementState = "ACKNOWLEDGEMENT_STATE_PENDING",
+  autoRenewEnabled = true,
+} = {}) {
+  const calls = [];
+  let current = { state, expiryTime, acknowledgementState, autoRenewEnabled };
+  const fetchImpl = async (input, init = {}) => {
+    const url = String(input);
+    calls.push({ url, init });
+    if (url === "https://oauth2.googleapis.com/token") {
+      const form = new URLSearchParams(init.body);
+      const assertion = form.get("assertion");
+      assert.equal(form.get("grant_type"), "urn:ietf:params:oauth:grant-type:jwt-bearer");
+      const claims = JSON.parse(Buffer.from(assertion.split(".")[1], "base64url").toString("utf8"));
+      assert.equal(claims.scope, "https://www.googleapis.com/auth/androidpublisher");
+      return Response.json({ access_token: "subscription-test-access-token", expires_in: 3600 });
+    }
+    if (init.method === "GET" && url.includes("/purchases/subscriptionsv2/tokens/")) {
+      return Response.json({
+        subscriptionState: current.state,
+        acknowledgementState: current.acknowledgementState,
+        externalAccountIdentifiers: { obfuscatedExternalAccountId: accountId },
+        lineItems: [{
+          productId: "paws_plus",
+          expiryTime: current.expiryTime,
+          offerDetails: { basePlanId: "monthly-auto", offerId: null },
+          autoRenewingPlan: { autoRenewEnabled: current.autoRenewEnabled },
+        }],
+      });
+    }
+    if (init.method === "POST" && url.endsWith(":acknowledge")) {
+      current = { ...current, acknowledgementState: "ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED" };
+      return new Response(null, { status: 204 });
+    }
+    throw new Error("Unexpected Google subscription API request: " + url);
+  };
+  return {
+    calls,
+    fetchImpl,
+    update(overrides) { current = { ...current, ...overrides }; },
+    current: () => ({ ...current }),
   };
 }
 
@@ -458,4 +517,113 @@ test("store status and verification routes stay closed until server billing is e
     ok: true,
     billingAvailable: true,
   });
+});
+
+
+test("Paws Plus subscription configuration fails closed unless Billing and RTDN identity are configured", async () => {
+  const env = await makeEnv();
+  assert.equal(googlePlaySubscriptionsEnabled(env), false);
+  env.GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED = "true";
+  assert.equal(googlePlaySubscriptionsEnabled(env), false);
+  env.GOOGLE_PLAY_RTDN_AUDIENCE = "https://api.example.test/api/google-play/rtdn";
+  env.GOOGLE_PLAY_RTDN_EMAIL = "ludo-rtdn@ludo-project.iam.gserviceaccount.com";
+  assert.equal(googlePlaySubscriptionsEnabled(env), true);
+  env.GOOGLE_PLAY_BILLING_ENABLED = "false";
+  assert.equal(googlePlaySubscriptionsEnabled(env), false);
+  assert.deepEqual(GOOGLE_PLAY_SUBSCRIPTIONS, {
+    paws_plus: { basePlanId: "monthly-auto" },
+  });
+});
+
+test("active Paws Plus subscription is verified, acknowledged, and syncs expiry idempotently", async () => {
+  const env = await makeSubscriptionEnv();
+  const accountId = "a".repeat(64);
+  const ownerAccountId = "123e4567-e89b-42d3-a456-426614174000";
+  const purchaseToken = "paws-plus-active-subscription-token";
+  const expiryOne = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+  const api = mockSubscriptionApi({ accountId, expiryTime: expiryOne });
+
+  const result = await verifyAndSyncGooglePlaySubscription(
+    env,
+    { productId: "paws_plus", purchaseToken, accountId, ownerAccountId },
+    api.fetchImpl,
+  );
+  assert.equal(result.verified, true);
+  assert.equal(result.pawsPlusActive, true);
+  assert.equal(result.subscriptionState, "SUBSCRIPTION_STATE_ACTIVE");
+  assert.equal(result.autoRenewEnabled, true);
+  assert.equal(result.replay, false);
+  assert.equal(
+    api.calls.filter(({ url, init }) => init.method === "POST" && url.endsWith(":acknowledge")).length,
+    1,
+  );
+
+  const ledger = env.LUDOPROOF_STORE_PURCHASES.get(result.subscriptionLedgerId);
+  const stored = await (await ledger.fetch(new Request("https://ledger/subscription/status"))).json();
+  assert.equal(stored.subscription.ownerAccountId, ownerAccountId);
+  assert.equal(stored.subscription.expiryTimeMs, Date.parse(expiryOne));
+
+  const replay = await verifyAndSyncGooglePlaySubscription(
+    env,
+    { productId: "paws_plus", purchaseToken, accountId, ownerAccountId },
+    api.fetchImpl,
+  );
+  assert.equal(replay.replay, true);
+  assert.equal(api.calls.filter(({ url, init }) => init.method === "POST" && url.endsWith(":acknowledge")).length, 1);
+
+  const expiryTwo = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
+  api.update({
+    expiryTime: expiryTwo,
+    acknowledgementState: "ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED",
+  });
+  const renewal = await verifyAndSyncGooglePlaySubscription(
+    env,
+    { productId: "paws_plus", purchaseToken, accountId, ownerAccountId },
+    api.fetchImpl,
+  );
+  assert.equal(renewal.replay, false);
+  assert.equal(renewal.expiryTimeMs, Date.parse(expiryTwo));
+  const renewed = await (await ledger.fetch(new Request("https://ledger/subscription/status"))).json();
+  assert.equal(renewed.subscription.expiryTimeMs, Date.parse(expiryTwo));
+});
+
+test("canceled and expired Paws Plus subscriptions do not keep benefits after expiry", async () => {
+  const env = await makeSubscriptionEnv();
+  const accountId = "b".repeat(64);
+  const ownerAccountId = "223e4567-e89b-42d3-a456-426614174000";
+  const purchaseToken = "paws-plus-expired-subscription-token";
+  const api = mockSubscriptionApi({
+    accountId,
+    state: "SUBSCRIPTION_STATE_EXPIRED",
+    expiryTime: new Date(Date.now() - 60_000).toISOString(),
+    acknowledgementState: "ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED",
+    autoRenewEnabled: false,
+  });
+  const result = await verifyAndSyncGooglePlaySubscription(
+    env,
+    { productId: "paws_plus", purchaseToken, accountId, ownerAccountId },
+    api.fetchImpl,
+  );
+  assert.equal(result.verified, true);
+  assert.equal(result.pawsPlusActive, false);
+  assert.equal(result.autoRenewEnabled, false);
+});
+
+test("subscription verification rejects wrong Google account and wrong base plan", async () => {
+  const env = await makeSubscriptionEnv();
+  const accountId = "c".repeat(64);
+  const ownerAccountId = "323e4567-e89b-42d3-a456-426614174000";
+  const api = mockSubscriptionApi({
+    accountId: "d".repeat(64),
+    expiryTime: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+  });
+  await assert.rejects(
+    verifyAndSyncGooglePlaySubscription(
+      env,
+      { productId: "paws_plus", purchaseToken: "paws-plus-mismatched-account-token", accountId, ownerAccountId },
+      api.fetchImpl,
+    ),
+    (error) => error.status === 400 && error.code === "PLAY_SUBSCRIPTION_ACCOUNT_MISMATCH",
+  );
+  assert.equal(api.calls.filter(({ url, init }) => init.method === "POST" && url.endsWith(":acknowledge")).length, 0);
 });
