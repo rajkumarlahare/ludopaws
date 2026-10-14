@@ -1,6 +1,6 @@
 # Ludo Paws — Configurable Store & Monetization Roadmap
 
-Status: planning baseline only. This document does not enable billing, rewarded ads, or production deployment.
+Status: planning baseline plus an initial Phase 2 catalog API implementation on feat/ludopaws-production-readiness. The Worker is not production-deployed, the catalog starts empty, and Android does not consume this API yet. This roadmap does not enable billing, rewarded ads, or production deployment.
 
 ## Objective
 
@@ -46,6 +46,8 @@ Acceptance: schema validation and tests reject duplicate IDs, invalid prices, in
 - All purchase/unlock requests re-check item status, content readiness, eligibility and prices on the server.
 - Use ETags/version numbers, caching and rollback of catalog versions.
 - Acceptance: stale clients cannot unlock archived/unavailable items; changing metadata does not delete ownership.
+
+Initial feature-branch implementation adds authenticated catalog reads with ETag/country availability filtering, account-allowlisted draft/publish/archive/rollback routes, optimistic revision checks, audit events, and a versioned Durable Object store. It remains undeployed. The new API is not yet wired into the legacy PlayerAccount cosmetic purchase/equip authority or Android UI, so the Phase 2 acceptance criterion for every purchase/unlock request remains open. Direct Play-product cosmetic publication is blocked until the verifier can grant the specific item entitlement. See docs/STORE_CATALOG_API.md.
 
 ### Phase 3 — Admin Studio and asset pipeline
 Target host: `studio.ludopaws.rekixo.com`, only after DNS/TLS and authentication setup.
