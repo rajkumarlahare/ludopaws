@@ -2,8 +2,9 @@ name: LudoProof Android Release Readiness
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
-    branches: [main]
+    branches: [main, feat/ludopaws-production-readiness]
 
 permissions:
   contents: read
@@ -14,6 +15,7 @@ concurrency:
 
 jobs:
   rc2-readiness:
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
