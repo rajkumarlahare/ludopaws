@@ -212,7 +212,9 @@ jobs:
           # on headless SwiftShader during long instrumentation runs. Keep the
           # same 3:~7 aspect ratio while reducing software-rendering pressure.
           AVD_CONFIG="$ANDROID_AVD_HOME/ludopaws-ci.avd/config.ini"
-          for setting in "hw.lcd.width=720" "hw.lcd.height=1600" "hw.lcd.density=320"; do
+          # The hosted runner has ~6.8 GB available for this AVD; the Pixel 6 default asks for ~7.2 GB.
+          # Cap userdata to 4 GB so the emulator fits while retaining ample app/test space.
+          for setting in "hw.lcd.width=720" "hw.lcd.height=1600" "hw.lcd.density=320" "disk.dataPartition.size=4096m"; do
             key="${setting%%=*}"
             if grep -q "^$key=" "$AVD_CONFIG"; then
               sed -i "s|^$key=.*|$setting|" "$AVD_CONFIG"
