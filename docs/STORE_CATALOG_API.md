@@ -89,7 +89,9 @@ The ETag version changes only when the published catalog changes. Draft edits ad
 
 ## Explicit implementation boundaries
 
-- The published catalog is independent of the legacy, hard-coded PlayerAccount cosmetics catalog. The existing purchase/equip endpoints are not dynamically driven by this API yet; dynamic store integration is Phase 4 and authoritative purchase/unlock enforcement is still required before launch.
+- The catalog is now consulted by PlayerAccount on each purchase, equip, and cosmetic-targeted rewarded-ad callback. If the ID exists in current catalog state, its status, content readiness, schedule, country eligibility, enabled unlock channel and server-configured Gem/ad price take precedence over the legacy map. An archived/unavailable item cannot fall back to a same-named legacy entry; catalog read failures fail closed when the binding is configured. Legacy IDs absent from catalog state continue to use the existing map during migration.
+- The Android Store still uses its current UI/data. Dynamic catalog display, multi-channel purchase choice in the client, safe catalog caching, and renderer/asset integration remain Phase 4; do not launch dynamic items until that client integration and device tests are complete.
 - PLAY_PRODUCT drafts are allowed for planning, but publishing them is blocked with 409 CATALOG_PLAY_PURCHASE_NOT_READY until the Google Play verifier can grant the specific cosmetic entitlement. This prevents the existing Gem / Remove Ads verifier from being misused as a cosmetic purchase.
+- BUNDLE publication is blocked until an atomic multi-item entitlement grant exists. LEVEL and EVENT entries may be saved as drafts, but publication is blocked until server-authoritative progression/event verification is implemented. Currently publishable unlock methods are FREE, GEMS, and REWARDED_ADS.
 - This phase does not add asset uploads, a web Admin Studio, entitlement writes, wallet deductions, rewarded-ad rewards, subscriptions, or client UI.
 - A Durable Object migration is included in Wrangler config. It takes effect only when the Worker is deliberately deployed through the protected manual deployment workflow.
