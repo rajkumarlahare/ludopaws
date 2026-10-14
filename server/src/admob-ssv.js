@@ -104,9 +104,14 @@ export async function verifyAdMobSsvRequest(request, env, fetchImpl = fetch, now
     throw ssvError(401, "SSV_SIGNATURE_INVALID", "reward callback signature is invalid");
   }
 
-  // AdMob URL-verification test callbacks can use a short dummy transaction ID.
-  // Allow that only after the callback verifies with Google test signing keys; production callbacks keep the strict ID format.
-  if (!isTest && !/^[A-Fa-f0-9]{16,128}$/.test(transactionId)) throw ssvError(400, "SSV_TRANSACTION_INVALID", "reward transaction ID is invalid");
+  // AdMob Console's URL-verification tool uses the fixed dummy transaction ID
+  // "123456789". The signature must still verify against a Google-published key
+  // before we classify it as verification-only; this path never grants a reward.
+  // Real production reward callbacks must retain a 16-128 character hex ID.
+  if (transactionId === "123456789") isTest = true;
+  if (!isTest && !/^[A-Fa-f0-9]{16,128}$/.test(transactionId)) {
+    throw ssvError(400, "SSV_TRANSACTION_INVALID", "reward transaction ID is invalid");
+  }
 
   if (!isTest) {
     const configuredAdUnit = String(env?.LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID ?? "").trim();
