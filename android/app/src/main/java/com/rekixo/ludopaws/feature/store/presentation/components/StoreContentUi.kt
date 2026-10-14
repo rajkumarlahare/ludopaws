@@ -211,7 +211,14 @@ private fun StoreActivity.pawsPlusCard(
         )
         addView(
             TextView(this@pawsPlusCard).apply {
-                text = "Suppresses forced post-win ads. Rewarded ads remain optional."
+                text = when {
+                    pawsPlusActiveForUi && pawsPlusAutoRenewEnabledForUi ->
+                        "Forced post-win ads are disabled. Renews monthly until canceled in Google Play; rewarded ads remain optional."
+                    pawsPlusActiveForUi ->
+                        "Forced post-win ads are disabled through the paid period. Renewal is off; rewarded ads remain optional."
+                    else ->
+                        "Monthly auto-renewing plan. Cancel in Google Play anytime. Core gameplay remains available without subscribing."
+                }
                 textSize = 11.5f
                 setTextColor(Color.WHITE)
                 gravity = Gravity.CENTER
