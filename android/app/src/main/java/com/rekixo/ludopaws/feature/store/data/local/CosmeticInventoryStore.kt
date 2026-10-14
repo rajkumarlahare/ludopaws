@@ -125,7 +125,8 @@ class CosmeticInventoryStore(
                 if (hasVerifiedEventEntitlement(cosmetic.id)) CosmeticAcquireResult.INVALID
                 else CosmeticAcquireResult.NEED_EVENT
             CosmeticUnlockKind.FREE,
-            CosmeticUnlockKind.LEVEL -> CosmeticAcquireResult.INVALID
+            CosmeticUnlockKind.LEVEL,
+            CosmeticUnlockKind.PLAY_PRODUCT -> CosmeticAcquireResult.INVALID
         }
     }
 
