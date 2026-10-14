@@ -133,6 +133,20 @@ export class StoreCatalogStore {
         message: "direct cosmetic checkout cannot be published until the Google Play verifier grants item ownership",
       });
     }
+    if (draft.category === "BUNDLE") {
+      return json(409, {
+        error: "CATALOG_BUNDLE_NOT_READY",
+        message: "bundle publication is blocked until atomic multi-item entitlement grants are implemented",
+      });
+    }
+    const unsupportedChannels = (draft.unlock?.channels ?? []).filter((channel) => ["LEVEL", "EVENT"].includes(channel));
+    if (unsupportedChannels.length) {
+      return json(409, {
+        error: "CATALOG_UNLOCK_CHANNEL_NOT_READY",
+        message: "LEVEL and EVENT unlocks require server-authoritative progression/event verification before publication",
+        details: unsupportedChannels,
+      });
+    }
 
     const nextVersion = state.publishedVersion + 1;
     let published;
