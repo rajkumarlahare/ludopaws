@@ -419,18 +419,48 @@ class StoreActivity :
         accountId: String,
         onFinished: () -> Unit,
     ) {
-        val pending =
-            PendingStorePurchase(
-                productId = productId,
-                purchaseToken = purchaseToken,
-                accountId = accountId,
-            )
+        queuePurchaseVerification(
+            productId = productId,
+            purchaseToken = purchaseToken,
+            accountId = accountId,
+            isSubscription = false,
+            onFinished = onFinished,
+        )
+    }
+
+    override fun onSubscriptionRequiresVerification(
+        productId: String,
+        purchaseToken: String,
+        accountId: String,
+        onFinished: () -> Unit,
+    ) {
+        queuePurchaseVerification(
+            productId = productId,
+            purchaseToken = purchaseToken,
+            accountId = accountId,
+            isSubscription = true,
+            onFinished = onFinished,
+        )
+    }
+
+    private fun queuePurchaseVerification(
+        productId: String,
+        purchaseToken: String,
+        accountId: String,
+        isSubscription: Boolean,
+        onFinished: () -> Unit,
+    ) {
+        val pending = PendingStorePurchase(
+            productId = productId,
+            purchaseToken = purchaseToken,
+            accountId = accountId,
+        )
         try {
             pendingPurchases.add(pending)
         } catch (error: Exception) {
             Log.e(TAG, "Could not persist pending Play purchase", error)
             showStoreMessage(
-                "Payment was received, but its verification could not be saved safely. No items were granted. Please keep the app installed and reopen the store.",
+                "Payment was received, but its verification could not be saved safely. No entitlement was granted. Please keep the app installed and reopen the store.",
             )
             onFinished()
             return
@@ -442,11 +472,17 @@ class StoreActivity :
                 pendingPurchases.remove(purchaseToken)
                 runOnUiThread {
                     if (!canRenderStoreUi()) return@runOnUiThread
+                    renderStore()
                     showStoreMessage(
-                        if (entitlementApplied) {
-                            "Purchase verified. Your store item is ready."
-                        } else {
-                            "Purchase verified. This item was already added to your profile."
+                        when {
+                            isSubscription && pawsPlusActiveForUi ->
+                                "Paws Plus is active. Forced interstitial ads are disabled while your subscription is active."
+                            isSubscription ->
+                                "Paws Plus subscription status was verified. The plan is not currently active."
+                            entitlementApplied ->
+                                "Purchase verified. Your store item is ready."
+                            else ->
+                                "Purchase verified. This item was already added to your profile."
                         },
                     )
                 }
@@ -454,14 +490,13 @@ class StoreActivity :
                 Log.e(TAG, "Store purchase verification failed", error)
                 runOnUiThread {
                     if (!canRenderStoreUi()) return@runOnUiThread
-                    val detail =
-                        error.message?.takeIf(String::isNotBlank)
-                            ?: "Please keep the app installed and try again."
+                    val detail = error.message?.takeIf(String::isNotBlank)
+                        ?: "Please keep the app installed and try again."
                     showStoreMessage(
                         if (entitlementApplied) {
-                            "Purchase was verified and the item was saved, but its recovery record could not be cleared. It will be safely checked again. $detail"
+                            "Payment was verified, but the recovery record could not be cleared. It will be safely checked again. $detail"
                         } else {
-                            "Payment was received, but purchase verification is still pending. No items were granted yet. $detail"
+                            "Payment was received, but its verification is still pending. No unverified entitlement was granted. $detail"
                         },
                     )
                 }
@@ -478,10 +513,21 @@ class StoreActivity :
         check(session.billingAccountId == pending.accountId) {
             "This Play purchase belongs to another account. Restore that account before recovering it."
         }
-        val response = accountRepository.verifyPlayPurchase(
-            productId = pending.productId,
-            purchaseToken = pending.purchaseToken,
-        )
+        val isSubscription = pending.productId == StoreCatalog.PAWS_PLUS
+        check(!isSubscription || pawsPlusSubscriptionsConfigured) {
+            "Paws Plus subscription verification is not enabled for this build and server."
+        }
+        val response = if (isSubscription) {
+            accountRepository.verifyPlaySubscription(
+                productId = pending.productId,
+                purchaseToken = pending.purchaseToken,
+            )
+        } else {
+            accountRepository.verifyPlayPurchase(
+                productId = pending.productId,
+                purchaseToken = pending.purchaseToken,
+            )
+        }
         check(
             response.optBoolean("ok") &&
                 response.optBoolean("verified") &&
@@ -495,7 +541,10 @@ class StoreActivity :
             "Verified wallet snapshot did not match the signed-in account."
         }
         cosmetics.applyServerSnapshot(serverWallet, session.accountId)
-        ProfileStore(this).addPurchase(pending.productId) // UI cache only; server remains authoritative.
+        pawsPlusActiveForUi = serverWallet.optBoolean("pawsPlusActive", false)
+        if (!isSubscription) {
+            ProfileStore(this).addPurchase(pending.productId) // UI cache only; server remains authoritative.
+        }
         return !response.optBoolean("replay", false)
     }
 
