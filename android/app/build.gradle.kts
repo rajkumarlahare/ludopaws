@@ -17,6 +17,15 @@ val ludoProofBillingEnabled =
         .get()
         .toBooleanStrictOrNull()
         ?: false
+val ludoProofSubscriptionsEnabled =
+    providers.gradleProperty("LUDOPROOF_SUBSCRIPTIONS_ENABLED")
+        .orElse("false")
+        .get()
+        .toBooleanStrictOrNull()
+        ?: false
+require(!ludoProofSubscriptionsEnabled || ludoProofBillingEnabled) {
+    "Paws Plus subscriptions cannot be enabled while Google Play Billing is disabled."
+}
 val ludoProofAdsEnabled =
     providers.gradleProperty("LUDOPROOF_ADS_ENABLED")
         .orElse("false")
@@ -156,6 +165,11 @@ android {
             "boolean",
             "LUDOPROOF_BILLING_ENABLED",
             ludoProofBillingEnabled.toString(),
+        )
+        buildConfigField(
+            "boolean",
+            "LUDOPROOF_SUBSCRIPTIONS_ENABLED",
+            ludoProofSubscriptionsEnabled.toString(),
         )
         buildConfigField(
             "boolean",
