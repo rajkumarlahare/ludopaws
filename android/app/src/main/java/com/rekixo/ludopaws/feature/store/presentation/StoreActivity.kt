@@ -27,6 +27,7 @@ import com.rekixo.ludopaws.feature.store.domain.model.StoreBillingProduct
 import com.rekixo.ludopaws.feature.store.domain.model.StoreTab
 import com.rekixo.ludopaws.feature.store.presentation.components.storeContent
 import com.rekixo.ludopaws.feature.store.presentation.components.storeHeader
+import com.rekixo.ludopaws.feature.store.presentation.components.pinnedRemoveAdsContent
 import com.rekixo.ludopaws.feature.store.presentation.components.storeTabs
 import java.util.concurrent.Executors
 import org.json.JSONObject
@@ -725,44 +726,17 @@ class StoreActivity :
     }
 
     internal fun renderStore() {
-        if (
-            !canRenderStoreUi()
-        ) {
-            return
-        }
+        if (!canRenderStoreUi()) return
 
         val (root, host) =
-            LudoProofTheme
-                .arcadeRoot(
-                    this,
-                    gameplayBackground = true,
-                )
-
-        val scroll =
-            ScrollView(this).apply {
-                isFillViewport =
-                    true
-                overScrollMode =
-                    View.OVER_SCROLL_NEVER
-            }
-        val contentHost =
-            FrameLayout(this)
-        scroll.addView(
-            contentHost,
-            FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-            ),
-        )
+            LudoProofTheme.arcadeRoot(
+                this,
+                gameplayBackground = true,
+            )
 
         val horizontalPadding =
             dp(
-                if (
-                    LudoProofTheme
-                        .isCompactWidth(
-                            this,
-                        )
-                ) {
+                if (LudoProofTheme.isCompactWidth(this)) {
                     10
                 } else {
                     14
@@ -770,75 +744,102 @@ class StoreActivity :
             )
         val contentWidth =
             minOf(
-                resources
-                    .displayMetrics
-                    .widthPixels -
-                    horizontalPadding *
-                        2,
-                dp(
-                    LudoProofTheme
-                        .pageMaxContentWidthDp(
-                            this,
-                        ),
-                ),
+                resources.displayMetrics.widthPixels - horizontalPadding * 2,
+                dp(LudoProofTheme.pageMaxContentWidthDp(this)),
             )
 
-        val content =
+        // The page itself does not scroll. Store navigation stays visible while only
+        // the active tab's catalog below it can move.
+        val page =
             LinearLayout(this).apply {
-                orientation =
-                    LinearLayout.VERTICAL
-                setPadding(
-                    0,
-                    dp(12),
-                    0,
-                    dp(30),
-                )
+                orientation = LinearLayout.VERTICAL
+                setPadding(0, dp(12), 0, dp(8))
+                clipChildren = false
+                clipToPadding = false
             }
-
-        contentHost.addView(
-            content,
-            FrameLayout.LayoutParams(
-                contentWidth,
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                Gravity.TOP or
-                    Gravity.CENTER_HORIZONTAL,
-            ),
-        )
         host.addView(
-            scroll,
+            page,
             FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT,
             ),
         )
 
-        content.addView(
-            storeHeader(),
+        val fixedHeader =
+            LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                clipChildren = false
+                clipToPadding = false
+            }
+        page.addView(
+            fixedHeader,
+            LinearLayout.LayoutParams(
+                contentWidth,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                gravity = Gravity.CENTER_HORIZONTAL
+            },
         )
-        content.addView(
+
+        fixedHeader.addView(storeHeader())
+        fixedHeader.addView(
             storeTabs(),
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(58),
             ).apply {
-                // Separate category tabs from the back button and gem/plus pill above.
+                // Keep category tabs beneath the back button and wallet pill.
                 topMargin = dp(14)
             },
         )
-        content.addView(
-            storeContent(),
+
+        if (selectedTab == StoreTab.GEMS) {
+            fixedHeader.addView(
+                pinnedRemoveAdsContent(),
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ).apply {
+                    topMargin = dp(12)
+                },
+            )
+        }
+
+        val scroll =
+            ScrollView(this).apply {
+                isFillViewport = true
+                overScrollMode = View.OVER_SCROLL_NEVER
+                clipToPadding = false
+            }
+        page.addView(
+            scroll,
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
+                0,
+                1f,
             ).apply {
-                topMargin =
-                    dp(12)
+                topMargin = dp(8)
             },
         )
 
-        setContentView(
-            root,
+        val scrollContentHost = FrameLayout(this)
+        scroll.addView(
+            scrollContentHost,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+            ),
         )
+        scrollContentHost.addView(
+            storeContent(),
+            FrameLayout.LayoutParams(
+                contentWidth,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP or Gravity.CENTER_HORIZONTAL,
+            ),
+        )
+
+        setContentView(root)
     }
 
     internal fun showStoreMessage(
