@@ -381,30 +381,21 @@ async function handleAccountRequest(request, env) {
         if (env?.LUDOPROOF_ADMOB_SSV_ENABLED !== "true" || !env?.LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID) {
           throw httpError(503, "ADMOB_SSV_NOT_ENABLED", "server-verified ad rewards are not enabled");
         }
-        try {
-          // Rate-limit before signature verification and authoritative wallet mutation.
-          await rateLimit(env, request, "admob:ssv", 120);
-          const verified = await verifyAdMobSsvRequest(request, env);
-          // URL-verification fixtures must succeed without granting production value.
-          if (verified.isTest === true) {
-            return json(200, { ok: true, verified: true, test: true, rewardGranted: false });
-          }
-          const response = await playerResponse(env, verified.accountId, "/wallet/reward-ad", {
-            accountId: verified.accountId,
-            transactionId: verified.transactionId,
-            kind: verified.kind,
-            cosmeticId: verified.cosmeticId,
-          });
-          console.info("admob-ssv-reward-accepted", { kind: verified.kind, status: response.status });
-          return response;
-        } catch (error) {
-          // Only safe error code/status are logged; never log account IDs, signatures, or callback URLs.
-          console.warn("admob-ssv-callback-failed", {
-            code: typeof error?.code === "string" ? error.code : "SSV_CALLBACK_FAILED",
-            status: Number.isInteger(error?.status) ? error.status : 500,
-          });
-          throw error;
+        // The outer account-handler catch logs only safe SSV error code/status on failure.
+        await rateLimit(env, request, "admob:ssv", 120);
+        const verified = await verifyAdMobSsvRequest(request, env);
+        // AdMob console URL verification must succeed without granting production value.
+        if (verified.isTest === true) {
+          return json(200, { ok: true, verified: true, test: true, rewardGranted: false });
         }
+        const response = await playerResponse(env, verified.accountId, "/wallet/reward-ad", {
+          accountId: verified.accountId,
+          transactionId: verified.transactionId,
+          kind: verified.kind,
+          cosmeticId: verified.cosmeticId,
+        });
+        console.info("admob-ssv-reward-accepted", { kind: verified.kind, status: response.status });
+        return response;
       }
 
       if (url.pathname === "/api/store/status" && request.method === "GET") {
