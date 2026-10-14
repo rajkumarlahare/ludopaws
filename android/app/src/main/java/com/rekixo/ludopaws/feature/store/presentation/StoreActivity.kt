@@ -2,6 +2,8 @@ package com.rekixo.ludopaws.feature.store.presentation
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.Gravity
@@ -22,6 +24,7 @@ import com.rekixo.ludopaws.feature.store.data.billing.PendingStorePurchaseStore
 import com.rekixo.ludopaws.feature.store.data.local.CosmeticInventoryStore
 import com.rekixo.ludopaws.feature.store.data.local.GemWalletStore
 import com.rekixo.ludopaws.feature.profile.data.local.ProfileStore
+import com.rekixo.ludopaws.feature.store.domain.StoreCatalog
 import com.rekixo.ludopaws.feature.store.domain.StoreCosmeticCatalog
 import com.rekixo.ludopaws.feature.store.domain.model.StoreBillingProduct
 import com.rekixo.ludopaws.feature.store.domain.model.StoreTab
@@ -50,6 +53,10 @@ class StoreActivity :
             > =
         emptyMap()
     private var billingAvailable = false
+    private var subscriptionsAvailableByServer = false
+    internal var pawsPlusActiveForUi = false
+    internal val pawsPlusSubscriptionsConfigured: Boolean
+        get() = BuildConfig.LUDOPROOF_SUBSCRIPTIONS_ENABLED && subscriptionsAvailableByServer
     private var rewardedAdsEnabledByServer = false
     private var rewardedAdsStatusLoaded = false
     private var rewardedAdsStatusError: Exception? = null
@@ -105,6 +112,7 @@ class StoreActivity :
             enabled =
                 BuildConfig
                     .LUDOPROOF_BILLING_ENABLED,
+            subscriptionsEnabled = pawsPlusSubscriptionsConfigured,
             accountId =
                 installAccountId,
             listener =
@@ -164,10 +172,13 @@ class StoreActivity :
             var adsAvailable = false
             var adsStatusLoaded = false
             var adsStatusError: Exception? = null
+            var subscriptionsAvailable = false
             try {
                 statusResponse = accountRepository.storeStatus()
                 adsAvailable = BuildConfig.LUDOPROOF_ADS_ENABLED &&
                     statusResponse.optBoolean("rewardedAdsAvailable", false)
+                subscriptionsAvailable = BuildConfig.LUDOPROOF_SUBSCRIPTIONS_ENABLED &&
+                    statusResponse.optBoolean("subscriptionsAvailable", false)
                 adsStatusLoaded = true
             } catch (error: Exception) {
                 adsStatusError = error
@@ -179,6 +190,7 @@ class StoreActivity :
                 rewardedAdsStatusLoaded = adsStatusLoaded
                 rewardedAdsStatusError = adsStatusError
                 rewardedAdsEnabledByServer = adsAvailable
+                subscriptionsAvailableByServer = subscriptionsAvailable
                 if (adsEnabledForBuild) rewardedAds.prepare()
                 renderStore()
             }
@@ -188,6 +200,7 @@ class StoreActivity :
             var recoveredPurchases = 0
             var recoveryError: Exception? = null
             var activeBillingAccountId: String? = null
+            var serverPawsPlusActive = false
             try {
                 val session = accountRepository.ensureGuestSession()
                 activeBillingAccountId = session.billingAccountId
@@ -196,11 +209,14 @@ class StoreActivity :
                 val serverWallet = accountRepository.wallet()
                 wallet.applyServerSnapshot(serverWallet, session.accountId)
                 cosmetics.applyServerSnapshot(serverWallet, session.accountId)
+                serverPawsPlusActive = serverWallet.optBoolean("pawsPlusActive", false)
 
                 // A purchase that belongs to another account is intentionally left pending.
                 // It can only be recovered after that same Google-linked account is restored.
                 if (available) {
-                    pendingPurchases.all().forEach { pending ->
+                    pendingPurchases.all().filter { pending ->
+                        pending.productId != StoreCatalog.PAWS_PLUS || subscriptionsAvailable
+                    }.forEach { pending ->
                         try {
                             val applied = verifyPurchaseAndFulfill(pending)
                             if (applied) recoveredPurchases += 1
@@ -219,6 +235,7 @@ class StoreActivity :
             runOnUiThread {
                 if (!canRenderStoreUi()) return@runOnUiThread
                 billingAvailable = available
+                pawsPlusActiveForUi = serverPawsPlusActive
                 if (BuildConfig.LUDOPROOF_BILLING_ENABLED && billingAvailable) {
                     val binding = activeBillingAccountId
                     if (binding.isNullOrBlank()) {
@@ -282,6 +299,10 @@ class StoreActivity :
     internal fun requestPurchase(
         productId: String,
     ) {
+        if (productId == StoreCatalog.PAWS_PLUS && !pawsPlusSubscriptionsConfigured) {
+            showStoreMessage("Paws Plus monthly subscription is not configured in Google Play and the server yet.")
+            return
+        }
         if (
             !BuildConfig
                 .LUDOPROOF_BILLING_ENABLED
@@ -666,6 +687,19 @@ class StoreActivity :
                 message.ifBlank { "Google Play payments are unavailable." },
                 Toast.LENGTH_LONG,
             ).show()
+        }
+    }
+
+    internal fun managePawsPlusSubscription() {
+        val uri = Uri.parse(
+            "https://play.google.com/store/account/subscriptions?sku=" +
+                StoreCatalog.PAWS_PLUS +
+                "&package=com.rekixo.ludopaws",
+        )
+        runCatching {
+            startActivity(Intent(Intent.ACTION_VIEW, uri))
+        }.onFailure {
+            showStoreMessage("Google Play subscription management could not be opened.")
         }
     }
 
