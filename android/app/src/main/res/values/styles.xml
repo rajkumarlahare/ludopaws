@@ -2,11 +2,14 @@
 <resources>
     <style name="Theme.LudoPaws" parent="@android:style/Theme.Material.Light.NoActionBar">
         <item name="android:windowNoTitle">true</item>
-        <item name="android:windowBackground">@drawable/ludo_paws_launch_window_background</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar">false</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+    </style>
+    <!-- Applied only to the launcher Activity. Other screens keep the normal app window background. -->
+    <style name="Theme.LudoPaws.Launch" parent="@style/Theme.LudoPaws">
+        <item name="android:windowBackground">@drawable/ludo_paws_launch_window_background</item>
     </style>
 </resources>
