@@ -91,7 +91,7 @@ export function googlePlaySubscriptionsEnabled(env) {
     typeof env?.GOOGLE_PLAY_RTDN_AUDIENCE === "string" &&
     /^https:\/\//.test(env.GOOGLE_PLAY_RTDN_AUDIENCE) &&
     typeof env?.GOOGLE_PLAY_RTDN_EMAIL === "string" &&
-    /^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(env.GOOGLE_PLAY_RTDN_EMAIL)
+    env.GOOGLE_PLAY_RTDN_EMAIL.includes("@") && !env.GOOGLE_PLAY_RTDN_EMAIL.includes(" ")
   );
 }
 
