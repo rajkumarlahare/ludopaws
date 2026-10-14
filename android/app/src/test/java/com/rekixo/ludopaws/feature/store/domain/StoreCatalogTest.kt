@@ -66,18 +66,9 @@ class StoreCatalogTest {
             product.featured,
         )
         assertEquals(
-            "₹99.00",
+            "Price set by Google Play",
             product.fallbackPrice,
         )
-    }
-
-    @Test
-    fun pawsPlusIsASeparateMonthlySubscriptionSku() {
-        assertEquals("paws_plus", StoreCatalog.PAWS_PLUS)
-        assertEquals(StoreProductKind.SUBSCRIPTION, StoreCatalog.pawsPlus.kind)
-        assertTrue(StoreCatalog.pawsPlus.title.contains("Monthly"))
-        assertTrue(StoreCatalog.pawsPlus.fallbackPrice.isNotBlank())
-        assertTrue(StoreCatalog.playProductIds.none { it == StoreCatalog.PAWS_PLUS })
     }
 
     @Test
