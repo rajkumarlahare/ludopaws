@@ -526,6 +526,7 @@ async function handleAccountRequest(request, env) {
         return json(200, {
           ok: true,
           verified: true,
+          productId: verified.productId,
           subscription: refreshed.subscription,
           wallet: refreshed.wallet,
         });
