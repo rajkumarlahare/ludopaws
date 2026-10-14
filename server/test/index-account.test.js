@@ -217,6 +217,32 @@ test("AdMob SSV rate limiting runs before signature/key verification", async () 
 });
 
 
+test("AdMob SSV validation logs the safe error code without logging callback data", async () => {
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (...args) => warnings.push(args);
+  try {
+    const response = await accountWorker.fetch(
+      new Request("https://api.example.test/api/admob/ssv"),
+      {
+        LUDOPROOF_API_GATE: makeRateGate(),
+        LUDOPROOF_ADMOB_SSV_ENABLED: "true",
+        LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID: "ca-app-pub-123/456",
+      },
+    );
+    assert.equal(response.status, 400);
+    assert.equal((await response.json()).error, "SSV_SIGNATURE_MISSING");
+    assert.deepEqual(warnings, [[
+      "admob-ssv-request-rejected",
+      { status: 400, code: "SSV_SIGNATURE_MISSING" },
+    ]]);
+    assert.doesNotMatch(JSON.stringify(warnings), /signature=|user_id|custom_data|transaction_id/i);
+  } finally {
+    console.warn = originalWarn;
+  }
+});
+
+
 function makeDeletionReplayEnv(deleted) {
   const calls = [];
   const directoryCalls = [];
