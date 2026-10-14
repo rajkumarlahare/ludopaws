@@ -1,6 +1,8 @@
 package com.rekixo.ludopaws.feature.store.presentation.components
 
+import android.content.Intent
 import android.graphics.Color
+import android.net.Uri
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
@@ -421,6 +423,19 @@ private fun StoreActivity.pawsPlusSubscriptionCard(): LinearLayout =
             text = if (price.isNullOrBlank()) "Subscribe — price shown by Google Play" else "Subscribe · $price / month"
             isAllCaps = false
             setOnClickListener { requestPurchase(StoreCatalog.PAWS_PLUS) }
+        }, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+        ))
+        addView(Button(this@pawsPlusSubscriptionCard).apply {
+            text = "Manage or cancel subscription"
+            isAllCaps = false
+            setOnClickListener {
+                val url = Uri.parse(
+                    "https://play.google.com/store/account/subscriptions?sku=${StoreCatalog.PAWS_PLUS}&package=com.rekixo.ludopaws",
+                )
+                startActivity(Intent(Intent.ACTION_VIEW, url))
+            }
         }, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT,
