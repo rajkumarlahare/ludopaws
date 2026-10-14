@@ -155,6 +155,48 @@ test("rejects incomplete content and direct Play checkout before publication", a
   assert.equal(publishDirectPurchase.body.error, "CATALOG_PLAY_PURCHASE_NOT_READY");
 });
 
+test("blocks bundle, Level, and Event publication until their grant authorities exist", async () => {
+  const { store } = createStore();
+
+  const bundle = item({
+    id: "bundle_safari_01",
+    category: "BUNDLE",
+    name: "Safari Bundle",
+  });
+  await call(store, "/catalog/draft/save", mutation({ item: bundle }));
+  const publishBundle = await call(store, "/catalog/publish", mutation({
+    expectedRevision: 1, itemId: bundle.id,
+  }));
+  assert.equal(publishBundle.response.status, 409);
+  assert.equal(publishBundle.body.error, "CATALOG_BUNDLE_NOT_READY");
+
+  const levelItem = item({
+    id: "paw_level_01",
+    unlock: { channels: ["LEVEL"], level: { enabled: true, minimumLevel: 3 } },
+  });
+  await call(store, "/catalog/draft/save", mutation({ expectedRevision: 1, item: levelItem }));
+  const publishLevel = await call(store, "/catalog/publish", mutation({
+    expectedRevision: 2, itemId: levelItem.id,
+  }));
+  assert.equal(publishLevel.response.status, 409);
+  assert.equal(publishLevel.body.error, "CATALOG_UNLOCK_CHANNEL_NOT_READY");
+
+  const eventItem = item({
+    id: "paw_event_01",
+    unlock: { channels: ["EVENT"], event: { enabled: true, eventKey: "halloween-2026" } },
+  });
+  await call(store, "/catalog/draft/save", mutation({ expectedRevision: 2, item: eventItem }));
+  const publishEvent = await call(store, "/catalog/publish", mutation({
+    expectedRevision: 3, itemId: eventItem.id,
+  }));
+  assert.equal(publishEvent.response.status, 409);
+  assert.equal(publishEvent.body.error, "CATALOG_UNLOCK_CHANNEL_NOT_READY");
+
+  const current = await call(store, "/catalog/current", null, "GET");
+  assert.equal(current.body.catalogVersion, 0);
+  assert.equal(current.body.items.length, 0);
+});
+
 test("published state and snapshot persistence are atomic on storage failure", async () => {
   const { store, storage } = createStore();
   await call(store, "/catalog/draft/save", mutation({ item: item() }));
