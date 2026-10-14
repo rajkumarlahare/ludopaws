@@ -71,8 +71,8 @@ class StoreActivity :
     }
     internal val adsEnabledForBuild: Boolean
         get() =
-            BuildConfig.LUDOPROOF_ADS_ENABLED &&
-                rewardedAdsEnabledByServer
+            rewardedAdsEnabledByServer &&
+                BuildConfig.LUDOPROOF_ADS_ENABLED
     private val rewardedAds by lazy {
         rewardedAdsWasCreated = true
         RewardedAdsController(
