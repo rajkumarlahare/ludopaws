@@ -12,6 +12,7 @@ import android.net.Uri
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.ScrollView
@@ -217,9 +218,9 @@ internal fun ProfileActivity.showProfileMenu(anchor: View) {
             isVerticalScrollBarEnabled = true
             addView(
                 options,
-                ScrollView.LayoutParams(
-                    ScrollView.LayoutParams.MATCH_PARENT,
-                    ScrollView.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
                 ),
             )
         }
