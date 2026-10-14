@@ -4,7 +4,7 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
   push:
-    branches: [main, feat/ludopaws-production-readiness]
+    branches: [main, feat/ludopaws-production-readiness, feat/paws-plus-subscription-lifecycle]
 
 permissions:
   contents: read
