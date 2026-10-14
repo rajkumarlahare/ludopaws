@@ -13,6 +13,7 @@ enum class CosmeticUnlockKind {
     LEVEL,
     REWARDED_ADS,
     EVENT,
+    PLAY_PRODUCT,
 }
 
 data class StoreCosmetic(
