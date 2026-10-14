@@ -257,7 +257,6 @@ tasks.named("preBuild").configure {
 }
 
 dependencies {
-    implementation("androidx.core:core-splashscreen:1.2.0")
     implementation("androidx.activity:activity:1.13.0")
     implementation("androidx.credentials:credentials:1.6.0")
     implementation("androidx.credentials:credentials-play-services-auth:1.6.0")
