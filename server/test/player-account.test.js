@@ -529,7 +529,7 @@ test("catalog-managed multi-channel purchase requires an explicit enabled channe
   assert.equal((await wrongCountry.json()).error, "COSMETIC_UNAVAILABLE");
 
   const ambiguous = await post(account, "/wallet/cosmetic/purchase", {
-    accountId, sessionId: created.sessionId, cosmeticId: "paw_multi_01",
+    accountId, sessionId: created.sessionId, cosmeticId: "dice_heart",
     clientRequestId: "8cc64312-e42b-4d4d-a6b2-3cfd16c3f098", catalogCountry: "IN",
   });
   assert.equal(ambiguous.status, 400);
@@ -537,7 +537,7 @@ test("catalog-managed multi-channel purchase requires an explicit enabled channe
   assert.equal(sql.wallet.get(accountId).balance, 150);
 
   const selectedChannel = await post(account, "/wallet/cosmetic/purchase", {
-    accountId, sessionId: created.sessionId, cosmeticId: "paw_multi_01", unlockChannel: "GEMS",
+    accountId, sessionId: created.sessionId, cosmeticId: "dice_heart", unlockChannel: "GEMS",
     clientRequestId: "c0e51f8e-2663-4d35-a0d1-248eaf508282", catalogCountry: "IN",
   });
   assert.equal(selectedChannel.status, 200);
@@ -571,14 +571,14 @@ test("catalog-managed rewarded ads verify current eligibility and can progress t
     assert.equal(reward.status, 200);
   }
   assert.equal(sql.wallet.get(accountId).balance, 10);
-  assert.equal(sql.adProgress.get("paw_reward_01"), 2);
+  assert.equal(sql.adProgress.get("dice_diwali"), 2);
 
   const purchase = await post(account, "/wallet/cosmetic/purchase", {
-    accountId, sessionId: (await created.json()).sessionId, cosmeticId: "paw_reward_01",
+    accountId, sessionId: (await created.json()).sessionId, cosmeticId: "dice_diwali",
     clientRequestId: "7ab6933e-2465-4b01-9cd2-aa33b2020605", catalogCountry: "IN",
   });
   assert.equal(purchase.status, 200);
-  assert.ok((await purchase.json()).wallet.ownedCosmetics.includes("paw_reward_01"));
+  assert.ok((await purchase.json()).wallet.ownedCosmetics.includes("dice_diwali"));
 });
 
 test("new catalog IDs stay unpurchasable until server renderer and entitlement support ship", async () => {
