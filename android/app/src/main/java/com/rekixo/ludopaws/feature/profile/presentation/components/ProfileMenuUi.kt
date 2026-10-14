@@ -78,8 +78,11 @@ internal fun ProfileActivity.showProfileMenu(anchor: View) {
         LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
         }
+    var sectionCount = 0
+    var itemCount = 0
 
     fun addSection(title: String) {
+        sectionCount += 1
         options.addView(
             TextView(this).apply {
                 text = title
@@ -102,6 +105,7 @@ internal fun ProfileActivity.showProfileMenu(anchor: View) {
         description: String,
         action: () -> Unit,
     ) {
+        itemCount += 1
         val item =
             LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
@@ -219,16 +223,18 @@ internal fun ProfileActivity.showProfileMenu(anchor: View) {
                 ),
             )
         }
+    val preferredScrollHeight = dp(itemCount * 61 + sectionCount * 25 + 8)
     val maxScrollHeight =
         minOf(
             dp(450),
             (resources.displayMetrics.heightPixels - dp(190)).coerceAtLeast(dp(220)),
         )
+    val scrollHeight = minOf(preferredScrollHeight, maxScrollHeight).coerceAtLeast(dp(160))
     panel.addView(
         scroll,
         LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
-            maxScrollHeight,
+            scrollHeight,
         ),
     )
 
@@ -356,7 +362,7 @@ Ludo Paws is a game published under the Rekixo brand. These terms apply when you
 Use the game lawfully and respectfully. Do not cheat, manipulate match outcomes, abuse other players, interfere with the service, reverse-engineer service protections, or use bots or automated methods to exploit gameplay or rewards.
 
 3. Accounts and deletion
-Guest progress may be tied to the installation until an account is linked or a supported recovery option is completed. Keep credentials and guest deletion codes private. A guest deletion code is for deleting an eligible guest account only; it is not a login or recovery code. Account deletion is permanent. Use Profile → menu → Delete account and data, or the official online deletion page.
+Guest accounts are generally tied to the installation unless linked to Google. Keep credentials and guest deletion codes private. A guest deletion code can delete an eligible unlinked guest account only; it cannot sign in or restore progress. Account deletion is permanent. Use Profile → menu → Delete account and data, or the official online deletion page.
 
 4. Purchases and virtual items
 Purchases offered through Google Play are subject to the purchase details shown at checkout and Google Play's applicable terms. Gems, cosmetics and other digital items are for use in Ludo Paws, are not cash, and have no cash value or transfer right except where applicable law requires otherwise. Entitlements may be checked against purchase records to prevent fraud or duplicate grants. Refunds and payment disputes are handled under applicable Google Play processes and law.
