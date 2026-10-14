@@ -405,7 +405,7 @@ class GooglePlayBillingGateway(
                         details.oneTimePurchaseOfferDetailsList?.firstOrNull()?.formattedPrice
                     } else {
                         null
-                    } ?: return@forEach
+                    }?.takeIf { it.isNotBlank() } ?: return@forEach
                     productDetails[details.productId] = details
                     mapped[details.productId] = StoreBillingProduct(
                         productId = details.productId,
