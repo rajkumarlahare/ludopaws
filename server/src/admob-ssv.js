@@ -11,7 +11,15 @@ export async function verifyAdMobSsvRequest(request, env, fetchImpl = fetch, now
   const marker = "&signature=";
   const signatureIndex = query.indexOf(marker);
   if (signatureIndex < 1) throw ssvError(400, "SSV_SIGNATURE_MISSING", "signed reward callback is invalid");
-  const signedContent = query.slice(0, signatureIndex);
+  // Google's reference verifier uses URI.getQuery(), which decodes percent-escaped
+  // query values before verifying the signed bytes. Preserve the raw query separately
+  // for parameter parsing, but verify the once-decoded content in its original order.
+  let signedContent;
+  try {
+    signedContent = decodeURIComponent(query.slice(0, signatureIndex));
+  } catch {
+    throw ssvError(400, "SSV_ENCODING_INVALID", "signed reward callback is invalid");
+  }
   const suffix = new URLSearchParams(query.slice(signatureIndex + 1));
   const signature = suffix.get("signature"), keyIdText = suffix.get("key_id"), suffixKeys = [...suffix.keys()];
   if (suffixKeys.length !== 2 || suffixKeys[0] !== "signature" || suffixKeys[1] !== "key_id" || !signature || !/^\d{1,20}$/.test(String(keyIdText ?? "")) || !signedContent) {
@@ -20,7 +28,7 @@ export async function verifyAdMobSsvRequest(request, env, fetchImpl = fetch, now
   const keyId = Number(keyIdText);
   if (!Number.isSafeInteger(keyId)) throw ssvError(400, "SSV_KEY_INVALID", "reward signing key is invalid");
 
-  const params = new URLSearchParams(signedContent);
+  const params = new URLSearchParams(query.slice(0, signatureIndex));
   const getSingle = (name) => {
     const values = params.getAll(name);
     if (values.length !== 1) throw ssvError(400, "SSV_PARAMETER_INVALID", "reward callback parameters are invalid");
