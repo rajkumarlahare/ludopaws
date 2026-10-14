@@ -1,6 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { assertCatalogCanPublish, validateCatalog, validateCatalogItem } from "./store-catalog.js";
+
+const ownDir = path.dirname(fileURLToPath(import.meta.url));
+const schema = JSON.parse(await readFile(path.resolve(ownDir, "../../docs/STORE_CATALOG_SCHEMA.json"), "utf8"));
 
 const item = (overrides = {}) => ({
   id: "paw_safari_01",
@@ -25,6 +31,11 @@ const item = (overrides = {}) => ({
   availability: { worldwide: true, allowedCountries: [], blockedCountries: ["KP"], startsAt: null, endsAt: null },
   catalogVersion: 1,
   ...overrides,
+});
+
+test("validator schema ID stays aligned with the canonical JSON Schema", () => {
+  const result = validateCatalogItem(item(), { playProducts: ["paw_safari_01"] });
+  assert.equal(result.schemaId, schema.$id);
 });
 
 test("accepts a draft item with independently enabled rewarded ads, Gems and direct purchase", () => {
