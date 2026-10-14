@@ -7,6 +7,23 @@ import org.junit.Test
 
 class StoreCatalogTest {
     @Test
+    fun storeOffersOnlyOneTimeProductsAndKeepsRemoveAdsAndGemPacks() {
+        assertEquals(
+            listOf(
+                StoreCatalog.REMOVE_ADS,
+                StoreCatalog.GEMS_300,
+                StoreCatalog.GEMS_1500,
+                StoreCatalog.GEMS_3500,
+                StoreCatalog.GEMS_20000,
+                StoreCatalog.GEMS_40000,
+                StoreCatalog.GEMS_200000,
+            ),
+            StoreCatalog.playProductIds,
+        )
+        assertTrue(StoreCatalog.products.none { it.productId.contains("plus", ignoreCase = true) })
+    }
+
+    @Test
     fun productIdsAreUnique() {
         val ids =
             StoreCatalog
