@@ -11,7 +11,7 @@
     <style name="Theme.LudoPaws.Launch" parent="@style/Theme.LudoPaws">
         <item name="android:windowBackground">@drawable/ludo_paws_launch_window_background</item>
         <item name="android:windowSplashScreenBackground">#03153F</item>
-        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_ludo_paws</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_ludo_paws_launch</item>
         <item name="android:windowSplashScreenAnimationDuration">0</item>
     </style>
 </resources>
