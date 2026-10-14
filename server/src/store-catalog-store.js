@@ -24,6 +24,9 @@ export class StoreCatalogStore {
       const state = await this.#loadState();
       return json(200, publicState(state));
     }
+    if (request.method === "GET" && url.pathname === "/catalog/admin-state") {
+      return json(200, await this.#loadState());
+    }
     if (request.method === "GET" && url.pathname === "/catalog/history") {
       const state = await this.#loadState();
       const requested = Number(url.searchParams.get("limit") ?? 30);
