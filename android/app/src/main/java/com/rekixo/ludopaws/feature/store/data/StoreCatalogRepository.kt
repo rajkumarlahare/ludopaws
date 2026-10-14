@@ -82,6 +82,17 @@ object StoreCatalogParser {
         }
         val itemVersion = item.optInt("catalogVersion", -1)
         require(itemVersion in 1..catalogVersion) { "Catalog item version is invalid." }
+        val asset = item.optJSONObject("asset")
+            ?: throw IllegalArgumentException("Catalog asset metadata is missing.")
+        require(asset.optString("thumbnail").isNotBlank()) { "Catalog thumbnail metadata is missing." }
+        require(asset.optString("manifest").isNotBlank()) { "Catalog manifest metadata is missing." }
+        require(asset.optInt("version", 0) > 0) { "Catalog asset version is invalid." }
+        require(Regex("^[a-f0-9]{64}$").matches(asset.optString("sha256"))) {
+            "Catalog asset digest is invalid."
+        }
+        require(asset.optString("format") in SUPPORTED_ASSET_FORMATS) {
+            "Catalog asset format is not supported by the catalog schema."
+        }
 
         val unlock = item.optJSONObject("unlock")
             ?: throw IllegalArgumentException("Catalog unlock rules are missing.")
@@ -171,6 +182,8 @@ object StoreCatalogParser {
         CosmeticCategory.AVATAR -> 0xFF3986CB.toInt() to 0xFF183C73.toInt()
         CosmeticCategory.CHARACTER_PACK -> 0xFF20A86B.toInt() to 0xFF075B72.toInt()
     }
+
+    private val SUPPORTED_ASSET_FORMATS = setOf("GLB", "GLTF", "PNG_SET", "SPRITE_ATLAS", "BUILT_IN")
 
     private val CHANNEL_PRIORITY = listOf(
         CosmeticUnlockKind.GEMS,
