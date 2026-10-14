@@ -58,7 +58,9 @@ internal class PostWinInterstitialExitGate(
                         "The server wallet snapshot could not be applied to the active account."
                     }
                     PostWinInterstitialPolicy.shouldShowFillerInterstitial(
-                        adsRemoved = wallet.getBoolean("adsRemoved"),
+                        // Paws Plus suppresses forced interstitials while its server-verified
+                        // entitlement is active; opt-in rewarded ads are handled separately.
+                        adsRemoved = wallet.getBoolean("adsRemoved") || wallet.optBoolean("pawsPlusActive", false),
                     )
                 } catch (error: Exception) {
                     // Fail open to navigation, not to ads: never show a filler ad if ownership
