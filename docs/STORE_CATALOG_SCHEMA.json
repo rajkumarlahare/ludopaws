@@ -4,135 +4,78 @@
   "title": "Ludo Paws Store Catalog Item",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "id",
-    "category",
-    "name",
-    "description",
-    "status",
-    "contentReady",
-    "asset",
-    "unlock",
-    "availability",
-    "catalogVersion"
-  ],
+  "required": ["id", "category", "name", "description", "status", "contentReady", "asset", "unlock", "availability", "catalogVersion"],
   "properties": {
-    "id": {
-      "type": "string",
-      "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$",
-      "description": "Stable immutable identifier. Do not reuse retired IDs."
-    },
-    "category": {
-      "enum": ["PAW", "DICE", "BOARD", "AVATAR", "BUNDLE"]
-    },
-    "name": { "type": "string", "minLength": 1, "maxLength": 80 },
-    "description": { "type": "string", "maxLength": 500 },
-    "localizationKey": { "type": "string", "maxLength": 120 },
-    "status": {
-      "enum": ["DRAFT", "PREVIEW", "SCHEDULED", "PUBLISHED", "ARCHIVED"]
-    },
-    "contentReady": { "type": "boolean" },
+    "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$", "description": "Stable immutable identifier. Do not reuse retired IDs."},
+    "category": {"enum": ["PAW", "DICE", "BOARD", "AVATAR", "BUNDLE"]},
+    "name": {"type": "string", "minLength": 1, "maxLength": 80},
+    "description": {"type": "string", "maxLength": 500},
+    "localizationKey": {"type": "string", "maxLength": 120},
+    "status": {"enum": ["DRAFT", "PREVIEW", "SCHEDULED", "PUBLISHED", "ARCHIVED"]},
+    "contentReady": {"type": "boolean"},
     "asset": {
-      "type": "object",
-      "additionalProperties": false,
+      "type": "object", "additionalProperties": false,
       "required": ["thumbnail", "manifest", "version", "sha256", "format"],
       "properties": {
-        "thumbnail": { "type": "string", "minLength": 1 },
-        "manifest": { "type": "string", "minLength": 1 },
-        "version": { "type": "integer", "minimum": 1 },
-        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-        "format": { "enum": ["GLB", "GLTF", "PNG_SET", "SPRITE_ATLAS", "BUILT_IN"] }
+        "thumbnail": {"type": "string", "minLength": 1},
+        "manifest": {"type": "string", "minLength": 1},
+        "version": {"type": "integer", "minimum": 1},
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "format": {"enum": ["GLB", "GLTF", "PNG_SET", "SPRITE_ATLAS", "BUILT_IN"]}
       }
     },
     "unlock": {
-      "type": "object",
-      "additionalProperties": false,
+      "type": "object", "additionalProperties": false,
       "required": ["channels"],
       "properties": {
-        "channels": {
-          "type": "array",
-          "minItems": 1,
-          "uniqueItems": true,
-          "items": { "enum": ["FREE", "REWARDED_ADS", "GEMS", "PLAY_PRODUCT", "LEVEL", "EVENT"] }
-        },
+        "channels": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["FREE", "REWARDED_ADS", "GEMS", "PLAY_PRODUCT", "LEVEL", "EVENT"]}},
         "rewardedAds": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["enabled", "requiredCompletedAds"],
-          "properties": {
-            "enabled": { "type": "boolean" },
-            "requiredCompletedAds": { "type": "integer", "minimum": 1, "maximum": 100 }
-          }
+          "type": "object", "additionalProperties": false, "required": ["enabled", "requiredCompletedAds"],
+          "properties": {"enabled": {"type": "boolean"}, "requiredCompletedAds": {"type": "integer", "minimum": 1, "maximum": 100}}
         },
         "gems": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["enabled", "price"],
-          "properties": {
-            "enabled": { "type": "boolean" },
-            "price": { "type": "integer", "minimum": 0, "maximum": 2000000000 }
-          }
+          "type": "object", "additionalProperties": false, "required": ["enabled", "price"],
+          "properties": {"enabled": {"type": "boolean"}, "price": {"type": "integer", "minimum": 1, "maximum": 2000000000}}
         },
         "playProduct": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["enabled", "productId", "productKind"],
-          "properties": {
-            "enabled": { "type": "boolean" },
-            "productId": { "type": "string", "pattern": "^[a-z][a-z0-9_]{2,63}$" },
-            "productKind": { "const": "NON_CONSUMABLE" }
-          }
+          "type": "object", "additionalProperties": false, "required": ["enabled", "productId", "productKind"],
+          "properties": {"enabled": {"type": "boolean"}, "productId": {"type": "string", "pattern": "^[a-z][a-z0-9_]{2,63}$"}, "productKind": {"const": "NON_CONSUMABLE"}}
         },
         "level": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["enabled", "minimumLevel"],
-          "properties": {
-            "enabled": { "type": "boolean" },
-            "minimumLevel": { "type": "integer", "minimum": 1 }
-          }
+          "type": "object", "additionalProperties": false, "required": ["enabled", "minimumLevel"],
+          "properties": {"enabled": {"type": "boolean"}, "minimumLevel": {"type": "integer", "minimum": 1}}
         },
         "event": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["enabled", "eventKey"],
-          "properties": {
-            "enabled": { "type": "boolean" },
-            "eventKey": { "type": "string", "minLength": 3, "maxLength": 100 }
-          }
+          "type": "object", "additionalProperties": false, "required": ["enabled", "eventKey"],
+          "properties": {"enabled": {"type": "boolean"}, "eventKey": {"type": "string", "minLength": 3, "maxLength": 100}}
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"channels": {"contains": {"const": "REWARDED_ADS"}}}},
+          "then": {"required": ["rewardedAds"], "properties": {"rewardedAds": {"properties": {"enabled": {"const": true}}}}}
+        },
+        {
+          "if": {"properties": {"channels": {"contains": {"const": "GEMS"}}}},
+          "then": {"required": ["gems"], "properties": {"gems": {"properties": {"enabled": {"const": true}, "price": {"minimum": 1}}}}}
+        },
+        {
+          "if": {"properties": {"channels": {"contains": {"const": "PLAY_PRODUCT"}}}},
+          "then": {"required": ["playProduct"], "properties": {"playProduct": {"properties": {"enabled": {"const": true}}}}}
+        }
+      ]
     },
     "availability": {
-      "type": "object",
-      "additionalProperties": false,
+      "type": "object", "additionalProperties": false,
       "required": ["worldwide", "allowedCountries", "blockedCountries"],
       "properties": {
-        "worldwide": { "type": "boolean" },
-        "allowedCountries": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^[A-Z]{2}$" } },
-        "blockedCountries": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^[A-Z]{2}$" } },
-        "startsAt": { "type": ["string", "null"], "format": "date-time" },
-        "endsAt": { "type": ["string", "null"], "format": "date-time" }
+        "worldwide": {"type": "boolean"},
+        "allowedCountries": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Z]{2}$"}},
+        "blockedCountries": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Z]{2}$"}},
+        "startsAt": {"type": ["string", "null"], "format": "date-time"},
+        "endsAt": {"type": ["string", "null"], "format": "date-time"}
       }
     },
-    "catalogVersion": { "type": "integer", "minimum": 1 }
-  },
-  "allOf": [
-    {
-      "if": {
-        "properties": { "unlock": { "properties": { "channels": { "contains": { "const": "REWARDED_ADS" } } } } }
-      },
-      "then": {
-        "properties": { "unlock": { "required": ["rewardedAds"], "properties": { "rewardedAds": { "properties": { "enabled": { "const": true } } } } } }
-      }
-    },
-    {
-      "if": {
-        "properties": { "unlock": { "properties": { "channels": { "contains": { "const": "GEMS" } } } }
-      },
-      "then": {
-        "properties": { "unlock": { "required": ["gems"], "properties": { "gems": { "properties": { "enabled": { "const": true }, "price": { "minimum": 1 } } } } }
-      }
-    }
-  ]
+    "catalogVersion": {"type": "integer", "minimum": 1}
+  }
 }
