@@ -297,18 +297,23 @@ jobs:
               console.error("Branded API /api/store/status response is missing expected boolean feature flags.");
               process.exit(2);
             }
+            const expectedBilling = process.env.GOOGLE_PLAY_BILLING_ENABLED === "true";
+            const androidBillingEnabled = process.env.LUDOPROOF_BILLING_ENABLED === "true";
             const expectedRewardedAds = process.env.LUDOPROOF_ADMOB_SSV_ENABLED === "true";
             const androidRewardedAds = process.env.LUDOPROOF_ADS_ENABLED === "true";
             if (
-              body.billingAvailable !== false ||
+              body.billingAvailable !== expectedBilling ||
+              androidBillingEnabled !== expectedBilling ||
               body.rewardedAdsAvailable !== expectedRewardedAds ||
               androidRewardedAds !== expectedRewardedAds
             ) {
-              console.error("Production store status does not match validated feature configuration. Billing must remain disabled, and Android/Worker Rewarded Ads flags must match.");
+              console.error("Production store status does not match validated feature configuration. Android/Worker Billing and Rewarded Ads flags must match their explicitly configured values.");
               process.exit(3);
             }
             console.log(
-              "Branded API store status verified; Billing disabled, Rewarded Ads " +
+              "Branded API store status verified; Billing " +
+                (expectedBilling ? "enabled by explicit validated configuration, " : "disabled, ") +
+                "Rewarded Ads " +
                 (expectedRewardedAds ? "enabled by explicit validated configuration." : "disabled.")
             );
           ' "$status_file"
