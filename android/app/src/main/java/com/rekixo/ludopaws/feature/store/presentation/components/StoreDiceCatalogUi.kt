@@ -101,7 +101,6 @@ private fun StoreActivity.dicePanel(
         isFocusable = !locked
         contentDescription =
             when {
-                locked && dice.remoteManaged -> "${dice.title}, not available in this app build yet"
                 locked -> "$LOCKED_DICE_TITLE, locked, coming soon"
                 !owned -> "${dice.title}, available to unlock"
                 else -> "${dice.title}, unlocked" + if (selected) ", selected" else ""
@@ -109,7 +108,7 @@ private fun StoreActivity.dicePanel(
 
         addView(
             TextView(this@dicePanel).apply {
-                text = if (locked && !dice.remoteManaged) LOCKED_DICE_TITLE else dice.title
+                text = if (locked) LOCKED_DICE_TITLE else dice.title
                 textSize = 14.5f
                 setTypeface(Typeface.DEFAULT_BOLD)
                 setTextColor(Color.WHITE)
