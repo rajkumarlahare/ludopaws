@@ -1,6 +1,6 @@
 # Ludo Paws — Configurable Store & Monetization Roadmap
 
-Status: Phase 2 catalog API and initial Phase 4 Android discovery/cache integration are implemented on feat/ludopaws-production-readiness. The Worker is not production-deployed, the catalog starts empty, and no dynamic asset bundle is uploaded. This roadmap does not enable billing, rewarded ads, or production deployment.
+Status: Store catalog/API and Android discovery/cache integration are in `main`. Paws Plus subscription lifecycle code is being validated on `feat/paws-plus-subscription-lifecycle`; it is not yet merged or deployed. The current Worker deployment does not include these branch changes, the catalog starts empty, and no dynamic asset bundle is uploaded. Billing, subscriptions and ads stay disabled.
 
 ## Objective
 
@@ -75,15 +75,14 @@ Optional LEVEL/EVENT methods require server-authoritative progression/event evid
 - Direct cosmetic purchases must be modeled as non-consumable one-time products unless a separate clearly defined consumable makes commercial sense.
 - Acceptance: duplicate callbacks/purchase retries cannot double-charge or double-grant; already-owned items do not charge again.
 
-### Phase 6 — Paws Plus monthly subscription
-- Create a new subscription product ID and monthly auto-renewing base plan. Keep legacy `remove_ads` semantics intact; do not silently reinterpret an existing one-time product ID as a subscription.
-- Proposed subscription ID: `paws_plus`; base plan: `monthly-auto`.
-- Active entitlement: suppress forced/post-win interstitial ads and other explicitly documented forced ads; keep opt-in rewarded ads available so players can still earn rewards. This does not mean all advertisements are disabled if the player deliberately chooses a reward ad.
-- Add recurring value that is real and delivered every cycle, such as a monthly cosmetic rental/perk, rotating subscribers-only cosmetics, or a fixed monthly Gem allowance. Any bonus must be supplemental to the core ongoing benefits and must be granted once per verified billing period.
-- Verify subscription state through Google Play Developer API subscription endpoints. Store current state/expiry server-side; process renewal, grace period, account hold, pause where offered, cancellation, expiry, revocation/refund and replacement/upgrade. Integrate Real-time Developer Notifications or an equally reliable reconciliation process.
-- Provide restore/refresh status and an easy Google Play subscription-management/cancellation entry in the app.
-- Clearly disclose price, billing period, auto-renewal, cancellation and what remains accessible without subscribing.
-- Acceptance: sandbox/license-tester flows pass initial purchase, renewal, cancellation, expiry, restore, hold/grace period and refund/revocation; expired subscriptions do not keep benefits.
+### Phase 6 — Paws Plus monthly subscription (code in validation; launch acceptance pending)
+- Subscription ID: `paws_plus`; monthly auto-renewing base plan: `monthly-auto`. Legacy `remove_ads` remains a separate one-time non-consumable product.
+- Implemented on `feat/paws-plus-subscription-lifecycle`: Android queries `SUBS` and `INAPP` separately, uses the localized Play offer price, initiates the monthly plan, restores owned subscriptions, and sends purchase tokens to the authenticated server. The UI offers a Google Play subscription-management entry.
+- The Worker verifies with Google Play `purchases.subscriptionsv2.get`, checks product/base-plan/account binding and expiry, acknowledges a qualifying subscription, stores its current state/expiry in the owner-bound ledger and player wallet, and exposes a Pub/Sub RTDN push endpoint protected by Google OIDC audience/email validation. Duplicate notifications and repeated state syncs are idempotent.
+- The active entitlement suppresses forced/post-win interstitial ads. Opt-in rewarded ads remain separate and available to users who choose them; Paws Plus does not locally grant Gems.
+- Billing/subscription flags default off. Before activating, create and publish the exact `paws_plus` subscription and `monthly-auto` base plan in Play Console, configure authenticated Pub/Sub RTDN to the branded endpoint, configure its audience/service-account email and the existing Play service-account secret/permissions, deploy the Worker, and build Android with matching flags.
+- The card discloses monthly pricing from Google Play, auto-renewal and cancellation, plus the current forced-ad benefit. Do not add recurring Gems or cosmetics until the benefit and per-cycle grant rule are explicitly approved.
+- Acceptance still requires licensed internal tests on the actual Play Console products for new purchase, acknowledgement, restore, renewal/expiry, cancellation, account hold/grace period, retry/duplicate notifications, refund/revocation and account switching. Expired subscriptions must not retain benefits.
 
 ### Phase 7 — Stable Google Play product catalogue and pricing
 - Existing one-time IDs remain stable: `gems_300`, `gems_1500`, `gems_3500`, `gems_20000`, `gems_40000`, `gems_200000`, and the existing `remove_ads` one-time product for compatibility.
@@ -134,13 +133,13 @@ A robust monthly operating model must include Workers, Durable Objects, R2, Entr
 
 ## Main-branch audit findings recorded for implementation
 - `StoreCatalog.kt` currently defines `remove_ads` as `NON_CONSUMABLE_REMOVE_ADS`; the Worker grants a persistent `ads_removed` boolean. Keep that ID's existing behavior for compatibility and create a new subscription ID for monthly Paws Plus.
-- `server/src/google-play-billing.js` currently verifies one-time `INAPP` purchases via products APIs and its hard-coded `GOOGLE_PLAY_PRODUCTS` map. Subscription purchase tokens, subscription status, acknowledgement, renewals and expiry are not implemented in that verifier yet.
+- `server/src/google-play-billing.js` now contains a separately gated `paws_plus` / `monthly-auto` subscription verifier in the current validation branch. Runtime activation, Play Console configuration, authenticated RTDN deployment, and licensed end-to-end lifecycle acceptance are still pending.
 - `server/src/player-account.js` has a hard-coded `COSMETICS` map and wallet/ad progress tables. Existing channels include FREE, GEMS and REWARDED_ADS, but new server-owned catalogue entries and arbitrary direct-purchase cosmetics require a catalog authority and SKU-to-item mapping.
-- `server/src/index-account.js` exposes wallet, cosmetic purchase/select, one-time purchase verification, store status and SSV routes, but no catalog-management/admin routes or subscription lifecycle routes.
+- `server/src/index-account.js` now contains authenticated subscription verification/status and Google Play RTDN routes on the current validation branch. Catalog management is server-side; a web Admin Studio and R2 asset pipeline remain separate work.
 - Current ad SSV grants 5 Gems on a cosmetic-targeted rewarded view as well as one unit of that item's ad progress. Product design must preserve this explicitly or migrate it only with tests and clear UI disclosure.
 - `server/wrangler.json` currently binds no R2 bucket. R2 upload/delivery requires adding a new explicit binding and deployment configuration; this plan does not modify Worker routing yet.
 - The repository contains a Store tab and category catalog, but its local cosmetic metadata is not yet a remote, operator-editable published catalog. The proposed admin workflow must not claim dynamic publishing until catalog persistence/API and Android fetch/cache are implemented.
 
 ## Not in scope for this planning baseline
 
-No code behavior, Google Play product, feature flag, secret, production deployment, production billing or ad activation has been changed by this plan. These require the phase-specific implementation and acceptance checks above.
+The Paws Plus validation branch adds code but does not create a Play Console product, alter secrets, enable runtime feature flags, deploy the production Worker, activate billing/ads, or claim successful live transactions. Those require the phase-specific configuration and acceptance checks above.
