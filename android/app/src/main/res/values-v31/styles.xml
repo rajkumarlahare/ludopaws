@@ -12,7 +12,7 @@
         <!-- Android's mandatory launch splash must not flash white or show the app icon
              before our layered WebP SplashActivity is drawn. -->
         <item name="android:windowSplashScreenBackground">#03153F</item>
-        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_transparent_icon</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ludo_paws_home_hero</item>
         <item name="android:windowSplashScreenAnimationDuration">0</item>
     </style>
 </resources>
