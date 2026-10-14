@@ -222,11 +222,13 @@ export class StoreCatalogStore {
       ...extra,
       items: clone(items),
     };
-    await this.ctx.storage.put(SNAPSHOT_PREFIX + nextVersion, snapshot);
-    await this.ctx.storage.put(STATE_KEY, next);
-    if (nextVersion > MAX_SNAPSHOTS) {
-      await this.ctx.storage.delete(SNAPSHOT_PREFIX + (nextVersion - MAX_SNAPSHOTS));
-    }
+    await this.ctx.storage.transaction(async (transaction) => {
+      await transaction.put(SNAPSHOT_PREFIX + nextVersion, snapshot);
+      await transaction.put(STATE_KEY, next);
+      if (nextVersion > MAX_SNAPSHOTS) {
+        await transaction.delete(SNAPSHOT_PREFIX + (nextVersion - MAX_SNAPSHOTS));
+      }
+    });
     return json(200, {
       ok: true,
       revision: next.revision,
