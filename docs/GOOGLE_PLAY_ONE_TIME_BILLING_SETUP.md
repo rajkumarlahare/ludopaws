@@ -9,6 +9,7 @@ This setup keeps monetization to Google Play one-time products only. Paws Plus M
 - `remove_ads` is a non-consumable one-time purchase. A server-verified purchase sets the account's permanent `ads_removed` entitlement and grants the configured one-time 5-gem bonus.
 - Gem packs remain consumable one-time products: `gems_300`, `gems_1500`, `gems_3500`, `gems_20000`, `gems_40000`, and `gems_200000`.
 - Do not create or re-enable a monthly subscription for this flow.
+- If a legacy `Paws Plus Monthly` entry exists in Play Console, keep its purchase option/base plan unavailable and do not wire it into the app. The Android/backend contract contains no recurring subscription entitlement.
 - Rewarded ads remain opt-in and may still be watched for rewards after Remove Ads has been purchased.
 
 ## Worldwide pricing and availability
