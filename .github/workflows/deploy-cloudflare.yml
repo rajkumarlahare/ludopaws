@@ -272,6 +272,11 @@ jobs:
               process.exit(2);
             }
             const expectedRewardedAds = process.env.LUDOPROOF_ADMOB_SSV_ENABLED === "true";
+            const expectedSubscriptions = process.env.GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED === "true";
+            if ((body.checks?.playSubscriptionsEnabled === true) !== expectedSubscriptions) {
+              console.error("The Worker readiness response does not match the validated Paws Plus subscription configuration.");
+              process.exit(4);
+            }
             if ((body.checks?.admobSsvEnabled === true) !== expectedRewardedAds) {
               console.error("The production API hostname is not serving the expected deployed AdMob SSV configuration.");
               process.exit(4);
