@@ -111,15 +111,36 @@ test("AdMob test signature wins over a colliding production key ID and never gra
   assert.equal(result.isTest, true);
   assert.equal(result.kind, "gems");
   assert.equal(result.transactionId, "123456789");
-  const malformedProductionRequest = await signedRequest({
+  const consoleVerificationRequest = await signedRequest({
     privateKey: productionPair.privateKey, keyId: 3335741209,
     accountId: "0a2c3a83-e0fb-4abc-8ac4-581a6d994fe7",
     adUnit: "456", customData: JSON.stringify({ kind: "gems" }), timestamp: now,
     transactionId: "123456789",
   });
+  const consoleVerificationResult = await verifyAdMobSsvRequest(
+    consoleVerificationRequest,
+    { LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID: "ca-app-pub-123/456" },
+    fetchImpl,
+    now,
+  );
+  // The console test's known dummy ID is accepted only after a valid Google
+  // signature, then the route treats it as verification-only (no wallet reward).
+  assert.equal(consoleVerificationResult.isTest, true);
+  assert.equal(consoleVerificationResult.transactionId, "123456789");
+
+  const malformedProductionRequest = await signedRequest({
+    privateKey: productionPair.privateKey, keyId: 3335741209,
+    accountId: "0a2c3a83-e0fb-4abc-8ac4-581a6d994fe7",
+    adUnit: "456", customData: JSON.stringify({ kind: "gems" }), timestamp: now,
+    transactionId: "not-a-valid-tx-id",
+  });
   await assert.rejects(
-    verifyAdMobSsvRequest(malformedProductionRequest,
-      { LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID: "ca-app-pub-123/456" }, fetchImpl, now),
+    verifyAdMobSsvRequest(
+      malformedProductionRequest,
+      { LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID: "ca-app-pub-123/456" },
+      fetchImpl,
+      now,
+    ),
     (error) => error.code === "SSV_TRANSACTION_INVALID",
   );
 });
