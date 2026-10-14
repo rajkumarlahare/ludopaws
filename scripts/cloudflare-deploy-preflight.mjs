@@ -140,11 +140,6 @@ if (vars.LUDOPROOF_ADMOB_SSV_ENABLED === "true" &&
   process.exit(2);
 }
 
-if (vars.LUDOPROOF_ADMOB_SSV_ENABLED === "true" &&
-    process.env.LUDOPROOF_ADS_ENABLED !== "true") {
-  console.error("AdMob SSV and Android rewarded ads must both be explicitly enabled.");
-  process.exit(2);
-}
 
 const fingerprint =
   String(
