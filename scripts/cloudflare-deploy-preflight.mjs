@@ -140,10 +140,6 @@ if (vars.LUDOPROOF_ADMOB_SSV_ENABLED === "true" &&
   process.exit(2);
 }
 
-if (vars.GOOGLE_PLAY_BILLING_ENABLED !== "false") {
-  console.error("Production deployment keeps Google Play Billing disabled for this release. AdMob SSV is permitted only when the runtime-config validation above confirms real, matching app/rewarded IDs and explicit matching Android/Worker flags.");
-  process.exit(2);
-}
 
 const fingerprint =
   String(

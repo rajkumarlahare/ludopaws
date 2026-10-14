@@ -65,10 +65,10 @@ test("production preflight permits explicitly enabled, validated AdMob SSV while
   assert.match(result.stdout, /Cloudflare production deploy preflight passed/);
 });
 
-test("production preflight still blocks Google Play Billing", () => {
-  const result = runPreflight({ adsEnabled: true, billingEnabled: true });
-  assert.notEqual(result.status, 0, "stdout: " + result.stdout + " stderr: " + result.stderr);
-  assert.match(result.stderr, /keeps Google Play Billing disabled/);
+test("production preflight permits explicit Google Play Billing after service-account configuration", () => {
+  const result = runPreflight({ adsEnabled: false, billingEnabled: true });
+  assert.equal(result.status, 0, "stdout: " + result.stdout + " stderr: " + result.stderr);
+  assert.match(result.stdout, /Cloudflare production deploy preflight passed/);
 });
 
 test("production preflight requires the API hostname to target the deployed Worker", () => {
@@ -77,6 +77,17 @@ test("production preflight requires the API hostname to target the deployed Work
   assert.match(result.stderr, /must explicitly route api\.ludopaws\.rekixo\.com/);
 });
 
+
+test("deployment workflow checks the Cloudflare private key before enabling Billing and verifies expected live flags", () => {
+  const workflow = fs.readFileSync(path.join(repoRoot, ".github", "workflows", "deploy-cloudflare.yml"), "utf8");
+  const secretStep = workflow.split("name: Verify Google Play service-account secret when Billing is enabled")[1]?.split("name: Wrangler production dry run")[0] ?? "";
+  assert.ok(secretStep.includes("GOOGLE_PLAY_SERVICE_ACCOUNT_PRIVATE_KEY"));
+  assert.ok(secretStep.includes("vars.GOOGLE_PLAY_BILLING_ENABLED == 'true'"));
+  const statusStep = workflow.split("name: Verify store status route and feature flags")[1]?.split("name: Verify live production game flow")[0] ?? "";
+  assert.ok(statusStep.includes('const expectedBilling = process.env.GOOGLE_PLAY_BILLING_ENABLED === "true";'));
+  assert.ok(statusStep.includes("body.billingAvailable !== expectedBilling"));
+  assert.ok(statusStep.includes("androidBillingEnabled !== expectedBilling"));
+});
 
 test("production readiness verifier reads its response from the explicit READY_FILE environment variable", () => {
   const workflow = fs.readFileSync(path.join(repoRoot, ".github", "workflows", "deploy-cloudflare.yml"), "utf8");
