@@ -66,7 +66,7 @@ class StoreCatalogTest {
             product.featured,
         )
         assertEquals(
-            "Price set by Google Play",
+            "Price unavailable",
             product.fallbackPrice,
         )
     }
