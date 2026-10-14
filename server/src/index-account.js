@@ -21,11 +21,12 @@ import {
 } from "./account-security.js";
 import { GOOGLE_PLAY_PRODUCTS, googlePlayBillingEnabled, verifyAndRedeemGooglePlayPurchase } from "./google-play-billing.js";
 import { verifyAdMobSsvRequest } from "./admob-ssv.js";
+import { StoreCatalogStore } from "./store-catalog-store.js";
 import { bearerToken, httpError, readJsonObject, sha256Hex } from "./crypto.js";
 
 export {
   ApiGate, FriendConversation, FriendDirectory, FriendRecentRoom, LeaderboardRoom,
-  MatchmakerQueue, MatchReceiptArchive, MatchRoom, StorePurchaseLedger, TeamMatchmakerQueue,
+  MatchmakerQueue, MatchReceiptArchive, MatchRoom, StorePurchaseLedger, StoreCatalogStore, TeamMatchmakerQueue,
   AccountDirectory, PlayerAccount,
 };
 
@@ -34,7 +35,7 @@ const RATE_WINDOW_MS = 60_000;
 const ACCOUNT_RATE_LIMITS = Object.freeze({
   guest: 5, challenge: 20, googleLogin: 10, googleLink: 10, sessionRefresh: 30,
   sessionLogout: 20, profile: 60, wallet: 120, walletMutation: 30, friendLink: 15, leaderboardLink: 15,
-  storePurchase: 10, guestDeletionCode: 3, guestDeletion: 3,
+  storePurchase: 10, guestDeletionCode: 3, guestDeletion: 3, catalogRead: 120, catalogAdmin: 20,
 });
 
 const ACCOUNT_WEB_CORS_PATHS = new Set([
@@ -398,6 +399,81 @@ async function handleAccountRequest(request, env) {
         return response;
       }
 
+
+      if (url.pathname === "/api/store/catalog" && request.method === "GET") {
+        await rateLimit(env, request, "store:catalog:read", ACCOUNT_RATE_LIMITS.catalogRead);
+        await authenticate(request, env);
+        const state = await catalogRequest(env, "/catalog/current");
+        const country = requestCatalogCountry(request);
+        const now = Date.now();
+        const items = state.items.filter((item) => isCatalogItemAvailable(item, country, now));
+        const etag = '"ludopaws-catalog-v' + String(state.catalogVersion) + "-" + country + '"';
+        const headers = catalogHeaders(etag);
+        const supplied = String(request.headers.get("if-none-match") ?? "")
+          .split(",").map((value) => value.trim());
+        if (supplied.includes("*") || supplied.includes(etag)) {
+          return new Response(null, { status: 304, headers });
+        }
+        return new Response(JSON.stringify({
+          ok: true,
+          catalogVersion: state.catalogVersion,
+          items,
+          updatedAt: state.updatedAt,
+        }), { status: 200, headers });
+      }
+
+      if (url.pathname === "/api/admin/store/catalog" && request.method === "GET") {
+        await rateLimit(env, request, "store:catalog:admin", ACCOUNT_RATE_LIMITS.catalogAdmin);
+        const session = await authenticate(request, env);
+        requireCatalogAdmin(session.accountId, env);
+        return json(200, await catalogRequest(env, "/catalog/admin-state"));
+      }
+
+      if (url.pathname === "/api/admin/store/catalog/versions" && request.method === "GET") {
+        await rateLimit(env, request, "store:catalog:admin", ACCOUNT_RATE_LIMITS.catalogAdmin);
+        const session = await authenticate(request, env);
+        requireCatalogAdmin(session.accountId, env);
+        const requested = Number(url.searchParams.get("limit") ?? 30);
+        const limit = Number.isSafeInteger(requested) ? Math.max(1, Math.min(100, requested)) : 30;
+        return json(200, await catalogRequest(env, "/catalog/history?limit=" + String(limit)));
+      }
+
+      const catalogDraftMatch = url.pathname.match(/^\/api\/admin\/store\/catalog\/items\/([a-z0-9][a-z0-9_-]{2,63})$/);
+      if (catalogDraftMatch && request.method === "PUT") {
+        await rateLimit(env, request, "store:catalog:admin", ACCOUNT_RATE_LIMITS.catalogAdmin);
+        const session = await authenticate(request, env);
+        requireCatalogAdmin(session.accountId, env);
+        const body = await readJson(request);
+        if (body?.item?.id !== catalogDraftMatch[1]) {
+          throw httpError(400, "CATALOG_ITEM_ID_MISMATCH", "item ID must match the URL path");
+        }
+        return json(200, await catalogRequest(env, "/catalog/draft/save", {
+          expectedRevision: body.expectedRevision,
+          actorId: session.accountId,
+          reason: body.reason,
+          item: body.item,
+        }));
+      }
+
+      const catalogMutationRoutes = new Map([
+        ["/api/admin/store/catalog/publish", "/catalog/publish"],
+        ["/api/admin/store/catalog/archive", "/catalog/archive"],
+        ["/api/admin/store/catalog/rollback", "/catalog/rollback"],
+      ]);
+      if (catalogMutationRoutes.has(url.pathname) && request.method === "POST") {
+        await rateLimit(env, request, "store:catalog:admin", ACCOUNT_RATE_LIMITS.catalogAdmin);
+        const session = await authenticate(request, env);
+        requireCatalogAdmin(session.accountId, env);
+        const body = await readJson(request);
+        return json(200, await catalogRequest(env, catalogMutationRoutes.get(url.pathname), {
+          expectedRevision: body.expectedRevision,
+          actorId: session.accountId,
+          reason: body.reason,
+          ...(body.itemId != null ? { itemId: body.itemId } : {}),
+          ...(body.targetVersion != null ? { targetVersion: body.targetVersion } : {}),
+        }));
+      }
+
       if (url.pathname === "/api/store/status" && request.method === "GET") {
         const billingReady = googlePlayBillingEnabled(env) &&
           Boolean(env?.LUDOPROOF_ACCOUNT_DIRECTORY) &&
@@ -594,6 +670,62 @@ function withAccountWebCors(request, response, env) {
     status: response.status,
     statusText: response.statusText,
     headers,
+  });
+}
+
+
+
+async function catalogRequest(env, path, body = null) {
+  const namespace = env?.LUDOPROOF_STORE_CATALOG;
+  if (!namespace) throw httpError(503, "STORE_CATALOG_NOT_CONFIGURED", "store catalog storage is not configured");
+  const target = namespace.get(namespace.idFromName("GLOBAL:V1"));
+  const response = await target.fetch(new Request("https://store-catalog" + path, {
+    method: body == null ? "GET" : "POST",
+    headers: body == null ? {} : { "content-type": "application/json" },
+    ...(body == null ? {} : { body: JSON.stringify(body) }),
+  }));
+  return parseInternalResponse(response, "STORE_CATALOG_UNAVAILABLE");
+}
+
+function requireCatalogAdmin(accountId, env) {
+  const raw = String(env?.LUDOPROOF_CATALOG_ADMIN_ACCOUNT_IDS ?? "").trim();
+  const allowed = raw.split(",").map((value) => value.trim().toLowerCase())
+    .filter((value) => /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(value));
+  if (!allowed.length) {
+    throw httpError(503, "CATALOG_ADMIN_NOT_CONFIGURED", "catalog admin account allowlist is not configured");
+  }
+  if (!allowed.includes(String(accountId).toLowerCase())) {
+    throw httpError(403, "CATALOG_ADMIN_FORBIDDEN", "catalog administrator permission is required");
+  }
+}
+
+function requestCatalogCountry(request) {
+  const value = String(request.cf?.country ?? request.headers.get("cf-ipcountry") ?? "").trim().toUpperCase();
+  return /^[A-Z]{2}$/.test(value) ? value : "ZZ";
+}
+
+function isCatalogItemAvailable(item, country, now) {
+  if (item?.status !== "PUBLISHED" || item?.contentReady !== true) return false;
+  const availability = item.availability;
+  if (!availability || typeof availability !== "object") return false;
+  if (availability.startsAt != null && Date.parse(availability.startsAt) > now) return false;
+  if (availability.endsAt != null && Date.parse(availability.endsAt) <= now) return false;
+  if (Array.isArray(availability.blockedCountries) && availability.blockedCountries.includes(country)) return false;
+  if (availability.worldwide !== true) {
+    if (!Array.isArray(availability.allowedCountries) || !availability.allowedCountries.includes(country)) return false;
+  }
+  return true;
+}
+
+function catalogHeaders(etag) {
+  return new Headers({
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "private, max-age=60, must-revalidate",
+    "etag": etag,
+    "vary": "CF-IPCountry",
+    "x-content-type-options": "nosniff",
+    "x-frame-options": "DENY",
+    "referrer-policy": "no-referrer",
   });
 }
 
