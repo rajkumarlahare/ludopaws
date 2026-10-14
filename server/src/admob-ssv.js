@@ -104,8 +104,19 @@ export async function verifyAdMobSsvRequest(request, env, fetchImpl = fetch, now
     throw ssvError(401, "SSV_SIGNATURE_INVALID", "reward callback signature is invalid");
   }
 
-  // Only callbacks verified with Google's test signing keys are verification-only.
-  // Production callbacks must carry AdMob's real unique hexadecimal transaction ID.
+  // AdMob Console URL verification may use a production signing key while
+  // sending these known placeholder IDs. Signature verification has already
+  // succeeded above. Treat this exact fixture as verification-only.
+  const isConsoleVerification =
+    !isTest &&
+    transactionId === "123456789" &&
+    adUnit === "1234567890";
+
+  if (isConsoleVerification) {
+    isTest = true;
+  }
+
+  // Every other production callback must have a real hexadecimal transaction ID.
   if (!isTest && !/^[A-Fa-f0-9]{16,128}$/.test(transactionId)) {
     throw ssvError(400, "SSV_TRANSACTION_INVALID", "reward transaction ID is invalid");
   }

@@ -111,6 +111,21 @@ test("AdMob test signature wins over a colliding production key ID and never gra
   assert.equal(result.isTest, true);
   assert.equal(result.kind, "gems");
   assert.equal(result.transactionId, "123456789");
+  const consoleVerificationRequest = await signedRequest({
+    privateKey: productionPair.privateKey, keyId: 3335741209,
+    accountId: "0a2c3a83-e0fb-4abc-8ac4-581a6d994fe7",
+    adUnit: "1234567890", customData: JSON.stringify({ kind: "gems" }), timestamp: now,
+    transactionId: "123456789",
+  });
+  const consoleResult = await verifyAdMobSsvRequest(
+    consoleVerificationRequest,
+    { LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID: "ca-app-pub-123/456" },
+    fetchImpl,
+    now,
+  );
+  assert.equal(consoleResult.isTest, true);
+  assert.equal(consoleResult.transactionId, "123456789");
+
   const malformedProductionRequest = await signedRequest({
     privateKey: productionPair.privateKey, keyId: 3335741209,
     accountId: "0a2c3a83-e0fb-4abc-8ac4-581a6d994fe7",
