@@ -130,13 +130,14 @@ class StoreActivity :
             // This endpoint is deliberately public. Fetch feature availability before
             // creating/refreshing the account session so an account/wallet failure does
             // not incorrectly disable AdMob for the whole store.
+            var statusResponse: JSONObject? = null
             var adsAvailable = false
             var adsStatusLoaded = false
             var adsStatusError: Exception? = null
             try {
-                val status = accountRepository.storeStatus()
+                statusResponse = accountRepository.storeStatus()
                 adsAvailable = BuildConfig.LUDOPROOF_ADS_ENABLED &&
-                    status.optBoolean("rewardedAdsAvailable", false)
+                    statusResponse.optBoolean("rewardedAdsAvailable", false)
                 adsStatusLoaded = true
             } catch (error: Exception) {
                 adsStatusError = error
@@ -160,9 +161,8 @@ class StoreActivity :
             try {
                 val session = accountRepository.ensureGuestSession()
                 activeBillingAccountId = session.billingAccountId
-                val status = accountRepository.storeStatus()
                 available = BuildConfig.LUDOPROOF_BILLING_ENABLED &&
-                    status.optBoolean("billingAvailable", false)
+                    statusResponse?.optBoolean("billingAvailable", false) == true
                 val serverWallet = accountRepository.wallet()
                 wallet.applyServerSnapshot(serverWallet, session.accountId)
                 cosmetics.applyServerSnapshot(serverWallet, session.accountId)
