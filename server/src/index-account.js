@@ -19,7 +19,7 @@ import {
   verifyAccessTokenForDeletionReplay,
   verifyGoogleIdToken,
 } from "./account-security.js";
-import { GOOGLE_PLAY_PRODUCTS, googlePlayBillingEnabled, verifyAndRedeemGooglePlayPurchase, verifyGooglePlaySubscription } from "./google-play-billing.js";
+import { GOOGLE_PLAY_PRODUCTS, googlePlayBillingEnabled, verifyAndRedeemGooglePlayPurchase } from "./google-play-billing.js";
 import { verifyAdMobSsvRequest } from "./admob-ssv.js";
 import { StoreCatalogStore } from "./store-catalog-store.js";
 import { bearerToken, httpError, readJsonObject, sha256Hex } from "./crypto.js";
@@ -499,37 +499,6 @@ async function handleAccountRequest(request, env) {
           Boolean(env?.LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID) &&
           (env?.LUDOPROOF_ADMOB_REWARD_ITEM == null || env.LUDOPROOF_ADMOB_REWARD_ITEM === "gems");
         return json(200, { ok: true, billingAvailable: billingReady, rewardedAdsAvailable: adsReady });
-      }
-
-      if (url.pathname === "/api/store/subscription/verify" && request.method === "POST") {
-        if (!googlePlayBillingEnabled(env)) {
-          throw httpError(503, "PLAY_BILLING_NOT_ENABLED", "Google Play subscriptions are not enabled by the server");
-        }
-        await rateLimit(env, request, "store:subscription:verify", ACCOUNT_RATE_LIMITS.storePurchase);
-        const session = await authenticate(request, env);
-        const body = await readJson(request);
-        const purchaseToken = requireOpaqueToken(body.purchaseToken, /^.{8,2048}$/);
-        const obfuscatedAccountId = await billingAccountId(session.accountId);
-        const verified = await verifyGooglePlaySubscription(env, {
-          purchaseToken,
-          accountId: obfuscatedAccountId,
-        });
-        const refreshed = await playerRequest(env, session.accountId, "/subscription/refresh", {
-          accountId: session.accountId,
-          sessionId: session.sessionId,
-          productId: verified.productId,
-          purchaseTokenHash: verified.purchaseTokenHash,
-          subscriptionState: verified.subscriptionState,
-          expiryTime: verified.expiryTime,
-          autoRenewEnabled: verified.autoRenewEnabled,
-        });
-        return json(200, {
-          ok: true,
-          verified: true,
-          productId: verified.productId,
-          subscription: refreshed.subscription,
-          wallet: refreshed.wallet,
-        });
       }
 
       if (url.pathname === "/api/store/purchases/verify" && request.method === "POST") {
