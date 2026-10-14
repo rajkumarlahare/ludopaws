@@ -19,7 +19,7 @@ import java.util.concurrent.ConcurrentHashMap
 class GooglePlayBillingGateway(
     private val activity: Activity,
     private val enabled: Boolean,
-    private val subscriptionsEnabled: Boolean = false,
+    subscriptionsEnabled: Boolean = false,
     accountId: String,
     private val listener: Listener,
 ) : PurchasesUpdatedListener {
@@ -31,6 +31,9 @@ class GooglePlayBillingGateway(
             String,
             ProductDetails,
             >()
+
+    @Volatile
+    private var subscriptionCheckoutEnabled = subscriptionsEnabled
 
     @Volatile
     private var closed =
@@ -64,6 +67,11 @@ class GooglePlayBillingGateway(
             "Google Play account binding is invalid."
         }
         currentBillingAccountId = newAccountId
+    }
+
+    /** The public server status and build flag must both allow subscriptions. */
+    fun updateSubscriptionsEnabled(available: Boolean) {
+        subscriptionCheckoutEnabled = enabled && available
     }
 
     fun connect() {
@@ -170,7 +178,7 @@ class GooglePlayBillingGateway(
         }
 
         val isSubscription = productId in StoreCatalog.subscriptionProductIds
-        if (isSubscription && !subscriptionsEnabled) {
+        if (isSubscription && !subscriptionCheckoutEnabled) {
             listener.onBillingUnavailable("Paws Plus subscriptions are not enabled for this build and server yet.")
             return
         }
@@ -304,7 +312,7 @@ class GooglePlayBillingGateway(
             productType = BillingClient.ProductType.INAPP,
             isSubscription = false,
         ) {
-            if (subscriptionsEnabled && !closed) {
+            if (subscriptionCheckoutEnabled && !closed) {
                 queryExistingPurchases(
                     productType = BillingClient.ProductType.SUBS,
                     isSubscription = true,
@@ -427,7 +435,7 @@ class GooglePlayBillingGateway(
             val combined = linkedMapOf<String, StoreBillingProduct>().apply {
                 putAll(oneTimeProducts)
             }
-            if (!subscriptionsEnabled || closed) {
+            if (!subscriptionCheckoutEnabled || closed) {
                 listener.onCatalogLoaded(combined)
                 return@queryProductType
             }
