@@ -2,6 +2,7 @@ const GOOGLE_WEB_CLIENT_ID = /^[0-9]+-[A-Za-z0-9_-]+\.apps\.googleusercontent\.c
 const GOOGLE_PLAY_SERVICE_ACCOUNT = /^[^@\s]+@[^@\s]+\.iam\.gserviceaccount\.com$/;
 const ADMOB_REWARDED_UNIT = /^ca-app-pub-[0-9]{16}\/[0-9]{10}$/;
 export const ACCOUNT_WEB_ORIGIN = "https://ludopaws.rekixo.com";
+export const GOOGLE_PLAY_RTDN_AUDIENCE = "https://api.ludopaws.rekixo.com/api/google-play/rtdn";
 
 function readBoolean(name, raw) {
   const value = String(raw ?? "").trim();
@@ -31,11 +32,19 @@ export function buildCloudflareRuntimeVars(existingVars, environment) {
   const androidBillingEnabled = readBoolean("LUDOPROOF_BILLING_ENABLED", environment.LUDOPROOF_BILLING_ENABLED);
   const adsEnabled = readBoolean("LUDOPROOF_ADMOB_SSV_ENABLED", environment.LUDOPROOF_ADMOB_SSV_ENABLED);
   const androidAdsEnabled = readBoolean("LUDOPROOF_ADS_ENABLED", environment.LUDOPROOF_ADS_ENABLED);
+  const subscriptionsEnabled = readBoolean("GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED", environment.GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED);
+  const androidSubscriptionsEnabled = readBoolean("LUDOPROOF_SUBSCRIPTIONS_ENABLED", environment.LUDOPROOF_SUBSCRIPTIONS_ENABLED);
   if (billingEnabled !== androidBillingEnabled) {
     throw new Error("GOOGLE_PLAY_BILLING_ENABLED and LUDOPROOF_BILLING_ENABLED must match before deployment.");
   }
   if (adsEnabled !== androidAdsEnabled) {
     throw new Error("LUDOPROOF_ADMOB_SSV_ENABLED and LUDOPROOF_ADS_ENABLED must match before deployment.");
+  }
+  if (subscriptionsEnabled !== androidSubscriptionsEnabled) {
+    throw new Error("GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED and LUDOPROOF_SUBSCRIPTIONS_ENABLED must match before deployment.");
+  }
+  if (subscriptionsEnabled && !billingEnabled) {
+    throw new Error("Paws Plus subscriptions cannot be enabled while Google Play Billing is disabled.");
   }
 
   const serviceAccountEmail = String(environment.GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL ?? "").trim();
@@ -44,6 +53,24 @@ export function buildCloudflareRuntimeVars(existingVars, environment) {
   }
   if (billingEnabled && !serviceAccountEmail) {
     throw new Error("Billing cannot be enabled until GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL is configured as a repository variable.");
+  }
+
+  const rtdnAudience = String(environment.GOOGLE_PLAY_RTDN_AUDIENCE ?? "").trim();
+  const rtdnEmail = String(environment.GOOGLE_PLAY_RTDN_EMAIL ?? "").trim();
+  const validRtdnEmail = /^[^@\\s]+@[^@\\s]+\\.iam\\.gserviceaccount\\.com$/.test(rtdnEmail);
+  if (subscriptionsEnabled) {
+    if (rtdnAudience !== GOOGLE_PLAY_RTDN_AUDIENCE) {
+      throw new Error("GOOGLE_PLAY_RTDN_AUDIENCE must exactly match the production subscription RTDN endpoint.");
+    }
+    if (!validRtdnEmail) {
+      throw new Error("GOOGLE_PLAY_RTDN_EMAIL must be the Google service account configured for authenticated Pub/Sub push.");
+    }
+  }
+  if (rtdnAudience && rtdnAudience !== GOOGLE_PLAY_RTDN_AUDIENCE) {
+    throw new Error("GOOGLE_PLAY_RTDN_AUDIENCE must exactly match the production subscription RTDN endpoint.");
+  }
+  if (rtdnEmail && !validRtdnEmail) {
+    throw new Error("GOOGLE_PLAY_RTDN_EMAIL must be a Google service-account email.");
   }
 
   const rewardedAdUnitId = String(environment.LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID ?? "").trim();
@@ -80,12 +107,21 @@ export function buildCloudflareRuntimeVars(existingVars, environment) {
     GOOGLE_SIGN_IN_WEB_CLIENT_ID: oauthClientId,
     LUDOPROOF_ACCOUNT_WEB_ORIGIN: accountOrigin,
     GOOGLE_PLAY_BILLING_ENABLED: String(billingEnabled),
+    GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED: String(subscriptionsEnabled),
     LUDOPROOF_ADMOB_SSV_ENABLED: String(adsEnabled),
     LUDOPROOF_ADMOB_REWARD_ITEM: "gems",
   };
 
   if (serviceAccountEmail) vars.GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL = serviceAccountEmail;
   else delete vars.GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL;
+
+  if (subscriptionsEnabled) {
+    vars.GOOGLE_PLAY_RTDN_AUDIENCE = rtdnAudience;
+    vars.GOOGLE_PLAY_RTDN_EMAIL = rtdnEmail;
+  } else {
+    delete vars.GOOGLE_PLAY_RTDN_AUDIENCE;
+    delete vars.GOOGLE_PLAY_RTDN_EMAIL;
+  }
 
   if (rewardedAdUnitId) vars.LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID = rewardedAdUnitId;
   else delete vars.LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID;
