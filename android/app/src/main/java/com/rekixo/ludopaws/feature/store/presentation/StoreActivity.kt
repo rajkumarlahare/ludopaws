@@ -723,20 +723,9 @@ class StoreActivity :
 
     internal fun priceFor(
         productId: String,
-        fallback: String,
+        @Suppress("UNUSED_PARAMETER") fallback: String,
     ): String =
-        liveProducts[
-            productId
-        ]
-            ?.formattedPrice
-            ?: if (
-                BuildConfig
-                    .LUDOPROOF_BILLING_ENABLED
-            ) {
-                "Price unavailable"
-            } else {
-                fallback
-            }
+        liveProducts[productId]?.formattedPrice ?: "Price unavailable"
 
     internal fun dp(
         value: Int,
