@@ -109,7 +109,7 @@ private fun StoreActivity.dicePanel(
 
         addView(
             TextView(this@dicePanel).apply {
-                text = if (locked) LOCKED_DICE_TITLE else dice.title
+                text = if (locked && !dice.remoteManaged) LOCKED_DICE_TITLE else dice.title
                 textSize = 14.5f
                 setTypeface(Typeface.DEFAULT_BOLD)
                 setTextColor(Color.WHITE)
