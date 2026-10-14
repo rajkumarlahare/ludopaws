@@ -6,6 +6,10 @@ import com.rekixo.ludopaws.feature.store.domain.model.StoreProductKind
 object StoreCatalog {
     const val REMOVE_ADS =
         "remove_ads"
+    const val PAWS_PLUS =
+        "paws_plus"
+    const val PAWS_PLUS_BASE_PLAN_ID =
+        "monthly-auto"
     const val GEMS_300 =
         "gems_300"
     const val GEMS_1500 =
@@ -34,6 +38,18 @@ object StoreCatalog {
                     "₹99.00",
                 featured =
                     true,
+            ),
+            StoreProduct(
+                productId =
+                    PAWS_PLUS,
+                title =
+                    "Paws Plus · Monthly",
+                gemAmount =
+                    0,
+                kind =
+                    StoreProductKind.SUBSCRIPTION_PAWS_PLUS,
+                fallbackPrice =
+                    "Google Play pricing",
             ),
             StoreProduct(
                 productId =
@@ -111,7 +127,16 @@ object StoreCatalog {
 
     val playProductIds:
         List<String> =
-        products.map {
+        products.filter {
+            it.kind != StoreProductKind.SUBSCRIPTION_PAWS_PLUS
+        }.map {
+            it.productId
+        }
+
+    val subscriptionProductIds: List<String> =
+        products.filter {
+            it.kind == StoreProductKind.SUBSCRIPTION_PAWS_PLUS
+        }.map {
             it.productId
         }
 
