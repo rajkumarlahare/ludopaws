@@ -65,10 +65,6 @@ export function googlePlayBillingEnabled(env) {
   );
 }
 
-export const GOOGLE_PLAY_SUBSCRIPTIONS = Object.freeze({
-  paws_plus: Object.freeze({ monthlyGemAllowance: 300 }),
-});
-
 export async function verifyGooglePlaySubscription(
   env,
   { purchaseToken, accountId },
@@ -123,7 +119,8 @@ export async function verifyGooglePlaySubscription(
     externalAccountId !== accountId ||
     !Array.isArray(lineItems) ||
     lineItems.length !== 1 ||
-    lineItems[0]?.productId !== "paws_plus"
+    lineItems[0]?.productId !== "paws_plus" ||
+    lineItems[0]?.offerDetails?.basePlanId !== "monthly-auto"
   ) {
     throw httpError(400, "PLAY_SUBSCRIPTION_NOT_VALID", "Google Play did not confirm this subscription for this app account");
   }
