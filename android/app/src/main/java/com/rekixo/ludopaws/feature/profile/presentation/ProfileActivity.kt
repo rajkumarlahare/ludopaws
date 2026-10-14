@@ -8,7 +8,6 @@ import android.os.Build
 import android.util.Log
 import android.view.Gravity
 import android.view.View
-import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -211,40 +210,6 @@ class ProfileActivity : Activity() {
             profilePurchasesPanel(profile),
             sectionParams(12),
         )
-        if (!accountGoogleLinked && accountRepository.currentSession()?.guestRecoveryEligible == true) {
-            content.addView(
-                Button(this).apply {
-                    text = "Guest deletion code (for uninstall)"
-                    isAllCaps = false
-                    setOnClickListener { showGuestDeletionCode() }
-                },
-                sectionParams(12),
-            )
-            content.addView(
-                Button(this).apply {
-                    text = "Replace guest deletion code"
-                    isAllCaps = false
-                    setOnClickListener {
-                        AlertDialog.Builder(this@ProfileActivity)
-                            .setTitle("Replace saved guest deletion code?")
-                            .setMessage("This invalidates all previously saved guest deletion codes for this account. Save the replacement privately before uninstalling.")
-                            .setNegativeButton("Cancel", null)
-                            .setPositiveButton("Replace code") { _, _ -> showGuestDeletionCode(rotateExisting = true) }
-                            .show()
-                    }
-                },
-                sectionParams(8),
-            )
-        }
-        content.addView(
-            Button(this).apply {
-                text = "Delete account and data"
-                isAllCaps = false
-                setOnClickListener { confirmAccountDeletion() }
-            },
-            sectionParams(12),
-        )
-
         // This screen uses immersive full-screen layout. Respect the physical camera cutout
         // so both the centered title and Back button (and all content below) start in the safe area.
         root.setOnApplyWindowInsetsListener { _, insets ->
@@ -300,7 +265,7 @@ class ProfileActivity : Activity() {
             .show()
     }
 
-    private fun showGuestDeletionCode(rotateExisting: Boolean = false) {
+    internal fun showGuestDeletionCode(rotateExisting: Boolean = false) {
         if (accountAuthInProgress) return
         accountAuthInProgress = true
         accountStatus = "Preparing guest deletion code…"
@@ -354,7 +319,7 @@ class ProfileActivity : Activity() {
         }
     }
 
-    private fun confirmAccountDeletion() {
+    internal fun confirmAccountDeletion() {
         if (accountAuthInProgress) return
         AlertDialog.Builder(this)
             .setTitle("Delete account and data?")
