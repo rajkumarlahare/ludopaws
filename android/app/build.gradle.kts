@@ -39,16 +39,13 @@ val admobRewardedAdUnitId =
         .get()
 val admobInterstitialAdUnitId =
     providers.gradleProperty("ADMOB_INTERSTITIAL_AD_UNIT_ID")
-        .orElse("ca-app-pub-3940256099942544/1033173712")
+        .orElse("")
         .get()
 require(admobAppId.isNotBlank()) {
     "ADMOB_APP_ID must not be blank."
 }
 require(admobRewardedAdUnitId.isNotBlank()) {
     "ADMOB_REWARDED_AD_UNIT_ID must not be blank."
-}
-require(admobInterstitialAdUnitId.isNotBlank()) {
-    "ADMOB_INTERSTITIAL_AD_UNIT_ID must not be blank."
 }
 if (ludoProofAdsEnabled) {
     require(Regex("^ca-app-pub-[0-9]{16}~[0-9]{10}$").matches(admobAppId)) {
@@ -65,6 +62,9 @@ if (ludoProofAdsEnabled) {
     }
 }
 if (ludoProofInterstitialAdsEnabled) {
+    require(admobInterstitialAdUnitId.isNotBlank()) {
+        "ADMOB_INTERSTITIAL_AD_UNIT_ID is required before enabling interstitial ads."
+    }
     require(Regex("^ca-app-pub-[0-9]{16}/[0-9]{10}$").matches(admobInterstitialAdUnitId)) {
         "ADMOB_INTERSTITIAL_AD_UNIT_ID must be a valid AdMob interstitial unit ID."
     }
