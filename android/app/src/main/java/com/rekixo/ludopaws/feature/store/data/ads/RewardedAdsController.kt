@@ -33,6 +33,8 @@ internal class RewardedAdsController(
 
     fun prepare() {
         if (!enabled || closed || rewardedAd != null || adLoading) return
+        if (activity.isFinishing || activity.isDestroyed) return
+        Log.d(TAG, "Preparing rewarded ad; sdkInitialized=$sdkInitialized, consentCanRequestAds=${consentInformation.canRequestAds()}")
         if (sdkInitialized) {
             loadRewardedAd()
             return
@@ -49,6 +51,7 @@ internal class RewardedAdsController(
                     if (error != null) {
                         Log.w(TAG, "Ad consent form could not be shown: ${error.message}")
                     }
+                    Log.d(TAG, "Consent flow complete; canRequestAds=${consentInformation.canRequestAds()}")
                     initializeAdsIfAllowed()
                 }
             },
@@ -151,10 +154,12 @@ internal class RewardedAdsController(
         if (sdkInitializationInProgress) return
 
         sdkInitializationInProgress = true
+        Log.d(TAG, "Initializing Google Mobile Ads SDK")
         MobileAds.initialize(activity) {
             if (closed) return@initialize
             sdkInitializationInProgress = false
             sdkInitialized = true
+            Log.d(TAG, "Google Mobile Ads SDK initialized")
             loadRewardedAd()
         }
     }
@@ -171,6 +176,7 @@ internal class RewardedAdsController(
             return
         }
         adLoading = true
+        Log.d(TAG, "Loading rewarded ad for configured production ad unit")
         RewardedAd.load(
             activity,
             adUnitId,
@@ -179,6 +185,7 @@ internal class RewardedAdsController(
                 override fun onAdLoaded(ad: RewardedAd) {
                     adLoading = false
                     adLoadFailed = false
+                    Log.i(TAG, "Rewarded ad loaded successfully")
                     if (!closed && consentInformation.canRequestAds()) {
                         rewardedAd = ad
                     }
@@ -187,7 +194,10 @@ internal class RewardedAdsController(
                 override fun onAdFailedToLoad(error: LoadAdError) {
                     adLoading = false
                     adLoadFailed = true
-                    Log.w(TAG, "Rewarded ad failed to load: ${error.message}")
+                    Log.w(
+                        TAG,
+                        "Rewarded ad failed to load: domain=${error.domain}, code=${error.code}, message=${error.message}",
+                    )
                 }
             },
         )
