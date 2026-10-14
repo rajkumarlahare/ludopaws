@@ -336,7 +336,7 @@ async function runPublisherAction(
   }
 }
 
-async function googleAccessToken(env, fetchImpl) {
+export async function googleAccessToken(env, fetchImpl) {
   const keyId =
     await sha256Hex(env.GOOGLE_PLAY_SERVICE_ACCOUNT_PRIVATE_KEY);
   if (

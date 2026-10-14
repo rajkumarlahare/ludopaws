@@ -20,6 +20,12 @@ import {
   verifyGoogleIdToken,
 } from "./account-security.js";
 import { GOOGLE_PLAY_PRODUCTS, googlePlayBillingEnabled, verifyAndRedeemGooglePlayPurchase } from "./google-play-billing.js";
+import {
+  GOOGLE_PLAY_SUBSCRIPTION_PRODUCT_ID,
+  googlePlaySubscriptionsEnabled,
+  verifyGooglePlayRtdnPush,
+  verifyGooglePlaySubscription,
+} from "./google-play-subscriptions.js";
 import { verifyAdMobSsvRequest } from "./admob-ssv.js";
 import { StoreCatalogStore } from "./store-catalog-store.js";
 import { bearerToken, httpError, readJsonObject, sha256Hex } from "./crypto.js";
@@ -35,7 +41,7 @@ const RATE_WINDOW_MS = 60_000;
 const ACCOUNT_RATE_LIMITS = Object.freeze({
   guest: 5, challenge: 20, googleLogin: 10, googleLink: 10, sessionRefresh: 30,
   sessionLogout: 20, profile: 60, wallet: 120, walletMutation: 30, friendLink: 15, leaderboardLink: 15,
-  storePurchase: 10, guestDeletionCode: 3, guestDeletion: 3, catalogRead: 120, catalogAdmin: 20,
+  storePurchase: 10, subscriptionRtdn: 120, guestDeletionCode: 3, guestDeletion: 3, catalogRead: 120, catalogAdmin: 20,
 });
 
 const ACCOUNT_WEB_CORS_PATHS = new Set([
@@ -106,6 +112,51 @@ async function handleAccountRequest(request, env) {
               (env?.LUDOPROOF_ADMOB_REWARD_ITEM == null || env.LUDOPROOF_ADMOB_REWARD_ITEM === "gems"),
           },
         });
+      }
+
+      if (url.pathname === "/api/store/subscriptions/rtdn" && request.method === "POST") {
+        await rateLimit(env, request, "store:subscriptions:rtdn", ACCOUNT_RATE_LIMITS.subscriptionRtdn);
+        const notification = await verifyGooglePlayRtdnPush(request, env);
+        if (notification.kind === "test" || notification.kind === "ignore") return json(200, { ok: true, ignored: true });
+        const tokenHash = await sha256Hex("ludopaws:google-play-subscription-token:v1:" + notification.purchaseToken);
+        const ledger = env?.LUDOPROOF_STORE_PURCHASES?.get(
+          env.LUDOPROOF_STORE_PURCHASES.idFromName("subscription:" + tokenHash),
+        );
+        if (!ledger) throw httpError(503, "SUBSCRIPTION_LEDGER_UNAVAILABLE", "subscription reconciliation is temporarily unavailable");
+        const ledgerBody = await parseInternalResponse(
+          await ledger.fetch(new Request("https://store-purchase-ledger/subscription/status", { method: "GET" })),
+          "SUBSCRIPTION_LEDGER_UNAVAILABLE",
+        );
+        const record = ledgerBody.subscription;
+        if (!record) throw httpError(503, "SUBSCRIPTION_NOT_REGISTERED", "subscription owner is not registered yet; notification will be retried");
+        if (record.deleted === true) return json(200, { ok: true, ignored: true, deleted: true });
+        const accountId = String(record.accountId ?? "");
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(accountId)) {
+          throw httpError(503, "SUBSCRIPTION_OWNER_INVALID", "subscription owner could not be verified");
+        }
+        const verified = await verifyGooglePlaySubscription(env, {
+          productId: GOOGLE_PLAY_SUBSCRIPTION_PRODUCT_ID,
+          purchaseToken: notification.purchaseToken,
+          expectedBillingAccountId: record.billingAccountId,
+        });
+        try {
+          const grant = await playerRequest(env, accountId, "/wallet/subscription/reconcile", {
+            accountId, productId: verified.productId, subscriptionState: verified.subscriptionState,
+            expiryAt: verified.expiryAt, autoRenewEnabled: verified.autoRenewEnabled,
+            latestOrderIdHash: verified.latestOrderIdHash, tokenHash: verified.tokenHash,
+            linkedPurchaseTokenHash: verified.linkedPurchaseTokenHash, checkedAt: verified.checkedAt,
+          });
+          return json(200, { ok: true, reconciled: true, active: grant.subscription?.active === true });
+        } catch (error) {
+          if (["ACCOUNT_DELETED", "ACCOUNT_DELETION_IN_PROGRESS"].includes(error?.code)) {
+            await ledger.fetch(new Request("https://store-purchase-ledger/subscription/delete", {
+              method: "POST", headers: { "content-type": "application/json" },
+              body: JSON.stringify({ accountId: record.billingAccountId }),
+            }));
+            return json(200, { ok: true, ignored: true, deleted: true });
+          }
+          throw error;
+        }
       }
 
       if (url.pathname === "/api/account/guest" && request.method === "POST") {
@@ -495,10 +546,13 @@ async function handleAccountRequest(request, env) {
         const billingReady = googlePlayBillingEnabled(env) &&
           Boolean(env?.LUDOPROOF_ACCOUNT_DIRECTORY) &&
           Boolean(env?.LUDOPROOF_PLAYER_ACCOUNTS);
+        const subscriptionReady = googlePlaySubscriptionsEnabled(env) &&
+          Boolean(env?.LUDOPROOF_ACCOUNT_DIRECTORY) &&
+          Boolean(env?.LUDOPROOF_PLAYER_ACCOUNTS);
         const adsReady = env?.LUDOPROOF_ADMOB_SSV_ENABLED === "true" &&
           Boolean(env?.LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID) &&
           (env?.LUDOPROOF_ADMOB_REWARD_ITEM == null || env.LUDOPROOF_ADMOB_REWARD_ITEM === "gems");
-        return json(200, { ok: true, billingAvailable: billingReady, rewardedAdsAvailable: adsReady });
+        return json(200, { ok: true, billingAvailable: billingReady, subscriptionAvailable: subscriptionReady, rewardedAdsAvailable: adsReady });
       }
 
       if (url.pathname === "/api/store/purchases/verify" && request.method === "POST") {
@@ -511,10 +565,42 @@ async function handleAccountRequest(request, env) {
         const productId = requireText(body.productId, "productId");
         const purchaseToken = requireOpaqueToken(body.purchaseToken, /^.{8,2048}$/);
         const obfuscatedAccountId = await billingAccountId(session.accountId);
+        if (productId === GOOGLE_PLAY_SUBSCRIPTION_PRODUCT_ID) {
+          if (!googlePlaySubscriptionsEnabled(env)) throw httpError(503, "PLAY_SUBSCRIPTION_NOT_ENABLED", "Paws Plus subscriptions are not enabled by the service");
+          const verifiedSubscription = await verifyGooglePlaySubscription(env, {
+            productId, purchaseToken, expectedBillingAccountId: obfuscatedAccountId,
+          });
+          const subscriptionGrant = await playerRequest(env, session.accountId, "/wallet/subscription/reconcile", {
+            accountId: session.accountId, productId: verifiedSubscription.productId,
+            subscriptionState: verifiedSubscription.subscriptionState, expiryAt: verifiedSubscription.expiryAt,
+            autoRenewEnabled: verifiedSubscription.autoRenewEnabled, latestOrderIdHash: verifiedSubscription.latestOrderIdHash,
+            tokenHash: verifiedSubscription.tokenHash, linkedPurchaseTokenHash: verifiedSubscription.linkedPurchaseTokenHash,
+            checkedAt: verifiedSubscription.checkedAt,
+          });
+          const subscriptionLedger = env.LUDOPROOF_STORE_PURCHASES.get(
+            env.LUDOPROOF_STORE_PURCHASES.idFromName("subscription:" + verifiedSubscription.tokenHash),
+          );
+          await parseInternalResponse(await subscriptionLedger.fetch(new Request("https://store-purchase-ledger/subscription/register", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ accountId: session.accountId, billingAccountId: obfuscatedAccountId, productId, tokenHash: verifiedSubscription.tokenHash }),
+          })), "SUBSCRIPTION_LEDGER_REGISTER_FAILED");
+          if (verifiedSubscription.linkedPurchaseTokenHash && verifiedSubscription.linkedPurchaseTokenHash !== verifiedSubscription.tokenHash) {
+            const oldLedger = env.LUDOPROOF_STORE_PURCHASES.get(
+              env.LUDOPROOF_STORE_PURCHASES.idFromName("subscription:" + verifiedSubscription.linkedPurchaseTokenHash),
+            );
+            await parseInternalResponse(await oldLedger.fetch(new Request("https://store-purchase-ledger/subscription/delete", {
+              method: "POST", headers: { "content-type": "application/json" },
+              body: JSON.stringify({ accountId: obfuscatedAccountId }),
+            })), "SUBSCRIPTION_LEDGER_REPLACE_FAILED");
+          }
+          return json(200, {
+            ok: true, verified: true, productId,
+            replay: subscriptionGrant.stale === true || subscriptionGrant.cycleReplay === true || subscriptionGrant.creditGranted !== true,
+            subscription: subscriptionGrant.subscription, wallet: subscriptionGrant.wallet,
+          });
+        }
         const verified = await verifyAndRedeemGooglePlayPurchase(env, {
-          productId,
-          purchaseToken,
-          accountId: obfuscatedAccountId,
+          productId, purchaseToken, accountId: obfuscatedAccountId,
         });
         const purchaseTokenHash = await sha256Hex("ludoproof:google-play-wallet-token:v1:" + purchaseToken);
         let grant;
@@ -615,10 +701,12 @@ async function deleteAccountData(env, accountId, sessionId, {
     if (!env?.LUDOPROOF_STORE_PURCHASES) throw httpError(503, "STORE_LEDGER_NOT_CONFIGURED", "purchase ledger is not configured for account deletion");
     const billingId = await billingAccountId(accountId);
     for (const ledgerId of wallet.purchaseLedgerIds) {
+      const isSubscriptionLedger = ledgerId.startsWith("subscription:");
       const ledger = env.LUDOPROOF_STORE_PURCHASES.get(env.LUDOPROOF_STORE_PURCHASES.idFromName(ledgerId));
-      await parseInternalResponse(await ledger.fetch(new Request("https://store-purchase-ledger/delete", {
+      const ledgerPath = isSubscriptionLedger ? "/subscription/delete" : "/delete";
+      await parseInternalResponse(await ledger.fetch(new Request("https://store-purchase-ledger" + ledgerPath, {
         method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ accountId: billingId }),
-      })), "STORE_PURCHASE_DELETE_FAILED");
+      })), isSubscriptionLedger ? "SUBSCRIPTION_LEDGER_DELETE_FAILED" : "STORE_PURCHASE_DELETE_FAILED");
     }
   }
 

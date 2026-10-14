@@ -6,6 +6,16 @@ import {
 import { GOOGLE_PLAY_PRODUCTS } from "./google-play-billing.js";
 
 const MAX_BALANCE = 2_000_000_000;
+const PAWS_PLUS_MONTHLY_GEMS = 300;
+const SUBSCRIPTION_STATES = new Set([
+  "SUBSCRIPTION_STATE_PENDING", "SUBSCRIPTION_STATE_ACTIVE", "SUBSCRIPTION_STATE_PAUSED",
+  "SUBSCRIPTION_STATE_IN_GRACE_PERIOD", "SUBSCRIPTION_STATE_ON_HOLD", "SUBSCRIPTION_STATE_CANCELED",
+  "SUBSCRIPTION_STATE_EXPIRED", "SUBSCRIPTION_STATE_PENDING_PURCHASE_CANCELED",
+]);
+function isPawsPlusEntitled(state, expiryAt, nowMs = Date.now()) {
+  return ["SUBSCRIPTION_STATE_ACTIVE", "SUBSCRIPTION_STATE_IN_GRACE_PERIOD", "SUBSCRIPTION_STATE_CANCELED"].includes(state) &&
+    Number.isSafeInteger(expiryAt) && expiryAt > nowMs;
+}
 const NAME_LENGTH = 24;
 const DEFAULT_COSMETICS = [
   ["board_classic", "BOARD"], ["dice_classic", "DICE"], ["dice_pumpkin", "DICE"],
@@ -61,6 +71,7 @@ export class PlayerAccount {
       sql.exec("CREATE TABLE IF NOT EXISTS account_deletion_claims (account_id TEXT PRIMARY KEY, claimed_at INTEGER NOT NULL)");
       sql.exec("CREATE TABLE IF NOT EXISTS account_sessions (session_id TEXT PRIMARY KEY, refresh_token_hash TEXT NOT NULL, previous_refresh_hash TEXT, last_refresh_request_id TEXT, created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, revoked_at INTEGER, last_seen_at INTEGER NOT NULL)");
       sql.exec("CREATE TABLE IF NOT EXISTS wallet (account_id TEXT PRIMARY KEY, balance INTEGER NOT NULL DEFAULT 0 CHECK(balance >= 0), ads_removed INTEGER NOT NULL DEFAULT 0 CHECK(ads_removed IN (0, 1)), updated_at INTEGER NOT NULL)");
+      sql.exec("CREATE TABLE IF NOT EXISTS subscription_entitlements (account_id TEXT PRIMARY KEY, product_id TEXT NOT NULL, subscription_state TEXT NOT NULL, expiry_at INTEGER NOT NULL, auto_renew_enabled INTEGER NOT NULL CHECK(auto_renew_enabled IN (0, 1)), latest_order_id TEXT, token_hash TEXT NOT NULL, updated_at INTEGER NOT NULL)");
       sql.exec("CREATE TABLE IF NOT EXISTS wallet_transactions (transaction_id TEXT PRIMARY KEY, idempotency_key TEXT NOT NULL UNIQUE, payload_hash TEXT NOT NULL, kind TEXT NOT NULL, delta INTEGER NOT NULL, balance_after INTEGER NOT NULL, source_ref_hash TEXT, created_at INTEGER NOT NULL)");
       sql.exec("CREATE TABLE IF NOT EXISTS owned_cosmetics (cosmetic_id TEXT PRIMARY KEY, category TEXT NOT NULL, source TEXT NOT NULL, acquired_at INTEGER NOT NULL, source_ref_hash TEXT)");
       sql.exec("CREATE TABLE IF NOT EXISTS selected_cosmetics (category TEXT PRIMARY KEY, cosmetic_id TEXT NOT NULL, updated_at INTEGER NOT NULL)");
@@ -82,6 +93,7 @@ export class PlayerAccount {
       if (request.method === "POST" && url.pathname === "/profile/update") return await this.#updateProfile(request);
       if (request.method === "POST" && url.pathname === "/wallet/get") return await this.#getWallet(request);
       if (request.method === "POST" && url.pathname === "/wallet/play-purchase") return await this.#grantPlayPurchase(request);
+      if (request.method === "POST" && url.pathname === "/wallet/subscription/reconcile") return await this.#reconcileSubscription(request);
       if (request.method === "POST" && url.pathname === "/wallet/reward-ad") return await this.#grantAdReward(request);
       if (request.method === "POST" && url.pathname === "/wallet/cosmetic/purchase") return await this.#purchaseCosmetic(request);
       if (request.method === "POST" && url.pathname === "/wallet/cosmetic/select") return await this.#selectCosmetic(request);
@@ -125,6 +137,10 @@ export class PlayerAccount {
       purchaseLedgerIds = [...this.ctx.storage.sql.exec(
         "SELECT source_ref_hash FROM wallet_transactions WHERE kind IN ('PLAY_GEM_PURCHASE', 'PLAY_REMOVE_ADS') AND source_ref_hash IS NOT NULL",
       )].map((row) => String(row.source_ref_hash)).filter((value) => /^[a-f0-9]{64}$/.test(value));
+       for (const row of this.ctx.storage.sql.exec("SELECT token_hash FROM subscription_entitlements WHERE account_id = ? LIMIT 1", accountId)) {
+         const tokenHash = String(row.token_hash ?? "");
+         if (/^[a-f0-9]{64}$/.test(tokenHash)) purchaseLedgerIds.push("subscription:" + tokenHash);
+       }
     });
 
     if (deleted) return json(200, { ok: true, deleted: true, deletionPending: false, purchaseLedgerIds: [] });
@@ -163,6 +179,7 @@ export class PlayerAccount {
       this.#profileSnapshot(accountId);
       this.ctx.storage.sql.exec("DELETE FROM account_sessions");
       this.ctx.storage.sql.exec("DELETE FROM wallet_transactions");
+       this.ctx.storage.sql.exec("DELETE FROM subscription_entitlements WHERE account_id = ?", accountId);
       this.ctx.storage.sql.exec("DELETE FROM cosmetic_ad_progress");
       this.ctx.storage.sql.exec("DELETE FROM selected_cosmetics");
       this.ctx.storage.sql.exec("DELETE FROM owned_cosmetics");
@@ -291,6 +308,83 @@ export class PlayerAccount {
     const payloadHash = await sha256Hex(JSON.stringify({ productId, gems: product.gemAmount, removeAds: product.removeAds }));
     const result = this.#applyWalletTransaction({ accountId, idempotencyKey: "play-purchase:" + tokenHash, payloadHash, kind: product.removeAds ? "PLAY_REMOVE_ADS" : "PLAY_GEM_PURCHASE", delta: product.gemAmount, sourceRefHash: purchaseLedgerId, removeAds: product.removeAds });
     return json(200, { ok: true, ...result, productId, gemAmount: product.gemAmount, removeAds: product.removeAds, wallet: this.#walletSnapshot(accountId) });
+  }
+
+  async #reconcileSubscription(request) {
+    const body = await readJson(request);
+    const accountId = requireAccountId(body?.accountId);
+    this.#requireAccountNotDeleting(accountId);
+    const productId = String(body?.productId ?? "");
+    const state = String(body?.subscriptionState ?? "");
+    const expiryAt = Number(body?.expiryAt);
+    const autoRenewEnabled = body?.autoRenewEnabled;
+    const tokenHash = requireHash(body?.tokenHash, "tokenHash");
+    const latestOrderIdHash = body?.latestOrderIdHash == null ? null : requireHash(body.latestOrderIdHash, "latestOrderIdHash");
+    const linkedPurchaseTokenHash = body?.linkedPurchaseTokenHash == null ? null : requireHash(body.linkedPurchaseTokenHash, "linkedPurchaseTokenHash");
+    const checkedAt = Number(body?.checkedAt);
+    if (productId !== "paws_plus" || !SUBSCRIPTION_STATES.has(state) ||
+        !Number.isSafeInteger(expiryAt) || expiryAt <= 0 || typeof autoRenewEnabled !== "boolean" ||
+        !Number.isSafeInteger(checkedAt) || checkedAt <= 0 || checkedAt > Date.now() + 60_000) {
+      throw httpError(400, "SUBSCRIPTION_STATE_INVALID", "verified subscription state is invalid");
+    }
+    const payloadHash = latestOrderIdHash == null ? null : await sha256Hex(JSON.stringify({
+      accountId, productId, gems: PAWS_PLUS_MONTHLY_GEMS, order: latestOrderIdHash,
+    }));
+    let update = { stale: false, creditGranted: false, cycleReplay: false, balance: null };
+    this.ctx.storage.transactionSync(() => {
+      this.#requireAccountNotDeleting(accountId);
+      const currentRows = [...this.ctx.storage.sql.exec(
+        "SELECT account_id, product_id, subscription_state, expiry_at, auto_renew_enabled, latest_order_id, token_hash, updated_at FROM subscription_entitlements WHERE account_id = ? LIMIT 1",
+        accountId,
+      )];
+      const current = currentRows[0] ?? null;
+      if (current && checkedAt <= Number(current.updated_at)) {
+        update = { stale: true, creditGranted: false, cycleReplay: true, balance: null };
+        return;
+      }
+      const previousActive = current != null && isPawsPlusEntitled(
+        String(current.subscription_state), Number(current.expiry_at), Date.now(),
+      );
+      if (previousActive && current.token_hash !== tokenHash && linkedPurchaseTokenHash !== current.token_hash) {
+        throw httpError(409, "SUBSCRIPTION_TOKEN_CONFLICT", "a different active subscription is already linked to this account");
+      }
+      const active = isPawsPlusEntitled(state, expiryAt, Date.now());
+      if (active && latestOrderIdHash != null) {
+        const idempotencyKey = "paws-plus-cycle:" + latestOrderIdHash;
+        const prior = [...this.ctx.storage.sql.exec(
+          "SELECT payload_hash, balance_after FROM wallet_transactions WHERE idempotency_key = ? LIMIT 1",
+          idempotencyKey,
+        )];
+        if (prior.length) {
+          if (String(prior[0].payload_hash) !== payloadHash) {
+            throw httpError(409, "WALLET_IDEMPOTENCY_CONFLICT", "subscription order was already redeemed with different details");
+          }
+          update.cycleReplay = true;
+          update.balance = Number(prior[0].balance_after);
+        } else {
+          const walletRows = [...this.ctx.storage.sql.exec("SELECT balance FROM wallet WHERE account_id = ? LIMIT 1", accountId)];
+          if (!walletRows.length) throw httpError(404, "WALLET_NOT_FOUND", "wallet was not found");
+          const next = Number(walletRows[0].balance) + PAWS_PLUS_MONTHLY_GEMS;
+          if (!Number.isSafeInteger(next) || next < 0 || next > MAX_BALANCE) {
+            throw httpError(409, "WALLET_BALANCE_LIMIT", "wallet balance cannot safely be updated");
+          }
+          this.ctx.storage.sql.exec("UPDATE wallet SET balance = ?, updated_at = ? WHERE account_id = ?", next, checkedAt, accountId);
+          this.ctx.storage.sql.exec(
+            "INSERT INTO wallet_transactions (transaction_id, idempotency_key, payload_hash, kind, delta, balance_after, source_ref_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            crypto.randomUUID().toLowerCase(), idempotencyKey, payloadHash, "PAWS_PLUS_MONTHLY_GEMS",
+            PAWS_PLUS_MONTHLY_GEMS, next, latestOrderIdHash, checkedAt,
+          );
+          update.creditGranted = true;
+          update.balance = next;
+        }
+      }
+      this.ctx.storage.sql.exec(
+        "INSERT INTO subscription_entitlements (account_id, product_id, subscription_state, expiry_at, auto_renew_enabled, latest_order_id, token_hash, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(account_id) DO UPDATE SET product_id = excluded.product_id, subscription_state = excluded.subscription_state, expiry_at = excluded.expiry_at, auto_renew_enabled = excluded.auto_renew_enabled, latest_order_id = excluded.latest_order_id, token_hash = excluded.token_hash, updated_at = excluded.updated_at",
+        accountId, productId, state, expiryAt, autoRenewEnabled ? 1 : 0, latestOrderIdHash, tokenHash, checkedAt,
+      );
+    });
+    const wallet = this.#walletSnapshot(accountId);
+    return json(200, { ok: true, ...update, subscription: wallet.subscription, wallet });
   }
 
   async #resolveCosmetic(cosmeticId, country = "ZZ") {
@@ -590,12 +684,30 @@ export class PlayerAccount {
   #walletSnapshot(accountId) {
     const rows = [...this.ctx.storage.sql.exec("SELECT balance, ads_removed, updated_at FROM wallet WHERE account_id = ? LIMIT 1", accountId)];
     if (!rows.length) throw httpError(404, "WALLET_NOT_FOUND", "wallet was not found");
+    const subscriptionRows = [...this.ctx.storage.sql.exec(
+      "SELECT product_id, subscription_state, expiry_at, auto_renew_enabled, latest_order_id, updated_at FROM subscription_entitlements WHERE account_id = ? LIMIT 1",
+      accountId,
+    )];
+    const subRow = subscriptionRows[0] ?? null;
+    const pawsPlusActive = subRow != null && isPawsPlusEntitled(String(subRow.subscription_state), Number(subRow.expiry_at), Date.now());
+    const permanentAdsRemoved = Number(rows[0].ads_removed) === 1;
+    const subscription = subRow == null ? null : {
+      productId: String(subRow.product_id), state: String(subRow.subscription_state), expiryAt: Number(subRow.expiry_at),
+      autoRenewEnabled: Number(subRow.auto_renew_enabled) === 1,
+      latestOrderIdHash: subRow.latest_order_id == null ? null : String(subRow.latest_order_id),
+      updatedAt: Number(subRow.updated_at), active: pawsPlusActive,
+    };
     const ownedCosmetics = [...this.ctx.storage.sql.exec("SELECT cosmetic_id FROM owned_cosmetics ORDER BY cosmetic_id")].map((row) => String(row.cosmetic_id));
     const selectedCosmetics = {};
     for (const row of this.ctx.storage.sql.exec("SELECT category, cosmetic_id FROM selected_cosmetics ORDER BY category")) selectedCosmetics[String(row.category)] = String(row.cosmetic_id);
     const rewardedAdProgress = {};
     for (const row of this.ctx.storage.sql.exec("SELECT cosmetic_id, progress FROM cosmetic_ad_progress ORDER BY cosmetic_id")) rewardedAdProgress[String(row.cosmetic_id)] = Number(row.progress);
-    return { accountId, balance: Number(rows[0].balance), adsRemoved: Number(rows[0].ads_removed) === 1, updatedAt: Number(rows[0].updated_at), ownedCosmetics, selectedCosmetics, rewardedAdProgress };
+    return {
+      accountId, balance: Number(rows[0].balance), adsRemoved: permanentAdsRemoved || pawsPlusActive, permanentAdsRemoved,
+      pawsPlusActive, pawsPlusExpiresAt: subscription?.expiryAt ?? 0,
+      pawsPlusAutoRenewEnabled: subscription?.autoRenewEnabled ?? false, subscription,
+      updatedAt: Number(rows[0].updated_at), ownedCosmetics, selectedCosmetics, rewardedAdProgress,
+    };
   }
 }
 
