@@ -407,7 +407,11 @@ async function handleAccountRequest(request, env) {
         const country = requestCatalogCountry(request);
         const now = Date.now();
         const items = state.items.filter((item) => isCatalogItemAvailable(item, country, now));
-        const etag = '"ludopaws-catalog-v' + String(state.catalogVersion) + "-" + country + '"';
+        // The same catalog version can expose different items when a scheduled
+        // availability window opens or closes. Include the visible ID set so
+        // conditional requests cannot preserve a stale filtered catalog forever.
+        const visibleIdsHash = (await sha256Hex(items.map((item) => item.id).sort().join("\n"))).slice(0, 16);
+        const etag = '"ludopaws-catalog-v' + String(state.catalogVersion) + "-" + country + "-" + visibleIdsHash + '"';
         const headers = catalogHeaders(etag);
         const supplied = String(request.headers.get("if-none-match") ?? "")
           .split(",").map((value) => value.trim());
