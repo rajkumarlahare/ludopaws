@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+      Launcher icon only: draw the existing transparent mascot artwork at 150% of
+      the normal 48dp launcher icon size. The icon canvas clips the overflow, as requested.
+      Keep the original image unchanged because it is also useful as a standalone asset.
+    -->
+    <item
+        android:drawable="@drawable/ic_ludo_paws_launcher"
+        android:width="72dp"
+        android:height="72dp"
+        android:gravity="center" />
+</layer-list>
