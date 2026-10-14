@@ -394,7 +394,7 @@ class GooglePlayBillingGateway(
                 }
             } else {
                 detailsList.forEach { details ->
-                    val formattedPrice = if (details.productId == StoreCatalog.PAWS_PLUS && subscriptionQuery) {
+                    val formattedPrice: String = (if (details.productId == StoreCatalog.PAWS_PLUS && subscriptionQuery) {
                         details.subscriptionOfferDetails
                             ?.firstOrNull { it.basePlanId == "monthly-auto" && it.offerId == null }
                             ?.pricingPhases
@@ -405,7 +405,7 @@ class GooglePlayBillingGateway(
                         details.oneTimePurchaseOfferDetailsList?.firstOrNull()?.formattedPrice
                     } else {
                         null
-                    }?.takeIf { it.isNotBlank() } ?: return@forEach
+                    })?.takeIf { it.isNotBlank() } ?: return@forEach
                     productDetails[details.productId] = details
                     mapped[details.productId] = StoreBillingProduct(
                         productId = details.productId,
