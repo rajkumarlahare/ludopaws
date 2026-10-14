@@ -75,21 +75,30 @@ class StoreCatalogTest {
     fun gemPacksMatchTheRecommendedLaunchLadder() {
         val expected =
             listOf(
-                StoreCatalog.GEMS_300 to (300 to "₹29.00"),
-                StoreCatalog.GEMS_1500 to (1_200 to "₹79.00"),
-                StoreCatalog.GEMS_3500 to (3_000 to "₹179.00"),
-                StoreCatalog.GEMS_20000 to (7_500 to "₹399.00"),
-                StoreCatalog.GEMS_40000 to (16_000 to "₹799.00"),
-                StoreCatalog.GEMS_200000 to (35_000 to "₹1,499.00"),
+                StoreCatalog.GEMS_300 to 300,
+                StoreCatalog.GEMS_1500 to 1_200,
+                StoreCatalog.GEMS_3500 to 3_000,
+                StoreCatalog.GEMS_20000 to 7_500,
+                StoreCatalog.GEMS_40000 to 16_000,
+                StoreCatalog.GEMS_200000 to 35_000,
             )
 
-        expected.forEach { (productId, offer) ->
+        expected.forEach { (productId, gemAmount) ->
             val product =
                 requireNotNull(
                     StoreCatalog.find(productId),
                 )
-            assertEquals(offer.first, product.gemAmount)
-            assertEquals(offer.second, product.fallbackPrice)
+            assertEquals(gemAmount, product.gemAmount)
+            assertEquals("Price unavailable", product.fallbackPrice)
         }
+    }
+
+    @Test
+    fun everyProductUsesPlayPriceInsteadOfHardcodedRegionalFallback() {
+        assertTrue(
+            StoreCatalog.products.all {
+                it.fallbackPrice == "Price unavailable"
+            },
+        )
     }
 }
