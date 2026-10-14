@@ -137,7 +137,7 @@ internal fun showPrivacyPolicyDialog(
 }
 
 private const val PRIVACY_POLICY_TEXT =
-    """Last updated: October 12, 2026
+    """Last updated: October 15, 2026
 
 Ludo Paws is published under the Rekixo brand. This policy describes information that may be processed by the Android game and its connected services. Which information is used depends on the features you choose and which services the publisher has enabled.
 
