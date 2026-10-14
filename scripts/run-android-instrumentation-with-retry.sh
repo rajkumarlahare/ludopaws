@@ -24,7 +24,8 @@ boot_emulator() {
   # lower-load settings configured by the workflow's initial boot.
   local config_file="$AVD_HOME/$AVD_NAME.avd/config.ini"
   if [[ -f "$config_file" ]]; then
-    for setting in "hw.lcd.width=720" "hw.lcd.height=1600" "hw.lcd.density=320"; do
+    # Keep the userdata partition within hosted-runner disk capacity on retry as well.
+    for setting in "hw.lcd.width=720" "hw.lcd.height=1600" "hw.lcd.density=320" "disk.dataPartition.size=4096m"; do
       local key="${setting%%=*}"
       if grep -q "^$key=" "$config_file"; then
         sed -i "s|^$key=.*|$setting|" "$config_file"
