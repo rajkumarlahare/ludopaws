@@ -159,9 +159,10 @@ function mockSubscriptionApi({
   expiryTime = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
   acknowledgementState = "ACKNOWLEDGEMENT_STATE_PENDING",
   autoRenewEnabled = true,
+  basePlanId = "monthly-auto",
 } = {}) {
   const calls = [];
-  let current = { state, expiryTime, acknowledgementState, autoRenewEnabled };
+  let current = { state, expiryTime, acknowledgementState, autoRenewEnabled, basePlanId };
   const fetchImpl = async (input, init = {}) => {
     const url = String(input);
     calls.push({ url, init });
@@ -181,7 +182,7 @@ function mockSubscriptionApi({
         lineItems: [{
           productId: "paws_plus",
           expiryTime: current.expiryTime,
-          offerDetails: { basePlanId: "monthly-auto", offerId: null },
+          offerDetails: { basePlanId: current.basePlanId, offerId: null },
           autoRenewingPlan: { autoRenewEnabled: current.autoRenewEnabled },
         }],
       });
@@ -670,17 +671,63 @@ test("subscription verification rejects wrong Google account and wrong base plan
   const env = await makeSubscriptionEnv();
   const accountId = "c".repeat(64);
   const ownerAccountId = "323e4567-e89b-42d3-a456-426614174000";
-  const api = mockSubscriptionApi({
+  const futureExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+  const wrongAccount = mockSubscriptionApi({
     accountId: "d".repeat(64),
-    expiryTime: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    expiryTime: futureExpiry,
   });
   await assert.rejects(
     verifyAndSyncGooglePlaySubscription(
       env,
       { productId: "paws_plus", purchaseToken: "paws-plus-mismatched-account-token", accountId, ownerAccountId },
-      api.fetchImpl,
+      wrongAccount.fetchImpl,
     ),
     (error) => error.status === 400 && error.code === "PLAY_SUBSCRIPTION_ACCOUNT_MISMATCH",
   );
-  assert.equal(api.calls.filter(({ url, init }) => init.method === "POST" && url.endsWith(":acknowledge")).length, 0);
+  assert.equal(wrongAccount.calls.filter(({ url, init }) => init.method === "POST" && url.endsWith(":acknowledge")).length, 0);
+
+  const wrongPlan = mockSubscriptionApi({
+    accountId,
+    expiryTime: futureExpiry,
+    basePlanId: "weekly-plan",
+  });
+  await assert.rejects(
+    verifyAndSyncGooglePlaySubscription(
+      env,
+      { productId: "paws_plus", purchaseToken: "paws-plus-wrong-base-plan-token", accountId, ownerAccountId },
+      wrongPlan.fetchImpl,
+    ),
+    (error) => error.status === 400 && error.code === "PLAY_SUBSCRIPTION_PRODUCT_INVALID",
+  );
+  assert.equal(wrongPlan.calls.filter(({ url, init }) => init.method === "POST" && url.endsWith(":acknowledge")).length, 0);
+});
+
+test("active subscription does not become entitled when Google Play acknowledgement fails", async () => {
+  const env = await makeSubscriptionEnv();
+  const accountId = "e".repeat(64);
+  const ownerAccountId = "423e4567-e89b-42d3-a456-426614174000";
+  const baseFetch = mockSubscriptionApi({
+    accountId,
+    expiryTime: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+  });
+  const fetchImpl = async (input, init = {}) => {
+    const url = String(input);
+    if (init.method === "POST" && url.endsWith(":acknowledge")) {
+      baseFetch.calls.push({ url, init });
+      return Response.json({ error: "acknowledgement failed" }, { status: 403 });
+    }
+    return baseFetch.fetchImpl(input, init);
+  };
+  await assert.rejects(
+    verifyAndSyncGooglePlaySubscription(
+      env,
+      { productId: "paws_plus", purchaseToken: "paws-plus-ack-failure-token", accountId, ownerAccountId },
+      fetchImpl,
+    ),
+    (error) => error.status === 503 && error.code === "PLAY_SUBSCRIPTION_ACK_FAILED",
+  );
+  const hash = await sha256Hex("ludopaws:google-play-subscription:v1:paws-plus-ack-failure-token");
+  const ledger = env.LUDOPROOF_STORE_PURCHASES.get(hash);
+  const stored = await (await ledger.fetch(new Request("https://ledger/subscription/status"))).json();
+  assert.equal(stored.subscription, null);
 });
