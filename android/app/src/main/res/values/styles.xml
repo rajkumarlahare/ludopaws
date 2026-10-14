@@ -2,6 +2,7 @@
 <resources>
     <style name="Theme.LudoPaws" parent="@android:style/Theme.Material.Light.NoActionBar">
         <item name="android:windowNoTitle">true</item>
+        <item name="android:windowBackground">#03153F</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar">false</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
