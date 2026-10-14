@@ -9,6 +9,17 @@ class MemoryStorage {
   async get(key) { return this.values.get(key); }
   async put(key, value) { this.values.set(key, structuredClone(value)); }
   async delete(key) { return this.values.delete(key); }
+  async transaction(callback) {
+    const staged = new Map([...this.values].map(([key, value]) => [key, structuredClone(value)]));
+    const transaction = {
+      get: async (key) => staged.get(key),
+      put: async (key, value) => { staged.set(key, structuredClone(value)); },
+      delete: async (key) => staged.delete(key),
+    };
+    const result = await callback(transaction);
+    this.values = staged;
+    return result;
+  }
 }
 
 function createStore() {
@@ -142,6 +153,29 @@ test("rejects incomplete content and direct Play checkout before publication", a
   }));
   assert.equal(publishDirectPurchase.response.status, 409);
   assert.equal(publishDirectPurchase.body.error, "CATALOG_PLAY_PURCHASE_NOT_READY");
+});
+
+test("published state and snapshot persistence are atomic on storage failure", async () => {
+  const { store, storage } = createStore();
+  await call(store, "/catalog/draft/save", mutation({ item: item() }));
+  const originalTransaction = storage.transaction.bind(storage);
+  storage.transaction = async () => { throw new Error("simulated durable storage failure"); };
+
+  await assert.rejects(
+    () => call(store, "/catalog/publish", mutation({
+      expectedRevision: 1, itemId: "paw_safari_01",
+    })),
+    /simulated durable storage failure/,
+  );
+
+  storage.transaction = originalTransaction;
+  const current = await call(store, "/catalog/current", null, "GET");
+  assert.equal(current.body.catalogVersion, 0);
+  assert.equal(current.body.items.length, 0);
+  const history = await call(store, "/catalog/history", null, "GET");
+  assert.equal(history.body.versions.length, 0);
+  assert.equal(history.body.audit.length, 1);
+  assert.equal(history.body.audit[0].action, "DRAFT_SAVED");
 });
 
 test("archive excludes an item, and rollback restores a prior snapshot as a new version", async () => {
