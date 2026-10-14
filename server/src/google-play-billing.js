@@ -163,6 +163,7 @@ export async function verifyAndRedeemGooglePlayPurchase(
       purchaseToken,
       "consume",
       fetchImpl,
+      purchase.apiVersion,
     );
   } else if (
     !product.consumable &&
@@ -174,6 +175,7 @@ export async function verifyAndRedeemGooglePlayPurchase(
       purchaseToken,
       "acknowledge",
       fetchImpl,
+      purchase.apiVersion,
     );
   }
 
@@ -244,7 +246,9 @@ async function getPlayPurchase(env, productId, purchaseToken, fetchImpl) {
       "Google Play returned an invalid purchase response",
     );
   }
-  return legacyResponse ? payload : normalizeProductPurchaseV2(payload);
+  return legacyResponse
+    ? { ...payload, apiVersion: "legacy" }
+    : { ...normalizeProductPurchaseV2(payload), apiVersion: "v2" };
 }
 
 function normalizeProductPurchaseV2(payload) {
@@ -284,24 +288,29 @@ function normalizeProductPurchaseV2(payload) {
   };
 }
 
+function publisherPurchaseActionUrl(productId, purchaseToken, action, apiVersion = "v2") {
+  const applicationPath = PUBLISHER_URL + "/applications/" + encodeURIComponent(PACKAGE_NAME);
+  if (apiVersion === "v2") {
+    return applicationPath + "/purchases/productsv2/tokens/" + encodeURIComponent(purchaseToken) + ":" + action;
+  }
+  return applicationPath + "/purchases/products/" + encodeURIComponent(productId) +
+    "/tokens/" + encodeURIComponent(purchaseToken) + ":" + action;
+}
+
 async function runPublisherAction(
   env,
   productId,
   purchaseToken,
   action,
   fetchImpl,
+  apiVersion = "v2",
 ) {
   const accessToken = await googleAccessToken(env, fetchImpl);
-  const url =
-    PUBLISHER_URL +
-    "/applications/" +
-    encodeURIComponent(PACKAGE_NAME) +
-    "/purchases/products/" +
-    encodeURIComponent(productId) +
-    "/tokens/" +
-    encodeURIComponent(purchaseToken) +
-    ":" +
-    action;
+  // Match the resource family used to verify this purchase. Purchases returned
+  // by productsv2 are finalized through the current one-time-products API;
+  // legacy in-app products retain the legacy action endpoint only when verification
+  // itself required the 404-only legacy fallback.
+  const url = publisherPurchaseActionUrl(productId, purchaseToken, action, apiVersion);
   let response;
   try {
     const headers = { authorization: "Bearer " + accessToken };
