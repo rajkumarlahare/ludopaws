@@ -115,11 +115,15 @@ test("AdMob test signature wins over a colliding production key ID and never gra
     privateKey: productionPair.privateKey, keyId: 3335741209,
     accountId: "0a2c3a83-e0fb-4abc-8ac4-581a6d994fe7",
     adUnit: "456", customData: JSON.stringify({ kind: "gems" }), timestamp: now,
-    transactionId: "123456789",
+    transactionId: "not-a-valid-tx-id",
   });
   await assert.rejects(
-    verifyAdMobSsvRequest(malformedProductionRequest,
-      { LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID: "ca-app-pub-123/456" }, fetchImpl, now),
+    verifyAdMobSsvRequest(
+      malformedProductionRequest,
+      { LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID: "ca-app-pub-123/456" },
+      fetchImpl,
+      now,
+    ),
     (error) => error.code === "SSV_TRANSACTION_INVALID",
   );
 });
