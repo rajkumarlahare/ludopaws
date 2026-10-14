@@ -10,11 +10,6 @@ import {
   requireClientRequestId,
   sha256Hex,
 } from "./crypto.js";
-import {
-  googlePlayBillingEnabled,
-  verifyAndRedeemGooglePlayPurchase,
-} from "./google-play-billing.js";
-
 export { MatchRoom } from "./match-room.js";
 export { ApiGate } from "./api-gate.js";
 export { LeaderboardRoom } from "./leaderboard-room.js";
@@ -32,7 +27,6 @@ const RATE_POLICIES = Object.freeze({
   leaderboard: 60,
   matchmaking: 90,
   friends: 120,
-  storePurchases: 10,
 });
 
 export default {
@@ -93,34 +87,6 @@ export default {
           entronexReachable,
           checks,
           productionClaim: false,
-        });
-      }
-
-      if (url.pathname === "/api/store/status") {
-        requireMethod(request, "GET");
-        return json(200, {
-          ok: true,
-          billingAvailable: googlePlayBillingEnabled(env),
-        });
-      }
-
-      if (url.pathname === "/api/store/purchases/verify") {
-        requireMethod(request, "POST");
-        const body = await readJsonRequest(request);
-        await enforceRateLimit(
-          env,
-          request,
-          "store:purchases:verify",
-          RATE_POLICIES.storePurchases,
-        );
-        const result = await verifyAndRedeemGooglePlayPurchase(env, {
-          productId: body.productId,
-          purchaseToken: body.purchaseToken,
-          accountId: body.accountId,
-        });
-        return json(200, {
-          ok: true,
-          ...result,
         });
       }
 
