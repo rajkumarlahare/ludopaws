@@ -119,7 +119,7 @@ private fun StoreActivity.boardPanel(
 
         addView(
             TextView(this@boardPanel).apply {
-                text = if (locked) LOCKED_BOARD_TITLE else board.title
+                text = if (locked && !board.remoteManaged) LOCKED_BOARD_TITLE else board.title
                 textSize = 14.5f
                 setTypeface(Typeface.DEFAULT_BOLD)
                 setTextColor(Color.WHITE)
