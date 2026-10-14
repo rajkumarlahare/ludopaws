@@ -168,28 +168,20 @@ class GooglePlayBillingGateway(
             return
         }
 
-        val offer =
-            details
-                .oneTimePurchaseOfferDetailsList
+        val offerToken = if (productId == StoreCatalog.PAWS_PLUS) {
+            details.subscriptionOfferDetails
                 ?.firstOrNull()
+                ?.offerToken
+        } else {
+            details.oneTimePurchaseOfferDetailsList
+                ?.firstOrNull()
+                ?.offerToken
+        }
 
-        if (offer == null) {
+        if (offerToken.isNullOrBlank()) {
             listener
                 .onBillingUnavailable(
                     "No eligible Google Play offer is available for this product.",
-                )
-            return
-        }
-
-        val offerToken =
-            offer.offerToken
-        if (
-            offerToken ==
-            null
-        ) {
-            listener
-                .onBillingUnavailable(
-                    "Google Play did not provide a usable offer token for this product.",
                 )
             return
         }
@@ -289,25 +281,21 @@ class GooglePlayBillingGateway(
 
     private fun queryExistingPurchases() {
         if (closed || !billingClient.isReady) return
-        billingClient.queryPurchasesAsync(
-            QueryPurchasesParams
-                .newBuilder()
-                .setProductType(BillingClient.ProductType.INAPP)
-                .build(),
-        ) { billingResult, purchases ->
-            if (closed) return@queryPurchasesAsync
-            if (
-                billingResult.responseCode !=
-                BillingClient.BillingResponseCode.OK
-            ) {
-                listener.onBillingUnavailable(
-                            billingResult.debugMessage.ifBlank {
-                                "Google Play could not reload previous purchases."
-                            },
-                )
-                return@queryPurchasesAsync
+        listOf(BillingClient.ProductType.INAPP, BillingClient.ProductType.SUBS).forEach { type ->
+            billingClient.queryPurchasesAsync(
+                QueryPurchasesParams.newBuilder().setProductType(type).build(),
+            ) { billingResult, purchases ->
+                if (closed) return@queryPurchasesAsync
+                if (billingResult.responseCode != BillingClient.BillingResponseCode.OK) {
+                    listener.onBillingUnavailable(
+                        billingResult.debugMessage.ifBlank {
+                            "Google Play could not reload previous purchases."
+                        },
+                    )
+                    return@queryPurchasesAsync
+                }
+                processPurchases(purchases)
             }
-            processPurchases(purchases)
         }
     }
 
@@ -393,23 +381,17 @@ class GooglePlayBillingGateway(
         }
 
         val products =
-            StoreCatalog
-                .playProductIds
-                .map {
-                        productId ->
-                    QueryProductDetailsParams
-                        .Product
-                        .newBuilder()
-                        .setProductId(
-                            productId,
-                        )
-                        .setProductType(
-                            BillingClient
-                                .ProductType
-                                .INAPP,
-                        )
-                        .build()
-                }
+            StoreCatalog.playProductIds.map { productId ->
+                QueryProductDetailsParams.Product.newBuilder()
+                    .setProductId(productId)
+                    .setProductType(BillingClient.ProductType.INAPP)
+                    .build()
+            } + listOf(
+                QueryProductDetailsParams.Product.newBuilder()
+                    .setProductId(StoreCatalog.PAWS_PLUS)
+                    .setProductType(BillingClient.ProductType.SUBS)
+                    .build(),
+            )
 
         val params =
             QueryProductDetailsParams
@@ -461,24 +443,21 @@ class GooglePlayBillingGateway(
                     .productDetailsList
                     .forEach {
                             details ->
-                        val offer =
-                            details
-                                .oneTimePurchaseOfferDetailsList
+                        val formattedPrice = if (details.productId == StoreCatalog.PAWS_PLUS) {
+                            details.subscriptionOfferDetails
                                 ?.firstOrNull()
-                                ?: return@forEach
-                        productDetails[
-                            details.productId
-                        ] =
-                            details
-                        mapped[
-                            details.productId
-                        ] =
-                            StoreBillingProduct(
-                                productId =
-                                    details.productId,
-                                formattedPrice =
-                                    offer.formattedPrice,
-                            )
+                                ?.pricingPhases
+                                ?.pricingPhaseList
+                                ?.firstOrNull()
+                                ?.formattedPrice
+                        } else {
+                            details.oneTimePurchaseOfferDetailsList?.firstOrNull()?.formattedPrice
+                        } ?: return@forEach
+                        productDetails[details.productId] = details
+                        mapped[details.productId] = StoreBillingProduct(
+                            productId = details.productId,
+                            formattedPrice = formattedPrice,
+                        )
                     }
 
                 listener
