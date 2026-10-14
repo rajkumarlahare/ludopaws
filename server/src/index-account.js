@@ -387,7 +387,6 @@ async function handleAccountRequest(request, env) {
           const verified = await verifyAdMobSsvRequest(request, env);
           // URL-verification fixtures must succeed without granting production value.
           if (verified.isTest === true) {
-            console.info("admob-ssv-console-verification-accepted", { rewardGranted: false });
             return json(200, { ok: true, verified: true, test: true, rewardGranted: false });
           }
           const response = await playerResponse(env, verified.accountId, "/wallet/reward-ad", {
