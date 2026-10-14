@@ -483,6 +483,15 @@ async function handleAccountRequest(request, env) {
 
       return await baseWorker.fetch(request, env);
     } catch (error) {
+      // SSV callback verification failures need a safe diagnostic code: AdMob's
+      // console only reports the HTTP status. Never log callback query, user ID,
+      // custom data, signature, or transaction ID.
+      if (url.pathname === "/api/admob/ssv") {
+        console.warn("admob-ssv-request-rejected", {
+          status: Number.isInteger(error?.status) ? error.status : 500,
+          code: typeof error?.code === "string" ? error.code : "INTERNAL_ERROR",
+        });
+      }
       return errorResponse(error);
     }
 }
