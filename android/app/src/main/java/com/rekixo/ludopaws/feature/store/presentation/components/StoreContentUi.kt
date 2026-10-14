@@ -20,6 +20,14 @@ import com.rekixo.ludopaws.feature.store.presentation.art.GemClusterView
 import com.rekixo.ludopaws.ui.home.HomeIconKind
 import com.rekixo.ludopaws.ui.home.HomeIconView
 
+internal fun StoreActivity.pinnedRemoveAdsContent(): LinearLayout {
+    val product =
+        requireNotNull(
+            StoreCatalog.find(StoreCatalog.REMOVE_ADS),
+        )
+    return featuredRemoveAdsCard(product)
+}
+
 internal fun StoreActivity.storeContent():
     LinearLayout =
     when (selectedTab) {
@@ -42,29 +50,6 @@ private fun StoreActivity.gemsContent():
     LinearLayout(this).apply {
         orientation =
             LinearLayout.VERTICAL
-
-        val removeAds =
-            requireNotNull(
-                StoreCatalog
-                    .find(
-                        StoreCatalog
-                            .REMOVE_ADS,
-                    ),
-            )
-
-        // Feature Remove Ads before the six gem price cards.
-        addView(
-            featuredRemoveAdsCard(
-                removeAds,
-            ),
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            ).apply {
-                topMargin = dp(4)
-                bottomMargin = dp(6)
-            },
-        )
 
         val packs =
             StoreCatalog
