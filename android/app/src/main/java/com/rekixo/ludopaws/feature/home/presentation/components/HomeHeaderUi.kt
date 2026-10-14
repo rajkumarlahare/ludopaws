@@ -18,6 +18,7 @@ import com.rekixo.ludopaws.feature.profile.data.local.ProfileStore
 import com.rekixo.ludopaws.feature.profile.presentation.ProfileActivity
 import com.rekixo.ludopaws.feature.profile.presentation.BadgesActivity
 import com.rekixo.ludopaws.feature.store.data.local.GemWalletStore
+import com.rekixo.ludopaws.feature.store.domain.StoreCatalog
 import com.rekixo.ludopaws.feature.store.presentation.StoreActivity
 
 internal fun HomeActivity.profileHud(): LinearLayout =
@@ -331,6 +332,7 @@ private fun HomeActivity.homeShortcutRow(): LinearLayout =
                 label = "Remove Ads",
                 tint = 0xFFFF3B30.toInt(),
                 iconKind = HomeIconKind.AD_BLOCKER,
+                enabled = true,
             ),
         ).forEach { item ->
             addView(
@@ -395,6 +397,17 @@ private fun HomeActivity.homeShortcut(
                             Intent(
                                 this@homeShortcut,
                                 BadgesActivity::class.java,
+                            ),
+                        )
+
+                    HomeIconKind.AD_BLOCKER ->
+                        startActivity(
+                            Intent(
+                                this@homeShortcut,
+                                StoreActivity::class.java,
+                            ).putExtra(
+                                StoreActivity.EXTRA_PURCHASE_PRODUCT_ID,
+                                StoreCatalog.REMOVE_ADS,
                             ),
                         )
 
