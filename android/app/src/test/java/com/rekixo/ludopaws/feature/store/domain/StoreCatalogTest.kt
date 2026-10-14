@@ -72,6 +72,27 @@ class StoreCatalogTest {
     }
 
     @Test
+    fun pawsPlusIsASeparateMonthlySubscriptionAndNotAnInAppProduct() {
+        val product = requireNotNull(StoreCatalog.find(StoreCatalog.PAWS_PLUS))
+        assertEquals(StoreProductKind.SUBSCRIPTION_PAWS_PLUS, product.kind)
+        assertEquals(0, product.gemAmount)
+        assertEquals("monthly-auto", StoreCatalog.PAWS_PLUS_BASE_PLAN_ID)
+        assertTrue(StoreCatalog.PAWS_PLUS in StoreCatalog.subscriptionProductIds)
+        assertTrue(StoreCatalog.PAWS_PLUS !in StoreCatalog.playProductIds)
+    }
+
+    @Test
+    fun legacyRemoveAdsAndGemProductsRemainOneTimeProducts() {
+        assertTrue(StoreCatalog.REMOVE_ADS in StoreCatalog.playProductIds)
+        assertTrue(StoreCatalog.GEMS_300 in StoreCatalog.playProductIds)
+        assertTrue(StoreCatalog.PAWS_PLUS !in StoreCatalog.playProductIds)
+        assertEquals(
+            StoreProductKind.NON_CONSUMABLE_REMOVE_ADS,
+            requireNotNull(StoreCatalog.find(StoreCatalog.REMOVE_ADS)).kind,
+        )
+    }
+
+    @Test
     fun gemPacksMatchTheRecommendedLaunchLadder() {
         val expected =
             listOf(
