@@ -381,21 +381,31 @@ async function handleAccountRequest(request, env) {
         if (env?.LUDOPROOF_ADMOB_SSV_ENABLED !== "true" || !env?.LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID) {
           throw httpError(503, "ADMOB_SSV_NOT_ENABLED", "server-verified ad rewards are not enabled");
         }
-        // Signed callbacks still consume CPU and may refresh Google's public verification keys.
-        // Apply the shared IP rate gate before parsing/cryptographic verification to limit abuse.
-        await rateLimit(env, request, "admob:ssv", 120);
-        const verified = await verifyAdMobSsvRequest(request, env);
-        // AdMob's dedicated verification test uses Google's test signing keys.
-        // A valid test callback must return success without ever crediting a wallet.
-        if (verified.isTest === true) {
-          return json(200, { ok: true, verified: true, test: true, rewardGranted: false });
+        try {
+          // Rate-limit before signature verification and authoritative wallet mutation.
+          await rateLimit(env, request, "admob:ssv", 120);
+          const verified = await verifyAdMobSsvRequest(request, env);
+          // URL-verification fixtures must succeed without granting production value.
+          if (verified.isTest === true) {
+            console.info("admob-ssv-console-verification-accepted", { rewardGranted: false });
+            return json(200, { ok: true, verified: true, test: true, rewardGranted: false });
+          }
+          const response = await playerResponse(env, verified.accountId, "/wallet/reward-ad", {
+            accountId: verified.accountId,
+            transactionId: verified.transactionId,
+            kind: verified.kind,
+            cosmeticId: verified.cosmeticId,
+          });
+          console.info("admob-ssv-reward-accepted", { kind: verified.kind, status: response.status });
+          return response;
+        } catch (error) {
+          // Only safe error code/status are logged; never log account IDs, signatures, or callback URLs.
+          console.warn("admob-ssv-callback-failed", {
+            code: typeof error?.code === "string" ? error.code : "SSV_CALLBACK_FAILED",
+            status: Number.isInteger(error?.status) ? error.status : 500,
+          });
+          throw error;
         }
-        return await playerResponse(env, verified.accountId, "/wallet/reward-ad", {
-          accountId: verified.accountId,
-          transactionId: verified.transactionId,
-          kind: verified.kind,
-          cosmeticId: verified.cosmeticId,
-        });
       }
 
       if (url.pathname === "/api/store/status" && request.method === "GET") {
