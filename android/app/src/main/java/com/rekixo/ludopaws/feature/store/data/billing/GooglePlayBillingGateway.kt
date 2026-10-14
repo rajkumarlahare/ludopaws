@@ -169,8 +169,9 @@ class GooglePlayBillingGateway(
         }
 
         val offerToken = if (productId == StoreCatalog.PAWS_PLUS) {
-            details.subscriptionOfferDetails
-                ?.firstOrNull()
+            (details.subscriptionOfferDetails
+                ?.firstOrNull { it.basePlanId == "monthly-auto" && it.offerId == null }
+                ?: details.subscriptionOfferDetails?.firstOrNull())
                 ?.offerToken
         } else {
             details.oneTimePurchaseOfferDetailsList
@@ -395,11 +396,12 @@ class GooglePlayBillingGateway(
             } else {
                 detailsList.forEach { details ->
                     val formattedPrice = if (details.productId == StoreCatalog.PAWS_PLUS && subscriptionQuery) {
-                        details.subscriptionOfferDetails
-                            ?.firstOrNull()
+                        (details.subscriptionOfferDetails
+                            ?.firstOrNull { it.basePlanId == "monthly-auto" && it.offerId == null }
+                            ?: details.subscriptionOfferDetails?.firstOrNull())
                             ?.pricingPhases
                             ?.pricingPhaseList
-                            ?.firstOrNull()
+                            ?.lastOrNull()
                             ?.formattedPrice
                     } else if (details.productId != StoreCatalog.PAWS_PLUS && !subscriptionQuery) {
                         details.oneTimePurchaseOfferDetailsList?.firstOrNull()?.formattedPrice
