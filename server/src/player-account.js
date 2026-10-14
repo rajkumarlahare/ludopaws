@@ -334,18 +334,30 @@ export class PlayerAccount {
           available = Array.isArray(availability.allowedCountries) &&
             availability.allowedCountries.includes(resolvedCountry);
         }
+        // A catalog entry can be published before every installed client has its
+        // renderer/asset support. Only IDs already registered as available server
+        // cosmetics may spend value or receive rewards; new IDs stay discoverable in
+        // the catalog but locked until the app/runtime and entitlement map are shipped.
+        const renderer = COSMETICS[item.id];
+        const ownershipCategory = item.category === "PAW" ? "CHARACTER_PACK" : item.category;
+        const rendererReady = Boolean(
+          renderer &&
+          renderer.available === true &&
+          renderer.category === ownershipCategory,
+        );
         return {
           id: item.id,
-          category: item.category,
+          category: renderer?.category ?? ownershipCategory,
           catalogManaged: true,
           catalogVersion: item.catalogVersion,
-          available,
+          available: available && rendererReady,
           channels,
           kind: channels.length === 1 ? channels[0] : null,
           gemPrice: Number.isSafeInteger(item.unlock?.gems?.price) ? item.unlock.gems.price : null,
           ads: Number.isSafeInteger(item.unlock?.rewardedAds?.requiredCompletedAds)
             ? item.unlock.rewardedAds.requiredCompletedAds : 0,
           level: Number.isSafeInteger(item.unlock?.level?.minimumLevel) ? item.unlock.level.minimumLevel : 0,
+          rendererReady,
         };
       }
     }
