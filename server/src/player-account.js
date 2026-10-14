@@ -383,7 +383,7 @@ export class PlayerAccount {
   }
 
   #requireSupportedCosmeticCategory(cosmetic) {
-    if (cosmetic.catalogManaged && !["PAW", "DICE", "BOARD", "AVATAR"].includes(cosmetic.category)) {
+    if (cosmetic.catalogManaged && !["PAW", "DICE", "BOARD", "AVATAR", "CHARACTER_PACK"].includes(cosmetic.category)) {
       throw httpError(409, "CATALOG_CATEGORY_NOT_READY", "this catalog category does not have an ownership/equip implementation yet");
     }
   }
