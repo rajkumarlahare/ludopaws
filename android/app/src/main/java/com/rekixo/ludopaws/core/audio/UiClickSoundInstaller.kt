@@ -61,7 +61,7 @@ object UiClickSoundInstaller {
                 view is ImageButton ||
                 view is CompoundButton ||
                 (view is TextView && view.isClickable) ||
-                (view is ViewGroup && view.isFocusable)
+                view is ViewGroup
 
         if (!buttonLike) return
 
