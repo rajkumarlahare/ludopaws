@@ -12,7 +12,6 @@ enum class StoreTab(
 enum class StoreProductKind {
     CONSUMABLE_GEMS,
     NON_CONSUMABLE_REMOVE_ADS,
-    SUBSCRIPTION,
 }
 
 data class StoreProduct(
