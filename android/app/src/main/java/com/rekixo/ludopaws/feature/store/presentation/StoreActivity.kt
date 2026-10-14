@@ -142,14 +142,14 @@ class StoreActivity :
                 if (snapshot.stale) {
                     Log.i(
                         TAG,
-                        "Using stale locked catalog display data (version=\${snapshot.catalogVersion}, itemCount=\${snapshot.items.size}).",
+                        "Using stale locked catalog display data (version=${snapshot.catalogVersion}, itemCount=${snapshot.items.size}).",
                     )
                 }
                 runOnUiThread {
                     if (canRenderStoreUi()) renderStore()
                 }
             } catch (error: Exception) {
-                Log.w(TAG, "Remote catalog refresh failed: \${safeErrorSummary(error)}")
+                Log.w(TAG, "Remote catalog refresh failed: ${safeErrorSummary(error)}")
             }
         }
 
