@@ -143,5 +143,15 @@
       "binding": "ENTRONEX_SERVICE",
       "service": "entronex-v4-eval"
     }
-  ]
+  ],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": {
+      "enabled": true,
+      "invocation_logs": false,
+      "head_sampling_rate": 1,
+      "persist": true
+    }
+  }
 }
