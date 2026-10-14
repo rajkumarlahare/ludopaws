@@ -101,6 +101,7 @@ private fun StoreActivity.dicePanel(
         isFocusable = !locked
         contentDescription =
             when {
+                locked && dice.remoteManaged -> "${dice.title}, not available in this app build yet"
                 locked -> "$LOCKED_DICE_TITLE, locked, coming soon"
                 !owned -> "${dice.title}, available to unlock"
                 else -> "${dice.title}, unlocked" + if (selected) ", selected" else ""
