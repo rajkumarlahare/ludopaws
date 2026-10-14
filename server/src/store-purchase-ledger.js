@@ -107,18 +107,22 @@ export class StorePurchaseLedger {
     )) {
       return json(409, { error: "SUBSCRIPTION_ACCOUNT_MISMATCH" });
     }
+    const changed = !existing ||
+      existing.subscriptionState !== body.subscriptionState ||
+      existing.expiryTimeMs !== body.expiryTimeMs ||
+      existing.autoRenewEnabled !== body.autoRenewEnabled;
     const subscription = {
       accountId: body.accountId,
-      ownerAccountId: body.ownerAccountId,
+      ownerAccountId: body.ownerAccountId.toLowerCase(),
       productId: body.productId,
       subscriptionState: body.subscriptionState,
       expiryTimeMs: body.expiryTimeMs,
       autoRenewEnabled: body.autoRenewEnabled,
       purchaseTokenHash: body.purchaseTokenHash,
-      updatedAt: Date.now(),
+      updatedAt: changed ? Date.now() : Number(existing.updatedAt ?? Date.now()),
     };
-    await this.ctx.storage.put("subscription:v1", subscription);
-    return json(200, { created: !existing, subscription });
+    if (changed) await this.ctx.storage.put("subscription:v1", subscription);
+    return json(200, { created: !existing, changed, replay: !changed, subscription });
   }
 
   async #markNotificationSeen(body) {
