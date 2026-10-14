@@ -1,10 +1,6 @@
-import { readFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
-import path from "node:path";
-
-const ownDir = path.dirname(fileURLToPath(import.meta.url));
-const schemaPath = path.resolve(ownDir, "../../docs/STORE_CATALOG_SCHEMA.json");
-const SCHEMA = JSON.parse(await readFile(schemaPath, "utf8"));
+// Keep this validator usable in both Node-based tests and the Cloudflare Worker runtime.
+// The canonical JSON Schema lives in docs/STORE_CATALOG_SCHEMA.json; its ID is mirrored here.
+const SCHEMA_ID = "https://ludopaws.rekixo.com/schemas/store-catalog-item.schema.json";
 
 const VALID_CHANNELS = new Set(["FREE", "REWARDED_ADS", "GEMS", "PLAY_PRODUCT", "LEVEL", "EVENT"]);
 const VALID_CATEGORIES = new Set(["PAW", "DICE", "BOARD", "AVATAR", "BUNDLE"]);
@@ -137,7 +133,7 @@ export function validateCatalogItem(item, { playProducts = [], requirePublished 
     add(isRecord(unlock) && Array.isArray(unlock.channels) && unlock.channels.length > 0, "published items require at least one unlock channel");
   }
 
-  return { valid: errors.length === 0, errors, schemaId: SCHEMA.$id };
+  return { valid: errors.length === 0, errors, schemaId: SCHEMA_ID };
 }
 
 export function validateCatalog(items, options = {}) {
