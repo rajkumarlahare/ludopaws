@@ -78,6 +78,7 @@ class DiceView @JvmOverloads constructor(
 
     private var diceStyleId =
         "dice_classic"
+    private var previewStyleId: String? = null
     private var face = 1
     private var rolling = false
     private var settling = false
@@ -245,12 +246,20 @@ class DiceView @JvmOverloads constructor(
 
     fun reloadStyle() {
         diceStyleId =
-            CosmeticInventoryStore(
-                context,
-            )
-                .selectedId(
-                    CosmeticCategory.DICE,
+            previewStyleId
+                ?: CosmeticInventoryStore(
+                    context,
                 )
+                    .selectedId(
+                        CosmeticCategory.DICE,
+                    )
+        invalidate()
+    }
+
+    /** Applies a store-only preview style without changing equipment or ownership. */
+    fun setPreviewStyle(styleId: String) {
+        previewStyleId = styleId
+        diceStyleId = styleId
         invalidate()
     }
 
@@ -516,28 +525,11 @@ class DiceView @JvmOverloads constructor(
      * The selected cosmetic id is still retained by the inventory/store contract,
      * while the white/light-gray face remains legible against the gameplay HUD.
      */
-    private fun dicePalette():
-        DicePalette {
-        @Suppress("UNUSED_VARIABLE")
-        val selectedStyle =
-            diceStyleId
-
-        return DicePalette(
-            intArrayOf(
-                0xFFF4F4F4.toInt(),
-                0xFFF4F4F4.toInt(),
-                0xFFF4F4F4.toInt(),
-            ),
-            playerTeamColor ?: 0xFF8A8A8A.toInt(),
-            0xFF3A3A3A.toInt(),
+    private fun dicePalette(): DicePalette =
+        DiceStylePalettePolicy.resolve(
+            styleId = diceStyleId,
+            teamColor = playerTeamColor,
         )
-    }
-
-    private data class DicePalette(
-        val faceColors: IntArray,
-        val borderColor: Int,
-        val pipColor: Int,
-    )
 
     private fun dp(
         value: Float,

@@ -325,6 +325,26 @@ test("cosmetic wallet purchase atomically debits gems, owns/selects once, and is
 });
 
 
+test("content-ready cosmetic purchases do not require client-only level progression", async () => {
+  const { account, sql } = makeAccount();
+  const accountId = "0a2c3a83-e0fb-4abc-8ac4-581a6d994fe7";
+  const created = await (await post(account, "/session/create", { accountId, displayName: "Cosmetic Tester" })).json();
+  sql.wallet.get(accountId).balance = 500;
+
+  const response = await post(account, "/wallet/cosmetic/purchase", {
+    accountId,
+    sessionId: created.sessionId,
+    cosmeticId: "dice_colors",
+    clientRequestId: "8a9b7c6d-5e4f-4321-9876-123456789abc",
+  });
+
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.wallet.balance, 300);
+  assert.equal(body.wallet.ownedCosmetics.includes("dice_colors"), true);
+  assert.equal(body.wallet.selectedCosmetics.DICE, "dice_colors");
+});
+
 test("refresh-token retries with the same request ID return the same rotated token", async () => {
   const { account } = makeAccount();
   const accountId = "0a2c3a83-e0fb-4abc-8ac4-581a6d994fe7";

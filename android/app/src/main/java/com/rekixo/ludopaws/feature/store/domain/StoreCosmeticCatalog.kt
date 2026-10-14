@@ -122,10 +122,10 @@ object StoreCosmeticCatalog {
             cosmetic("dice_classic","CLASSIC",CosmeticCategory.DICE,CosmeticUnlockKind.FREE,"⚄",0xFFF7F7F7.toInt(),0xFF1B2838.toInt()),
             cosmetic("dice_pumpkin","PUMPKIN",CosmeticCategory.DICE,CosmeticUnlockKind.FREE,"1",0xFFD9802F.toInt(),0xFF6A351C.toInt()),
             cosmetic("dice_diwali","DIWALI",CosmeticCategory.DICE,CosmeticUnlockKind.REWARDED_ADS,"6",0xFFB21C32.toInt(),0xFFFFC832.toInt(),ads=5),
-            cosmetic("dice_football","FOOTBALL",CosmeticCategory.DICE,CosmeticUnlockKind.REWARDED_ADS,"6",0xFFF5F5F5.toInt(),0xFF222222.toInt(),level=18,ads=10),
+            cosmetic("dice_football","FOOTBALL",CosmeticCategory.DICE,CosmeticUnlockKind.REWARDED_ADS,"6",0xFFF5F5F5.toInt(),0xFF222222.toInt(),ads=10),
             cosmetic("dice_cricket","CRICKET",CosmeticCategory.DICE,CosmeticUnlockKind.REWARDED_ADS,"1",0xFF4F9E5F.toInt(),0xFFE8F4D8.toInt(),ads=20),
-            cosmetic("dice_summers","SUMMERS",CosmeticCategory.DICE,CosmeticUnlockKind.REWARDED_ADS,"3",0xFFFFF1D4.toInt(),0xFFE84432.toInt(),level=12,ads=30),
-            cosmetic("dice_colors","COLORS",CosmeticCategory.DICE,CosmeticUnlockKind.GEMS,"3",0xFFFFD63B.toInt(),0xFFEF3F8A.toInt(),gems=200,level=24),
+            cosmetic("dice_summers","SUMMERS",CosmeticCategory.DICE,CosmeticUnlockKind.REWARDED_ADS,"3",0xFFFFF1D4.toInt(),0xFFE84432.toInt(),ads=30),
+            cosmetic("dice_colors","COLORS",CosmeticCategory.DICE,CosmeticUnlockKind.GEMS,"3",0xFFFFD63B.toInt(),0xFFEF3F8A.toInt(),gems=200),
             cosmetic("dice_heart","HEART",CosmeticCategory.DICE,CosmeticUnlockKind.GEMS,"♥",0xFFF8F8F8.toInt(),0xFFD82E3D.toInt(),gems=250),
         )
 
@@ -139,8 +139,8 @@ object StoreCosmeticCatalog {
             cosmetic("avatar_7","Avatar 7",CosmeticCategory.AVATAR,CosmeticUnlockKind.FREE,"A7",0xFF1E91E8.toInt(),0xFF073F97.toInt()),
             cosmetic("avatar_1","Avatar 1",CosmeticCategory.AVATAR,CosmeticUnlockKind.FREE,"A1",0xFF1E91E8.toInt(),0xFF073F97.toInt()),
             cosmetic("avatar_8","Avatar 8",CosmeticCategory.AVATAR,CosmeticUnlockKind.FREE,"A8",0xFF1E91E8.toInt(),0xFF073F97.toInt()),
-            cosmetic("avatar_2","Avatar 2",CosmeticCategory.AVATAR,CosmeticUnlockKind.GEMS,"A2",0xFF7D3FC1.toInt(),0xFF33206E.toInt(),gems=500,level=30),
-            cosmetic("avatar_10","Avatar 10",CosmeticCategory.AVATAR,CosmeticUnlockKind.GEMS,"A10",0xFFE14F7C.toInt(),0xFF79203D.toInt(),gems=500,level=30),
+            cosmetic("avatar_2","Avatar 2",CosmeticCategory.AVATAR,CosmeticUnlockKind.GEMS,"A2",0xFF7D3FC1.toInt(),0xFF33206E.toInt(),gems=500),
+            cosmetic("avatar_10","Avatar 10",CosmeticCategory.AVATAR,CosmeticUnlockKind.GEMS,"A10",0xFFE14F7C.toInt(),0xFF79203D.toInt(),gems=500),
         )
 
     /**
