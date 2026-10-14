@@ -133,8 +133,7 @@ object StoreCatalogParser {
         }
 
         val builtIn = StoreCosmeticCatalog.findBuiltIn(id)
-        val rendererCompatible = backendCategory != "PAW" &&
-            builtIn != null &&
+        val rendererCompatible = builtIn != null &&
             builtIn.category == category &&
             builtIn.contentAvailable
         val prioritizedChannel = channels.firstOrNull { it in CHANNEL_PRIORITY }
