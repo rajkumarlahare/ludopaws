@@ -248,6 +248,7 @@ class StoreActivity :
                         return@runOnUiThread
                     }
                     billing.updateAccountId(binding)
+                    billing.updateSubscriptionsEnabled(pawsPlusSubscriptionsConfigured)
                     billing.connect()
                 } else if (BuildConfig.LUDOPROOF_BILLING_ENABLED) {
                     val message = availabilityError?.message
