@@ -222,19 +222,19 @@ private fun StoreActivity.pawsPlusCard(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
             ),
         )
-        val price = priceFor(product.productId, "Not configured")
+        val price = liveProducts[product.productId]?.formattedPrice?.takeIf(String::isNotBlank)
         addView(
             Button(this@pawsPlusCard).apply {
                 text = when {
                     pawsPlusActiveForUi -> "MANAGE SUBSCRIPTION"
-                    pawsPlusSubscriptionsConfigured && price != "UNAVAILABLE" ->
+                    pawsPlusSubscriptionsConfigured && price != null ->
                         "SUBSCRIBE · $price / month"
                     else -> "MONTHLY PLAN NOT AVAILABLE"
                 }
                 textSize = 14f
                 setTypeface(Typeface.DEFAULT_BOLD)
                 setTextColor(Color.WHITE)
-                isEnabled = pawsPlusActiveForUi || pawsPlusSubscriptionsConfigured
+                isEnabled = pawsPlusActiveForUi || (pawsPlusSubscriptionsConfigured && price != null)
                 background = GradientDrawable(
                     GradientDrawable.Orientation.TOP_BOTTOM,
                     if (pawsPlusActiveForUi) {
@@ -256,10 +256,14 @@ private fun StoreActivity.pawsPlusCard(
                 dp(46),
             ),
         )
-        if (!pawsPlusSubscriptionsConfigured && !pawsPlusActiveForUi) {
+        if ((!pawsPlusSubscriptionsConfigured || price == null) && !pawsPlusActiveForUi) {
             addView(
                 TextView(this@pawsPlusCard).apply {
-                    text = "Checkout stays disabled until Play Console and server verification are configured."
+                    text = if (!pawsPlusSubscriptionsConfigured) {
+                        "Checkout stays disabled until Play Console and server verification are configured."
+                    } else {
+                        "Google Play has not returned an eligible monthly offer yet. Checkout remains disabled."
+                    }
                     textSize = 10f
                     setTextColor(0xFFEED9B7.toInt())
                     gravity = Gravity.CENTER
