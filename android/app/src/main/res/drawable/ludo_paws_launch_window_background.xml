@@ -7,7 +7,5 @@
     </item>
     <item
         android:drawable="@drawable/ic_ludo_paws"
-        android:width="288dp"
-        android:height="288dp"
         android:gravity="center" />
 </layer-list>
