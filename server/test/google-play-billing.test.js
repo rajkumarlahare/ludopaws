@@ -253,17 +253,16 @@ test("verified purchases are consumed, redeemed once, and recover idempotently",
 });
 
 
-test("current one-time products are finalized through productsv2 action endpoints", async () => {
+test("current one-time product status is checked with productsv2 and finalized with products.consume", async () => {
   const env = await makeEnv();
   const accountId = "8".repeat(64);
   const { calls, fetchImpl } = mockPlayApi({ productId: "gems_300", accountId });
   await verifyAndRedeemGooglePlayPurchase(env, {
     productId: "gems_300", purchaseToken: "modern-action-token", accountId,
   }, fetchImpl);
-  assert.equal(calls.filter(({ url }) => url.includes("/purchases/productsv2/tokens/") && url.endsWith(":consume")).length, 1);
-  assert.equal(calls.filter(({ url }) => url.includes("/purchases/products/gems_300/tokens/") && url.endsWith(":consume")).length, 0);
+  assert.equal(calls.filter(({ url }) => url.includes("/purchases/productsv2/tokens/") && calls.find(c => c.url === url)?.init?.method === "GET").length, 1);
+  assert.equal(calls.filter(({ url, init }) => url.includes("/purchases/products/gems_300/tokens/") && url.endsWith(":consume") && init.method === "POST").length, 1);
 });
-
 test("legacy in-app products fall back only when productsv2 returns 404", async () => {
   const env = await makeEnv();
   const accountId = "e".repeat(64);
