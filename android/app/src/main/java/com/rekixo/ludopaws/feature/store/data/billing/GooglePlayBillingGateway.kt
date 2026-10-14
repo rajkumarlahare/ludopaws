@@ -168,11 +168,12 @@ class GooglePlayBillingGateway(
             return
         }
 
-        val offerToken = details.oneTimePurchaseOfferDetailsList
-            ?.firstOrNull()
-            ?.offerToken
+        val offer =
+            details.oneTimePurchaseOfferDetailsList
+                ?.firstOrNull()
+                ?: details.oneTimePurchaseOfferDetails
 
-        if (offerToken.isNullOrBlank()) {
+        if (offer == null) {
             listener
                 .onBillingUnavailable(
                     "No eligible Google Play offer is available for this product.",
@@ -180,17 +181,20 @@ class GooglePlayBillingGateway(
             return
         }
 
-        val productParams =
+        val productParamsBuilder =
             BillingFlowParams
                 .ProductDetailsParams
                 .newBuilder()
                 .setProductDetails(
                     details,
                 )
-                .setOfferToken(
-                    offerToken,
-                )
-                .build()
+        // Multi-offer products require an offer token; legacy/single-offer
+        // one-time products may not expose one and must still be purchasable.
+        offer.offerToken
+            ?.takeIf(String::isNotBlank)
+            ?.let(productParamsBuilder::setOfferToken)
+        val productParams =
+            productParamsBuilder.build()
 
         val result =
             billingClient
@@ -394,8 +398,11 @@ class GooglePlayBillingGateway(
             productDetails.clear()
             val mapped = linkedMapOf<String, StoreBillingProduct>()
             result.productDetailsList.forEach { details ->
-                val offer = details.oneTimePurchaseOfferDetailsList?.firstOrNull()
-                    ?: return@forEach
+                val offer =
+                    details.oneTimePurchaseOfferDetailsList
+                        ?.firstOrNull()
+                        ?: details.oneTimePurchaseOfferDetails
+                        ?: return@forEach
                 productDetails[details.productId] = details
                 mapped[details.productId] = StoreBillingProduct(
                     productId = details.productId,
