@@ -11,8 +11,13 @@ internal fun StoreActivity.handleCosmeticTap(cosmetic: StoreCosmetic) {
     // CONTENT_UNAVAILABLE is handled before any server request or value-bearing action.
     if (!cosmetic.contentAvailable) {
         showStoreMessage(
-            cosmetic.title +
-                " is reserved for a future complete animal-pack drop. No gems, ad progress, or event entitlement was spent.",
+            if (cosmetic.remoteManaged) {
+                cosmetic.title +
+                    " is listed in the server catalog, but this app build does not yet contain a verified renderer/asset pack for it. No Gems, ad progress, or entitlement was spent."
+            } else {
+                cosmetic.title +
+                    " is reserved for a future complete content drop. No Gems, ad progress, or event entitlement was spent."
+            },
         )
         return
     }
