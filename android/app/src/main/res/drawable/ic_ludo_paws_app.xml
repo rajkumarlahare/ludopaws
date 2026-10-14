@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Zoom only the installed launcher icon; the original logo asset remains unchanged for launch splash. -->
-<inset xmlns:android="http://schemas.android.com/apk/res/android"
-    android:drawable="@drawable/ic_ludo_paws"
-    android:insetLeft="-2dp"
-    android:insetTop="-2dp"
-    android:insetRight="-2dp"
-    android:insetBottom="-2dp" />
