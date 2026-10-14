@@ -50,6 +50,8 @@ class StoreActivity :
         emptyMap()
     private var billingAvailable = false
     private var rewardedAdsEnabledByServer = false
+    private var rewardedAdsStatusLoaded = false
+    private var rewardedAdsStatusError: Exception? = null
     private var billingWasCreated = false
     private var rewardedAdsWasCreated = false
     private val accountRepository by lazy {
@@ -62,6 +64,10 @@ class StoreActivity :
     private val rewardVerificationExecutor =
         Executors.newSingleThreadExecutor { runnable ->
             Thread(runnable, "LudoPawsRewardVerification")
+        }
+    private val rewardedAdRequestExecutor =
+        Executors.newSingleThreadExecutor { runnable ->
+            Thread(runnable, "LudoPawsRewardRequest")
         }
     private val pendingPurchases by lazy {
         PendingStorePurchaseStore(this)
@@ -117,23 +123,46 @@ class StoreActivity :
     override fun onStart() {
         super.onStart()
         billingAvailable = false
+        rewardedAdsStatusLoaded = false
+        rewardedAdsStatusError = null
+
         billingExecutor.execute {
-            var available = false
+            // This endpoint is deliberately public. Fetch feature availability before
+            // creating/refreshing the account session so an account/wallet failure does
+            // not incorrectly disable AdMob for the whole store.
+            var statusResponse: JSONObject? = null
             var adsAvailable = false
+            var adsStatusLoaded = false
+            var adsStatusError: Exception? = null
+            try {
+                statusResponse = accountRepository.storeStatus()
+                adsAvailable = BuildConfig.LUDOPROOF_ADS_ENABLED &&
+                    statusResponse.optBoolean("rewardedAdsAvailable", false)
+                adsStatusLoaded = true
+            } catch (error: Exception) {
+                adsStatusError = error
+                Log.w(TAG, "Rewarded-ad availability request failed: ${safeErrorSummary(error)}", error)
+            }
+
+            runOnUiThread {
+                if (!canRenderStoreUi()) return@runOnUiThread
+                rewardedAdsStatusLoaded = adsStatusLoaded
+                rewardedAdsStatusError = adsStatusError
+                rewardedAdsEnabledByServer = adsAvailable
+                if (adsEnabledForBuild) rewardedAds.prepare()
+                renderStore()
+            }
+
+            var available = false
             var availabilityError: Exception? = null
             var recoveredPurchases = 0
             var recoveryError: Exception? = null
-            var activeAccountId: String? = null
             var activeBillingAccountId: String? = null
             try {
                 val session = accountRepository.ensureGuestSession()
-                activeAccountId = session.accountId
                 activeBillingAccountId = session.billingAccountId
-                val status = accountRepository.storeStatus()
                 available = BuildConfig.LUDOPROOF_BILLING_ENABLED &&
-                    status.optBoolean("billingAvailable", false)
-                adsAvailable = BuildConfig.LUDOPROOF_ADS_ENABLED &&
-                    status.optBoolean("rewardedAdsAvailable", false)
+                    statusResponse?.optBoolean("billingAvailable", false) == true
                 val serverWallet = accountRepository.wallet()
                 wallet.applyServerSnapshot(serverWallet, session.accountId)
                 cosmetics.applyServerSnapshot(serverWallet, session.accountId)
@@ -147,19 +176,19 @@ class StoreActivity :
                             if (applied) recoveredPurchases += 1
                             pendingPurchases.remove(pending.purchaseToken)
                         } catch (error: Exception) {
-                            Log.e(TAG, "Pending Play purchase verification failed", error)
+                            Log.e(TAG, "Pending Play purchase verification failed: ${safeErrorSummary(error)}", error)
                             if (recoveryError == null) recoveryError = error
                         }
                     }
                 }
             } catch (error: Exception) {
                 availabilityError = error
-                Log.w(TAG, "Account/store bootstrap is unavailable", error)
+                Log.w(TAG, "Account/store bootstrap failed: ${safeErrorSummary(error)}", error)
             }
+
             runOnUiThread {
                 if (!canRenderStoreUi()) return@runOnUiThread
                 billingAvailable = available
-                rewardedAdsEnabledByServer = adsAvailable
                 if (BuildConfig.LUDOPROOF_BILLING_ENABLED && billingAvailable) {
                     val binding = activeBillingAccountId
                     if (binding.isNullOrBlank()) {
@@ -173,7 +202,6 @@ class StoreActivity :
                         ?: "Google Play payments are not configured yet."
                     showStoreMessage(message)
                 }
-                if (adsEnabledForBuild) rewardedAds.prepare()
                 renderStore()
                 if (recoveredPurchases > 0) {
                     showStoreMessage(
@@ -197,12 +225,12 @@ class StoreActivity :
             }
         }
     }
-
     override fun onDestroy() {
         if (billingWasCreated) billing.close()
         if (rewardedAdsWasCreated) rewardedAds.close()
         billingExecutor.shutdownNow()
         rewardVerificationExecutor.shutdownNow()
+        rewardedAdRequestExecutor.shutdownNow()
         super.onDestroy()
     }
 
@@ -247,16 +275,24 @@ class StoreActivity :
     internal fun requestRewardedAd(
         cosmeticId: String? = null,
     ) {
-        if (!adsEnabledForBuild) {
-            showStoreMessage("Rewarded ads are temporarily unavailable. Please try again shortly.")
+        if (!BuildConfig.LUDOPROOF_ADS_ENABLED) {
+            showStoreMessage("Rewarded ads are not enabled in this installation.")
             return
         }
-        val session = try {
-            accountRepository.requireSession()
-        } catch (error: Exception) {
-            showStoreMessage(error.message ?: "Connect to the account service before requesting a reward.")
+        if (!rewardedAdsStatusLoaded) {
+            val message = if (rewardedAdsStatusError != null) {
+                "The reward service could not be reached. Check your connection and try again."
+            } else {
+                "Connecting to the reward service. Please try again in a moment."
+            }
+            showStoreMessage(message)
             return
         }
+        if (!rewardedAdsEnabledByServer) {
+            showStoreMessage("Rewarded ads are currently unavailable from the service. Please try again later.")
+            return
+        }
+
         val customData = JSONObject()
             .put("kind", if (cosmeticId == null) "gems" else "cosmetic")
             .apply {
@@ -265,19 +301,43 @@ class StoreActivity :
             .toString()
         val initialBalance = wallet.balance()
         val initialProgress = cosmeticId?.let(cosmetics::rewardedAdProgress) ?: 0
-        rewardedAds.showRewardedAd(
-            userId = session.accountId,
-            customData = customData,
-        ) {
-            refreshWalletAfterRewardedAd(
-                accountId = session.accountId,
-                initialBalance = initialBalance,
-                cosmeticId = cosmeticId,
-                initialProgress = initialProgress,
-            )
+
+        // Session validation can refresh a token over HTTPS. Never call it on the UI
+        // thread; a slow/expired session must not throw NetworkOnMainThreadException.
+        rewardedAdRequestExecutor.execute {
+            try {
+                val session = accountRepository.ensureGuestSession()
+                runOnUiThread {
+                    if (!canRenderStoreUi()) return@runOnUiThread
+                    val latest = accountRepository.currentSession()
+                    if (latest == null || latest.accountId != session.accountId) {
+                        showStoreMessage("The signed-in account changed. Reopen the store and try again.")
+                        return@runOnUiThread
+                    }
+                    rewardedAds.showRewardedAd(
+                        userId = session.accountId,
+                        customData = customData,
+                    ) {
+                        refreshWalletAfterRewardedAd(
+                            accountId = session.accountId,
+                            initialBalance = initialBalance,
+                            cosmeticId = cosmeticId,
+                            initialProgress = initialProgress,
+                        )
+                    }
+                }
+            } catch (error: Exception) {
+                Log.w(TAG, "Rewarded-ad account preparation failed: ${safeErrorSummary(error)}", error)
+                runOnUiThread {
+                    if (!canRenderStoreUi()) return@runOnUiThread
+                    showStoreMessage(
+                        (error as? com.rekixo.ludopaws.feature.account.data.AccountApiException)?.message
+                            ?: "Your account could not be connected to the reward service. Check your connection and try again.",
+                    )
+                }
+            }
         }
     }
-
     internal fun showAdPrivacyOptions() {
         PostWinInterstitialAdController.showPrivacyOptions(this, ::showStoreMessage)
     }
@@ -556,6 +616,15 @@ class StoreActivity :
     private fun canRenderStoreUi(): Boolean =
         !isFinishing &&
             !isDestroyed
+
+    private fun safeErrorSummary(error: Exception): String {
+        val apiError = error as? com.rekixo.ludopaws.feature.account.data.AccountApiException
+        return if (apiError != null) {
+            "type=${error.javaClass.simpleName} status=${apiError.status} code=${apiError.code}"
+        } else {
+            "type=${error.javaClass.simpleName}"
+        }
+    }
 
     internal fun renderStore() {
         if (
