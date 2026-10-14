@@ -248,6 +248,7 @@ class StoreActivity :
                     billing.connect()
                 } else if (pendingAutoPurchaseProductId != null) {
                     val productId = pendingAutoPurchaseProductId
+                        ?: return@runOnUiThread
                     pendingAutoPurchaseProductId = null
                     requestPurchase(productId)
                 } else if (
