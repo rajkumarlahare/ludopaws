@@ -55,6 +55,7 @@ class StoreActivity :
     private var billingAvailable = false
     private var subscriptionsAvailableByServer = false
     internal var pawsPlusActiveForUi = false
+    internal var pawsPlusAutoRenewEnabledForUi = false
     internal val pawsPlusSubscriptionsConfigured: Boolean
         get() = BuildConfig.LUDOPROOF_SUBSCRIPTIONS_ENABLED && subscriptionsAvailableByServer
     private var rewardedAdsEnabledByServer = false
@@ -201,6 +202,7 @@ class StoreActivity :
             var recoveryError: Exception? = null
             var activeBillingAccountId: String? = null
             var serverPawsPlusActive = false
+            var serverPawsPlusAutoRenewEnabled = false
             try {
                 val session = accountRepository.ensureGuestSession()
                 activeBillingAccountId = session.billingAccountId
@@ -210,6 +212,8 @@ class StoreActivity :
                 wallet.applyServerSnapshot(serverWallet, session.accountId)
                 cosmetics.applyServerSnapshot(serverWallet, session.accountId)
                 serverPawsPlusActive = serverWallet.optBoolean("pawsPlusActive", false)
+                serverPawsPlusAutoRenewEnabled = serverWallet.optJSONObject("pawsPlusSubscription")
+                    ?.optBoolean("autoRenewEnabled", false) == true
 
                 // A purchase that belongs to another account is intentionally left pending.
                 // It can only be recovered after that same Google-linked account is restored.
@@ -236,6 +240,7 @@ class StoreActivity :
                 if (!canRenderStoreUi()) return@runOnUiThread
                 billingAvailable = available
                 pawsPlusActiveForUi = serverPawsPlusActive
+                pawsPlusAutoRenewEnabledForUi = serverPawsPlusAutoRenewEnabled
                 if (BuildConfig.LUDOPROOF_BILLING_ENABLED && billingAvailable) {
                     val binding = activeBillingAccountId
                     if (binding.isNullOrBlank()) {
