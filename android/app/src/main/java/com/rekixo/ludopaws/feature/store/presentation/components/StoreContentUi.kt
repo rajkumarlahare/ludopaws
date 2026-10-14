@@ -279,7 +279,7 @@ private fun StoreActivity.featuredRemoveAdsCard(
         )
         titleCopy.addView(
             TextView(this@featuredRemoveAdsCard).apply {
-                text = "ONE-TIME BONUS"
+                text = "ONE-TIME PURCHASE"
                 textSize = 8f
                 setTypeface(Typeface.DEFAULT_BOLD)
                 setTextColor(0xFFEED9B7.toInt())
