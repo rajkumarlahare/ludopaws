@@ -292,6 +292,9 @@ async function runPublisherAction(
   fetchImpl,
 ) {
   const accessToken = await googleAccessToken(env, fetchImpl);
+  // Google documents consume/acknowledge under purchases.products. The productsv2
+  // resource is used to read purchase state, then the action is performed with the
+  // product ID through the documented products action resource.
   const url =
     PUBLISHER_URL +
     "/applications/" +
