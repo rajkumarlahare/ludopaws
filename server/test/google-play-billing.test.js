@@ -520,6 +520,63 @@ test("store status and verification routes stay closed until server billing is e
 });
 
 
+test("subscription ledger is owner-bound, renewal-aware, duplicate-safe, and deletable", async () => {
+  const ledger = new StorePurchaseLedger({ storage: new FakeStorage() });
+  const billingAccountId = "a".repeat(64);
+  const otherBillingAccountId = "b".repeat(64);
+  const ownerAccountId = "123e4567-e89b-42d3-a456-426614174000";
+  const purchaseTokenHash = "c".repeat(64);
+  const base = {
+    accountId: billingAccountId,
+    ownerAccountId,
+    productId: "paws_plus",
+    subscriptionState: "SUBSCRIPTION_STATE_ACTIVE",
+    expiryTimeMs: Date.now() + 60_000,
+    autoRenewEnabled: true,
+    purchaseTokenHash,
+  };
+  const post = (path, body) => ledger.fetch(new Request("https://ledger" + path, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  }));
+  const first = await (await post("/subscription/sync", base)).json();
+  assert.equal(first.created, true);
+  assert.equal(first.changed, true);
+  assert.equal(first.replay, false);
+
+  const wrongOwner = await post("/subscription/sync", {
+    ...base,
+    accountId: otherBillingAccountId,
+  });
+  assert.equal(wrongOwner.status, 409);
+
+  const replay = await (await post("/subscription/sync", base)).json();
+  assert.equal(replay.created, false);
+  assert.equal(replay.changed, false);
+  assert.equal(replay.replay, true);
+
+  const renewedExpiry = base.expiryTimeMs + 30 * 24 * 60 * 60 * 1000;
+  const renewal = await (await post("/subscription/sync", {
+    ...base,
+    expiryTimeMs: renewedExpiry,
+  })).json();
+  assert.equal(renewal.changed, true);
+  assert.equal(renewal.replay, false);
+
+  const mark = () => post("/subscription/notification/seen", { messageId: "pubsub-message-1" });
+  assert.equal((await (await mark()).json()).duplicate, false);
+  assert.equal((await (await mark()).json()).duplicate, true);
+
+  const deniedDelete = await post("/delete", { accountId: otherBillingAccountId });
+  assert.equal(deniedDelete.status, 409);
+  const deletion = await post("/delete", { accountId: billingAccountId });
+  assert.equal((await deletion.json()).deleted, true);
+  const stored = await (await ledger.fetch(new Request("https://ledger/subscription/status"))).json();
+  assert.equal(stored.subscription, null);
+  assert.deepEqual(stored.notificationIds, []);
+});
+
 test("Paws Plus subscription configuration fails closed unless Billing and RTDN identity are configured", async () => {
   const env = await makeEnv();
   assert.equal(googlePlaySubscriptionsEnabled(env), false);
