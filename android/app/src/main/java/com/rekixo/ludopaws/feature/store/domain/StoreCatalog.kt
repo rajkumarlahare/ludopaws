@@ -4,6 +4,8 @@ import com.rekixo.ludopaws.feature.store.domain.model.StoreProduct
 import com.rekixo.ludopaws.feature.store.domain.model.StoreProductKind
 
 object StoreCatalog {
+    private const val PRICE_UNAVAILABLE = "Price unavailable"
+
     const val REMOVE_ADS =
         "remove_ads"
     const val GEMS_300 =
@@ -31,7 +33,7 @@ object StoreCatalog {
                 kind =
                     StoreProductKind.NON_CONSUMABLE_REMOVE_ADS,
                 fallbackPrice =
-                    "Price unavailable",
+                    PRICE_UNAVAILABLE,
                 featured =
                     true,
             ),
@@ -45,7 +47,7 @@ object StoreCatalog {
                 kind =
                     StoreProductKind.CONSUMABLE_GEMS,
                 fallbackPrice =
-                    "₹29.00",
+                    PRICE_UNAVAILABLE,
             ),
             StoreProduct(
                 productId =
@@ -57,7 +59,7 @@ object StoreCatalog {
                 kind =
                     StoreProductKind.CONSUMABLE_GEMS,
                 fallbackPrice =
-                    "₹79.00",
+                    PRICE_UNAVAILABLE,
             ),
             StoreProduct(
                 productId =
@@ -69,7 +71,7 @@ object StoreCatalog {
                 kind =
                     StoreProductKind.CONSUMABLE_GEMS,
                 fallbackPrice =
-                    "₹179.00",
+                    PRICE_UNAVAILABLE,
             ),
             StoreProduct(
                 productId =
@@ -81,7 +83,7 @@ object StoreCatalog {
                 kind =
                     StoreProductKind.CONSUMABLE_GEMS,
                 fallbackPrice =
-                    "₹399.00",
+                    PRICE_UNAVAILABLE,
             ),
             StoreProduct(
                 productId =
@@ -93,7 +95,7 @@ object StoreCatalog {
                 kind =
                     StoreProductKind.CONSUMABLE_GEMS,
                 fallbackPrice =
-                    "₹799.00",
+                    PRICE_UNAVAILABLE,
             ),
             StoreProduct(
                 productId =
@@ -105,7 +107,7 @@ object StoreCatalog {
                 kind =
                     StoreProductKind.CONSUMABLE_GEMS,
                 fallbackPrice =
-                    "₹1,499.00",
+                    PRICE_UNAVAILABLE,
             ),
         )
 
