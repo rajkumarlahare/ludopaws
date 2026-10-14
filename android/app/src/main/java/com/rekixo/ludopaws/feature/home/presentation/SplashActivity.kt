@@ -165,7 +165,12 @@ class SplashActivity : Activity() {
     }
 
     override fun onDestroy() {
-        progressAnimator?.cancel()
+        progressAnimator?.apply {
+            // Cancelling during Activity teardown must not trigger a late Home launch.
+            removeAllUpdateListeners()
+            removeAllListeners()
+            cancel()
+        }
         progressAnimator = null
         super.onDestroy()
     }
