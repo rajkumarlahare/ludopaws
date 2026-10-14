@@ -114,13 +114,16 @@ object UiClickSoundInstaller {
                     val fileName = path.substringAfterLast('/')
                     val extension = fileName.substringAfterLast('.', "")
                     val stem = fileName.substringBeforeLast('.')
-                    val duplicatePattern = Regex(
-                        "^${Regex.escape(stem)} \\\\(\\\\d+\\\\)\\\\.${Regex.escape(extension)}$",
-                        RegexOption.IGNORE_CASE,
-                    )
                     assets.list(directory)
                         .orEmpty()
-                        .firstOrNull(duplicatePattern::matches)
+                        .firstOrNull { candidate ->
+                            candidate.startsWith("$stem (") &&
+                                candidate.endsWith(").$extension", ignoreCase = true) &&
+                                candidate
+                                    .removePrefix("$stem (")
+                                    .removeSuffix(").$extension")
+                                    .toIntOrNull() != null
+                        }
                         ?.let { "$directory/$it" }
                 }
             }
