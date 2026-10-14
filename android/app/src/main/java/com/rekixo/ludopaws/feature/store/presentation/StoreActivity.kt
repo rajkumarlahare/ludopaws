@@ -68,11 +68,7 @@ class StoreActivity :
     internal val adsEnabledForBuild: Boolean
         get() =
             BuildConfig.LUDOPROOF_ADS_ENABLED &&
-                rewardedAdsEnabledByServer &&
-                (
-                    !BuildConfig.LUDOPROOF_ADS_USE_TEST_IDS ||
-                        BuildConfig.DEBUG
-                    )
+                rewardedAdsEnabledByServer
     private val rewardedAds by lazy {
         rewardedAdsWasCreated = true
         RewardedAdsController(
@@ -255,10 +251,6 @@ class StoreActivity :
         } catch (error: Exception) {
             showStoreMessage(error.message ?: "Connect to the account service before requesting a reward.")
             return
-        }
-        if (BuildConfig.DEBUG && cosmeticId == null) {
-            Log.i("LudoPawsSSVTest", "AdMob SSV User ID for this debug account: ${session.accountId}")
-            Log.i("LudoPawsSSVTest", "AdMob SSV Custom data for Gems: {\"kind\":\"gems\"}")
         }
         val customData = JSONObject()
             .put("kind", if (cosmeticId == null) "gems" else "cosmetic")
@@ -443,7 +435,7 @@ class StoreActivity :
         billingExecutor.execute {
             var latest: JSONObject? = null
             var changed = false
-            for (attempt in 0 until 5) {
+            for (attempt in 0 until 30) {
                 try {
                     val session = accountRepository.requireSession()
                     if (session.accountId != accountId) break
@@ -461,7 +453,7 @@ class StoreActivity :
                 } catch (error: Exception) {
                     Log.w(TAG, "Waiting for server-verified ad reward", error)
                 }
-                if (attempt < 4) Thread.sleep(1500)
+                if (attempt < 29) Thread.sleep(2000)
             }
             val snapshot = latest
             runOnUiThread {
@@ -479,7 +471,7 @@ class StoreActivity :
                         if (cosmeticId == null) "Your +5 rewarded-ad gems were verified by the server."
                         else "Your +5 gems and rewarded-ad progress for this item were verified by the server."
                     } else {
-                        "The ad finished, but the server reward has not arrived yet. No local reward was granted; the store will update when verification completes."
+                        "Reward verification is still pending. No local Gems were granted; reopen the store shortly to refresh the server wallet."
                     },
                 )
             }
