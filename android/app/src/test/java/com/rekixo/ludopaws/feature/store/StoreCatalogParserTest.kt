@@ -128,6 +128,37 @@ class StoreCatalogParserTest {
     }
 
     @Test
+    fun categoryMismatchDoesNotLeaveTheLegacyOfferVisibleInItsOldTab() {
+        val snapshot = StoreCatalogParser.parse(
+            catalogResponse(
+                items = arrayOf(
+                    catalogItem(
+                        id = "dice_heart",
+                        category = "PAW",
+                        name = "Misclassified Paw",
+                        channels = arrayOf("GEMS"),
+                        gemPrice = 100,
+                    ),
+                ),
+            ),
+        )
+        try {
+            com.rekixo.ludopaws.feature.store.domain.StoreCosmeticCatalog
+                .replaceRemoteCatalog(snapshot.items, snapshot.suppressedIds)
+            assertFalse(
+                com.rekixo.ludopaws.feature.store.domain.StoreCosmeticCatalog.dice
+                    .any { it.id == "dice_heart" },
+            )
+            val remote = com.rekixo.ludopaws.feature.store.domain.StoreCosmeticCatalog.characterPacks
+                .firstOrNull { it.id == "dice_heart" }
+            assertNotNull(remote)
+            assertFalse(requireNotNull(remote).contentAvailable)
+        } finally {
+            com.rekixo.ludopaws.feature.store.domain.StoreCosmeticCatalog.clearRemoteCatalog()
+        }
+    }
+
+    @Test
     fun rejectsPublishedResponsesWithInvalidOrDuplicateItemIds() {
         val invalid = catalogItem(id = "INVALID", category = "DICE", name = "BAD", channels = arrayOf("FREE"))
         org.junit.Assert.assertThrows(IllegalArgumentException::class.java) {
