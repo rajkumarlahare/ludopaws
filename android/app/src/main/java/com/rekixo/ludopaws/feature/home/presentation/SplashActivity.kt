@@ -15,7 +15,6 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
-import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 
 /**
  * Branded launch screen reusing the exact shared background and Home hero art.
@@ -26,9 +25,6 @@ class SplashActivity : Activity() {
     private var homeLaunchStarted = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Apply the system splash theme before Activity creation so the OS icon
-        // is suppressed and the branded WebP layout can draw as the first frame.
-        installSplashScreen()
         super.onCreate(savedInstanceState)
         LudoProofTheme.configureWindow(this)
 
