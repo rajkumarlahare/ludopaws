@@ -312,10 +312,14 @@ object StoreCosmeticCatalog {
         val hiddenIds = suppressedLegacyIds
         val remote = remoteItemsById
         val visibleBuiltIns = builtIns
-            .filterNot { it.id in hiddenIds }
+            .filterNot { builtIn ->
+                val serverItem = remote[builtIn.id]
+                builtIn.id in hiddenIds ||
+                    (serverItem != null && serverItem.category != builtIn.category)
+            }
             .map { builtIn ->
                 val serverItem = remote[builtIn.id]
-                if (serverItem == null || serverItem.category != builtIn.category) {
+                if (serverItem == null) {
                     builtIn
                 } else {
                     serverItem.copy(
