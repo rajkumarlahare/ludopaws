@@ -111,6 +111,7 @@ private fun StoreActivity.boardPanel(
         isFocusable = !locked
         contentDescription =
             when {
+                locked && board.remoteManaged -> "${board.title}, not available in this app build yet"
                 locked -> "$LOCKED_BOARD_TITLE, locked, coming soon"
                 !owned -> "${board.title}, available to unlock"
                 else -> "${board.title}, unlocked" + if (selected) ", selected" else ""
