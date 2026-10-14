@@ -168,15 +168,26 @@ class GooglePlayBillingGateway(
             return
         }
 
-        val offer =
+        val listedOffer =
             details.oneTimePurchaseOfferDetailsList
                 ?.firstOrNull()
+        val offer =
+            listedOffer
                 ?: details.oneTimePurchaseOfferDetails
 
         if (offer == null) {
             listener
                 .onBillingUnavailable(
                     "No eligible Google Play offer is available for this product.",
+                )
+            return
+        }
+        // Offer-token based one-time products must supply the token for the
+        // selected offer. Legacy single-offer products may have no token.
+        if (listedOffer != null && listedOffer.offerToken.isNullOrBlank()) {
+            listener
+                .onBillingUnavailable(
+                    "Google Play returned an incomplete offer for this product.",
                 )
             return
         }
@@ -188,8 +199,6 @@ class GooglePlayBillingGateway(
                 .setProductDetails(
                     details,
                 )
-        // Multi-offer products require an offer token; legacy/single-offer
-        // one-time products may not expose one and must still be purchasable.
         offer.offerToken
             ?.takeIf(String::isNotBlank)
             ?.let(productParamsBuilder::setOfferToken)
