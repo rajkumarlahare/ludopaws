@@ -96,7 +96,7 @@ class StoreCatalogParserTest {
                 .dice.firstOrNull { it.id == "dice_safari_01" }
             assertNotNull(dynamicItem)
             assertFalse(requireNotNull(dynamicItem).contentAvailable)
-            assertEquals(null, com.rekixo.ludopaws.feature.store.domain.StoreCosmeticCatalog.find("dice_pumpkin"))
+            assertFalse(com.rekixo.ludopaws.feature.store.domain.StoreCosmeticCatalog.find("dice_pumpkin") != null)
             assertNotNull(com.rekixo.ludopaws.feature.store.domain.StoreCosmeticCatalog.find("dice_classic"))
         } finally {
             com.rekixo.ludopaws.feature.store.domain.StoreCosmeticCatalog.clearRemoteCatalog()
@@ -139,8 +139,8 @@ class StoreCatalogParserTest {
         .put("ok", true)
         .put("catalogVersion", version)
         .put("updatedAt", "2026-10-14T12:00:00.000Z")
-        .put("items", JSONArray().apply { items.forEach(::put) })
-        .put("suppressedIds", JSONArray().apply { suppressedIds.forEach(::put) })
+        .put("items", JSONArray().apply { items.forEach { item -> put(item) } })
+        .put("suppressedIds", JSONArray().apply { suppressedIds.forEach { id -> put(id) } })
 
     private fun catalogItem(
         id: String,
@@ -168,7 +168,7 @@ class StoreCatalogParserTest {
         .put(
             "unlock",
             JSONObject()
-                .put("channels", JSONArray().apply { channels.forEach(::put) })
+                .put("channels", JSONArray().apply { channels.forEach { channel -> put(channel) } })
                 .apply {
                     if ("GEMS" in channels) {
                         put("gems", JSONObject().put("enabled", true).put("price", gemPrice))
