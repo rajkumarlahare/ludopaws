@@ -293,6 +293,89 @@ export class PlayerAccount {
     return json(200, { ok: true, ...result, productId, gemAmount: product.gemAmount, removeAds: product.removeAds, wallet: this.#walletSnapshot(accountId) });
   }
 
+  async #resolveCosmetic(cosmeticId, country = "ZZ") {
+    const namespace = this.env?.LUDOPROOF_STORE_CATALOG;
+    if (namespace) {
+      let state;
+      try {
+        const target = namespace.get(namespace.idFromName("GLOBAL:V1"));
+        const response = await target.fetch(new Request("https://store-catalog/catalog/current", {
+          method: "GET",
+        }));
+        if (!response.ok) throw new Error("catalog read failed");
+        state = await response.json();
+      } catch {
+        throw httpError(503, "STORE_CATALOG_UNAVAILABLE", "store catalog could not be verified");
+      }
+      if (!Array.isArray(state?.items) || !Number.isSafeInteger(state?.catalogVersion)) {
+        throw httpError(503, "STORE_CATALOG_INVALID", "store catalog returned an invalid response");
+      }
+      const item = state.items.find((entry) => entry?.id === cosmeticId);
+      if (item) {
+        const channels = Array.isArray(item.unlock?.channels) ? [...item.unlock.channels] : [];
+        const availability = item.availability;
+        const now = Date.now();
+        let available = item.status === "PUBLISHED" && item.contentReady === true &&
+          availability !== null && typeof availability === "object";
+        if (available && availability.startsAt != null) {
+          const startsAt = Date.parse(availability.startsAt);
+          available = Number.isFinite(startsAt) && startsAt <= now;
+        }
+        if (available && availability.endsAt != null) {
+          const endsAt = Date.parse(availability.endsAt);
+          available = Number.isFinite(endsAt) && endsAt > now;
+        }
+        const resolvedCountry = /^[A-Z]{2}$/.test(String(country)) ? String(country) : "ZZ";
+        if (available && Array.isArray(availability.blockedCountries) &&
+            availability.blockedCountries.includes(resolvedCountry)) {
+          available = false;
+        }
+        if (available && availability.worldwide !== true) {
+          available = Array.isArray(availability.allowedCountries) &&
+            availability.allowedCountries.includes(resolvedCountry);
+        }
+        return {
+          id: item.id,
+          category: item.category,
+          catalogManaged: true,
+          catalogVersion: item.catalogVersion,
+          available,
+          channels,
+          kind: channels.length === 1 ? channels[0] : null,
+          gemPrice: Number.isSafeInteger(item.unlock?.gems?.price) ? item.unlock.gems.price : null,
+          ads: Number.isSafeInteger(item.unlock?.rewardedAds?.requiredCompletedAds)
+            ? item.unlock.rewardedAds.requiredCompletedAds : 0,
+          level: Number.isSafeInteger(item.unlock?.level?.minimumLevel) ? item.unlock.level.minimumLevel : 0,
+        };
+      }
+    }
+
+    // The catalog is introduced alongside the legacy PlayerAccount catalog.
+    // Preserve already-shipped IDs when no matching dynamic entry exists, but
+    // never fall back to a legacy ID after a matching archived dynamic record.
+    const legacy = COSMETICS[cosmeticId];
+    if (!legacy) return null;
+    const channel = ({
+      FREE: "FREE",
+      GEMS: "GEMS",
+      REWARDED_ADS: "REWARDED_ADS",
+      LEVEL: "LEVEL",
+      EVENT: "EVENT",
+    })[legacy.kind];
+    return {
+      ...legacy,
+      id: cosmeticId,
+      catalogManaged: false,
+      channels: channel ? [channel] : [],
+    };
+  }
+
+  #requireSupportedCosmeticCategory(cosmetic) {
+    if (cosmetic.catalogManaged && !["PAW", "DICE", "BOARD", "AVATAR"].includes(cosmetic.category)) {
+      throw httpError(409, "CATALOG_CATEGORY_NOT_READY", "this catalog category does not have an ownership/equip implementation yet");
+    }
+  }
+
   async #grantAdReward(request) {
     const body = await readJson(request), accountId = requireAccountId(body?.accountId);
     this.#profileSnapshot(accountId);
@@ -307,8 +390,12 @@ export class PlayerAccount {
       return json(200, { ok: true, ...result, wallet: this.#walletSnapshot(accountId) });
     }
     if (kind === "cosmetic") {
-      const cosmetic = COSMETICS[cosmeticId];
-      if (!cosmetic || cosmetic.kind !== "REWARDED_ADS" || !cosmetic.available || cosmetic.ads < 1) throw httpError(400, "COSMETIC_REWARD_INVALID", "cosmetic does not support rewarded ads");
+      const cosmetic = await this.#resolveCosmetic(cosmeticId, body?.catalogCountry);
+      if (!cosmetic || !cosmetic.available ||
+          !cosmetic.channels.includes("REWARDED_ADS") || cosmetic.ads < 1) {
+        throw httpError(400, "COSMETIC_REWARD_INVALID", "cosmetic does not currently support rewarded ads");
+      }
+      this.#requireSupportedCosmeticCategory(cosmetic);
       if (cosmetic.level > 0) throw httpError(409, "PROFILE_PROGRESSION_NOT_SERVER_AUTHORITATIVE", "this cosmetic requires server-verified progression before it can be unlocked");
       let replay = false;
       this.ctx.storage.transactionSync(() => {
@@ -342,10 +429,29 @@ export class PlayerAccount {
     const body = await readJson(request), accountId = requireAccountId(body?.accountId), sessionId = requireSessionId(body?.sessionId);
     this.#requireActiveSession(accountId, sessionId);
     const cosmeticId = String(body?.cosmeticId ?? ""), requestId = requireClientRequestId(body?.clientRequestId);
-    const cosmetic = COSMETICS[cosmeticId];
-    if (!cosmetic || !cosmetic.available) throw httpError(400, "COSMETIC_UNAVAILABLE", "this cosmetic is not available for purchase");
-    if (cosmetic.level > 0) throw httpError(409, "PROFILE_PROGRESSION_NOT_SERVER_AUTHORITATIVE", "this cosmetic requires server-verified progression before it can be unlocked");
-    if (cosmetic.kind === "FREE") {
+    const cosmetic = await this.#resolveCosmetic(cosmeticId, body?.catalogCountry);
+    if (!cosmetic || !cosmetic.available) throw httpError(400, "COSMETIC_UNAVAILABLE", "this cosmetic is not currently available for purchase");
+    this.#requireSupportedCosmeticCategory(cosmetic);
+    let purchaseKind = cosmetic.kind;
+    if (cosmetic.catalogManaged) {
+      const requestedChannel = typeof body?.unlockChannel === "string"
+        ? body.unlockChannel
+        : cosmetic.channels.length === 1 ? cosmetic.channels[0] : null;
+      if (!requestedChannel) {
+        throw httpError(400, "COSMETIC_UNLOCK_CHANNEL_REQUIRED", "choose one of the item's enabled unlock channels");
+      }
+      if (!cosmetic.channels.includes(requestedChannel)) {
+        throw httpError(409, "COSMETIC_UNLOCK_CHANNEL_UNAVAILABLE", "the requested unlock channel is not enabled for this item");
+      }
+      purchaseKind = requestedChannel;
+    }
+    if (["LEVEL", "EVENT"].includes(purchaseKind) || (!cosmetic.catalogManaged && cosmetic.level > 0)) {
+      throw httpError(409, "PROFILE_PROGRESSION_NOT_SERVER_AUTHORITATIVE", "this cosmetic requires server-verified progression or event eligibility");
+    }
+    if (purchaseKind === "PLAY_PRODUCT") {
+      throw httpError(409, "CATALOG_PLAY_PURCHASE_NOT_READY", "direct cosmetic checkout is not yet connected to item-specific Google Play entitlement verification");
+    }
+    if (purchaseKind === "FREE") {
       let alreadyOwned = false;
       this.ctx.storage.transactionSync(() => {
         this.#requireAccountNotDeleting(accountId);
@@ -356,7 +462,7 @@ export class PlayerAccount {
       });
       return json(200, { ok: true, alreadyOwned, wallet: this.#walletSnapshot(accountId) });
     }
-    if (cosmetic.kind === "GEMS") {
+    if (purchaseKind === "GEMS") {
       if (!Number.isSafeInteger(cosmetic.gemPrice) || cosmetic.gemPrice < 1) throw httpError(400, "COSMETIC_PRICE_INVALID", "cosmetic price is invalid");
       const idem = "cosmetic-purchase:" + requestId;
       const payloadHash = await sha256Hex(JSON.stringify({ cosmeticId, gemPrice: cosmetic.gemPrice }));
@@ -386,7 +492,7 @@ export class PlayerAccount {
       });
       return json(200, { ok: true, ...result, cosmeticId, wallet: this.#walletSnapshot(accountId) });
     }
-    if (cosmetic.kind === "REWARDED_ADS") {
+    if (purchaseKind === "REWARDED_ADS") {
       const progress = Number([...this.ctx.storage.sql.exec("SELECT progress FROM cosmetic_ad_progress WHERE cosmetic_id = ? LIMIT 1", cosmeticId)][0]?.progress ?? 0);
       if (progress < cosmetic.ads) throw httpError(409, "NEED_REWARDED_ADS", "this cosmetic needs more verified rewarded ads");
       let alreadyOwned = false;
@@ -405,8 +511,10 @@ export class PlayerAccount {
   async #selectCosmetic(request) {
     const body = await readJson(request), accountId = requireAccountId(body?.accountId), sessionId = requireSessionId(body?.sessionId);
     this.#requireActiveSession(accountId, sessionId);
-    const cosmeticId = String(body?.cosmeticId ?? ""), cosmetic = COSMETICS[cosmeticId];
-    if (!cosmetic || !cosmetic.available) throw httpError(400, "COSMETIC_UNAVAILABLE", "this cosmetic is not available");
+    const cosmeticId = String(body?.cosmeticId ?? "");
+    const cosmetic = await this.#resolveCosmetic(cosmeticId, body?.catalogCountry);
+    if (!cosmetic || !cosmetic.available) throw httpError(400, "COSMETIC_UNAVAILABLE", "this cosmetic is not currently available");
+    this.#requireSupportedCosmeticCategory(cosmetic);
     if ([...this.ctx.storage.sql.exec("SELECT cosmetic_id FROM owned_cosmetics WHERE cosmetic_id = ? LIMIT 1", cosmeticId)].length !== 1) throw httpError(403, "COSMETIC_NOT_OWNED", "this cosmetic is not owned by this account");
     this.ctx.storage.sql.exec("INSERT INTO selected_cosmetics (category, cosmetic_id, updated_at) VALUES (?, ?, ?) ON CONFLICT(category) DO UPDATE SET cosmetic_id = excluded.cosmetic_id, updated_at = excluded.updated_at", cosmetic.category, cosmeticId, Date.now());
     return json(200, { ok: true, cosmeticId, wallet: this.#walletSnapshot(accountId) });
