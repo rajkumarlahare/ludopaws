@@ -384,7 +384,7 @@ export async function issueLeaderboardProfileAssertion(
     profileId,
     clientRequestId,
     expiresAt,
-    playerType = "HUMAN",
+    playerType,
   },
 ) {
   const claims =
@@ -703,7 +703,10 @@ function normalizeLeaderboardAssertionClaims(value) {
     rawProfileId == null ? null : String(rawProfileId).trim().toLowerCase();
   const clientRequestId = requireClientRequestId(value?.clientRequestId);
   const expiresAt = Number(value?.expiresAt);
-  const playerType = String(value?.playerType ?? "HUMAN").trim().toUpperCase();
+  const hasPlayerType = value?.playerType != null;
+  const playerType = hasPlayerType
+    ? String(value.playerType).trim().toUpperCase()
+    : "HUMAN";
 
   if (
     !/^LP[A-Z2-9]{8}$/.test(matchId) ||
@@ -726,7 +729,7 @@ function normalizeLeaderboardAssertionClaims(value) {
     profileId,
     clientRequestId,
     expiresAt,
-    playerType,
+    ...(hasPlayerType ? { playerType } : {}),
   };
 }
 function normalizeFriendJoinClaims(
