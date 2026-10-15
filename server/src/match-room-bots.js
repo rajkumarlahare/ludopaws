@@ -272,6 +272,7 @@ export class MatchRoom extends LifecycleMatchRoom {
         body: JSON.stringify(body),
       }),
     );
+    await this.#scheduleRecoveryAlarm();
     let payload;
     try {
       payload = await response.json();
