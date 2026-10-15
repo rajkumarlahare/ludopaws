@@ -327,11 +327,11 @@ internal fun MainActivity.moveToken(
                 return
             }
 
-    onlineMoveRequestInFlight = true
     withSession {
             code,
             token,
         ->
+        onlineMoveRequestInFlight = true
         runNetwork(
             action = {
                 api.move(
