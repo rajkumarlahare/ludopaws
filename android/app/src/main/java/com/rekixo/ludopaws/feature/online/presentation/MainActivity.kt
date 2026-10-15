@@ -207,6 +207,7 @@ class MainActivity : ComponentActivity() {
     internal fun releaseOnlineGameplayRequest() {
         onlineRollRequestInFlight = false
         onlineMoveRequestInFlight = false
+        if (!canRenderUi()) return
         currentState?.let { state ->
             updateControls(state)
             updateRollButton()
