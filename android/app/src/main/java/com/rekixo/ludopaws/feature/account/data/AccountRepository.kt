@@ -186,6 +186,18 @@ class AccountRepository(context: Context) {
         )
     }
 
+    fun verifyPlaySubscription(productId: String, purchaseToken: String): JSONObject {
+        val session = requireSession()
+        return request(
+            "POST",
+            "/api/store/subscriptions/verify",
+            JSONObject()
+                .put("productId", productId)
+                .put("purchaseToken", purchaseToken),
+            session.accessToken,
+        )
+    }
+
     fun purchaseCosmetic(cosmeticId: String, unlockChannel: String? = null): JSONObject {
         val session = requireSession()
         val body = JSONObject()
