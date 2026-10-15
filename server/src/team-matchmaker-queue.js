@@ -79,7 +79,6 @@ export class TeamMatchmakerQueue {
               count: TARGET_PLAYER_COUNT - realPlayers.length,
               playerCount: TARGET_PLAYER_COUNT,
               matchMode: "TEAM_UP",
-              seedRequestId: realPlayers[0].clientRequestId,
               existingNames: realPlayers.map((candidate) => candidate.displayName),
               now,
             });
