@@ -89,7 +89,7 @@ function makeEnv() {
       return {
         async fetch(request) {
           const authorization = request.headers.get("authorization") ?? "";
-          const match = authorization.match(/^Bearer\\s+(lpp_[A-Za-z0-9_-]{32,})$/);
+          const match = authorization.match(/^Bearer\s+(lpp_[A-Za-z0-9_-]{32,})$/);
           if (!match) {
             return Response.json({ ok: false, error: "PROFILE_AUTH_INVALID" }, { status: 401 });
           }
