@@ -77,7 +77,7 @@ Optional LEVEL/EVENT methods require server-authoritative progression/event evid
 
 ### Phase 6 — Remove Ads one-time purchase
 
-- Keep `remove_ads` as a non-consumable Google Play one-time product; do not use recurring billing.
+- Keep `remove_ads` as a non-consumable Google Play one-time product.
 - A successful, server-verified purchase permanently sets the account's `ads_removed` entitlement. Optional rewarded ads remain available for players who choose to watch them for rewards.
 - Set the source price to exactly US$1.00 in the Remove Ads purchase option in Play Console and apply Google's localized conversion to all intended distribution regions. If Play Console rejects that amount for this product, stop and check the supported price setup rather than silently substituting a different price. Review the generated local prices, taxes and regional pricing patterns, and refresh converted prices when appropriate; never calculate foreign prices in the app.
 - Android must show the localized `ProductDetails` price. Do not display a hard-coded INR or USD price as if it were the live checkout price.
