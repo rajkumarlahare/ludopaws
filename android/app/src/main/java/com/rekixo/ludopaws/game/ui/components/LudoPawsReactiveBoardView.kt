@@ -206,6 +206,21 @@ class LudoPawsReactiveBoardView @JvmOverloads constructor(
         )
     }
 
+    fun beginPendingMovePreview(
+        state: MatchSnapshot,
+        playerId: String,
+        tokenIndex: Int,
+    ): Boolean =
+        pawn3DScene.beginPendingMovePreview(
+            state = state,
+            playerId = playerId,
+            tokenIndex = tokenIndex,
+        )
+
+    fun cancelPendingMovePreview(authoritative: MatchSnapshot?) {
+        pawn3DScene.cancelPendingMovePreview(authoritative)
+    }
+
     fun reloadStyle() {
         board.reloadStyle()
     }
