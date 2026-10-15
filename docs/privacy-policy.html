@@ -86,7 +86,7 @@
     (function () {
       var config = window.LUDO_ACCOUNT_CONFIG || {};
       var email = String(config.supportEmail || "AI@rekixo.com").trim();
-      if (!/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(email)) email = "AI@rekixo.com";
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) email = "AI@rekixo.com";
       document.querySelectorAll('a[href^="mailto:AI@rekixo.com"]').forEach(function (link) {
         link.href = "mailto:" + email + "?subject=" + encodeURIComponent("Ludo Paws privacy request");
         link.textContent = email;
