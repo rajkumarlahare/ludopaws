@@ -10,7 +10,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: ludoproof-ci-${{ github.ref }}
+  # Use the PR source branch, not GitHub's synthetic refs/pull/<number>/merge ref,
+  # so successive updates to the same PR correctly supersede its previous validation run.
+  group: ludoproof-ci-${{ github.event.pull_request.head.ref || github.ref }}
   cancel-in-progress: true
 
 jobs:
