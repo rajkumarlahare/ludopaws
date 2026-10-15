@@ -1,5 +1,7 @@
 package com.rekixo.ludopaws
 
+import android.os.SystemClock
+import com.rekixo.ludopaws.feature.settings.data.local.GameSettingsStore
 import com.rekixo.ludopaws.feature.settings.data.local.GameSpeed
 
 internal data class OnlineGameplayPacingTransition(
@@ -91,4 +93,35 @@ internal object OnlineGameplayPacingPolicy {
             delayMillis = delay.coerceAtLeast(0L),
         )
     }
+}
+
+
+internal fun MainActivity.applyOnlineGameplayPacing(
+    previous: MatchSnapshot?,
+    current: MatchSnapshot,
+) {
+    if (previous == null || previous.matchId != current.matchId) {
+        onlineGameplayActionBlockedUntilMillis = 0L
+        lastOnlineGameplayPacingKey = null
+        return
+    }
+    if (current.status != "ACTIVE") {
+        onlineGameplayActionBlockedUntilMillis = 0L
+        lastOnlineGameplayPacingKey = null
+        return
+    }
+
+    val transition = OnlineGameplayPacingPolicy.resolve(
+        previous = previous,
+        current = current,
+        speed = GameSettingsStore(this).snapshot().gameSpeed,
+    ) ?: return
+    if (transition.key == lastOnlineGameplayPacingKey) return
+
+    lastOnlineGameplayPacingKey = transition.key
+    onlineGameplayActionBlockedUntilMillis = maxOf(
+        onlineGameplayActionBlockedUntilMillis,
+        SystemClock.uptimeMillis() + transition.delayMillis,
+    )
+    scheduleOnlineGameplayUnlock()
 }
