@@ -122,6 +122,20 @@ export function newMatch({
   };
 }
 
+function colorForSeat(state, seat) {
+  // Public two-player Online matches occupy opposing diagonal bases: host Red
+  // at bottom-left and guest Yellow at top-right. Seat order and turn order
+  // remain sequential; only the color/home quadrant assignment changes.
+  if (
+    state?.matchMode === "ONLINE" &&
+    state?.targetPlayerCount === 2 &&
+    seat === 1
+  ) {
+    return "YELLOW";
+  }
+  return COLORS[seat];
+}
+
 export function addPlayer(
   state,
   {
@@ -151,7 +165,7 @@ export function addPlayer(
     displayName,
     characterId: publicCharacterId(characterId),
     playerType: playerType === "BOT" ? "BOT" : "HUMAN",
-    color: COLORS[seat],
+    color: colorForSeat(next, seat),
     ...(isTeamUp(next) ? { teamId: teamIdForSeat(next, seat) } : {}),
     tokenAuthHash,
     tokens: [-1, -1, -1, -1],
