@@ -80,8 +80,10 @@ internal object OnlineGameplayPacingPolicy {
         val previousActor = previous.actingSeat ?: previous.turnSeat
         val currentActor = current.actingSeat ?: current.turnSeat
         val extraTurn = previousActor == currentActor
+        val captureDuration =
+            if (hasCapture) LudoPawsGameplayPacingPolicy.captureReturnDurationMillis(speed) else 0L
         val delay = forwardDuration +
-            if (hasCapture) LudoPawsGameplayPacingPolicy.captureReturnDurationMillis(speed) else 0L +
+            captureDuration +
             LudoPawsGameplayPacingPolicy.postMoveBreathMillis(speed, extraTurn)
 
         return OnlineGameplayPacingTransition(
