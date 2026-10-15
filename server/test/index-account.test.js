@@ -338,6 +338,55 @@ test("store status disables rewarded ads when configured reward item is not gems
   assert.equal(status.rewardedAdsAvailable, false);
 });
 
+test("store status explains why Play Billing is disabled without returning secrets", async () => {
+  const privateKey = "-----BEGIN PRIVATE KEY-----\\nredacted-test-material\\n-----END PRIVATE KEY-----";
+  const response = await accountWorker.fetch(
+    new Request("https://api.example.test/api/store/status"),
+    {
+      GOOGLE_PLAY_BILLING_ENABLED: "false",
+      GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL: "ludo-publisher@ludo-project.iam.gserviceaccount.com",
+      GOOGLE_PLAY_SERVICE_ACCOUNT_PRIVATE_KEY: privateKey,
+      LUDOPROOF_STORE_PURCHASES: {},
+      LUDOPROOF_ACCOUNT_DIRECTORY: {},
+      LUDOPROOF_PLAYER_ACCOUNTS: {},
+    },
+  );
+  assert.equal(response.status, 200);
+  const status = await response.json();
+  assert.equal(status.billingAvailable, false);
+  assert.deepEqual(status.billingChecks, {
+    featureFlagEnabled: false,
+    serviceAccountEmailConfigured: true,
+    privateKeyPemPresent: true,
+    purchaseLedgerBindingConfigured: true,
+    credentialsConfigured: true,
+    enabled: false,
+    accountDirectoryConfigured: true,
+    playerAccountsConfigured: true,
+    available: false,
+  });
+  assert.equal(JSON.stringify(status).includes("redacted-test-material"), false);
+});
+
+test("store status requires credentials, purchase ledger, and account bindings before Billing is available", async () => {
+  const response = await accountWorker.fetch(
+    new Request("https://api.example.test/api/store/status"),
+    { GOOGLE_PLAY_BILLING_ENABLED: "true" },
+  );
+  assert.equal(response.status, 200);
+  const status = await response.json();
+  assert.equal(status.billingAvailable, false);
+  assert.equal(status.billingChecks.featureFlagEnabled, true);
+  assert.equal(status.billingChecks.serviceAccountEmailConfigured, false);
+  assert.equal(status.billingChecks.privateKeyPemPresent, false);
+  assert.equal(status.billingChecks.purchaseLedgerBindingConfigured, false);
+  assert.equal(status.billingChecks.credentialsConfigured, false);
+  assert.equal(status.billingChecks.accountDirectoryConfigured, false);
+  assert.equal(status.billingChecks.playerAccountsConfigured, false);
+  assert.equal(status.billingChecks.available, false);
+});
+
+
 
 test("AdMob SSV rate limiting runs before signature/key verification", async () => {
   const env = {
