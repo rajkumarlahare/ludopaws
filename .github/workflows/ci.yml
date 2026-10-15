@@ -234,18 +234,43 @@ jobs:
       - name: Install emulator and Android SDK
         shell: bash
         run: |
+          set -Eeuo pipefail
           SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
           SDKMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
           if [ ! -x "$SDKMANAGER" ]; then
             SDKMANAGER="$(command -v sdkmanager)"
           fi
           yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
-          "$SDKMANAGER" \
-            "platform-tools" \
-            "emulator" \
-            "platforms;android-36" \
-            "build-tools;35.0.0" \
+
+          # Android SDK downloads can occasionally return a truncated emulator
+          # archive from the package CDN. Retry the install after discarding only
+          # incomplete SDK download/temp state; do not continue without every package.
+          packages=(
+            "platform-tools"
+            "emulator"
+            "platforms;android-36"
+            "build-tools;35.0.0"
             "system-images;android-35;google_apis;x86_64"
+          )
+          installed=""
+          for attempt in 1 2 3; do
+            echo "Installing Android emulator packages (attempt $attempt/3)."
+            if "$SDKMANAGER" "${packages[@]}"; then
+              installed="true"
+              break
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "SDK package install failed; cleaning partial download state before retry." >&2
+              rm -rf "$SDK_ROOT/.temp" "$SDK_ROOT/temp" "$SDK_ROOT/.downloadIntermediates"
+              sleep $((attempt * 5))
+            fi
+          done
+          if [ "$installed" != "true" ]; then
+            echo "Android SDK package installation failed after three attempts." >&2
+            exit 1
+          fi
+          test -x "$SDK_ROOT/platform-tools/adb"
+          test -x "$SDK_ROOT/emulator/emulator"
           echo "$SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
           echo "$SDK_ROOT/emulator" >> "$GITHUB_PATH"
           echo "$SDK_ROOT/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
