@@ -397,7 +397,7 @@ export class TeamMatchmakerQueue {
 
     let assignment;
     try {
-      const assignment = await this.#materialize(pending.participants);
+      assignment = await this.#materialize(pending.participants);
     } catch (error) {
       pending.retryAt = Date.now() + botRetryDelayMs(this.env);
       state.pendingMatch = pending;
