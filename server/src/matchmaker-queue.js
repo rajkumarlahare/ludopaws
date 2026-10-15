@@ -381,7 +381,7 @@ export class MatchmakerQueue {
     );
     if (finalizing) {
       await this.#persist(state);
-      return json(202, finalizing);
+      return json(200, finalizing);
     }
 
     const queued = state.queue.find(
