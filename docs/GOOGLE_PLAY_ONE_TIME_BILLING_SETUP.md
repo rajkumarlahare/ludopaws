@@ -1,6 +1,6 @@
 # Google Play One-Time Billing Setup — Ludo Paws
 
-This setup keeps monetization to Google Play one-time products only. Paws Plus Monthly and recurring subscription flows are intentionally out of the app/backend design. Do not enable a billing flag merely because code is present.
+This setup covers the Google Play one-time products used by Ludo Paws. Do not enable a billing flag merely because code is present.
 
 ## Product contract
 
@@ -8,14 +8,12 @@ This setup keeps monetization to Google Play one-time products only. Paws Plus M
 - Permanent ad-removal product ID: `remove_ads` (keep this existing ID; do not delete/recreate it as a different SKU)
 - `remove_ads` is a non-consumable one-time purchase. A server-verified purchase sets the account's permanent `ads_removed` entitlement and grants the configured one-time 5-gem bonus.
 - Gem packs remain consumable one-time products: `gems_300`, `gems_1500`, `gems_3500`, `gems_20000`, `gems_40000`, and `gems_200000`.
-- Do not create or re-enable a monthly subscription for this flow.
-- If a legacy `Paws Plus Monthly` entry exists in Play Console, keep its purchase option/base plan unavailable and do not wire it into the app. The Android/backend contract contains no recurring subscription entitlement.
 - Rewarded ads remain opt-in and may still be watched for rewards after Remove Ads has been purchased.
 
 ## Worldwide pricing and availability
 
 1. In Google Play Console, open the existing Ludo Paws app whose package is `com.rekixo.ludopaws`.
-2. Keep the existing `remove_ads` product ID and configure it as a one-time product/permanent entitlement, not as a subscription. Use the current Play Console one-time-product UI for the product's purchase option and regional availability.
+2. Keep the existing `remove_ads` product ID and configure it as a permanent non-consumable one-time purchase. Use the current Play Console one-time-product UI for the product's purchase option and regional availability.
 3. Set the source/base price to **US$1.00** for the intended Remove Ads purchase option. Select all countries/regions where this app and one-time products should be offered. Apply Play's one-time local-currency conversion to those regions, then review each generated price and any region-specific restrictions/taxes. Save the product and pricing changes.
 4. Confirm the app's own distribution availability also includes the intended countries. Product availability cannot make the app purchasable in a country where the app itself is unavailable.
 5. Review each Gem product's availability and regional price independently. Do not assume the Remove Ads price config automatically configures Gem packs.
