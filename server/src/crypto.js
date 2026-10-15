@@ -384,6 +384,7 @@ export async function issueLeaderboardProfileAssertion(
     profileId,
     clientRequestId,
     expiresAt,
+    playerType = "HUMAN",
   },
 ) {
   const claims =
@@ -392,6 +393,7 @@ export async function issueLeaderboardProfileAssertion(
       profileId,
       clientRequestId,
       expiresAt,
+      playerType,
     });
   const encodedPayload =
     base64Url(
@@ -694,47 +696,23 @@ async function sha256Bytes(text) {
   return new Uint8Array(digest);
 }
 
-function normalizeLeaderboardAssertionClaims(
-  value,
-) {
-  const matchId =
-    String(
-      value?.matchId ??
-        "",
-    )
-      .trim()
-      .toUpperCase();
-  const rawProfileId =
-    value?.profileId;
+function normalizeLeaderboardAssertionClaims(value) {
+  const matchId = String(value?.matchId ?? "").trim().toUpperCase();
+  const rawProfileId = value?.profileId;
   const profileId =
-    rawProfileId == null
-      ? null
-      : String(
-          rawProfileId,
-        )
-          .trim()
-          .toLowerCase();
-  const clientRequestId =
-    requireClientRequestId(
-      value?.clientRequestId,
-    );
-  const expiresAt =
-    Number(
-      value?.expiresAt,
-    );
+    rawProfileId == null ? null : String(rawProfileId).trim().toLowerCase();
+  const clientRequestId = requireClientRequestId(value?.clientRequestId);
+  const expiresAt = Number(value?.expiresAt);
+  const playerType = String(value?.playerType ?? "HUMAN").trim().toUpperCase();
 
   if (
-    !/^LP[A-Z2-9]{8}$/
-      .test(matchId) ||
-    (
-      profileId !== null &&
-      !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
-        .test(profileId)
-    ) ||
-    !Number.isSafeInteger(
-      expiresAt,
-    ) ||
-    expiresAt <= 0
+    !/^LP[A-Z2-9]{8}$/.test(matchId) ||
+    (profileId !== null &&
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(profileId)) ||
+    !Number.isSafeInteger(expiresAt) ||
+    expiresAt <= 0 ||
+    !["HUMAN", "BOT"].includes(playerType) ||
+    (playerType === "BOT" && profileId !== null)
   ) {
     throw httpError(
       401,
@@ -748,9 +726,9 @@ function normalizeLeaderboardAssertionClaims(
     profileId,
     clientRequestId,
     expiresAt,
+    playerType,
   };
 }
-
 function normalizeFriendJoinClaims(
   value,
 ) {
