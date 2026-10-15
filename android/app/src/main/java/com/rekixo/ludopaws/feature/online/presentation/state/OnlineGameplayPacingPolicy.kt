@@ -122,9 +122,24 @@ internal fun MainActivity.applyOnlineGameplayPacing(
     // The dice renderer owns the remaining spin + settle lock, avoiding a
     // second full hold after the result has already waited on the network.
     if (transition.key.startsWith("${current.matchId}:roll:")) return
+
+    val now = SystemClock.uptimeMillis()
+    val previewStartedAt = onlineMovePreviewStartedAtMillis
+    val alreadyPresentedMillis =
+        if (
+            transition.key.startsWith("${current.matchId}:move:") &&
+            previewStartedAt != null
+        ) {
+            onlineMovePreviewStartedAtMillis = null
+            (now - previewStartedAt).coerceAtLeast(0L)
+        } else {
+            0L
+        }
+    val remainingDelay =
+        (transition.delayMillis - alreadyPresentedMillis).coerceAtLeast(0L)
     onlineGameplayActionBlockedUntilMillis = maxOf(
         onlineGameplayActionBlockedUntilMillis,
-        SystemClock.uptimeMillis() + transition.delayMillis,
+        now + remainingDelay,
     )
     scheduleOnlineGameplayUnlock()
 }
