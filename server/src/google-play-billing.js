@@ -49,14 +49,18 @@ let cachedAccessToken = null;
 export function googlePlayBillingChecks(env) {
   const serviceAccountEmailConfigured =
     typeof env?.GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL === "string" &&
-    /^[^@\\s]+@[^@\\s]+\\.iam\\.gserviceaccount\\.com$/.test(
+    /^[^@\s]+@[^@\s]+\.iam\.gserviceaccount\.com$/.test(
       env.GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL,
     );
   const privateKey = env?.GOOGLE_PLAY_SERVICE_ACCOUNT_PRIVATE_KEY;
-  const privateKeyPemPresent =
-    typeof privateKey === "string" &&
-    privateKey.includes("-----BEGIN PRIVATE KEY-----") &&
-    privateKey.includes("-----END PRIVATE KEY-----");
+  const normalizedPrivateKey =
+    typeof privateKey === "string" ? privateKey.replace(/\\n/g, "\n") : "";
+  const privateKeyMatch = normalizedPrivateKey.match(
+    /-----BEGIN PRIVATE KEY-----\s*([A-Za-z0-9+/=\s]+?)\s*-----END PRIVATE KEY-----/,
+  );
+  const privateKeyPemPresent = Boolean(
+    privateKeyMatch && privateKeyMatch[1].replace(/\s/g, "").length >= 100,
+  );
   const purchaseLedgerBindingConfigured = Boolean(env?.LUDOPROOF_STORE_PURCHASES);
   const featureFlagEnabled = env?.GOOGLE_PLAY_BILLING_ENABLED === "true";
   const credentialsConfigured = serviceAccountEmailConfigured && privateKeyPemPresent;
