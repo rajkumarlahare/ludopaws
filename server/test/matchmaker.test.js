@@ -233,6 +233,7 @@ async function read(
 function player(
   suffix,
   playerCount,
+  characterId = "dog",
 ) {
   return {
     displayName:
@@ -247,6 +248,7 @@ function player(
         "0",
       ),
     playerCount,
+    characterId,
   };
 }
 
@@ -259,11 +261,13 @@ test(
       player(
         1,
         2,
+        "dog",
       );
     const second =
       player(
         2,
         2,
+        "goat",
       );
 
     const waiting =
@@ -373,6 +377,7 @@ test(
               player(
                 index,
                 4,
+                ["dog", "goat", "duck", "cat"][index - 1],
               ),
             ),
           ),
@@ -426,11 +431,13 @@ test(
       player(
         1,
         2,
+        "dog",
       );
     const second =
       player(
         2,
         2,
+        "goat",
       );
 
     await queue.fetch(
@@ -521,6 +528,7 @@ test(
       player(
         22,
         2,
+        "goat",
       );
 
     const waiting =
