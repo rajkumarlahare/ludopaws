@@ -9,6 +9,12 @@ import {
   normalizeCharacterId,
 } from "./ludo-paws-characters.js";
 import {
+  CHARACTER_PREFERENCE_WINDOW_MS,
+  characterPreferenceKey,
+  distinctCharacterCount,
+  selectCharacterDiverseGroup,
+} from "./matchmaking-characters.js";
+import {
   botFillDelayMs,
   botMatchFillEnabled,
   botRetryDelayMs,
@@ -63,6 +69,36 @@ export class MatchmakerQueue {
         if (!completed) return;
       }
 
+      // Resolve expired character-preference windows before bot fallback. If a
+      // diverse human group never arrived, choose the most diverse available
+      // group and proceed instead of extending the search indefinitely.
+      for (const key of Object.keys(state.characterPreferences ?? {})) {
+        state = this.#cleanup(await this.#load(), Date.now());
+        if (state.pendingMatch) break;
+        const preference = state.characterPreferences?.[key];
+        if (!preference || Number(preference.readyAt ?? 0) > Date.now()) continue;
+        const eligible = state.queue.filter((candidate) =>
+          candidate.playerCount === preference.playerCount &&
+          (candidate.rulesetKey ?? DEFAULT_RULESET_KEY) === preference.rulesetKey
+        );
+        const group = selectCharacterDiverseGroup(eligible, preference.playerCount);
+        delete state.characterPreferences[key];
+        if (group.length < preference.playerCount) {
+          await this.#persist(state);
+          continue;
+        }
+        state.pendingMatch = {
+          matchMode: "ONLINE",
+          playerCount: preference.playerCount,
+          rulesetKey: preference.rulesetKey,
+          participants: group,
+          retryAt: Date.now() + botRetryDelayMs(this.env),
+        };
+        await this.#persist(state);
+        const completed = await this.#resumePendingMatch(state, Date.now());
+        if (!completed) return;
+      }
+
       if (botMatchFillEnabled(this.env)) {
         for (const playerCount of [2, 4]) {
           state = this.#cleanup(await this.#load(), Date.now());
@@ -91,13 +127,15 @@ export class MatchmakerQueue {
           if (!expiredGroup) continue;
 
           const { rulesetKey, waiting } = expiredGroup;
-          const humans = waiting.slice(0, playerCount);
+          const humanCount = Math.min(waiting.length, playerCount);
+          const humans = selectCharacterDiverseGroup(waiting, humanCount);
           const bots = await createBotParticipants({
             count: playerCount - humans.length,
             playerCount,
             matchMode: "ONLINE",
             rulesetKey,
             existingNames: humans.map((candidate) => candidate.displayName),
+            existingCharacterIds: humans.map((candidate) => candidate.characterId),
             now,
           });
           state.pendingMatch = {
@@ -193,7 +231,44 @@ export class MatchmakerQueue {
       eligible.length >= participant.playerCount &&
       !state.pendingMatch
     ) {
-      const group = eligible.slice(0, participant.playerCount);
+      const group = selectCharacterDiverseGroup(eligible, participant.playerCount);
+      const preferenceKey = characterPreferenceKey(
+        participant.playerCount,
+        participant.rulesetKey,
+      );
+      const preferences = state.characterPreferences ?? {};
+      const preference = preferences[preferenceKey];
+      const hasUniqueCharacters =
+        group.length === participant.playerCount &&
+        distinctCharacterCount(group) === participant.playerCount;
+
+      if (
+        !hasUniqueCharacters &&
+        preference &&
+        Number(preference.readyAt ?? 0) > now
+      ) {
+        await this.#persist(state);
+        return json(202, searchingPayload(
+          state, participant.playerCount, now, participant.rulesetKey,
+        ));
+      }
+
+      if (!hasUniqueCharacters && !preference) {
+        preferences[preferenceKey] = {
+          playerCount: participant.playerCount,
+          rulesetKey: participant.rulesetKey,
+          startedAt: now,
+          readyAt: now + CHARACTER_PREFERENCE_WINDOW_MS,
+        };
+        state.characterPreferences = preferences;
+        await this.#persist(state);
+        return json(202, searchingPayload(
+          state, participant.playerCount, now, participant.rulesetKey,
+        ));
+      }
+
+      delete preferences[preferenceKey];
+      state.characterPreferences = preferences;
       state.pendingMatch = {
         matchMode: "ONLINE",
         playerCount: participant.playerCount,
@@ -632,6 +707,7 @@ export class MatchmakerQueue {
         schemaVersion: 1,
         queue: [],
         assignments: {},
+        characterPreferences: {},
       }
     );
   }
@@ -649,6 +725,19 @@ export class MatchmakerQueue {
       }
     }
     next.assignments = assignments;
+    const preferences = next.characterPreferences ?? {};
+    for (const [key, preference] of Object.entries(preferences)) {
+      const playerCount = Number(preference?.playerCount);
+      const rulesetKey = String(preference?.rulesetKey ?? DEFAULT_RULESET_KEY);
+      const eligibleCount = next.queue.filter((candidate) =>
+        candidate.playerCount === playerCount &&
+        (candidate.rulesetKey ?? DEFAULT_RULESET_KEY) === rulesetKey
+      ).length;
+      if (!Number.isInteger(playerCount) || eligibleCount < playerCount) {
+        delete preferences[key];
+      }
+    }
+    next.characterPreferences = preferences;
     return next;
   }
 
@@ -659,6 +748,9 @@ export class MatchmakerQueue {
       ...(state.pendingMatch
         ? [Number(state.pendingMatch.retryAt ?? Date.now() + botRetryDelayMs(this.env))]
         : []),
+      ...Object.values(state.characterPreferences ?? {}).map(
+        (preference) => Number(preference.readyAt ?? Date.now()),
+      ),
       ...state.queue.flatMap((participant) => {
         const queueExpiry = Number(
           participant.lastSeenAt ?? participant.joinedAt ?? Date.now(),
