@@ -71,7 +71,6 @@ has(pagesWorkflow, "https://api.ludopaws.rekixo.com", "Rekixo API origin");
 has(pagesWorkflow, "cp docs/landing-page.html site/index.html", "landing page publication mapping");
 has(pagesWorkflow, "actions/deploy-pages", "explicit Pages publishing step");
 
-console.log("Account-deletion source checks passed. Public publication remains gated by publisher/legal, OAuth, support and origin configuration.");
 
 const pricing = read("../docs/pricing.html");
 has(landingPage, 'href="./pricing.html"', "landing-page pricing-policy link");
@@ -84,3 +83,5 @@ has(pagesWorkflow, 'test -f docs/pricing.html', "pricing page publication file g
 has(pagesWorkflow, 'cp docs/pricing.html site/pricing.html', "pricing page publication mapping");
 has(pagesWorkflow, 'node scripts/check-pricing-policy.mjs', "pricing contract check before publication");
 has(inAppPolicy, 'https://ludopaws.rekixo.com/pricing.html', "in-app pricing-policy URL");
+
+console.log("Account-deletion source checks passed. Public publication remains gated by publisher/legal, OAuth, support and origin configuration.");
