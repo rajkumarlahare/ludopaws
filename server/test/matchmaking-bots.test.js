@@ -438,3 +438,91 @@ test("Online reservation retries the same bot seats and blocks cancellation/remi
   assert.ok(storedMatch.players[1].profileId == null);
   assert.equal(storedMatch.players[1].playerType, "BOT");
 });
+
+
+test("Team Up reservation retries the same three bot seats after partial room materialization", async () => {
+  const env = makeEnv();
+  const namespace = env.LUDOPROOF_MATCHES;
+  const originalGet = namespace.get.bind(namespace);
+  let failFirstJoin = true;
+  namespace.get = (id) => {
+    const room = originalGet(id);
+    return {
+      fetch: async (request) => {
+        if (failFirstJoin && new URL(request.url).pathname === "/join") {
+          failFirstJoin = false;
+          return Response.json(
+            { error: "TEMPORARY_TEST_FAILURE", message: "temporary room failure" },
+            { status: 503 },
+          );
+        }
+        return room.fetch(request);
+      },
+    };
+  };
+
+  const queue = new TeamMatchmakerQueue({ storage: new FakeStorage() }, env);
+  const first = human(51, 4, true);
+  const firstSearch = await parse(await queue.fetch(
+    request("/search", {
+      clientRequestId: first.clientRequestId,
+      displayName: first.displayName,
+      characterId: first.characterId,
+    }, first.profileToken),
+  ));
+  assert.equal(firstSearch.body.status, "SEARCHING");
+
+  await backdateQueue(queue, "team-matchmaking-state-v1");
+  await queue.alarm();
+
+  let reservedState = await queue.ctx.storage.get("team-matchmaking-state-v1");
+  assert.ok(reservedState.pendingMatch);
+  const reservedBots = reservedState.pendingMatch.participants
+    .filter((player) => player.playerType === "BOT");
+  assert.equal(reservedBots.length, 3);
+  const reservedBotIds = reservedBots.map((bot) => bot.clientRequestId);
+
+  const second = human(52, 4, true);
+  const secondSearch = await parse(await queue.fetch(
+    request("/search", {
+      clientRequestId: second.clientRequestId,
+      displayName: second.displayName,
+      characterId: second.characterId,
+    }, second.profileToken),
+  ));
+  assert.equal(secondSearch.body.status, "SEARCHING");
+
+  reservedState = await queue.ctx.storage.get("team-matchmaking-state-v1");
+  reservedState.pendingMatch.retryAt = Date.now() - 1;
+  await queue.ctx.storage.put("team-matchmaking-state-v1", reservedState);
+  await queue.alarm();
+
+  const finalized = await queue.ctx.storage.get("team-matchmaking-state-v1");
+  assert.equal(finalized.pendingMatch, undefined);
+  assert.ok(finalized.assignments[first.clientRequestId]);
+  assert.equal(finalized.assignments[second.clientRequestId], undefined);
+  assert.ok(finalized.queue.some((player) => player.clientRequestId === second.clientRequestId));
+
+  const matched = await parse(await queue.fetch(
+    request("/status", {
+      clientRequestId: first.clientRequestId,
+    }, first.profileToken),
+  ));
+  assert.equal(matched.body.status, "MATCHED");
+  assert.deepEqual(
+    matched.body.state.players.map((player) => player.playerType),
+    ["HUMAN", "BOT", "BOT", "BOT"],
+  );
+  assert.deepEqual(
+    matched.body.state.players.map((player) => player.teamId),
+    ["A", "B", "A", "B"],
+  );
+
+  const room = namespace.rooms.get(matched.body.matchId);
+  const storedMatch = await room.ctx.storage.get("match-state");
+  assert.deepEqual(
+    storedMatch.players.filter((player) => player.playerType === "BOT")
+      .map((player) => player.joinRequestId),
+    reservedBotIds,
+  );
+});
