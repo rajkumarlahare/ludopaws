@@ -381,6 +381,8 @@ test("Online reservation retries the same bot seats and blocks cancellation/remi
   const reservedBots = reservedState.pendingMatch.participants
     .filter((player) => player.playerType === "BOT");
   assert.equal(reservedBots.length, 1);
+  const reservedMatchId = reservedState.pendingMatch.matchId;
+  assert.ok(reservedMatchId);
   const reservedBotRequestId = reservedBots[0].clientRequestId;
   const reservedBotName = reservedBots[0].displayName;
   assert.equal(reservedState.assignments[first.clientRequestId], undefined);
@@ -426,6 +428,7 @@ test("Online reservation retries the same bot seats and blocks cancellation/remi
     }, first.profileToken),
   ));
   assert.equal(matched.body.status, "MATCHED");
+  assert.equal(matched.body.matchId, reservedMatchId);
   assert.deepEqual(
     matched.body.state.players.map((player) => player.playerType),
     ["HUMAN", "BOT"],
@@ -480,6 +483,8 @@ test("Team Up reservation retries the same three bot seats after partial room ma
   const reservedBots = reservedState.pendingMatch.participants
     .filter((player) => player.playerType === "BOT");
   assert.equal(reservedBots.length, 3);
+  const reservedMatchId = reservedState.pendingMatch.matchId;
+  assert.ok(reservedMatchId);
   const reservedBotIds = reservedBots.map((bot) => bot.clientRequestId);
 
   const second = human(52, 4, true);
@@ -509,6 +514,7 @@ test("Team Up reservation retries the same three bot seats after partial room ma
     }, first.profileToken),
   ));
   assert.equal(matched.body.status, "MATCHED");
+  assert.equal(matched.body.matchId, reservedMatchId);
   assert.deepEqual(
     matched.body.state.players.map((player) => player.playerType),
     ["HUMAN", "BOT", "BOT", "BOT"],
