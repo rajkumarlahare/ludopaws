@@ -5,6 +5,7 @@ import {
   MatchRoom,
   expectedDigests,
 } from "../src/match-room.js";
+import { MatchRoom as BotMatchRoom } from "../src/match-room-bots.js";
 import {
   deriveLeaderboardIdentity,
   issueFriendRoomJoinToken,
@@ -2243,3 +2244,75 @@ test("Quick Chat rejects messages without a server-authenticated player tag", as
   );
   assert.equal(socket.messages.length, 0);
 });
+
+
+test(
+  "server bot takes a real verified turn through commit, reveal, and legal move handlers",
+  { concurrency: false },
+  async (t) => {
+    const ctx = makeContext();
+    const env = makeEnv();
+    const room = new BotMatchRoom(ctx, env);
+    const host = await createMatch(room, "LPB0TTEST1");
+    const botRequestId = crypto.randomUUID();
+    const profileAssertion = await issueLeaderboardProfileAssertion(env, {
+      matchId: host.matchId,
+      profileId: null,
+      clientRequestId: botRequestId,
+      playerType: "BOT",
+      expiresAt: Date.now() + 10 * 60 * 1000,
+    });
+
+    const joined = await json(
+      await room.fetch(
+        roomRequest("/join", {
+          method: "POST",
+          profileAssertion,
+          body: {
+            displayName: "Maya",
+            clientRequestId: botRequestId,
+          },
+        }),
+      ),
+    );
+    assert.equal(joined.response.status, 201);
+    assert.equal(joined.body.state.players[1].playerType, "BOT");
+    assert.equal(joined.body.state.players[1].displayName, "Maya");
+
+    await startMatch(room, host.playerToken);
+    const state = await ctx.storage.get("match-state");
+    state.turnSeat = 1;
+    state.updatedAt = Date.now();
+    await ctx.storage.put("match-state", state);
+
+    await room.fetch(
+      roomRequest("/state", {
+        token: host.playerToken,
+      }),
+    );
+    const scheduled = await ctx.storage.get("match-state");
+    assert.equal(scheduled.botTurn.playerId, scheduled.players[1].playerId);
+    scheduled.botTurn.runAt = Date.now() - 1;
+    scheduled.botTurn.inProgress = false;
+    await ctx.storage.put("match-state", scheduled);
+
+    const mock = installEntroNexMock(t, {
+      outcomes: [6],
+      clientSeeds: [scheduled.botTurn.clientSeed],
+    });
+    await room.alarm();
+
+    const after = await ctx.storage.get("match-state");
+    assert.equal(after.status, "ACTIVE");
+    assert.equal(after.pendingRoll, null);
+    assert.equal(after.randomEventIndex, 1);
+    assert.ok(after.players[1].tokens.some((position) => position === 0));
+    assert.ok(after.history.some(
+      (event) => event.playerId === after.players[1].playerId && event.moveTokenIndex != null,
+    ));
+    assert.equal(mock.createCalls(), 1);
+    assert.equal(mock.resolveCalls(), 1);
+    assert.equal(after.botTurn?.eventIndex, 1);
+    assert.equal(after.botTurn?.inProgress, false);
+  },
+);
