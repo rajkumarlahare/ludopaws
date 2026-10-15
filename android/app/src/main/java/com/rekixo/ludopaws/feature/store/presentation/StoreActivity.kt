@@ -2,6 +2,8 @@ package com.rekixo.ludopaws.feature.store.presentation
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.Gravity
@@ -52,6 +54,11 @@ class StoreActivity :
             > =
         emptyMap()
     private var billingAvailable = false
+    private var subscriptionsAvailableByServer = false
+    internal var pawsPlusActiveForUi = false
+    internal var pawsPlusAutoRenewEnabledForUi = false
+    internal val pawsPlusSubscriptionsConfigured: Boolean
+        get() = BuildConfig.LUDOPROOF_SUBSCRIPTIONS_ENABLED && subscriptionsAvailableByServer
     private var billingProductCatalogLoaded = false
     private var pendingAutoPurchaseProductId: String? = null
     private var rewardedAdsEnabledByServer = false
@@ -109,6 +116,7 @@ class StoreActivity :
             enabled =
                 BuildConfig
                     .LUDOPROOF_BILLING_ENABLED,
+            subscriptionsEnabled = pawsPlusSubscriptionsConfigured,
             accountId =
                 installAccountId,
             listener =
@@ -173,10 +181,13 @@ class StoreActivity :
             var adsAvailable = false
             var adsStatusLoaded = false
             var adsStatusError: Exception? = null
+            var subscriptionsAvailable = false
             try {
                 statusResponse = accountRepository.storeStatus()
                 adsAvailable = BuildConfig.LUDOPROOF_ADS_ENABLED &&
                     statusResponse.optBoolean("rewardedAdsAvailable", false)
+                subscriptionsAvailable = BuildConfig.LUDOPROOF_SUBSCRIPTIONS_ENABLED &&
+                    statusResponse.optBoolean("subscriptionsAvailable", false)
                 adsStatusLoaded = true
             } catch (error: Exception) {
                 adsStatusError = error
@@ -188,6 +199,7 @@ class StoreActivity :
                 rewardedAdsStatusLoaded = adsStatusLoaded
                 rewardedAdsStatusError = adsStatusError
                 rewardedAdsEnabledByServer = adsAvailable
+                subscriptionsAvailableByServer = subscriptionsAvailable
                 if (adsEnabledForBuild) rewardedAds.prepare()
                 renderStore()
             }
@@ -197,6 +209,8 @@ class StoreActivity :
             var recoveredPurchases = 0
             var recoveryError: Exception? = null
             var activeBillingAccountId: String? = null
+            var serverPawsPlusActive = false
+            var serverPawsPlusAutoRenewEnabled = false
             try {
                 val session = accountRepository.ensureGuestSession()
                 activeBillingAccountId = session.billingAccountId
@@ -205,11 +219,16 @@ class StoreActivity :
                 val serverWallet = accountRepository.wallet()
                 wallet.applyServerSnapshot(serverWallet, session.accountId)
                 cosmetics.applyServerSnapshot(serverWallet, session.accountId)
+                serverPawsPlusActive = serverWallet.optBoolean("pawsPlusActive", false)
+                serverPawsPlusAutoRenewEnabled = serverWallet.optJSONObject("pawsPlusSubscription")
+                    ?.optBoolean("autoRenewEnabled", false) == true
 
                 // A purchase that belongs to another account is intentionally left pending.
                 // It can only be recovered after that same Google-linked account is restored.
                 if (available) {
-                    pendingPurchases.all().forEach { pending ->
+                    pendingPurchases.all().filter { pending ->
+                        pending.productId != StoreCatalog.PAWS_PLUS || subscriptionsAvailable
+                    }.forEach { pending ->
                         try {
                             val applied = verifyPurchaseAndFulfill(pending)
                             if (applied) recoveredPurchases += 1
@@ -228,6 +247,8 @@ class StoreActivity :
             runOnUiThread {
                 if (!canRenderStoreUi()) return@runOnUiThread
                 billingAvailable = available
+                pawsPlusActiveForUi = serverPawsPlusActive
+                pawsPlusAutoRenewEnabledForUi = serverPawsPlusAutoRenewEnabled
 
                 val requestedProduct = pendingAutoPurchaseProductId
                 if (
@@ -245,6 +266,7 @@ class StoreActivity :
                         return@runOnUiThread
                     }
                     billing.updateAccountId(binding)
+                    billing.updateSubscriptionsEnabled(pawsPlusSubscriptionsConfigured)
                     billing.connect()
                 } else if (pendingAutoPurchaseProductId != null) {
                     val productId = pendingAutoPurchaseProductId
@@ -309,6 +331,10 @@ class StoreActivity :
     internal fun requestPurchase(
         productId: String,
     ) {
+        if (productId == StoreCatalog.PAWS_PLUS && !pawsPlusSubscriptionsConfigured) {
+            showStoreMessage("Paws Plus monthly subscription is not configured in Google Play and the server yet.")
+            return
+        }
         if (
             !BuildConfig
                 .LUDOPROOF_BILLING_ENABLED
@@ -450,18 +476,48 @@ class StoreActivity :
         accountId: String,
         onFinished: () -> Unit,
     ) {
-        val pending =
-            PendingStorePurchase(
-                productId = productId,
-                purchaseToken = purchaseToken,
-                accountId = accountId,
-            )
+        queuePurchaseVerification(
+            productId = productId,
+            purchaseToken = purchaseToken,
+            accountId = accountId,
+            isSubscription = false,
+            onFinished = onFinished,
+        )
+    }
+
+    override fun onSubscriptionRequiresVerification(
+        productId: String,
+        purchaseToken: String,
+        accountId: String,
+        onFinished: () -> Unit,
+    ) {
+        queuePurchaseVerification(
+            productId = productId,
+            purchaseToken = purchaseToken,
+            accountId = accountId,
+            isSubscription = true,
+            onFinished = onFinished,
+        )
+    }
+
+    private fun queuePurchaseVerification(
+        productId: String,
+        purchaseToken: String,
+        accountId: String,
+        isSubscription: Boolean,
+        onFinished: () -> Unit,
+    ) {
+        val pending = PendingStorePurchase(
+            productId = productId,
+            purchaseToken = purchaseToken,
+            accountId = accountId,
+        )
         try {
             pendingPurchases.add(pending)
         } catch (error: Exception) {
             Log.e(TAG, "Could not persist pending Play purchase", error)
             showStoreMessage(
-                "Payment was received, but its verification could not be saved safely. No items were granted. Please keep the app installed and reopen the store.",
+                "Payment was received, but its verification could not be saved safely. No entitlement was granted. Please keep the app installed and reopen the store.",
             )
             onFinished()
             return
@@ -473,11 +529,17 @@ class StoreActivity :
                 pendingPurchases.remove(purchaseToken)
                 runOnUiThread {
                     if (!canRenderStoreUi()) return@runOnUiThread
+                    renderStore()
                     showStoreMessage(
-                        if (entitlementApplied) {
-                            "Purchase verified. Your store item is ready."
-                        } else {
-                            "Purchase verified. This item was already added to your profile."
+                        when {
+                            isSubscription && pawsPlusActiveForUi ->
+                                "Paws Plus is active. Forced interstitial ads are disabled while your subscription is active."
+                            isSubscription ->
+                                "Paws Plus subscription status was verified. The plan is not currently active."
+                            entitlementApplied ->
+                                "Purchase verified. Your store item is ready."
+                            else ->
+                                "Purchase verified. This item was already added to your profile."
                         },
                     )
                 }
@@ -485,14 +547,13 @@ class StoreActivity :
                 Log.e(TAG, "Store purchase verification failed", error)
                 runOnUiThread {
                     if (!canRenderStoreUi()) return@runOnUiThread
-                    val detail =
-                        error.message?.takeIf(String::isNotBlank)
-                            ?: "Please keep the app installed and try again."
+                    val detail = error.message?.takeIf(String::isNotBlank)
+                        ?: "Please keep the app installed and try again."
                     showStoreMessage(
                         if (entitlementApplied) {
-                            "Purchase was verified and the item was saved, but its recovery record could not be cleared. It will be safely checked again. $detail"
+                            "Payment was verified, but the recovery record could not be cleared. It will be safely checked again. $detail"
                         } else {
-                            "Payment was received, but purchase verification is still pending. No items were granted yet. $detail"
+                            "Payment was received, but its verification is still pending. No unverified entitlement was granted. $detail"
                         },
                     )
                 }
@@ -509,10 +570,21 @@ class StoreActivity :
         check(session.billingAccountId == pending.accountId) {
             "This Play purchase belongs to another account. Restore that account before recovering it."
         }
-        val response = accountRepository.verifyPlayPurchase(
-            productId = pending.productId,
-            purchaseToken = pending.purchaseToken,
-        )
+        val isSubscription = pending.productId == StoreCatalog.PAWS_PLUS
+        check(!isSubscription || pawsPlusSubscriptionsConfigured) {
+            "Paws Plus subscription verification is not enabled for this build and server."
+        }
+        val response = if (isSubscription) {
+            accountRepository.verifyPlaySubscription(
+                productId = pending.productId,
+                purchaseToken = pending.purchaseToken,
+            )
+        } else {
+            accountRepository.verifyPlayPurchase(
+                productId = pending.productId,
+                purchaseToken = pending.purchaseToken,
+            )
+        }
         check(
             response.optBoolean("ok") &&
                 response.optBoolean("verified") &&
@@ -526,7 +598,10 @@ class StoreActivity :
             "Verified wallet snapshot did not match the signed-in account."
         }
         cosmetics.applyServerSnapshot(serverWallet, session.accountId)
-        ProfileStore(this).addPurchase(pending.productId) // UI cache only; server remains authoritative.
+        pawsPlusActiveForUi = serverWallet.optBoolean("pawsPlusActive", false)
+        if (!isSubscription) {
+            ProfileStore(this).addPurchase(pending.productId) // UI cache only; server remains authoritative.
+        }
         return !response.optBoolean("replay", false)
     }
 
@@ -718,6 +793,19 @@ class StoreActivity :
                 message.ifBlank { "Google Play payments are unavailable." },
                 Toast.LENGTH_LONG,
             ).show()
+        }
+    }
+
+    internal fun managePawsPlusSubscription() {
+        val uri = Uri.parse(
+            "https://play.google.com/store/account/subscriptions?sku=" +
+                StoreCatalog.PAWS_PLUS +
+                "&package=com.rekixo.ludopaws",
+        )
+        runCatching {
+            startActivity(Intent(Intent.ACTION_VIEW, uri))
+        }.onFailure {
+            showStoreMessage("Google Play subscription management could not be opened.")
         }
     }
 
