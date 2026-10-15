@@ -143,6 +143,37 @@ internal fun showPrivacyPolicyDialog(
 
     panel.addView(
         TextView(context).apply {
+            text = "OPEN TERMS OF SERVICE"
+            textSize = 13f
+            setTypeface(Typeface.DEFAULT_BOLD)
+            setTextColor(0xFFFFD34E.toInt())
+            gravity = Gravity.CENTER
+            setPadding(
+                0,
+                settingsDp(context, 8),
+                0,
+                settingsDp(context, 8),
+            )
+            isClickable = true
+            isFocusable = true
+            contentDescription = "Open the Ludo Paws Terms of Service"
+            setOnClickListener {
+                try {
+                    context.startActivity(
+                        Intent(
+                            Intent.ACTION_VIEW,
+                            Uri.parse("https://ludopaws.rekixo.com/terms-of-service.html"),
+                        ),
+                    )
+                } catch (_: ActivityNotFoundException) {
+                    Toast.makeText(context, "No browser is available to open this page.", Toast.LENGTH_LONG).show()
+                }
+            }
+        },
+    )
+
+    panel.addView(
+        TextView(context).apply {
             text = "CLOSE"
             textSize = 14f
             setTypeface(Typeface.DEFAULT_BOLD)
