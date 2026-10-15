@@ -78,21 +78,23 @@ Google's billing test guide: https://developer.android.com/google/play/billing/t
 
 Purchase-processing guidance: https://developer.android.com/google/play/billing/integrate
 
-## 6. Deploy and verify only after test acceptance
+## 6. Controlled deployment and release verification
 
-1. Confirm all source/CI checks pass on the exact commit being released.
-2. In **Actions → LudoProof Cloudflare Production → Run workflow**, select the reviewed release commit on `main`. Production deployment is manual; merging a pull request does not itself deploy.
-3. Confirm the workflow's production readiness, store status, and live game-flow checks succeed.
-4. From PowerShell, query:
+This repository currently has a manual production Worker deployment workflow, not a separate staging Worker. Treat enabling the backend flag as a live configuration change and use it only for a controlled internal-test window.
+
+1. Confirm source/CI checks pass on the exact commit. Confirm every SKU, regional price/availability, Play Developer API permission, Cloudflare private-key secret, and license-tester account is ready.
+2. Build and sign the Billing-enabled AAB with the command in section 4. Upload it to **Internal testing only** and make sure the opt-in tester list is restricted to your intended test accounts. Do not promote it to any public track yet.
+3. Set both GitHub production environment variables `GOOGLE_PLAY_BILLING_ENABLED=true` and `LUDOPROOF_BILLING_ENABLED=true`. Then go to **Actions → LudoProof Cloudflare Production → Run workflow**, select the reviewed commit on `main`, and run it. Merging a PR alone does not deploy. If the workflow fails, leave the feature disabled and investigate before retrying.
+4. Confirm the workflow's production readiness, store-status and live game-flow checks pass. From PowerShell, run:
 
    ```powershell
    Invoke-RestMethod "https://api.ludopaws.rekixo.com/ready" | ConvertTo-Json -Depth 8
    Invoke-RestMethod "https://api.ludopaws.rekixo.com/api/store/status" | ConvertTo-Json -Depth 8
    ```
 
-   Confirm `checks.playBillingEnabled = true` and `billingAvailable = true`. The optional `billingChecks` breakdown identifies whether the flag, service-account email, private-key PEM presence, purchase-ledger binding, account directory, or player-account binding is absent. It reports booleans only, not the private key.
-
-6. Once all tests pass, keep the Worker/client flag values aligned and promote the reviewed candidate through the intended staged release. Watch purchase verification errors, refunds, and support reports after rollout.
+   Verify `checks.playBillingEnabled = true` and `billingAvailable = true`. With the diagnostics PR deployed, inspect `billingChecks` for the first false condition. Those fields are booleans only; the service-account email and private key are never returned.
+5. Install the Billing-enabled AAB from the internal test track (not a sideloaded build for the final acceptance run) and execute every test in section 5 against the deployed API: product query, successful consumable and non-consumable purchases, wallet/entitlement delivery, repeat/retry/idempotency, force-stop/relaunch restore, pending/cancelled transactions, wrong-account rejection, and server consume/acknowledge.
+6. If any purchase test fails, keep the app off public tracks, set both flags back to `false`, run the production workflow again to close checkout, then correct the failed gate and retest. Only after every test succeeds should this candidate be promoted through a staged release. Keep the Android/Worker Billing flags aligned and monitor verification failures, refunds and support reports after rollout.
 
 ## Release gate
 
