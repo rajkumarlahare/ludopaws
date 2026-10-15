@@ -1,6 +1,9 @@
 package com.rekixo.ludopaws.feature.online
 
 import android.view.View
+import android.widget.FrameLayout
+import android.widget.LinearLayout
+import android.widget.ScrollView
 import com.rekixo.ludopaws.*
 import com.rekixo.ludopaws.ui.online.*
 
@@ -126,6 +129,46 @@ internal fun MainActivity.updateControls(
     val active = state.status == "ACTIVE"
     onlineHeroPanel?.visibility = if (waiting) View.VISIBLE else View.GONE
     val finished = state.status == "FINISHED"
+
+    // Keep the live board in a fixed center stage for remote Online / Team Up matches.
+    // The parent ScrollView remains scrollable in the lobby, but the active game uses
+    // the full viewport and gives the board the flexible space between player rails.
+    val gameplayContent = boardFrame.parent as? LinearLayout
+    val gameplayContentHost = gameplayContent?.parent as? FrameLayout
+    val gameplayScroll = gameplayContentHost?.parent as? ScrollView
+    val viewportHeight =
+        if (active) FrameLayout.LayoutParams.MATCH_PARENT
+        else FrameLayout.LayoutParams.WRAP_CONTENT
+
+    gameplayContentHost?.layoutParams?.let { params ->
+        if (params.height != viewportHeight) {
+            params.height = viewportHeight
+            gameplayContentHost.layoutParams = params
+        }
+    }
+
+    (gameplayContent?.layoutParams as? FrameLayout.LayoutParams)?.let { params ->
+        if (params.height != viewportHeight) {
+            params.height = viewportHeight
+            gameplayContent.layoutParams = params
+        }
+    }
+
+    (boardFrame.layoutParams as? LinearLayout.LayoutParams)?.let { params ->
+        val targetHeight =
+            if (active) 0 else LinearLayout.LayoutParams.WRAP_CONTENT
+        val targetWeight = if (active) 1f else 0f
+        if (params.height != targetHeight || params.weight != targetWeight) {
+            params.height = targetHeight
+            params.weight = targetWeight
+            boardFrame.layoutParams = params
+        }
+    }
+
+    if (active && gameplayScroll != null && gameplayScroll.scrollY != 0) {
+        gameplayScroll.post { gameplayScroll.scrollTo(0, 0) }
+    }
+
     val canEnterAnotherMatch =
         finished && gameMode == GameMode.ONLINE
 
