@@ -171,11 +171,22 @@ for (const marker of [
   'movementAudioNextHop',
   'GameSoundFeedback.jump(context)',
   'GameSoundFeedback.moveStep(',
-  'MAX_HOP_AUDIO_LATENESS_MILLIS',
-  'MAX_LANDING_AUDIO_LATENESS_MILLIS',
+  'Coalesce missed hops into one cue',
+  'play only the newest one instead of bursting old cues',
+  'latestLandmark?.second?.let',
 ]) {
   if (!movementScene.includes(marker)) {
     throw new Error(`Movement audio clock is missing ${marker}`);
+  }
+}
+for (const retiredThreshold of [
+  'MAX_HOP_AUDIO_LATENESS_MILLIS',
+  'MAX_LANDING_AUDIO_LATENESS_MILLIS',
+]) {
+  if (movementScene.includes(retiredThreshold)) {
+    throw new Error(
+      `Movement audio must coalesce missed-frame cues instead of discarding them at ${retiredThreshold}.`,
+    );
   }
 }
 for (const marker of [
