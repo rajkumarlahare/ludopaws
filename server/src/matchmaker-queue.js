@@ -52,9 +52,19 @@ export class MatchmakerQueue {
       const now = Date.now();
       let state = this.#cleanup(await this.#load(), now);
 
+      if (state.pendingMatch) {
+        if (Number(state.pendingMatch.retryAt ?? 0) > now) {
+          await this.#persist(state);
+          return;
+        }
+        const completed = await this.#resumePendingMatch(state, now);
+        if (!completed) return;
+      }
+
       if (botMatchFillEnabled(this.env)) {
         for (const playerCount of [2, 4]) {
           state = this.#cleanup(await this.#load(), Date.now());
+          if (state.pendingMatch) break;
           const waiting = state.queue
             .filter((candidate) => candidate.playerCount === playerCount)
             .sort((left, right) => left.joinedAt - right.joinedAt);
@@ -64,48 +74,23 @@ export class MatchmakerQueue {
           if (fallbackAt > now) continue;
 
           const humans = waiting.slice(0, playerCount);
-          const bots = createBotParticipants({
+          const bots = await createBotParticipants({
             count: playerCount - humans.length,
             playerCount,
             matchMode: "ONLINE",
+            seedRequestId: humans[0].clientRequestId,
             existingNames: humans.map((candidate) => candidate.displayName),
             now,
           });
-          const group = [...humans, ...bots];
+          state.pendingMatch = {
+            matchMode: "ONLINE",
+            playerCount,
+            participants: [...humans, ...bots],
+            retryAt: now,
+          };
           await this.#persist(state);
-
-          let assignment;
-          try {
-            assignment = await this.#materialize(group, playerCount);
-          } catch (error) {
-            for (const candidate of humans) {
-              candidate.botFallbackAt = now + botRetryDelayMs(this.env);
-            }
-            await this.#persist(state);
-            console.error("Online bot fallback could not materialize a match", {
-              code: error?.code ?? "BOT_MATCH_MATERIALIZE_FAILED",
-            });
-            return;
-          }
-
-          const realRequestIds = new Set(humans.map((candidate) => candidate.clientRequestId));
-          state.queue = state.queue.filter(
-            (candidate) => !realRequestIds.has(candidate.clientRequestId),
-          );
-          group.forEach((candidate, index) => {
-            if (candidate.playerType === "BOT") return;
-            state.assignments[candidate.clientRequestId] = {
-              matchId: assignment.matchId,
-              targetPlayerCount: playerCount,
-              role: index === 0 ? "HOST" : "GUEST",
-              assignedAt: now,
-              expiresAt: now + ASSIGNMENT_TTL_MS,
-              displayName: candidate.displayName,
-              characterId: normalizeCharacterId(candidate.characterId),
-              profileId: candidate.profileId,
-            };
-          });
-          await this.#persist(state);
+          const completed = await this.#resumePendingMatch(state, now);
+          if (!completed) return;
         }
       }
 
