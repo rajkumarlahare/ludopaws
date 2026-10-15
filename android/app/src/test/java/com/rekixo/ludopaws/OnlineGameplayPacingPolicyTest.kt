@@ -55,7 +55,7 @@ class OnlineGameplayPacingPolicyTest {
         val current = snapshot(
             randomEventIndex = 5,
             turnSeat = 1,
-            players = players(firstTokens = listOf(3, -1, -1, -1)),
+            players = makePlayers(firstTokens = listOf(3, -1, -1, -1)),
             history = listOf(event(eventIndex = 4, outcome = 3, moveTokenIndex = 0)),
         )
         val motion = LudoPawsPawnAnimationPolicy.plans(previous, current).single()
@@ -89,7 +89,7 @@ class OnlineGameplayPacingPolicyTest {
             turnSeat = 0,
             actingSeat = 2,
             randomEventIndex = 5,
-            players = players(firstTokens = listOf(3, -1, -1, -1), teamUp = true),
+            players = makePlayers(firstTokens = listOf(3, -1, -1, -1), teamUp = true),
             history = listOf(event(eventIndex = 4, outcome = 3, moveTokenIndex = 0)),
         )
         val motion = LudoPawsPawnAnimationPolicy.plans(previous, current).single()
@@ -112,7 +112,7 @@ class OnlineGameplayPacingPolicyTest {
         randomEventIndex: Int,
         pending: PendingRollSnapshot? = null,
         history: List<HistoryEventSnapshot> = emptyList(),
-        players: List<PlayerSnapshot> = players(),
+        players: List<PlayerSnapshot> = makePlayers(),
         matchMode: String = "ONLINE",
         actingSeat: Int? = null,
     ): MatchSnapshot =
@@ -133,7 +133,7 @@ class OnlineGameplayPacingPolicyTest {
             teamAssignments = if (matchMode == "TEAM_UP") listOf("A", "B", "A", "B") else emptyList(),
         )
 
-    private fun players(
+    private fun makePlayers(
         firstTokens: List<Int> = listOf(-1, -1, -1, -1),
         teamUp: Boolean = false,
     ): List<PlayerSnapshot> =
