@@ -52,6 +52,9 @@ jobs:
       - name: Account deletion page source checks
         working-directory: .
         run: node scripts/check-account-deletion-pages.mjs
+      - name: Pricing and in-app purchase policy contract gate
+        working-directory: .
+        run: node scripts/check-pricing-policy.mjs
       - name: Server tests
         run: npm test
       - name: Production smoke syntax check
