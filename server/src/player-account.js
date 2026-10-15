@@ -340,7 +340,7 @@ export class PlayerAccount {
       // accepted so a same-token revocation can remove access immediately.
       if (existing &&
           String(existing.purchase_token_hash) !== body.purchaseTokenHash &&
-          Number(existing.expiry_time_ms) > body.expiryTimeMs) {
+          Number(existing.expiry_time_ms) >= body.expiryTimeMs) {
         staleUpdateIgnored = true;
         return;
       }
