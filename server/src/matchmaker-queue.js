@@ -411,7 +411,7 @@ export class MatchmakerQueue {
 
     let assignment;
     try {
-      const assignment = await this.#materialize(
+      assignment = await this.#materialize(
         pending.participants,
         pending.playerCount,
       );
