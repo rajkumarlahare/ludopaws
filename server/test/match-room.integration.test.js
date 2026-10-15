@@ -2343,7 +2343,7 @@ test(
     };
 
     const room = new MatchRoom(ctx, env);
-    const host = await createMatch(room, "LPBOTUNRANK");
+    const host = await createMatch(room, "LPBOTUNRAN");
     await joinMatch(room, "Maya");
     await startMatch(room, host.playerToken);
 
