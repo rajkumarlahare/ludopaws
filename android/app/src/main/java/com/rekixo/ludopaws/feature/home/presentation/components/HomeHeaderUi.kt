@@ -183,20 +183,14 @@ private fun HomeActivity.homeCurrencyPill(): LinearLayout =
             HomeIconView(this@homeCurrencyPill).apply {
                 kind = HomeIconKind.ADD
                 iconColor = Color.WHITE
-                addIconScale = 0.5f
                 isClickable = true
                 isFocusable = true
                 contentDescription = "Add currency"
-                setPadding(
-                    dp(9),
-                    dp(9),
-                    dp(9),
-                    dp(9),
-                )
                 background =
                     plywoodBackground(
                         context = this@homeCurrencyPill,
-                        cornerRadiusDp = if (isCompact()) 19.5f else 22f,
+                        cornerRadiusDp = if (isCompact()) 13f else 14.5f,
+                        rimThicknessDp = 7f,
                     )
                 setOnClickListener {
                     startActivity(
@@ -208,8 +202,8 @@ private fun HomeActivity.homeCurrencyPill(): LinearLayout =
                 }
             },
             LinearLayout.LayoutParams(
-                dp(if (isCompact()) 39 else 44),
-                dp(if (isCompact()) 39 else 44),
+                dp(if (isCompact()) 26 else 29),
+                dp(if (isCompact()) 26 else 29),
             ),
         )
     }
