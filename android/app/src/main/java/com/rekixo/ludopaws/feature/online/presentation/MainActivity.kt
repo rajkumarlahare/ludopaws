@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.text.InputType
 import android.view.Gravity
 import android.view.View
@@ -192,6 +193,41 @@ class MainActivity : ComponentActivity() {
 
     internal var lastTurnTimeoutNoticeAt = 0L
     internal var timeoutExitScheduled = false
+
+    internal var onlineGameplayActionBlockedUntilMillis = 0L
+    internal var lastOnlineGameplayPacingKey: String? = null
+
+    internal fun canSubmitOnlineGameplayAction(): Boolean =
+        SystemClock.uptimeMillis() >= onlineGameplayActionBlockedUntilMillis
+
+    internal fun scheduleOnlineGameplayUnlock() {
+        val remaining =
+            (onlineGameplayActionBlockedUntilMillis - SystemClock.uptimeMillis())
+                .coerceAtLeast(0L)
+        if (!screenStarted || remaining == 0L) return
+        mainHandler.removeCallbacks(onlineGameplayUnlockRunnable)
+        mainHandler.postDelayed(onlineGameplayUnlockRunnable, remaining)
+    }
+
+    internal val onlineGameplayUnlockRunnable =
+        object : Runnable {
+            override fun run() {
+                if (!screenStarted) return
+                val remaining =
+                    (onlineGameplayActionBlockedUntilMillis - SystemClock.uptimeMillis())
+                        .coerceAtLeast(0L)
+                if (remaining > 0L) {
+                    mainHandler.postDelayed(this, remaining)
+                    return
+                }
+
+                currentState?.let { state ->
+                    updateControls(state)
+                    updateRollButton()
+                    OnlineLudoPawsPresentation.refreshActionControls(this@MainActivity, state)
+                }
+            }
+        }
 
     internal val realtimeRefreshRunnable =
         Runnable {
@@ -821,6 +857,7 @@ class MainActivity : ComponentActivity() {
         super.onStart()
         screenStarted = true
         connectivityMonitor.start()
+        scheduleOnlineGameplayUnlock()
         mainHandler.removeCallbacks(
             statePollRunnable,
         )
@@ -846,6 +883,7 @@ class MainActivity : ComponentActivity() {
     override fun onStop() {
         stopFriendsVoice("Voice paused when you left the match.")
         screenStarted = false
+        mainHandler.removeCallbacks(onlineGameplayUnlockRunnable)
         uiStateHolder.update {
             it.copy(
                 currentStateSource = null,
