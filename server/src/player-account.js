@@ -62,6 +62,7 @@ export class PlayerAccount {
       sql.exec("CREATE TABLE IF NOT EXISTS account_sessions (session_id TEXT PRIMARY KEY, refresh_token_hash TEXT NOT NULL, previous_refresh_hash TEXT, last_refresh_request_id TEXT, created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, revoked_at INTEGER, last_seen_at INTEGER NOT NULL)");
       sql.exec("CREATE TABLE IF NOT EXISTS wallet (account_id TEXT PRIMARY KEY, balance INTEGER NOT NULL DEFAULT 0 CHECK(balance >= 0), ads_removed INTEGER NOT NULL DEFAULT 0 CHECK(ads_removed IN (0, 1)), updated_at INTEGER NOT NULL)");
       sql.exec("CREATE TABLE IF NOT EXISTS wallet_transactions (transaction_id TEXT PRIMARY KEY, idempotency_key TEXT NOT NULL UNIQUE, payload_hash TEXT NOT NULL, kind TEXT NOT NULL, delta INTEGER NOT NULL, balance_after INTEGER NOT NULL, source_ref_hash TEXT, created_at INTEGER NOT NULL)");
+      sql.exec("CREATE TABLE IF NOT EXISTS paws_plus_subscriptions (account_id TEXT PRIMARY KEY, product_id TEXT NOT NULL, purchase_token_hash TEXT NOT NULL, subscription_state TEXT NOT NULL, expiry_time_ms INTEGER NOT NULL, auto_renew_enabled INTEGER NOT NULL CHECK(auto_renew_enabled IN (0, 1)), updated_at INTEGER NOT NULL)");
       sql.exec("CREATE TABLE IF NOT EXISTS owned_cosmetics (cosmetic_id TEXT PRIMARY KEY, category TEXT NOT NULL, source TEXT NOT NULL, acquired_at INTEGER NOT NULL, source_ref_hash TEXT)");
       sql.exec("CREATE TABLE IF NOT EXISTS selected_cosmetics (category TEXT PRIMARY KEY, cosmetic_id TEXT NOT NULL, updated_at INTEGER NOT NULL)");
       sql.exec("CREATE TABLE IF NOT EXISTS cosmetic_ad_progress (cosmetic_id TEXT PRIMARY KEY, progress INTEGER NOT NULL DEFAULT 0 CHECK(progress >= 0), updated_at INTEGER NOT NULL)");
@@ -82,6 +83,7 @@ export class PlayerAccount {
       if (request.method === "POST" && url.pathname === "/profile/update") return await this.#updateProfile(request);
       if (request.method === "POST" && url.pathname === "/wallet/get") return await this.#getWallet(request);
       if (request.method === "POST" && url.pathname === "/wallet/play-purchase") return await this.#grantPlayPurchase(request);
+      if (request.method === "POST" && url.pathname === "/wallet/subscription/sync") return await this.#syncSubscription(request);
       if (request.method === "POST" && url.pathname === "/wallet/reward-ad") return await this.#grantAdReward(request);
       if (request.method === "POST" && url.pathname === "/wallet/cosmetic/purchase") return await this.#purchaseCosmetic(request);
       if (request.method === "POST" && url.pathname === "/wallet/cosmetic/select") return await this.#selectCosmetic(request);
@@ -122,9 +124,14 @@ export class PlayerAccount {
         "INSERT OR IGNORE INTO account_deletion_claims (account_id, claimed_at) VALUES (?, ?)",
         accountId, Date.now(),
       );
-      purchaseLedgerIds = [...this.ctx.storage.sql.exec(
-        "SELECT source_ref_hash FROM wallet_transactions WHERE kind IN ('PLAY_GEM_PURCHASE', 'PLAY_REMOVE_ADS') AND source_ref_hash IS NOT NULL",
-      )].map((row) => String(row.source_ref_hash)).filter((value) => /^[a-f0-9]{64}$/.test(value));
+      purchaseLedgerIds = [
+        ...[...this.ctx.storage.sql.exec(
+          "SELECT source_ref_hash FROM wallet_transactions WHERE kind IN ('PLAY_GEM_PURCHASE', 'PLAY_REMOVE_ADS') AND source_ref_hash IS NOT NULL",
+        )].map((row) => String(row.source_ref_hash)),
+        ...[...this.ctx.storage.sql.exec(
+          "SELECT purchase_token_hash FROM paws_plus_subscriptions WHERE account_id = ? LIMIT 1", accountId,
+        )].map((row) => String(row.purchase_token_hash)),
+      ].filter((value) => /^[a-f0-9]{64}$/.test(value));
     });
 
     if (deleted) return json(200, { ok: true, deleted: true, deletionPending: false, purchaseLedgerIds: [] });
@@ -163,6 +170,7 @@ export class PlayerAccount {
       this.#profileSnapshot(accountId);
       this.ctx.storage.sql.exec("DELETE FROM account_sessions");
       this.ctx.storage.sql.exec("DELETE FROM wallet_transactions");
+      this.ctx.storage.sql.exec("DELETE FROM paws_plus_subscriptions WHERE account_id = ?", accountId);
       this.ctx.storage.sql.exec("DELETE FROM cosmetic_ad_progress");
       this.ctx.storage.sql.exec("DELETE FROM selected_cosmetics");
       this.ctx.storage.sql.exec("DELETE FROM owned_cosmetics");
@@ -293,7 +301,62 @@ export class PlayerAccount {
     return json(200, { ok: true, ...result, productId, gemAmount: product.gemAmount, removeAds: product.removeAds, wallet: this.#walletSnapshot(accountId) });
   }
 
-  async #resolveCosmetic(cosmeticId, country = "ZZ") {
+  async #syncSubscription(request) {
+    const body = await readJson(request);
+    const accountId = requireAccountId(body?.accountId);
+    this.#requireAccountNotDeleting(accountId);
+    if (!["paws_plus"].includes(body?.productId) ||
+        ![
+          "SUBSCRIPTION_STATE_PENDING",
+          "SUBSCRIPTION_STATE_ACTIVE",
+          "SUBSCRIPTION_STATE_PAUSED",
+          "SUBSCRIPTION_STATE_IN_GRACE_PERIOD",
+          "SUBSCRIPTION_STATE_ON_HOLD",
+          "SUBSCRIPTION_STATE_CANCELED",
+          "SUBSCRIPTION_STATE_EXPIRED",
+          "SUBSCRIPTION_STATE_PENDING_PURCHASE_CANCELED",
+        ].includes(body?.subscriptionState) ||
+        !Number.isSafeInteger(body?.expiryTimeMs) ||
+        body.expiryTimeMs <= 0 ||
+        typeof body?.autoRenewEnabled !== "boolean" ||
+        !/^[a-f0-9]{64}$/.test(String(body?.purchaseTokenHash ?? ""))) {
+      throw httpError(400, "INVALID_SUBSCRIPTION_STATE", "verified subscription state is invalid");
+    }
+    const exists = [...this.ctx.storage.sql.exec(
+      "SELECT account_id FROM account_meta WHERE account_id = ? LIMIT 1", accountId,
+    )];
+    if (!exists.length) throw httpError(404, "ACCOUNT_NOT_FOUND", "account was not found");
+
+    let staleUpdateIgnored = false;
+    this.ctx.storage.transactionSync(() => {
+      this.#requireAccountNotDeleting(accountId);
+      const existingRows = [...this.ctx.storage.sql.exec(
+        "SELECT purchase_token_hash, expiry_time_ms FROM paws_plus_subscriptions WHERE account_id = ? LIMIT 1",
+        accountId,
+      )];
+      const existing = existingRows[0];
+      // When an old token emits a delayed expiry/cancel notification after a resubscribe,
+      // it must not overwrite the newer entitlement. Updates for the same token are always
+      // accepted so a same-token revocation can remove access immediately.
+      if (existing &&
+          String(existing.purchase_token_hash) !== body.purchaseTokenHash &&
+          Number(existing.expiry_time_ms) > body.expiryTimeMs) {
+        staleUpdateIgnored = true;
+        return;
+      }
+      const now = Date.now();
+      this.ctx.storage.sql.exec(
+        "INSERT INTO paws_plus_subscriptions (account_id, product_id, purchase_token_hash, subscription_state, expiry_time_ms, auto_renew_enabled, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(account_id) DO UPDATE SET product_id = excluded.product_id, purchase_token_hash = excluded.purchase_token_hash, subscription_state = excluded.subscription_state, expiry_time_ms = excluded.expiry_time_ms, auto_renew_enabled = excluded.auto_renew_enabled, updated_at = excluded.updated_at",
+        accountId, body.productId, body.purchaseTokenHash, body.subscriptionState,
+        body.expiryTimeMs, body.autoRenewEnabled ? 1 : 0, now,
+      );
+    });
+    return json(200, {
+      ok: true,
+      staleUpdateIgnored,
+      wallet: this.#walletSnapshot(accountId),
+    });
+  }  async #resolveCosmetic(cosmeticId, country = "ZZ") {
     const namespace = this.env?.LUDOPROOF_STORE_CATALOG;
     if (namespace) {
       let state;
@@ -595,7 +658,32 @@ export class PlayerAccount {
     for (const row of this.ctx.storage.sql.exec("SELECT category, cosmetic_id FROM selected_cosmetics ORDER BY category")) selectedCosmetics[String(row.category)] = String(row.cosmetic_id);
     const rewardedAdProgress = {};
     for (const row of this.ctx.storage.sql.exec("SELECT cosmetic_id, progress FROM cosmetic_ad_progress ORDER BY cosmetic_id")) rewardedAdProgress[String(row.cosmetic_id)] = Number(row.progress);
-    return { accountId, balance: Number(rows[0].balance), adsRemoved: Number(rows[0].ads_removed) === 1,
+    const subscriptionRows = [...this.ctx.storage.sql.exec(
+      "SELECT product_id, subscription_state, expiry_time_ms, auto_renew_enabled, updated_at FROM paws_plus_subscriptions WHERE account_id = ? LIMIT 1",
+      accountId,
+    )];
+    const subscriptionRow = subscriptionRows[0] ?? null;
+    const subscriptionExpiryTimeMs = subscriptionRow ? Number(subscriptionRow.expiry_time_ms) : 0;
+    const pawsPlusActive = Boolean(
+      subscriptionRow &&
+      ["SUBSCRIPTION_STATE_ACTIVE", "SUBSCRIPTION_STATE_IN_GRACE_PERIOD", "SUBSCRIPTION_STATE_CANCELED"].includes(String(subscriptionRow.subscription_state)) &&
+      Number.isSafeInteger(subscriptionExpiryTimeMs) &&
+      subscriptionExpiryTimeMs > Date.now(),
+    );
+    const pawsPlusSubscription = subscriptionRow ? {
+      productId: String(subscriptionRow.product_id),
+      state: String(subscriptionRow.subscription_state),
+      expiresAt: subscriptionExpiryTimeMs,
+      autoRenewEnabled: Number(subscriptionRow.auto_renew_enabled) === 1,
+      active: pawsPlusActive,
+      updatedAt: Number(subscriptionRow.updated_at),
+    } : null;
+    const ownedCosmetics = [...this.ctx.storage.sql.exec("SELECT cosmetic_id FROM owned_cosmetics ORDER BY cosmetic_id")].map((row) => String(row.cosmetic_id));
+    const selectedCosmetics = {};
+    for (const row of this.ctx.storage.sql.exec("SELECT category, cosmetic_id FROM selected_cosmetics ORDER BY category")) selectedCosmetics[String(row.category)] = String(row.cosmetic_id);
+    const rewardedAdProgress = {};
+    for (const row of this.ctx.storage.sql.exec("SELECT cosmetic_id, progress FROM cosmetic_ad_progress ORDER BY cosmetic_id")) rewardedAdProgress[String(row.cosmetic_id)] = Number(row.progress);
+    return { accountId, balance: Number(rows[0].balance), adsRemoved: Number(rows[0].ads_removed) === 1, pawsPlusActive, pawsPlusSubscription,
       updatedAt: Number(rows[0].updated_at), ownedCosmetics, selectedCosmetics, rewardedAdProgress };
   }
 }
