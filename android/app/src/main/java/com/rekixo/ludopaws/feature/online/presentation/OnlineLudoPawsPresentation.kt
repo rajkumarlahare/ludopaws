@@ -450,8 +450,8 @@ internal object OnlineLudoPawsPresentation {
                     null
                 }
             if (activeDiceControl != null) {
-                host.activeDiceControl = activeDiceControl
-                host.activeDicePlayerId = player.playerId
+                quickChatHost.activeDiceControl = activeDiceControl
+                quickChatHost.activeDicePlayerId = player.playerId
             }
             if (alignEnd && activeDiceControl != null) {
                 slotHost.addView(activeDiceControl)
