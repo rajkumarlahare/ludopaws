@@ -296,7 +296,7 @@ private fun ProfileActivity.showTermsAndConditionsDialog() {
             setTextColor(Color.WHITE)
             setLineSpacing(0f, 1.16f)
             setPadding(dp(5), dp(3), dp(5), dp(12))
-            textIsSelectable = true
+            setTextIsSelectable(true)
         }
     val scroll =
         ScrollView(this).apply {
