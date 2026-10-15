@@ -356,7 +356,9 @@ export class PlayerAccount {
       staleUpdateIgnored,
       wallet: this.#walletSnapshot(accountId),
     });
-  }  async #resolveCosmetic(cosmeticId, country = "ZZ") {
+  }
+
+  async #resolveCosmetic(cosmeticId, country = "ZZ") {
     const namespace = this.env?.LUDOPROOF_STORE_CATALOG;
     if (namespace) {
       let state;
@@ -651,13 +653,27 @@ export class PlayerAccount {
     return { accountId: String(rows[0].account_id), displayName: String(rows[0].display_name), createdAt: Number(rows[0].created_at), updatedAt: Number(rows[0].updated_at) };
   }
   #walletSnapshot(accountId) {
-    const rows = [...this.ctx.storage.sql.exec("SELECT balance, ads_removed, updated_at FROM wallet WHERE account_id = ? LIMIT 1", accountId)];
+    const rows = [...this.ctx.storage.sql.exec(
+      "SELECT balance, ads_removed, updated_at FROM wallet WHERE account_id = ? LIMIT 1",
+      accountId,
+    )];
     if (!rows.length) throw httpError(404, "WALLET_NOT_FOUND", "wallet was not found");
-    const ownedCosmetics = [...this.ctx.storage.sql.exec("SELECT cosmetic_id FROM owned_cosmetics ORDER BY cosmetic_id")].map((row) => String(row.cosmetic_id));
+    const ownedCosmetics = [...this.ctx.storage.sql.exec(
+      "SELECT cosmetic_id FROM owned_cosmetics ORDER BY cosmetic_id",
+    )].map((row) => String(row.cosmetic_id));
     const selectedCosmetics = {};
-    for (const row of this.ctx.storage.sql.exec("SELECT category, cosmetic_id FROM selected_cosmetics ORDER BY category")) selectedCosmetics[String(row.category)] = String(row.cosmetic_id);
+    for (const row of this.ctx.storage.sql.exec(
+      "SELECT category, cosmetic_id FROM selected_cosmetics ORDER BY category",
+    )) {
+      selectedCosmetics[String(row.category)] = String(row.cosmetic_id);
+    }
     const rewardedAdProgress = {};
-    for (const row of this.ctx.storage.sql.exec("SELECT cosmetic_id, progress FROM cosmetic_ad_progress ORDER BY cosmetic_id")) rewardedAdProgress[String(row.cosmetic_id)] = Number(row.progress);
+    for (const row of this.ctx.storage.sql.exec(
+      "SELECT cosmetic_id, progress FROM cosmetic_ad_progress ORDER BY cosmetic_id",
+    )) {
+      rewardedAdProgress[String(row.cosmetic_id)] = Number(row.progress);
+    }
+
     const subscriptionRows = [...this.ctx.storage.sql.exec(
       "SELECT product_id, subscription_state, expiry_time_ms, auto_renew_enabled, updated_at FROM paws_plus_subscriptions WHERE account_id = ? LIMIT 1",
       accountId,
@@ -678,13 +694,18 @@ export class PlayerAccount {
       active: pawsPlusActive,
       updatedAt: Number(subscriptionRow.updated_at),
     } : null;
-    const ownedCosmetics = [...this.ctx.storage.sql.exec("SELECT cosmetic_id FROM owned_cosmetics ORDER BY cosmetic_id")].map((row) => String(row.cosmetic_id));
-    const selectedCosmetics = {};
-    for (const row of this.ctx.storage.sql.exec("SELECT category, cosmetic_id FROM selected_cosmetics ORDER BY category")) selectedCosmetics[String(row.category)] = String(row.cosmetic_id);
-    const rewardedAdProgress = {};
-    for (const row of this.ctx.storage.sql.exec("SELECT cosmetic_id, progress FROM cosmetic_ad_progress ORDER BY cosmetic_id")) rewardedAdProgress[String(row.cosmetic_id)] = Number(row.progress);
-    return { accountId, balance: Number(rows[0].balance), adsRemoved: Number(rows[0].ads_removed) === 1, pawsPlusActive, pawsPlusSubscription,
-      updatedAt: Number(rows[0].updated_at), ownedCosmetics, selectedCosmetics, rewardedAdProgress };
+
+    return {
+      accountId,
+      balance: Number(rows[0].balance),
+      adsRemoved: Number(rows[0].ads_removed) === 1,
+      pawsPlusActive,
+      pawsPlusSubscription,
+      updatedAt: Number(rows[0].updated_at),
+      ownedCosmetics,
+      selectedCosmetics,
+      rewardedAdProgress,
+    };
   }
 }
 
