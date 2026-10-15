@@ -19,6 +19,10 @@ const policy = read("../docs/privacy-policy.html");
 const worker = read("../server/src/index-account.js");
 const directory = read("../server/src/account-directory.js");
 const player = read("../server/src/player-account.js");
+const receiptArchive = read("../server/src/match-receipt-archive.js");
+const voiceSession = read("../android/app/src/main/java/com/rekixo/ludopaws/feature/online/data/realtime/FriendsVoiceChatSession.kt");
+const manifest = read("../android/app/src/main/AndroidManifest.xml");
+const inAppPolicy = read("../android/app/src/main/java/com/rekixo/ludopaws/feature/settings/presentation/PrivacyPolicyDialogUi.kt");
 const pagesWorkflow = read("../.github/workflows/account-deletion-pages.yml");
 
 has(page, 'id="guest-deletion-code" type="password" maxlength="64"', "guest delete-only credential input");
@@ -42,8 +46,20 @@ has(worker, 'ludoproof:guest-deletion-credential:v1:', "domain-separated guest c
 has(directory, "deleted_guest_deletion_credentials", "guest deletion replay tombstone");
 has(directory, "ACCOUNT_DELETION_IN_PROGRESS", "guest deletion claim lock");
 has(player, "const guestRecoveryVerified = body?.guestRecoveryVerified === true", "guest deletion server-owned verification boundary");
-has(policy, "delete-only code", "guest deletion disclosure in privacy-policy draft");
-has(policy, "<h2>8. Account and data deletion</h2>", "privacy-policy deletion section");
+has(policy, "delete-only code", "guest deletion disclosure in privacy policy");
+has(policy, 'href="./account-deletion.html">official account and data deletion page</a>', "privacy policy links to the external deletion page");
+has(policy, "365 days from match completion", "privacy policy receipt retention period");
+has(policy, "AI@rekixo.com", "privacy support contact");
+has(page, "365 days after a match finishes", "deletion page receipt retention disclosure");
+has(page, "AI@rekixo.com", "deletion page support contact");
+has(receiptArchive, "const RECEIPT_RETENTION_MS = 365 * 24 * 60 * 60 * 1000;", "180-day receipt retention constant");
+has(receiptArchive, "async alarm()", "scheduled receipt expiration handler");
+has(receiptArchive, "MATCH_RECEIPT_RETENTION_EXPIRED", "expired receipt access protection");
+has(policy, "Optional Friends voice chat", "published microphone and voice-chat disclosure");
+has(inAppPolicy, "Optional Friends voice chat", "in-app microphone and voice-chat disclosure");
+has(manifest, "android.permission.RECORD_AUDIO", "declared microphone permission");
+has(voiceSession, "stun:stun.l.google.com:19302", "configured WebRTC STUN provider");
+has(voiceSession, "audioTrack?.setEnabled(micEnabled)", "microphone track behavior");
 
 has(pagesWorkflow, "LUDOPROOF_POLICY_RELEASE_APPROVED", "publisher approval gate");
 has(pagesWorkflow, "GOOGLE_SIGN_IN_WEB_CLIENT_ID", "Google OAuth Web Client ID release gate");

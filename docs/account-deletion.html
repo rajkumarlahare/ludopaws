@@ -42,7 +42,7 @@
     <header>LUDO PAWS</header>
     <section class="panel">
       <h1>Account and data deletion</h1>
-      <p>Use the Google account that you previously linked to Ludo Paws to request deletion of that Ludo Paws account. This does not delete your Google account or your Google Play account.</p>
+      <p>This page lets you request deletion of your Ludo Paws account and associated account data. For a Google-linked account, use the same Google identity that you previously linked. This does not delete your Google account or Google's separate Google Play order history.</p>
       <p class="muted">For security, this page only asks the Ludo Paws server to delete an account after Google identity verification and an additional explicit confirmation. Session tokens are kept in page memory only and are not saved to browser storage.</p>
 
       <h2>1. Find your account</h2>
@@ -53,7 +53,8 @@
       <div id="account-actions" hidden>
         <p>Signed in to a Google-linked Ludo Paws account: <strong id="account-name">Google account</strong>.</p>
         <h2>2. Confirm deletion</h2>
-        <p>Deletion removes the account profile, server wallet and gems, cosmetic inventory/progress, active sessions, linked Friend ID/social data, linked leaderboard profile, and account-linked Play purchase-verification records managed by Ludo Paws.</p>
+        <p>When the request completes, the server removes the account profile, active sessions, wallet and gems, cosmetic inventory and rewarded-ad progress, account-linked app purchase ledger records, linked Friend ID and social records, and linked leaderboard profile. The app also attempts to clear its local profile, wallet, pending-purchase, friend and leaderboard caches. If the app reports that local cleanup failed, clear the app's storage on that device.</p>
+        <p>Online match-proof receipts are kept for up to 365 days after a match finishes, or 365 days after creation if it does not finish. Minimal hashed or pseudonymous security markers may remain as described in the <a href="./privacy-policy.html">Privacy Policy</a>. Google Play's separate order history is not deleted.</p>
         <label class="check">
           <input type="checkbox" id="confirm-delete">
           <span>I understand that deleting this Ludo Paws account is permanent and cannot be undone.</span>
@@ -79,10 +80,10 @@
 
       <h2>Accounts without a saved guest code or sign-in problems</h2>
       <p>If you still have the app, you can also use <strong>Profile → Delete account and data</strong>. If you uninstalled without saving a guest deletion code, contact publisher support using the contact link below so the publisher can verify ownership through a separate process. Do not send passwords, session tokens, guest deletion codes, purchase tokens, or full payment details.</p>
-      <p id="support-missing" class="fine-print">Publisher support contact has not been configured on this page yet. This site is not ready for public launch until the publisher adds and verifies a monitored support address.</p>
+      <p id="support-missing" class="fine-print" hidden>If you cannot complete deletion, email <a href="mailto:AI@rekixo.com">AI@rekixo.com</a>. Support will verify account ownership through a reasonable process. Do not send passwords, access or refresh tokens, purchase tokens, full payment details, or guest deletion codes.</p>
       <p id="support-link" hidden><a id="support-email" href="#">Contact publisher support for a deletion request</a></p>
 
-      <p class="fine-print">Read the <a href="./privacy-policy.html">Privacy Policy</a> for details of data use and retention. Match proof/receipt retention must be governed by the reviewed published policy before public launch; this page does not claim that all separate integrity records are deleted.</p>
+      <p class="fine-print">Read the <a href="./privacy-policy.html">Privacy Policy</a> for full details of data use, sharing and retention. Deleting an account does not delete every offline copy on your device or records retained independently by Google or another service provider.</p>
     </section>
     <footer>Never share your Google password or verification code. Ludo Paws will not ask for either.</footer>
   </main>
@@ -171,7 +172,7 @@
   });
 
   function showSupportContact() {
-    const email = String(config.supportEmail || "").trim();
+    const email = String(config.supportEmail || "AI@rekixo.com").trim();
     if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
       const link = document.getElementById("support-email");
       link.href = "mailto:" + email + "?subject=" + encodeURIComponent("Ludo Paws account deletion request");

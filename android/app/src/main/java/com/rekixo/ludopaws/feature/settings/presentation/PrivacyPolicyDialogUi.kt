@@ -139,24 +139,32 @@ internal fun showPrivacyPolicyDialog(
 private const val PRIVACY_POLICY_TEXT =
     """Last updated: October 15, 2026
 
-Ludo Paws is published under the Rekixo brand. This policy describes information that may be processed by the Android game and its connected services. Which information is used depends on the features you choose and which services the publisher has enabled.
+Ludo Paws is a mobile Ludo-style game published under the Rekixo brand. The data processed depends on the features you use and the services enabled in your version of the game.
 
 INFORMATION THAT MAY BE PROCESSED
-• Account and profile information, such as an internal account identifier, display name, account/session status, and links to Google, Friend ID, or leaderboard identities when you choose to link those features.
-• Online game and integrity information, such as match/player identifiers, moves, outcomes, dice/proof commitments, proof digests, and event history needed to operate multiplayer games and investigate game-integrity issues.
-• Social and leaderboard information, such as Friend IDs, friend relationships, invitations/messages when used, and submitted player names, scores, wins, or points.
-• Store and entitlement information, such as selected cosmetics, gem balance, cosmetics inventory, rewarded-ad progress when enabled, purchase product IDs, and transaction references used to verify entitlements and prevent duplicate grants.
-• Device-local information, such as settings, local game state, selected appearance, and account-scoped cache data.
-• Technical and security records needed to authenticate requests, maintain sessions, limit abuse, troubleshoot errors, and protect the service.
+• Account information: an internal account ID, display name, account state, and links to Google, Friend ID or leaderboard identities when you use those features. Ludo Paws does not need your Google password.
+• Security information: session identifiers/expiry status, refresh-token hashes, sign-in nonces, request identifiers, and limited anti-abuse/rate-limit records.
+• Gameplay and fairness: online match and pseudonymous player IDs, game state, moves, results, timestamps, ruleset IDs, dice commitments, proof digests and event history. Offline game state may remain on your device.
+• Optional Friends voice chat: during an active Friends match, if you start voice chat and grant microphone permission, your microphone audio is sent to participating friends over WebRTC. The game service relays connection setup data (session descriptions and ICE candidates); Google's public STUN service helps establish the connection and may process IP/network information. The current client does not upload the voice stream to the game API for storage; network details may be exposed to other participants depending on the connection.
+• Social and leaderboard information: Friend IDs, display names, relationships, requests, invitations, recent players, friend conversations when used, submitted results and scores.
+• Store data: gem balance, selected/owned cosmetics, cosmetic/reward progress when enabled, Play product IDs and hashed purchase references used to verify entitlements and prevent duplicate grants.
+• Device data: local settings, profile statistics, offline game state and account-scoped cache. Hosting or network providers may process IP address and request/device-network information to deliver and protect the service. The API derives a one-way IP hash for rate limiting and does not intentionally save raw IP addresses in match or rate-limit state.
 
-HOW INFORMATION IS USED AND SHARED
-Information is used to provide account and game features, synchronize supported progress and entitlements, operate online matches and social/leaderboard features, verify game integrity and purchases, prevent abuse, troubleshoot service errors, and respond to privacy requests. Data may be processed by Google sign-in/Google Play Games, Google Play billing, advertising services such as AdMob when enabled, and infrastructure or network providers to the extent needed for configured features. Those providers also apply their own privacy notices and terms. Ludo Paws does not need your Google password to verify Google sign-in.
+WHY DATA IS USED AND WHO MAY PROCESS IT
+Data is used to run the game and accounts, authenticate sessions, provide online/social/leaderboard features, sync entitlements, verify purchases and rewarded ads, protect match integrity, prevent abuse, troubleshoot errors and respond to privacy requests. Depending on features enabled, providers include Cloudflare hosting/storage, the configured EntroNex dice-proof service, Google sign-in services, Google Play Games Services for supported achievements/leaderboard integration, Google Play Billing, Google's public STUN service for optional voice-chat setup, and Google Mobile Ads/AdMob with Google's consent tools. Providers apply their own privacy notices and terms. Ludo Paws does not sell personal information.
 
-ON-DEVICE DATA, PURCHASES AND ADS
-Game settings and some local profile or wallet information can be stored on your device for display and offline use; local caches are not authoritative proof of paid entitlements. Google Play handles its own order history and payment process. If ads or rewarded ads are enabled, Google Mobile Ads/AdMob may process ad requests and consent signals under Google's policies; rewards are applied only through the configured validation flow. This text does not mean ads or every online feature are currently enabled.
+PURCHASES AND ADS
+When one-time Google Play Billing is enabled, the server checks a purchase with Google before granting the configured item. Google Play separately keeps its order/payment history. When ads are enabled, Google Mobile Ads/AdMob may process ad requests, device or advertising identifiers, consent signals and ad-interaction information under Google's policies. Rewarded items are granted only after the configured server-side validation succeeds.
+
+LOCAL STORAGE AND SECURITY
+The app uses Android Keystore-backed protection for account credentials and selected sensitive local records where implemented. API requests use HTTPS, and local wallet caches are not trusted as proof of paid entitlement. If local cleanup fails after account deletion, clear Ludo Paws app storage on that device before handing it over.
 
 RETENTION AND ACCOUNT DELETION
-Service data may be kept while needed to operate features, secure accounts, prevent abuse or duplicate grants, resolve disputes, maintain game integrity, or meet legal obligations. Any specific retention period and justified exception must be described in the official published policy. Use Profile → menu → Delete account and data to request deletion in the app. A guest-only account may use its optional delete-only guest code; save it privately before uninstalling. The official online deletion page is available at https://ludopaws.rekixo.com/account-deletion.html when the publisher-hosted site is published and available. Deleting a Ludo Paws account does not delete your Google account or erase Google's separate Play order history.
+Open Profile → menu → Delete account and data to delete your Ludo Paws account, or use the official web page:
+https://ludopaws.rekixo.com/account-deletion.html
+The web page lets a Google-linked player verify the previously linked Google identity or lets an eligible unlinked guest use the delete-only code created before uninstalling. The guest code can delete an account only; it cannot sign in or restore progress. Never send it to support.
 
-CHANGES AND CONTACT
-This policy may be updated when the game, service providers, or applicable requirements change. Before public release, the publisher must verify the final provider list, data-retention details, support contact, and Play Console Data safety answers against the final app and server configuration."""
+When the request completes, the service deletes the account profile, sessions, wallet, cosmetics/reward progress, app-side purchase-ledger records, linked social data and leaderboard profile; the app also attempts to clear local account caches. Match-proof receipts are retained for up to 365 days after a match finishes, or 365 days after creation if unfinished. Minimal hashed/pseudonymous deletion and anti-replay security markers may remain as long as needed to prevent deleted accounts or codes from being reused; the current service does not assign a fixed expiry to every such marker. Google Play order history and independent providers' records are not deleted by this request. Offline/local data may remain until app data is cleared or the app is uninstalled.
+
+CONTACT AND AUDIENCE
+For privacy questions or help with account deletion, contact AI@rekixo.com. The publisher must confirm the target age group/children's treatment and align the final public policy with service providers and Google Play Data safety answers before release."""
