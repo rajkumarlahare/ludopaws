@@ -399,7 +399,7 @@ export class MatchRoom extends LifecycleMatchRoom {
   }
 }
 
-function chooseBotMove(state, playerId, legalTokenIndexes) {
+export function chooseBotMove(state, playerId, legalTokenIndexes) {
   const player = state.players.find((candidate) => candidate.playerId === playerId);
   const seat = state.players.findIndex((candidate) => candidate.playerId === playerId);
   const ranked = legalTokenIndexes.map((tokenIndex) => {
