@@ -220,11 +220,11 @@ requireText(
   'matchStatus != FINISHED_STATUS',
   "post-win placement must reject unfinished matches.",
 );
-requireText(
+requirePattern(
   "PostWinInterstitialPolicy.kt",
   interstitialPolicy,
-  "shouldShowFillerInterstitial(adsRemoved: Boolean): Boolean = !adsRemoved",
-  "Remove Ads must suppress the unsolicited interstitial placement.",
+  /shouldShowFillerInterstitial\(\s*adsRemoved:\s*Boolean,\s*pawsPlusActive:\s*Boolean\s*=\s*false,\s*\):\s*Boolean\s*=\s*!adsRemoved\s*&&\s*!pawsPlusActive/,
+  "Remove Ads and an active Paws Plus subscription must suppress the unsolicited interstitial placement.",
 );
 requireText(
   "PostWinInterstitialExitGate.kt",
