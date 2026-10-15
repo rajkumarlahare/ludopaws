@@ -5,6 +5,7 @@ import {
   applyMove,
   globalCellFor,
   isTeamUp,
+  teamIdForSeat,
 } from "./game.js";
 import { botResultHoldMs, botRetryDelayMs, botTurnDelayMs, botTurnsEnabled } from "./matchmaking-bots.js";
 import { MatchRoom as LifecycleMatchRoom, MOVE_SELECTION_TIMEOUT_MS } from "./match-room-lifecycle.js";
@@ -421,10 +422,11 @@ export function chooseBotMove(state, playerId, legalTokenIndexes) {
         if (isTeamUp(state)) {
           // Encourage (but never require) cooperative stacking with a partner:
           // the authoritative engine already prevents same-team captures.
+          const movingTeam = teamIdForSeat(state, seat);
           const teammateSharesCell = state.players.some(
             (candidate, candidateSeat) =>
               candidateSeat !== seat &&
-              candidate.teamId === player.teamId &&
+              teamIdForSeat(state, candidateSeat) === movingTeam &&
               candidate.tokens.some((position) =>
                 position >= 0 &&
                 position <= 50 &&
@@ -433,14 +435,16 @@ export function chooseBotMove(state, playerId, legalTokenIndexes) {
           );
           if (teammateSharesCell) score += 24;
 
-          const opponentSeats = state.players
-            .map((candidate) => candidate)
-            .filter((candidate) => candidate.teamId !== player.teamId);
-          if (opponentSeats.some((candidate) =>
-            candidate.tokens.some((position) => position >= 0 && position <= 50 &&
-              globalCellFor(candidate.color, position) === globalCell))) {
-            score += 90;
-          }
+          const opponentAtCell = state.players.some(
+            (candidate, candidateSeat) =>
+              teamIdForSeat(state, candidateSeat) !== movingTeam &&
+              candidate.tokens.some((position) =>
+                position >= 0 &&
+                position <= 50 &&
+                globalCellFor(candidate.color, position) === globalCell,
+              ),
+          );
+          if (opponentAtCell) score += 90;
         }
       }
     } catch {
