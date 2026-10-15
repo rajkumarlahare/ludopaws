@@ -179,6 +179,18 @@ export class MatchmakerQueue {
       );
     }
 
+    const finalizing = finalizingPayload(
+      state,
+      participant.clientRequestId,
+      participant.profileId,
+      participant.playerCount,
+      now,
+    );
+    if (finalizing) {
+      await this.#persist(state);
+      return json(202, finalizing);
+    }
+
     const existingIndex = state.queue.findIndex(
       (candidate) => candidate.clientRequestId === participant.clientRequestId,
     );
@@ -358,6 +370,18 @@ export class MatchmakerQueue {
       };
       await this.#persist(state);
       return await this.#matchedResponse(participant, assignment);
+    }
+
+    const finalizing = finalizingPayload(
+      state,
+      clientRequestId,
+      profile.profileId,
+      playerCount,
+      now,
+    );
+    if (finalizing) {
+      await this.#persist(state);
+      return json(202, finalizing);
     }
 
     const queued = state.queue.find(
@@ -848,6 +872,27 @@ function searchingPayload(state, playerCount, now, rulesetKey = DEFAULT_RULESET_
     queuedPlayers: Math.min(queued.length, playerCount),
     targetPlayerCount: playerCount,
     searchStartedAt: queued[0]?.joinedAt ?? now,
+  };
+}
+
+function finalizingPayload(state, clientRequestId, profileId, playerCount, now) {
+  const pending = state.pendingMatch;
+  const participant = pending?.participants?.find(
+    (candidate) => candidate.clientRequestId === clientRequestId,
+  );
+  if (!participant || participant.profileId !== profileId) return null;
+
+  const targetPlayerCount = Number(pending.playerCount ?? playerCount);
+  if (targetPlayerCount !== playerCount) return null;
+  return {
+    status: "FINALIZING",
+    matchMode: "ONLINE",
+    pending: true,
+    playerCount: targetPlayerCount,
+    targetPlayerCount,
+    queuedPlayers: Math.min(pending.participants.length, targetPlayerCount),
+    retryAt: Number(pending.retryAt ?? now),
+    searchStartedAt: Number(participant.joinedAt ?? now),
   };
 }
 
