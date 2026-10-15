@@ -41,6 +41,7 @@ internal data class LudoPaws3DSceneState(
     val forwardStartedAtMillis: Long = 0L,
     val forwardDurationMillis: Long = 0L,
     val captureReturns: Map<LudoPaws3DPawnKey, LudoPaws3DCaptureReturnState> = emptyMap(),
+    val pendingPreviewEventIndex: Int? = null,
     val activeReactions: Map<LudoPaws3DPawnKey, LudoPaws3DActiveReaction> = emptyMap(),
 )
 
@@ -56,6 +57,7 @@ internal class LudoPaws3DSceneView @JvmOverloads constructor(
     attrs: AttributeSet? = null,
 ) : TextureView(context, attrs), TextureView.SurfaceTextureListener {
     private val settingsStore = GameSettingsStore(context)
+    private var authoritativeSnapshot: MatchSnapshot? = null
     private var movementAudioMotionKey: String? = null
     private var movementAudioNextHop: Int = 1
     private var movementAudioNextStep: Int = 1
@@ -84,6 +86,81 @@ internal class LudoPaws3DSceneView @JvmOverloads constructor(
         surfaceTextureListener = this
     }
 
+    fun beginPendingMovePreview(
+        state: MatchSnapshot,
+        playerId: String,
+        tokenIndex: Int,
+    ): Boolean {
+        val pending = state.pendingRoll ?: return false
+        if (
+            state.status != "ACTIVE" ||
+            pending.status != "RESOLVED" ||
+            pending.eventIndex < 0 ||
+            pending.seat !in state.players.indices ||
+            state.players[pending.seat].playerId != playerId ||
+            tokenIndex !in pending.legalTokenIndexes
+        ) {
+            return false
+        }
+        val player = state.players.firstOrNull { it.playerId == playerId } ?: return false
+        val from = player.tokens.getOrNull(tokenIndex) ?: return false
+        val roll = pending.outcome ?: return false
+        val to = LudoPathEncoding.destinationForRoll(from, roll) ?: return false
+        val motion = LudoPawsPawnAnimationPolicy.transition(
+            playerId = playerId,
+            tokenIndex = tokenIndex,
+            from = from,
+            to = to,
+        ) ?: return false
+        if (motion.kind != LudoPawsPawnMotionKind.FORWARD) return false
+        val current = sceneState
+        if (current.pendingPreviewEventIndex != null) return false
+
+        val now = SystemClock.uptimeMillis()
+        val speed = settingsStore.snapshot().gameSpeed
+        val previewPlayers = state.players.map { candidate ->
+            if (candidate.playerId != playerId) {
+                candidate
+            } else {
+                candidate.copy(
+                    tokens = candidate.tokens.toMutableList().also { tokens ->
+                        tokens[tokenIndex] = to
+                    },
+                )
+            }
+        }
+        val previewSnapshot = state.copy(players = previewPlayers)
+        sceneState = current.copy(
+            snapshot = previewSnapshot,
+            forwardMotion = motion,
+            forwardStartedAtMillis = now,
+            forwardDurationMillis = LudoPawsGameplayPacingPolicy
+                .forwardAnimationDurationMillis(speed, motion.visualSteps),
+            pendingPreviewEventIndex = pending.eventIndex,
+        )
+        movementAudioMotionKey = motionKey(state.matchId, motion)
+        movementAudioNextHop = 1
+        movementAudioNextStep = 1
+        return true
+    }
+
+    fun cancelPendingMovePreview(authoritative: MatchSnapshot?) {
+        val current = sceneState
+        if (current.pendingPreviewEventIndex == null) return
+        authoritativeSnapshot = authoritative
+        sceneState = current.copy(
+            snapshot = authoritative,
+            forwardMotion = null,
+            forwardStartedAtMillis = 0L,
+            forwardDurationMillis = 0L,
+            captureReturns = emptyMap(),
+            pendingPreviewEventIndex = null,
+        )
+        movementAudioMotionKey = null
+        movementAudioNextHop = 1
+        movementAudioNextStep = 1
+    }
+
     fun bind(
         state: MatchSnapshot?,
         playerId: String?,
@@ -92,12 +169,65 @@ internal class LudoPaws3DSceneView @JvmOverloads constructor(
     ) {
         val now = SystemClock.uptimeMillis()
         val previousState = sceneState
-        val previousSnapshot = previousState.snapshot
+        val previousSnapshot = authoritativeSnapshot
+        val previewEventIndex = previousState.pendingPreviewEventIndex
+        val previewMotion = previousState.forwardMotion.takeIf { previewEventIndex != null }
         val sameMatch =
             previousSnapshot != null &&
                 state != null &&
                 previousSnapshot.matchId == state.matchId
-        if (!sameMatch) {
+        val previewPlayerId = previewMotion?.playerId
+        val previewPlayer = previewPlayerId?.let { id ->
+            state?.players?.firstOrNull { it.playerId == id }
+        }
+        val previewPosition = previewMotion?.let { motion ->
+            previewPlayer?.tokens?.getOrNull(motion.tokenIndex)
+        }
+        val previewAccepted =
+            previewMotion != null &&
+                sameMatch &&
+                previewPosition == previewMotion.toPosition &&
+                state?.history?.any { event ->
+                    event.eventIndex == previewEventIndex &&
+                        event.playerId == previewMotion.playerId &&
+                        event.moveTokenIndex == previewMotion.tokenIndex
+                } == true
+        val previewStillPending =
+            previewMotion != null &&
+                !previewAccepted &&
+                sameMatch &&
+                state?.status == "ACTIVE" &&
+                state.pendingRoll?.status == "RESOLVED" &&
+                state.pendingRoll?.eventIndex == previewEventIndex &&
+                previewPosition == previewMotion.fromPosition
+
+        if (previewStillPending && state != null && previewMotion != null) {
+            authoritativeSnapshot = state
+            val displaySnapshot = state.copy(
+                players = state.players.map { candidate ->
+                    if (candidate.playerId != previewMotion.playerId) {
+                        candidate
+                    } else {
+                        candidate.copy(
+                            tokens = candidate.tokens.toMutableList().also { tokens ->
+                                tokens[previewMotion.tokenIndex] = previewMotion.toPosition
+                            },
+                        )
+                    }
+                },
+            )
+            sceneState = previousState.copy(
+                snapshot = displaySnapshot,
+                localPlayerId = playerId,
+                perspectiveColor = perspectiveColor?.takeIf {
+                    it in OfflinePlayerLayout.COLORS
+                },
+                characterIdsBySeat = characterIdsBySeat.take(4),
+            )
+            return
+        }
+
+        if (!sameMatch || state == null) {
             emittedCaptureAudioKeys.clear()
         }
         val settings = settingsStore.snapshot()
@@ -106,14 +236,26 @@ internal class LudoPaws3DSceneView @JvmOverloads constructor(
                 previous = previousSnapshot,
                 current = state,
             )
-        val newForward =
+        val detectedForward =
             motions.firstOrNull {
                 it.kind == LudoPawsPawnMotionKind.FORWARD
             }
+        val acceptedPreviewMotion = if (
+            previewAccepted &&
+            previewMotion != null &&
+            detectedForward?.playerId == previewMotion.playerId &&
+            detectedForward.tokenIndex == previewMotion.tokenIndex &&
+            detectedForward.fromPosition == previewMotion.fromPosition &&
+            detectedForward.toPosition == previewMotion.toPosition
+        ) {
+            previewMotion
+        } else {
+            null
+        }
+        val newForward = acceptedPreviewMotion ?: detectedForward
 
-        if (newForward != null) {
-            movementAudioMotionKey =
-                "${state?.matchId}:${newForward.playerId}:${newForward.tokenIndex}:${newForward.fromPosition}:${newForward.toPosition}"
+        if (newForward != null && acceptedPreviewMotion == null) {
+            movementAudioMotionKey = state?.let { motionKey(it.matchId, newForward) }
             movementAudioNextHop = 1
             movementAudioNextStep = 1
         }
@@ -121,6 +263,7 @@ internal class LudoPaws3DSceneView @JvmOverloads constructor(
         val retainedForward =
             if (
                 newForward == null &&
+                previousState.pendingPreviewEventIndex == null &&
                 sameMatch &&
                 previousState.forwardMotion != null &&
                 now <
@@ -134,7 +277,9 @@ internal class LudoPaws3DSceneView @JvmOverloads constructor(
             }
         val forward = newForward ?: retainedForward
         val forwardStartedAtMillis =
-            if (newForward != null) {
+            if (acceptedPreviewMotion != null) {
+                previousState.forwardStartedAtMillis
+            } else if (newForward != null) {
                 now
             } else if (forward != null) {
                 previousState.forwardStartedAtMillis
@@ -142,7 +287,9 @@ internal class LudoPaws3DSceneView @JvmOverloads constructor(
                 0L
             }
         val forwardDurationMillis =
-            if (newForward != null) {
+            if (acceptedPreviewMotion != null) {
+                previousState.forwardDurationMillis
+            } else if (newForward != null) {
                 LudoPawsGameplayPacingPolicy
                     .forwardAnimationDurationMillis(
                         speed = settings.gameSpeed,
@@ -164,38 +311,38 @@ internal class LudoPaws3DSceneView @JvmOverloads constructor(
             }
         val newCaptureReturns =
             motions
-                    .asSequence()
-                    .filter {
-                        it.kind == LudoPawsPawnMotionKind.CAPTURE_RETURN
+                .asSequence()
+                .filter {
+                    it.kind == LudoPawsPawnMotionKind.CAPTURE_RETURN
+                }
+                .associate { motion ->
+                    // Keep a captured pawn on its square until the attacker's
+                    // presentation timeline reaches contact, including optimistic previews.
+                    val animationStart = if (acceptedPreviewMotion != null) {
+                        previousState.forwardStartedAtMillis
+                    } else {
+                        now
                     }
-                    .associate { motion ->
-                        // The captured animal must remain on the occupied square
-                        // until the attacker has visibly completed its full route.
-                        // Its impact/pop/yard return begins only after contact.
-                        val contactAtMillis =
-                            now +
-                                if (newForward != null) {
-                                    LudoPaws3DRenderCadencePolicy
-                                        .captureContactDelayMillis(
-                                            forwardDurationMillis,
-                                        )
-                                } else {
-                                    0L
-                                }
-                        LudoPaws3DPawnKey(
-                            playerId = motion.playerId,
-                            tokenIndex = motion.tokenIndex,
-                        ) to
-                            LudoPaws3DCaptureReturnState(
-                                motion = motion,
-                                startedAtMillis = contactAtMillis,
-                                durationMillis =
-                                    LudoPawsGameplayPacingPolicy
-                                        .captureReturnDurationMillis(
-                                            settings.gameSpeed,
-                                        ),
-                            )
-                    }
+                    val contactAtMillis =
+                        animationStart +
+                            if (newForward != null) {
+                                LudoPaws3DRenderCadencePolicy
+                                    .captureContactDelayMillis(forwardDurationMillis)
+                            } else {
+                                0L
+                            }
+                    LudoPaws3DPawnKey(
+                        playerId = motion.playerId,
+                        tokenIndex = motion.tokenIndex,
+                    ) to
+                        LudoPaws3DCaptureReturnState(
+                            motion = motion,
+                            startedAtMillis = contactAtMillis,
+                            durationMillis =
+                                LudoPawsGameplayPacingPolicy
+                                    .captureReturnDurationMillis(settings.gameSpeed),
+                        )
+                }
         val retainedReactions =
             if (sameMatch) {
                 previousState.activeReactions.filterValues { reaction ->
@@ -205,6 +352,7 @@ internal class LudoPaws3DSceneView @JvmOverloads constructor(
                 emptyMap()
             }
 
+        authoritativeSnapshot = state
         sceneState =
             LudoPaws3DSceneState(
                 snapshot = state,
@@ -384,6 +532,7 @@ internal class LudoPaws3DSceneView @JvmOverloads constructor(
     override fun onDetachedFromWindow() {
         stopRenderLoop()
         sceneState = LudoPaws3DSceneState()
+        authoritativeSnapshot = null
         super.onDetachedFromWindow()
     }
 
@@ -429,6 +578,9 @@ internal class LudoPaws3DSceneView @JvmOverloads constructor(
         }
         setOperational(false)
     }
+
+    private fun motionKey(matchId: String, motion: LudoPawsPawnMotion): String =
+        "${matchId}:${motion.playerId}:${motion.tokenIndex}:${motion.fromPosition}:${motion.toPosition}"
 
     private fun setOperational(value: Boolean) {
         if (operational == value) return
