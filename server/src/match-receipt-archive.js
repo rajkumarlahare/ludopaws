@@ -235,6 +235,8 @@ export class MatchReceiptArchive {
       );
     }
     await this.#requireWithinRetention(meta);
+    // Backfill expiry scheduling for older archives the first time they are read after rollout.
+    await this.ctx.storage.setAlarm(receiptExpiresAt(meta));
     const receipt = await this.#buildReceipt(meta);
     const seal = await this.ctx.storage.get(SEAL_KEY);
     if (seal) {
