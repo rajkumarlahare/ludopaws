@@ -7,6 +7,8 @@ import { MatchRoom } from "../src/match-room-bots.js";
 import {
   botFillDelayMs,
   botMatchFillEnabled,
+  botResultHoldMs,
+  botTurnDelayMs,
   botTurnsEnabled,
   createBotParticipants,
 } from "../src/matchmaking-bots.js";
@@ -142,6 +144,11 @@ test("bot settings are bounded and bots receive non-profile identities", () => {
   assert.equal(botMatchFillEnabled({ LUDOPROOF_BOT_MATCH_FILL_ENABLED: "false" }), false);
   assert.equal(botTurnsEnabled({ LUDOPROOF_BOT_TURNS_ENABLED: "off" }), false);
   assert.equal(botFillDelayMs({ LUDOPROOF_BOT_FILL_DELAY_MS: "10" }), 15_000);
+  assert.equal(botTurnDelayMs({}), 1_100);
+  assert.equal(botTurnDelayMs({ LUDOPROOF_BOT_TURN_DELAY_MS: "12_000" }), 1_100);
+  assert.equal(botResultHoldMs({}), 950);
+  assert.equal(botResultHoldMs({ LUDOPROOF_BOT_RESULT_HOLD_MS: "100" }), 950);
+  assert.equal(botResultHoldMs({ LUDOPROOF_BOT_RESULT_HOLD_MS: "1_250" }), 1_250);
   const bots = createBotParticipants({
     count: 3,
     playerCount: 4,
