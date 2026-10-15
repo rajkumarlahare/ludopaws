@@ -419,10 +419,24 @@ function chooseBotMove(state, playerId, legalTokenIndexes) {
         const globalCell = globalCellFor(player.color, after);
         if (RULESET.safeGlobalCells.includes(globalCell)) score += 16;
         if (isTeamUp(state)) {
+          // Encourage (but never require) cooperative stacking with a partner:
+          // the authoritative engine already prevents same-team captures.
+          const teammateSharesCell = state.players.some(
+            (candidate, candidateSeat) =>
+              candidateSeat !== seat &&
+              candidate.teamId === player.teamId &&
+              candidate.tokens.some((position) =>
+                position >= 0 &&
+                position <= 50 &&
+                globalCellFor(candidate.color, position) === globalCell,
+              ),
+          );
+          if (teammateSharesCell) score += 24;
+
           const opponentSeats = state.players
-            .map((candidate, index) => ({ candidate, index }))
-            .filter(({ candidate }) => candidate.teamId !== player.teamId);
-          if (opponentSeats.some(({ candidate }) =>
+            .map((candidate) => candidate)
+            .filter((candidate) => candidate.teamId !== player.teamId);
+          if (opponentSeats.some((candidate) =>
             candidate.tokens.some((position) => position >= 0 && position <= 50 &&
               globalCellFor(candidate.color, position) === globalCell))) {
             score += 90;
