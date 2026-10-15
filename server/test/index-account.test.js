@@ -365,7 +365,7 @@ test("store status explains why Play Billing is disabled without returning secre
     playerAccountsConfigured: true,
     available: false,
   });
-  assert.equal(JSON.stringify(status).includes("synthetic-test-private-key-material"), false);
+  assert.equal(JSON.stringify(status).includes(privateKey), false);
 });
 
 test("store status requires credentials, purchase ledger, and account bindings before Billing is available", async () => {
