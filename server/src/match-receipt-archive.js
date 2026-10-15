@@ -264,7 +264,7 @@ export class MatchReceiptArchive {
     throw httpError(
       410,
       "MATCH_RECEIPT_RETENTION_EXPIRED",
-      "match receipt is outside the 180-day retention window",
+      "match receipt is outside the 365-day retention window",
     );
   }
 
