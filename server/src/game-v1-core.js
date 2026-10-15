@@ -76,11 +76,13 @@ export function newMatch({
   hostPlayerId,
   hostDisplayName,
   hostCharacterId = DEFAULT_CHARACTER_ID,
+  hostPlayerType = "HUMAN",
   now,
   targetPlayerCount = null,
   matchMode = "ONLINE",
 }) {
   const teamUp = matchMode === "TEAM_UP";
+  const normalizedHostPlayerType = hostPlayerType === "BOT" ? "BOT" : "HUMAN";
   return {
     schemaVersion: 1,
     matchId,
@@ -102,6 +104,7 @@ export function newMatch({
         playerId: hostPlayerId,
         displayName: hostDisplayName,
         characterId: publicCharacterId(hostCharacterId),
+        playerType: normalizedHostPlayerType,
         color: COLORS[0],
         ...(teamUp ? { teamId: TEAM_ASSIGNMENTS[0] } : {}),
         tokenAuthHash: null,
@@ -123,6 +126,7 @@ export function addPlayer(
     playerId,
     displayName,
     characterId = DEFAULT_CHARACTER_ID,
+    playerType = "HUMAN",
     tokenAuthHash,
     now,
   },
@@ -144,6 +148,7 @@ export function addPlayer(
     playerId,
     displayName,
     characterId: publicCharacterId(characterId),
+    playerType: playerType === "BOT" ? "BOT" : "HUMAN",
     color: COLORS[seat],
     ...(isTeamUp(next) ? { teamId: teamIdForSeat(next, seat) } : {}),
     tokenAuthHash,
@@ -580,6 +585,7 @@ export function publicState(state) {
       playerId: player.playerId,
       displayName: player.displayName,
       characterId: publicCharacterId(player.characterId),
+      playerType: player.playerType === "BOT" ? "BOT" : "HUMAN",
       color: player.color,
       seat,
       ...(teamUp ? { teamId: teamIdForSeat(state, seat) } : {}),
