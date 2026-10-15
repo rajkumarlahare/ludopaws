@@ -339,7 +339,7 @@ test("store status disables rewarded ads when configured reward item is not gems
 });
 
 test("store status explains why Play Billing is disabled without returning secrets", async () => {
-  const privateKey = "-----BEGIN PRIVATE KEY-----\\nredacted-test-material\\n-----END PRIVATE KEY-----";
+  const privateKey = "-----BEGIN PRIVATE KEY-----\\n" + "A".repeat(256) + "\\n-----END PRIVATE KEY-----";
   const response = await accountWorker.fetch(
     new Request("https://api.example.test/api/store/status"),
     {
@@ -365,7 +365,7 @@ test("store status explains why Play Billing is disabled without returning secre
     playerAccountsConfigured: true,
     available: false,
   });
-  assert.equal(JSON.stringify(status).includes("redacted-test-material"), false);
+  assert.equal(JSON.stringify(status).includes("synthetic-test-private-key-material"), false);
 });
 
 test("store status requires credentials, purchase ledger, and account bindings before Billing is available", async () => {
