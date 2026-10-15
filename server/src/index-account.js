@@ -498,9 +498,15 @@ async function handleAccountRequest(request, env) {
       }
 
       if (url.pathname === "/api/store/status" && request.method === "GET") {
-        const billingReady = googlePlayBillingEnabled(env) &&
-          Boolean(env?.LUDOPROOF_ACCOUNT_DIRECTORY) &&
-          Boolean(env?.LUDOPROOF_PLAYER_ACCOUNTS);
+        const billingChecks = {
+          ...googlePlayBillingChecks(env),
+          accountDirectoryConfigured: Boolean(env?.LUDOPROOF_ACCOUNT_DIRECTORY),
+          playerAccountsConfigured: Boolean(env?.LUDOPROOF_PLAYER_ACCOUNTS),
+          available: googlePlayBillingEnabled(env) &&
+            Boolean(env?.LUDOPROOF_ACCOUNT_DIRECTORY) &&
+            Boolean(env?.LUDOPROOF_PLAYER_ACCOUNTS),
+        };
+        const billingReady = billingChecks.available;
         const subscriptionsReady = googlePlaySubscriptionsEnabled(env) &&
           Boolean(env?.LUDOPROOF_ACCOUNT_DIRECTORY) &&
           Boolean(env?.LUDOPROOF_PLAYER_ACCOUNTS);
@@ -510,6 +516,7 @@ async function handleAccountRequest(request, env) {
         return json(200, {
           ok: true,
           billingAvailable: billingReady,
+          billingChecks,
           subscriptionsAvailable: subscriptionsReady,
           rewardedAdsAvailable: adsReady,
         });
