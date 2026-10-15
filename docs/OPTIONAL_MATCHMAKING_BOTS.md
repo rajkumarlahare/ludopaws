@@ -20,6 +20,7 @@ Missing, invalid, or out-of-range delays use the documented defaults. Test and s
 
 - Online Find Match supports the existing 2-seat and 4-seat queue modes. Team Up remains exactly four seats and preserves A/B/A/B assignments.
 - Real-player queue entries always take precedence. Bots only fill seats still vacant when the oldest eligible real-player request reaches the grace deadline.
+- Once server-side match creation starts, the queue stores the exact participant reservation (including bot IDs and names) and retries it after transient errors instead of remixing seats. Cancel reports that the match is being finalized and reconnects to its status; it does not silently discard a partially-created room.
 - Bot display names are natural names, but every bot carries the server-authored `playerType: "BOT"` value and the Android roster shows a BOT label. Bot status is not inferred from a display name and cannot be set by an Android request.
 - Bot identities have ephemeral player/request IDs and no leaderboard profile or social identity. Bot-filled matches are casual/unranked and are not submitted to the competitive leaderboard.
 - Bot dice actions go through the regular MatchRoom commit/reveal, proof verification, and legal move endpoints. The bot controller does not create its own dice outcomes or bypass game rules.
