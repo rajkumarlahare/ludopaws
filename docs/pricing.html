@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#143b35">
-  <meta name="description" content="Ludo Paws one-time in-app purchase information, Gem pack quantities, localized Google Play pricing and purchase support.">
+  <meta name="description" content="Ludo Paws one-time in-app purchases, Paws Plus monthly subscription terms, Gem quantities and localized Google Play pricing.">
   <title>Ludo Paws — Pricing & In-App Purchase Policy</title>
   <style>
     :root{color-scheme:light;--ink:#173632;--muted:#5d716b;--paper:#f5f7ed;--card:#fff;--green:#1b6955;--lime:#d9f36a;--coral:#ff9678;--line:#dce5d9}
@@ -51,7 +51,7 @@
   <main class="wrap">
     <span class="eyebrow">Clear prices. Verified purchases.</span>
     <h1>Pricing & in-app purchase policy</h1>
-    <p class="intro">This page explains the one-time digital products currently defined for Ludo Paws. It lists the in-game quantity or entitlement a verified product grants; it does not quote a currency price.</p>
+    <p class="intro">This page describes the one-time digital products and the separately configured Paws Plus monthly subscription. It lists verified fulfillment and subscription benefits; it does not quote a currency price or claim that a Google Play offer is live until it is available in the app.</p>
 
     <div class="notice">
       <strong>Where to see your price</strong>
@@ -74,16 +74,30 @@
           </tbody>
         </table>
       </div>
-      <p class="muted">These are the current source-code fulfillment amounts, not currency prices. A product may be unavailable unless its matching one-time product and purchase option are activated in Google Play for an eligible region.</p>
+      <p class="muted">These are the current source-code fulfillment amounts, not currency prices. A one-time product may be unavailable unless its matching product and purchase option are activated in Google Play for an eligible region.</p>
+    </section>
+
+    <h2>Paws Plus monthly subscription</h2>
+    <section class="panel">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Product ID</th><th>Benefit while active</th><th>Billing type</th></tr></thead>
+          <tbody>
+            <tr><td><code>paws_plus</code></td><td><strong>Paws Plus</strong><br>Suppresses eligible forced post-win interstitial ads while the server-verified subscription is active. Opt-in rewarded ads remain optional.</td><td><span class="label">Auto-renewing · monthly</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The intended Google Play base plan ID is <code>monthly-auto</code>. This source-code identifier is not proof that the product or offer is active in Google Play. Checkout must remain unavailable unless Google Play returns an eligible localized offer and the server subscription gate is enabled.</p>
+      <p>Google Play displays the current price and billing period before purchase. The subscription renews monthly until canceled in Google Play, subject to the live offer's terms. Canceling turns off future renewal; access may continue through the already-paid period and ends when the server verifies expiry, revocation or another inactive state. Grace period, account hold, refunds and reversals follow Google's subscription state and applicable consumer rules. Do not rely on a cached in-app status as proof of an active entitlement.</p>
     </section>
 
     <h2>How prices and purchases work</h2>
     <ul>
-      <li>All products listed here are one-time purchases; the current catalog does not offer subscriptions or automatic renewals.</li>
+      <li>The Gem packs and <code>remove_ads</code> shown above are one-time products. <code>paws_plus</code> is a separate monthly auto-renewing subscription and is not part of the one-time product list.</li>
       <li>The app uses the price returned by Google Play Billing for the available product. It does not calculate or promise live currency conversion, invent a local price, or collect payment on this website.</li>
       <li>Gem packs are consumable in-game items. Gems are virtual game currency and are not a cash balance or a cash-redemption service.</li>
       <li><code>remove_ads</code> is a non-consumable entitlement. It suppresses eligible non-rewarded ads; the player may still choose an opt-in rewarded ad where that feature is available.</li>
-      <li>The server verifies purchases with Google Play before granting Gems or the Remove Ads entitlement. Pending, invalid, mismatched or unverified purchases must not grant value. A retry of the same verified purchase must not grant the item twice.</li>
+      <li>The server verifies one-time purchases before granting Gems or Remove Ads, and verifies subscription state before applying Paws Plus. Pending, invalid, mismatched, expired, revoked or unverified transactions must not create an active entitlement. Duplicate callbacks and retries must not double-grant.</li>
       <li>Purchase availability may depend on Google Play account eligibility, the selected country or region, the product's activation and the app's distribution availability. If a price is unavailable, the app should not invent one.</li>
     </ul>
 
@@ -123,4 +137,4 @@
   </script>
 </body>
 </html>
-<!-- PRICING_RELEASE_REVIEW_REQUIRED: confirm every live Play Console product ID/type, regional availability and price; verify refund/support handling; align the public terms with the final release before removing this marker. -->
+<!-- PRICING_RELEASE_REVIEW_REQUIRED: confirm every live Play Console product ID/type, regional availability and price; verify one-time and subscription offers, regional availability/prices, renewal/cancellation/expiry/refund handling; align the public terms with the final release before removing this marker. -->
