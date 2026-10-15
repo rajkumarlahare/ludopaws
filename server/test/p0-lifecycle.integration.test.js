@@ -177,6 +177,40 @@ test("four missed dice turns forfeit a classic player and finish a two-player ma
   assert.equal(stored.winnerTeamId, null);
 });
 
+test("Team Up timeout advances from the scheduled seat when its finished partner was acting", async () => {
+  const now = Date.now();
+  const state = stateWithResolvedMove(now - TURN_ROLL_TIMEOUT_MS - 1);
+  state.matchMode = "TEAM_UP";
+  state.teamAssignments = ["A", "B", "A", "B"];
+  state.targetPlayerCount = 4;
+  state.players[0].teamId = "A";
+  state.players[0].tokens = [57, 57, 57, 57];
+  state.players[1].teamId = "B";
+  state.players.push(
+    {
+      playerId: "p3", displayName: "Three", characterId: "goat", playerType: "HUMAN",
+      color: "YELLOW", teamId: "A", tokenAuthHash: "c".repeat(64), tokens: [-1, -1, -1, -1],
+    },
+    {
+      playerId: "p4", displayName: "Four", characterId: "cat", playerType: "HUMAN",
+      color: "BLUE", teamId: "B", tokenAuthHash: "d".repeat(64), tokens: [-1, -1, -1, -1],
+    },
+  );
+  state.consecutiveSixes = [0, 0, 0, 0];
+  state.turnTimeoutCounts = {};
+  state.pendingRoll = null;
+  state.turnSeat = 0;
+  state.updatedAt = now - TURN_ROLL_TIMEOUT_MS - 1;
+  const { room, storage } = makeRoom(state);
+
+  await room.alarm();
+
+  const stored = await storage.get("match-state");
+  assert.equal(stored.turnTimeoutCounts.p3, 1);
+  assert.equal(stored.turnTimeoutNotice.playerId, "p3");
+  assert.equal(stored.turnSeat, 1);
+});
+
 test("four missed dice turns in Team Up award the other team", async () => {
   const now = Date.now();
   const state = stateWithResolvedMove(now - TURN_ROLL_TIMEOUT_MS - 1);

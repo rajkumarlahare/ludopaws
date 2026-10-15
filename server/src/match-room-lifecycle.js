@@ -80,7 +80,7 @@ export class MatchRoom extends SocialMatchRoom {
     if (!player) return false;
     if (Number.isSafeInteger(player.forfeitedAt)) {
       const next = structuredClone(state);
-      next.turnSeat = nextActiveSeat(next, seat);
+      next.turnSeat = nextActiveSeat(next, state.turnSeat);
       next.updatedAt = now;
       next.revision = Number(next.revision ?? 0) + 1;
       await this.ctx.storage.put(STATE_KEY, next);
@@ -125,10 +125,10 @@ export class MatchRoom extends SocialMatchRoom {
           next.winnerTeamId = null;
         }
       } else {
-        next.turnSeat = nextActiveSeat(next, seat);
+        next.turnSeat = nextActiveSeat(next, state.turnSeat);
       }
     } else {
-      next.turnSeat = nextActiveSeat(next, seat);
+      next.turnSeat = nextActiveSeat(next, state.turnSeat);
     }
 
     next.updatedAt = now;
