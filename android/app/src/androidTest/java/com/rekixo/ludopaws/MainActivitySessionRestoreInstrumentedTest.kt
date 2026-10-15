@@ -95,18 +95,29 @@ class MainActivitySessionRestoreInstrumentedTest {
         expectedSession: PlayerSession,
         expectedPending: PendingRollSecret,
     ) {
+        assertTrue(
+            "the activity must observe the disabled emulator network before validating offline restore",
+            waitForActivityOnline(scenario, expected = false),
+        )
+
         scenario.onActivity { activity ->
             assertEquals(expectedSession.matchId, activity.matchId)
             assertEquals(expectedSession.playerId, activity.playerId)
             assertEquals(expectedSession.playerToken, activity.playerToken)
             assertEquals(expectedPending, activity.pendingSecret)
             assertEquals(GameMode.ONLINE, activity.gameMode)
-            assertTrue(activity.shouldRestoreSavedSession)
+            assertTrue(
+                "the resume-saved-match intent flag must survive recreate/cold launch",
+                activity.shouldRestoreSavedSession,
+            )
             assertEquals(
                 "RESUME VERIFIED ROLL",
                 activity.rollButton.text.toString(),
             )
-            assertFalse(activity.isOnline)
+            assertFalse(
+                "restoring saved online credentials while the emulator is offline must not mark the activity online",
+                activity.isOnline,
+            )
         }
 
         assertEquals(
@@ -117,6 +128,23 @@ class MainActivitySessionRestoreInstrumentedTest {
             expectedPending,
             PendingRollStore(context).load(),
         )
+    }
+
+    private fun waitForActivityOnline(
+        scenario: ActivityScenario<MainActivity>,
+        expected: Boolean,
+    ): Boolean {
+        repeat(40) {
+            var online: Boolean? = null
+            scenario.onActivity { activity ->
+                online = activity.isOnline
+            }
+            if (online == expected) return true
+            // Do not sleep on the main thread: connectivity callbacks update
+            // activity state through MainActivity's main-handler queue.
+            SystemClock.sleep(100L)
+        }
+        return false
     }
 
     private fun setDeviceNetworkEnabled(enabled: Boolean) {
