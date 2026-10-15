@@ -136,7 +136,10 @@ internal fun MainActivity.applyOnlineGameplayPacing(
             0L
         }
     val remainingDelay =
-        (transition.delayMillis - alreadyPresentedMillis).coerceAtLeast(0L)
+        LudoPawsGameplayPacingPolicy.remainingPresentationDelayMillis(
+            totalDelayMillis = transition.delayMillis,
+            alreadyPresentedMillis = alreadyPresentedMillis,
+        )
     onlineGameplayActionBlockedUntilMillis = maxOf(
         onlineGameplayActionBlockedUntilMillis,
         now + remainingDelay,
