@@ -19,7 +19,7 @@ import {
   verifyAccessTokenForDeletionReplay,
   verifyGoogleIdToken,
 } from "./account-security.js";
-import { GOOGLE_PLAY_PRODUCTS, googlePlayBillingEnabled, verifyAndRedeemGooglePlayPurchase } from "./google-play-billing.js";
+import { GOOGLE_PLAY_PRODUCTS, googlePlayBillingChecks, googlePlayBillingEnabled, verifyAndRedeemGooglePlayPurchase } from "./google-play-billing.js";
 import { verifyAdMobSsvRequest } from "./admob-ssv.js";
 import { StoreCatalogStore } from "./store-catalog-store.js";
 import { bearerToken, httpError, readJsonObject, sha256Hex } from "./crypto.js";
@@ -101,6 +101,7 @@ async function handleAccountRequest(request, env) {
             googleSignInClientIdConfigured,
             sessionHmacConfigured,
             playBillingEnabled: googlePlayBillingEnabled(env),
+            playBillingConfiguration: googlePlayBillingChecks(env),
             admobSsvEnabled: env?.LUDOPROOF_ADMOB_SSV_ENABLED === "true" &&
               Boolean(env?.LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID) &&
               (env?.LUDOPROOF_ADMOB_REWARD_ITEM == null || env.LUDOPROOF_ADMOB_REWARD_ITEM === "gems"),
@@ -492,13 +493,27 @@ async function handleAccountRequest(request, env) {
       }
 
       if (url.pathname === "/api/store/status" && request.method === "GET") {
-        const billingReady = googlePlayBillingEnabled(env) &&
-          Boolean(env?.LUDOPROOF_ACCOUNT_DIRECTORY) &&
-          Boolean(env?.LUDOPROOF_PLAYER_ACCOUNTS);
+        const billingConfiguration = googlePlayBillingChecks(env);
+        const accountDirectoryConfigured = Boolean(env?.LUDOPROOF_ACCOUNT_DIRECTORY);
+        const playerAccountsConfigured = Boolean(env?.LUDOPROOF_PLAYER_ACCOUNTS);
+        const billingReady = billingConfiguration.enabled &&
+          accountDirectoryConfigured &&
+          playerAccountsConfigured;
+        const billingChecks = {
+          ...billingConfiguration,
+          accountDirectoryConfigured,
+          playerAccountsConfigured,
+          available: billingReady,
+        };
         const adsReady = env?.LUDOPROOF_ADMOB_SSV_ENABLED === "true" &&
           Boolean(env?.LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID) &&
           (env?.LUDOPROOF_ADMOB_REWARD_ITEM == null || env.LUDOPROOF_ADMOB_REWARD_ITEM === "gems");
-        return json(200, { ok: true, billingAvailable: billingReady, rewardedAdsAvailable: adsReady });
+        return json(200, {
+          ok: true,
+          billingAvailable: billingReady,
+          billingChecks,
+          rewardedAdsAvailable: adsReady,
+        });
       }
 
       if (url.pathname === "/api/store/purchases/verify" && request.method === "POST") {
