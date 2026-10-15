@@ -316,6 +316,7 @@ for (const property of [
   "LUDOPROOF_BILLING_ENABLED",
   "LUDOPROOF_ADS_ENABLED",
   "LUDOPROOF_INTERSTITIAL_ADS_ENABLED",
+  "LUDOPROOF_SUBSCRIPTIONS_ENABLED",
   "ADMOB_APP_ID",
   "ADMOB_REWARDED_AD_UNIT_ID",
   "ADMOB_INTERSTITIAL_AD_UNIT_ID",
@@ -341,6 +342,25 @@ requireText(
   signedReleaseWorkflow,
   "ready.productionClaim !== false",
   "signed release must fail closed unless the Worker explicitly reports productionClaim=false.",
+);
+
+requireText(
+  ".github/workflows/android-signed-release.yml",
+  signedReleaseWorkflow,
+  "GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED: ${{ vars.GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED }}",
+  "signed release must use the production server subscription gate.",
+);
+requireText(
+  ".github/workflows/android-signed-release.yml",
+  signedReleaseWorkflow,
+  "APP_SUBSCRIPTIONS !== SERVER_SUBSCRIPTIONS",
+  "signed release must reject an Android/Worker Paws Plus feature-flag mismatch.",
+);
+requireText(
+  ".github/workflows/android-signed-release.yml",
+  signedReleaseWorkflow,
+  "status.subscriptionsAvailable !== true",
+  "signed release must fail closed when Paws Plus is enabled but the production Worker is not subscription-ready.",
 );
 
 if (failures.length > 0) {
