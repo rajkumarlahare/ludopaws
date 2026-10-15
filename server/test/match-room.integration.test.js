@@ -2316,3 +2316,59 @@ test(
     assert.equal(after.botTurn?.inProgress, false);
   },
 );
+
+
+test(
+  "finished bot-filled match is explicitly kept out of the competitive leaderboard",
+  { concurrency: false },
+  async () => {
+    const ctx = makeContext();
+    const env = makeEnv();
+    let leaderboardRecordCalls = 0;
+    env.LUDOPROOF_LEADERBOARD = {
+      idFromName(name) {
+        assert.equal(name, "global");
+        return name;
+      },
+      get() {
+        return {
+          async fetch(request) {
+            if (new URL(request.url).pathname === "/record") {
+              leaderboardRecordCalls += 1;
+            }
+            return Response.json({ ok: true });
+          },
+        };
+      },
+    };
+
+    const room = new MatchRoom(ctx, env);
+    const host = await createMatch(room, "LPBOTUNRANK");
+    await joinMatch(room, "Maya");
+    await startMatch(room, host.playerToken);
+
+    const state = await ctx.storage.get("match-state");
+    state.players[1].playerType = "BOT";
+    state.players[1].profileId = null;
+    state.status = "FINISHED";
+    state.winnerPlayerId = state.players[0].playerId;
+    state.winnerTeamId = null;
+    state.finishedAt = Date.now();
+    state.pendingRoll = null;
+    await ctx.storage.put("match-state", state);
+
+    const result = await json(
+      await room.fetch(
+        roomRequest("/state", {
+          token: host.playerToken,
+        }),
+      ),
+    );
+    assert.equal(result.response.status, 200);
+    assert.equal(result.body.state.players[1].playerType, "BOT");
+    assert.equal(leaderboardRecordCalls, 0);
+    assert.ok(
+      (await ctx.storage.get("match-state")).leaderboardRecordedAt > 0,
+    );
+  },
+);
