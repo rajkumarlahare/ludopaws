@@ -196,7 +196,8 @@ internal class LudoPaws3DSceneView @JvmOverloads constructor(
             previewMotion != null &&
                 !previewAccepted &&
                 sameMatch &&
-                state?.status == "ACTIVE" &&
+                state != null &&
+                state.status == "ACTIVE" &&
                 state.pendingRoll?.status == "RESOLVED" &&
                 state.pendingRoll?.eventIndex == previewEventIndex &&
                 previewPosition == previewMotion.fromPosition
@@ -243,7 +244,8 @@ internal class LudoPaws3DSceneView @JvmOverloads constructor(
         val acceptedPreviewMotion = if (
             previewAccepted &&
             previewMotion != null &&
-            detectedForward?.playerId == previewMotion.playerId &&
+            detectedForward != null &&
+            detectedForward.playerId == previewMotion.playerId &&
             detectedForward.tokenIndex == previewMotion.tokenIndex &&
             detectedForward.fromPosition == previewMotion.fromPosition &&
             detectedForward.toPosition == previewMotion.toPosition
