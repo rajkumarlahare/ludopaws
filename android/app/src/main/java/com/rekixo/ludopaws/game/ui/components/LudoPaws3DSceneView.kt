@@ -154,6 +154,11 @@ internal class LudoPaws3DSceneView @JvmOverloads constructor(
             }
         }
         val previewSnapshot = state.copy(players = previewPlayers)
+        movementAudioMotionKey = motionKey(state.matchId, motion)
+        movementAudioNextHop = 1
+        movementAudioNextStep = 1
+        // Publish sceneState last: the render thread observes this volatile write
+        // together with the movement's matching audio cursor/key.
         sceneState = current.copy(
             snapshot = previewSnapshot,
             forwardMotion = motion,
@@ -162,9 +167,6 @@ internal class LudoPaws3DSceneView @JvmOverloads constructor(
                 .forwardAnimationDurationMillis(speed, motion.visualSteps),
             pendingPreviewEventIndex = pending.eventIndex,
         )
-        movementAudioMotionKey = motionKey(state.matchId, motion)
-        movementAudioNextHop = 1
-        movementAudioNextStep = 1
         return true
     }
 
@@ -172,6 +174,10 @@ internal class LudoPaws3DSceneView @JvmOverloads constructor(
         val current = sceneState
         if (current.pendingPreviewEventIndex == null) return
         authoritativeSnapshot = authoritative
+        movementAudioMotionKey = null
+        movementAudioNextHop = 1
+        movementAudioNextStep = 1
+        // Publish the cleared motion after resetting its associated audio cursor.
         sceneState = current.copy(
             snapshot = authoritative,
             forwardMotion = null,
@@ -180,9 +186,6 @@ internal class LudoPaws3DSceneView @JvmOverloads constructor(
             captureReturns = emptyMap(),
             pendingPreviewEventIndex = null,
         )
-        movementAudioMotionKey = null
-        movementAudioNextHop = 1
-        movementAudioNextStep = 1
     }
 
     fun bind(
