@@ -4,8 +4,6 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
-import android.view.View
-import android.widget.FrameLayout
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
@@ -22,34 +20,34 @@ class DiceVisibilityInstrumentedTest {
             ApplicationProvider
                 .getApplicationContext<Context>()
         val size = 192
+        val backgroundColor = 0xFF071A47.toInt()
 
-        val host =
-            FrameLayout(context).apply {
-                setBackgroundColor(
-                    0xFF071A47.toInt(),
-                )
-            }
+        // Render the View directly into a known-size bitmap. A detached
+        // FrameLayout can vary in child drawing/layout behavior across Android
+        // versions; that is unrelated to the dice contrast this test protects.
+        // A static outcome also prevents a frame callback from rotating/scaling
+        // the die while the pixel assertion is running.
         val dice =
             DiceView(context).apply {
                 isEnabled = false
                 alpha = 1f
-                showOutcome(6)
+                setPreviewStyle("dice_classic")
+                showOutcome(
+                    outcome = 6,
+                    animate = false,
+                )
             }
-        host.addView(
-            dice,
-            FrameLayout.LayoutParams(
+        dice.measure(
+            android.view.View.MeasureSpec.makeMeasureSpec(
                 size,
+                android.view.View.MeasureSpec.EXACTLY,
+            ),
+            android.view.View.MeasureSpec.makeMeasureSpec(
                 size,
+                android.view.View.MeasureSpec.EXACTLY,
             ),
         )
-
-        val exact =
-            View.MeasureSpec.makeMeasureSpec(
-                size,
-                View.MeasureSpec.EXACTLY,
-            )
-        host.measure(exact, exact)
-        host.layout(0, 0, size, size)
+        dice.layout(0, 0, size, size)
 
         val bitmap =
             Bitmap.createBitmap(
@@ -57,12 +55,12 @@ class DiceVisibilityInstrumentedTest {
                 size,
                 Bitmap.Config.ARGB_8888,
             )
-        host.draw(
-            Canvas(bitmap),
-        )
+        val canvas = Canvas(bitmap)
+        canvas.drawColor(backgroundColor)
+        dice.draw(canvas)
 
-        // Sample the upper-middle of the face: safely inside the rounded
-        // rectangle and away from all pip locations.
+        // Sample the upper-middle face, away from the rounded corners and
+        // the six pips. Keep the location fixed so failures are reproducible.
         val pixel =
             bitmap.getPixel(
                 size / 2,
@@ -73,11 +71,11 @@ class DiceVisibilityInstrumentedTest {
         val blue = Color.blue(pixel)
 
         assertTrue(
-            "dice face must remain bright",
+            "dice face must remain bright (sampled RGB=$red,$green,$blue)",
             red >= 225 && green >= 225 && blue >= 225,
         )
         assertTrue(
-            "dice face must remain neutral, not blue-tinted",
+            "dice face must remain neutral, not blue-tinted (sampled RGB=$red,$green,$blue)",
             abs(red - blue) <= 18,
         )
         assertEquals(
