@@ -8,6 +8,7 @@ on:
       - "docs/account-deletion.html"
       - "docs/privacy-policy.html"
       - "docs/pricing.html"
+      - "docs/terms-of-service.html"
       - ".github/workflows/account-deletion-pages.yml"
   workflow_dispatch:
 
@@ -48,7 +49,8 @@ jobs:
           test -f docs/account-deletion.html
           test -f docs/privacy-policy.html
           test -f docs/pricing.html
-          if grep -Eq "POLICY_RELEASE_REVIEW_REQUIRED|PRICING_RELEASE_REVIEW_REQUIRED" docs/privacy-policy.html docs/pricing.html; then
+          test -f docs/terms-of-service.html
+          if grep -Eq "POLICY_RELEASE_REVIEW_REQUIRED|PRICING_RELEASE_REVIEW_REQUIRED|TERMS_RELEASE_REVIEW_REQUIRED" docs/privacy-policy.html docs/pricing.html docs/terms-of-service.html; then
             echo "A privacy or pricing policy release-review marker remains. Complete publisher/legal review before publishing." >&2
             exit 2
           fi
@@ -85,6 +87,7 @@ jobs:
           cp docs/account-deletion.html site/account-deletion.html
           cp docs/privacy-policy.html site/privacy-policy.html
           cp docs/pricing.html site/pricing.html
+          cp docs/terms-of-service.html site/terms-of-service.html
           printf '%s\n' 'ludopaws.rekixo.com' > site/CNAME
           node <<'NODE'
           const fs = require("node:fs");
@@ -127,14 +130,16 @@ jobs:
           home="$(fetch_public_page /)"
           privacy="$(fetch_public_page /privacy-policy.html)"
           pricing="$(fetch_public_page /pricing.html)"
+          terms="$(fetch_public_page /terms-of-service.html)"
           deletion="$(fetch_public_page /account-deletion.html)"
           config="$(fetch_public_page /config.js)"
 
           printf '%s' "$home" | grep -qi "Ludo Paws"
           printf '%s' "$privacy" | grep -qi "Privacy Policy"
           printf '%s' "$pricing" | grep -qi "Pricing"
+          printf '%s' "$terms" | grep -qi "Terms of Service"
           printf '%s' "$deletion" | grep -qi "Account and data deletion"
           printf '%s' "$config" | grep -Fq "$GOOGLE_SIGN_IN_WEB_CLIENT_ID"
           printf '%s' "$config" | grep -Fq "$LUDOPROOF_SUPPORT_EMAIL"
 
-          echo "Public site smoke check passed: home, privacy, pricing, account deletion and public sign-in/support configuration are served over HTTPS."
+          echo "Public site smoke check passed: home, privacy, pricing, terms, account deletion and public sign-in/support configuration are served over HTTPS."
