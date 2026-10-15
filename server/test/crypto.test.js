@@ -198,6 +198,48 @@ test(
 );
 
 
+test(
+  "bot assertions are signed and legacy human assertion claims remain backward-compatible",
+  async () => {
+    const env = {
+      LUDOPROOF_SESSION_HMAC_KEY:
+        "lp_test_session_hmac_key_1234567890abcdef",
+    };
+    const humanClaims = {
+      matchId: "LPABCDEFGH",
+      profileId: "550e8400-e29b-41d4-a716-446655440000",
+      clientRequestId: "00000000-0000-4000-8000-000000000121",
+      expiresAt: 40_000,
+    };
+    const humanToken = await issueLeaderboardProfileAssertion(env, humanClaims);
+    assert.deepEqual(
+      await verifyLeaderboardProfileAssertion(env, humanToken, 39_000),
+      humanClaims,
+    );
+
+    const botClaims = {
+      matchId: "LPABCDEFGH",
+      profileId: null,
+      clientRequestId: "00000000-0000-4000-8000-000000000122",
+      expiresAt: 40_000,
+      playerType: "BOT",
+    };
+    const botToken = await issueLeaderboardProfileAssertion(env, botClaims);
+    assert.deepEqual(
+      await verifyLeaderboardProfileAssertion(env, botToken, 39_000),
+      botClaims,
+    );
+
+    await assert.rejects(
+      issueLeaderboardProfileAssertion(env, {
+        ...botClaims,
+        profileId: "550e8400-e29b-41d4-a716-446655440000",
+      }),
+      (error) => error?.code === "PROFILE_ASSERTION_INVALID",
+    );
+  },
+);
+
 test("bounded JSON reader cancels an oversized streamed request before buffering the full body", async () => {
   let chunkCount = 0;
   let cancelled = false;

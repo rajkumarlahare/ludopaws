@@ -800,7 +800,13 @@ class TeamUpActivity : Activity() {
             },
             onSuccess = { response ->
                 if (response.optString("status") == "MATCHED") {
-                    showStatus("Match was found while cancelling. Opening it…")
+                    showStatus(
+                        if (response.optBoolean("pending", false)) {
+                            "A team match is being finalized and can no longer be cancelled. Reconnecting…"
+                        } else {
+                            "Match was found while cancelling. Opening it…"
+                        },
+                    )
                     pollSearch()
                 } else {
                     ticketStore.clear()

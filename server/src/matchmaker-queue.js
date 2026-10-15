@@ -8,6 +8,12 @@ import {
 import {
   normalizeCharacterId,
 } from "./ludo-paws-characters.js";
+import {
+  botFillDelayMs,
+  botMatchFillEnabled,
+  botRetryDelayMs,
+  createBotParticipants,
+} from "./matchmaking-bots.js";
 
 const STATE_KEY = "matchmaking-state";
 const QUEUE_TTL_MS = 2 * 60 * 1000;
@@ -42,8 +48,54 @@ export class MatchmakerQueue {
   }
 
   async alarm() {
-    const state = await this.#load();
-    await this.#persist(this.#cleanup(state, Date.now()));
+    return this.#mutate(async () => {
+      const now = Date.now();
+      let state = this.#cleanup(await this.#load(), now);
+
+      if (state.pendingMatch) {
+        if (Number(state.pendingMatch.retryAt ?? 0) > now) {
+          await this.#persist(state);
+          return;
+        }
+        const completed = await this.#resumePendingMatch(state, now);
+        if (!completed) return;
+      }
+
+      if (botMatchFillEnabled(this.env)) {
+        for (const playerCount of [2, 4]) {
+          state = this.#cleanup(await this.#load(), Date.now());
+          if (state.pendingMatch) break;
+          const waiting = state.queue
+            .filter((candidate) => candidate.playerCount === playerCount)
+            .sort((left, right) => left.joinedAt - right.joinedAt);
+          if (waiting.length === 0) continue;
+          const oldest = waiting[0];
+          const fallbackAt = Number(oldest.botFallbackAt ?? oldest.joinedAt + botFillDelayMs(this.env));
+          if (fallbackAt > now) continue;
+
+          const humans = waiting.slice(0, playerCount);
+          const bots = await createBotParticipants({
+            count: playerCount - humans.length,
+            playerCount,
+            matchMode: "ONLINE",
+            existingNames: humans.map((candidate) => candidate.displayName),
+            now,
+          });
+          state.pendingMatch = {
+            matchMode: "ONLINE",
+            playerCount,
+            participants: [...humans, ...bots],
+            retryAt: now + botRetryDelayMs(this.env),
+          };
+          await this.#persist(state);
+          const completed = await this.#resumePendingMatch(state, now);
+          if (!completed) return;
+        }
+      }
+
+      state = this.#cleanup(await this.#load(), Date.now());
+      await this.#persist(state);
+    });
   }
 
   #mutate(work) {
@@ -113,32 +165,35 @@ export class MatchmakerQueue {
       .filter((candidate) => candidate.playerCount === participant.playerCount)
       .sort((left, right) => left.joinedAt - right.joinedAt);
 
-    if (eligible.length >= participant.playerCount) {
+    if (
+      eligible.length >= participant.playerCount &&
+      !state.pendingMatch
+    ) {
       const group = eligible.slice(0, participant.playerCount);
-      // Persist before crossing into MatchRoom. Deterministic request IDs make
-      // create/join/start replays safe after a Durable Object restart.
+      state.pendingMatch = {
+        matchMode: "ONLINE",
+        playerCount: participant.playerCount,
+        participants: group,
+        retryAt: now + botRetryDelayMs(this.env),
+      };
       await this.#persist(state);
-      const assignment = await this.#materialize(group, participant.playerCount);
-      const requestIds = new Set(group.map((candidate) => candidate.clientRequestId));
-      state.queue = state.queue.filter(
-        (candidate) => !requestIds.has(candidate.clientRequestId),
-      );
-
-      group.forEach((candidate, index) => {
-        state.assignments[candidate.clientRequestId] = {
-          matchId: assignment.matchId,
-          targetPlayerCount: participant.playerCount,
-          role: index === 0 ? "HOST" : "GUEST",
-          assignedAt: now,
-          expiresAt: now + ASSIGNMENT_TTL_MS,
-          displayName: candidate.displayName,
-          characterId: normalizeCharacterId(candidate.characterId),
-          profileId: candidate.profileId,
-        };
-      });
-      await this.#persist(state);
+      const completed = await this.#resumePendingMatch(state, now);
+      if (!completed) {
+        throw httpError(
+          503,
+          "MATCHMAKER_RECOVERY_PENDING",
+          "match setup is being retried; keep searching",
+        );
+      }
 
       const ownAssignment = state.assignments[participant.clientRequestId];
+      if (!ownAssignment) {
+        throw httpError(
+          503,
+          "MATCHMAKER_ASSIGNMENT_MISSING",
+          "match was created but the player assignment is not available yet",
+        );
+      }
       return await this.#matchedResponse(
         {
           ...participant,
@@ -229,6 +284,22 @@ export class MatchmakerQueue {
       });
     }
 
+    const reserved = state.pendingMatch?.participants.some(
+      (candidate) =>
+        candidate.playerType !== "BOT" &&
+        candidate.clientRequestId === clientRequestId &&
+        candidate.profileId === profile.profileId,
+    );
+    if (reserved) {
+      await this.#persist(state);
+      return json(200, {
+        status: "MATCHED",
+        cancelled: false,
+        pending: true,
+        playerCount,
+      });
+    }
+
     const queued = state.queue.find(
       (candidate) => candidate.clientRequestId === clientRequestId,
     );
@@ -252,10 +323,11 @@ export class MatchmakerQueue {
     });
   }
 
-  async #materialize(participants, targetPlayerCount) {
+  async #materialize(participants, targetPlayerCount, reservation = {}) {
     const host = participants[0];
     for (let attempt = 0; attempt < 4; attempt += 1) {
-      const matchId = await deterministicMatchId(host.clientRequestId, attempt);
+      const matchId = reservation.matchId
+        ?? await deterministicMatchId(host.clientRequestId, attempt);
       const target = room(this.env, matchId);
       const createResponse = await target.fetch(
         new Request("https://room/create", {
@@ -267,6 +339,7 @@ export class MatchmakerQueue {
               {
                 matchId,
                 profileId: host.profileId,
+                playerType: host.playerType ?? "HUMAN",
                 clientRequestId: host.clientRequestId,
                 expiresAt: Date.now() + PROFILE_ASSERTION_TTL_MS,
               },
@@ -282,8 +355,21 @@ export class MatchmakerQueue {
           }),
         }),
       );
-      if (createResponse.status === 409) continue;
+      if (createResponse.status === 409) {
+        if (reservation.matchId) {
+          throw httpError(
+            503,
+            "MATCH_RESERVED_ID_CONFLICT",
+            "reserved match ID no longer belongs to its reservation",
+          );
+        }
+        continue;
+      }
       const created = await requireJsonResponse(createResponse);
+      if (!reservation.matchId) {
+        reservation.matchId = matchId;
+        if (reservation.onMatchReserved) await reservation.onMatchReserved(matchId);
+      }
 
       for (let index = 1; index < participants.length; index += 1) {
         const participant = participants[index];
@@ -297,6 +383,7 @@ export class MatchmakerQueue {
                 {
                   matchId,
                   profileId: participant.profileId,
+                  playerType: participant.playerType ?? "HUMAN",
                   clientRequestId: participant.clientRequestId,
                   expiresAt: Date.now() + PROFILE_ASSERTION_TTL_MS,
                 },
@@ -331,6 +418,63 @@ export class MatchmakerQueue {
       "MATCH_ID_EXHAUSTED",
       "could not allocate a public match",
     );
+  }
+
+  async #resumePendingMatch(state, now) {
+    const pending = state.pendingMatch;
+    if (!pending) return true;
+
+    let assignment;
+    try {
+      assignment = await this.#materialize(
+        pending.participants,
+        pending.playerCount,
+        {
+          matchId: pending.matchId,
+          onMatchReserved: async (matchId) => {
+            pending.matchId = matchId;
+            state.pendingMatch = pending;
+            await this.#persist(state);
+          },
+        },
+      );
+    } catch (error) {
+      pending.retryAt = Date.now() + botRetryDelayMs(this.env);
+      state.pendingMatch = pending;
+      await this.#persist(state);
+      console.error("Online reserved match could not be materialized; retry scheduled", {
+        code: error?.code ?? "MATCH_MATERIALIZE_FAILED",
+      });
+      return false;
+    }
+
+      const realParticipants = pending.participants.filter(
+        (candidate) => candidate.playerType !== "BOT",
+      );
+      const realRequestIds = new Set(
+        realParticipants.map((candidate) => candidate.clientRequestId),
+      );
+      state.queue = state.queue.filter(
+        (candidate) => !realRequestIds.has(candidate.clientRequestId),
+      );
+
+      const assignedAt = Date.now();
+      pending.participants.forEach((candidate, index) => {
+        if (candidate.playerType === "BOT") return;
+        state.assignments[candidate.clientRequestId] = {
+          matchId: assignment.matchId,
+          targetPlayerCount: pending.playerCount,
+          role: index === 0 ? "HOST" : "GUEST",
+          assignedAt,
+          expiresAt: assignedAt + ASSIGNMENT_TTL_MS,
+          displayName: candidate.displayName,
+          characterId: normalizeCharacterId(candidate.characterId),
+          profileId: candidate.profileId,
+        };
+      });
+      delete state.pendingMatch;
+      await this.#persist(state);
+      return true;
   }
 
   async #matchedResponse(participant, assignment) {
@@ -375,6 +519,7 @@ export class MatchmakerQueue {
             {
               matchId: assignment.matchId,
               profileId: participant.profileId,
+              playerType: participant.playerType ?? "HUMAN",
               clientRequestId: participant.clientRequestId,
               expiresAt: Date.now() + PROFILE_ASSERTION_TTL_MS,
             },
@@ -480,16 +625,30 @@ export class MatchmakerQueue {
     await this.ctx.storage.put(STATE_KEY, state);
     if (typeof this.ctx.storage.setAlarm !== "function") return;
     const deadlines = [
-      ...state.queue.map(
-        (participant) =>
-          Number(participant.lastSeenAt ?? participant.joinedAt ?? Date.now()) + QUEUE_TTL_MS,
-      ),
+      ...(state.pendingMatch
+        ? [Number(state.pendingMatch.retryAt ?? Date.now() + botRetryDelayMs(this.env))]
+        : []),
+      ...state.queue.flatMap((participant) => {
+        const queueExpiry = Number(
+          participant.lastSeenAt ?? participant.joinedAt ?? Date.now(),
+        ) + QUEUE_TTL_MS;
+        const values = [queueExpiry];
+        if (botMatchFillEnabled(this.env) && !state.pendingMatch) {
+          const fallbackAt = Number(
+            participant.botFallbackAt ?? participant.joinedAt + botFillDelayMs(this.env),
+          );
+          values.push(Math.max(Date.now() + 1, fallbackAt));
+        }
+        return values;
+      }),
       ...Object.values(state.assignments).map(
         (assignment) => Number(assignment.expiresAt ?? Date.now() + ASSIGNMENT_TTL_MS),
       ),
-    ].filter(Number.isFinite);
+    ].filter((deadline) => Number.isFinite(deadline) && deadline > Date.now());
     if (deadlines.length > 0) {
       await this.ctx.storage.setAlarm(Math.min(...deadlines));
+    } else if (typeof this.ctx.storage.deleteAlarm === "function") {
+      await this.ctx.storage.deleteAlarm();
     }
   }
 }
@@ -501,6 +660,7 @@ function normalizeParticipant(body, profileId) {
     characterId: normalizeCharacterId(body?.characterId),
     profileId,
     playerCount: requirePlayerCount(body?.playerCount),
+    playerType: "HUMAN",
   };
 }
 

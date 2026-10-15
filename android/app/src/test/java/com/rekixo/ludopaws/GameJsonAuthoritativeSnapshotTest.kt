@@ -155,6 +155,46 @@ class GameJsonAuthoritativeSnapshotTest {
         assertEquals(0, parsed.actingSeat)
     }
 
+    @Test
+    fun legacySnapshotDefaultsPlayerTypesToHuman() {
+        val parsed =
+            GameJson.envelope(
+                JSONObject().put(
+                    "state",
+                    classicState(status = "ACTIVE", playerCount = 2),
+                ),
+            ).state
+
+        requireNotNull(parsed)
+        assertEquals(listOf("HUMAN", "HUMAN"), parsed.players.map { it.playerType })
+    }
+
+    @Test
+    fun botRosterEntryKeepsNaturalNameAndBotType() {
+        val state = classicState(status = "ACTIVE", playerCount = 2)
+        state.getJSONArray("players")
+            .getJSONObject(1)
+            .put("displayName", "Maya")
+            .put("playerType", "BOT")
+
+        val parsed =
+            GameJson.envelope(JSONObject().put("state", state)).state
+
+        requireNotNull(parsed)
+        assertEquals("Maya", parsed.players[1].displayName)
+        assertEquals("BOT", parsed.players[1].playerType)
+    }
+
+    @Test(expected = GameSchemaException::class)
+    fun snapshotRejectsUnknownPlayerType() {
+        val state = classicState(status = "ACTIVE", playerCount = 2)
+        state.getJSONArray("players")
+            .getJSONObject(1)
+            .put("playerType", "UNKNOWN")
+
+        GameJson.envelope(JSONObject().put("state", state))
+    }
+
     @Test(expected = GameSchemaException::class)
     fun numericFieldsRejectStringCoercion() {
         val state = classicState(status = "ACTIVE", playerCount = 2)

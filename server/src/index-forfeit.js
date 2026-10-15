@@ -28,4 +28,4 @@ export {
 
 export {
   MatchRoom,
-} from "./match-room-lifecycle.js";
+} from "./match-room-bots.js";

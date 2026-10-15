@@ -228,7 +228,11 @@ internal fun MainActivity.cancelPublicMatchmaking() {
             ) {
                 "MATCHED" -> {
                     showStatus(
-                        "A match was found while cancelling. Opening it now…",
+                        if (response.optBoolean("pending", false)) {
+                            "A match is being finalized and can no longer be cancelled. Reconnecting…"
+                        } else {
+                            "A match was found while cancelling. Opening it now…"
+                        },
                     )
                     pollPublicMatchmaking()
                 }
@@ -294,13 +298,27 @@ internal fun MainActivity.applyPublicMatchmakingResponse(
             )
             connectRealtimeIfPossible()
 
+            val matchPlayers = response.optJSONObject("state")?.optJSONArray("players")
+            val actualPlayerCount = matchPlayers?.length() ?: count
+            val botCount = if (matchPlayers == null) {
+                0
+            } else {
+                (0 until matchPlayers.length()).count { index ->
+                    matchPlayers.optJSONObject(index)?.optString("playerType") == "BOT"
+                }
+            }
+            val humanCount = (actualPlayerCount - botCount).coerceAtLeast(0)
+            val rosterSummary = if (botCount > 0) {
+                "$humanCount real players + $botCount bots"
+            } else {
+                "$humanCount real players"
+            }
+
             showStatus(
                 if (secureSessionPersistenceFailed) {
                     "Match is connected, but secure resume could not be saved. Keep this screen open until the match is finished."
                 } else {
-                    "Match found • " +
-                        count +
-                        " real players • game started."
+                    "Match found • $rosterSummary • game started."
                 },
             )
         }

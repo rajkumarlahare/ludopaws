@@ -127,12 +127,15 @@ class LudoPawsPlayerCardView(
             modelTeamColor = player.color,
         )
 
-        nameText.text = displayPlayerName(player.displayName, computer)
+        val isBot = player.playerType == "BOT"
+        val renderedName = displayPlayerName(player.displayName, computer)
+        nameText.text = if (isBot) "$renderedName • BOT" else renderedName
         nameText.textSize =
             if (compact) 10.5f else 11.5f
 
         val turnLabel =
             when {
+                active && isBot -> "BOT TURN"
                 active && computer -> "CPU TURN"
                 active && localPlayer -> "YOUR TURN"
                 active && player.teamId != null -> "TEAM ${player.teamId} TURN"
@@ -185,6 +188,7 @@ class LudoPawsPlayerCardView(
                 append(characterName)
                 append(", ")
                 append(player.displayName)
+                if (isBot) append(", bot player")
                 append(", ")
                 append(player.color.lowercase())
                 append(", ")

@@ -11,6 +11,12 @@ import {
 import {
   normalizeCharacterId,
 } from "./ludo-paws-characters.js";
+import {
+  botFillDelayMs,
+  botMatchFillEnabled,
+  botRetryDelayMs,
+  createBotParticipants,
+} from "./matchmaking-bots.js";
 
 const STATE_KEY = "team-matchmaking-state-v1";
 const QUEUE_TTL_MS = 2 * 60 * 1000;
@@ -45,9 +51,53 @@ export class TeamMatchmakerQueue {
   }
 
   async alarm() {
-    await this.#persist(
-      this.#cleanup(await this.#load(), Date.now()),
-    );
+    return this.#mutate(async () => {
+      const now = Date.now();
+      let state = this.#cleanup(await this.#load(), now);
+
+      if (state.pendingMatch) {
+        if (Number(state.pendingMatch.retryAt ?? 0) > now) {
+          await this.#persist(state);
+          return;
+        }
+        const completed = await this.#resumePendingMatch(state, now);
+        if (!completed) return;
+      }
+
+      if (botMatchFillEnabled(this.env)) {
+        state = this.#cleanup(await this.#load(), Date.now());
+        if (!state.pendingMatch) {
+          const humans = [...state.queue].sort((left, right) => left.joinedAt - right.joinedAt);
+          const oldest = humans[0];
+          const fallbackAt = oldest
+            ? Number(oldest.botFallbackAt ?? oldest.joinedAt + botFillDelayMs(this.env))
+            : Number.POSITIVE_INFINITY;
+
+          if (oldest && fallbackAt <= now) {
+            const realPlayers = humans.slice(0, TARGET_PLAYER_COUNT);
+            const bots = await createBotParticipants({
+              count: TARGET_PLAYER_COUNT - realPlayers.length,
+              playerCount: TARGET_PLAYER_COUNT,
+              matchMode: "TEAM_UP",
+              existingNames: realPlayers.map((candidate) => candidate.displayName),
+              now,
+            });
+            state.pendingMatch = {
+              matchMode: "TEAM_UP",
+              playerCount: TARGET_PLAYER_COUNT,
+              participants: [...realPlayers, ...bots],
+              retryAt: now + botRetryDelayMs(this.env),
+            };
+            await this.#persist(state);
+            const completed = await this.#resumePendingMatch(state, now);
+            if (!completed) return;
+          }
+        }
+      }
+
+      state = this.#cleanup(await this.#load(), Date.now());
+      await this.#persist(state);
+    });
   }
 
   #mutate(work) {
@@ -118,39 +168,38 @@ export class TeamMatchmakerQueue {
       (left, right) => left.joinedAt - right.joinedAt,
     );
 
-    if (eligible.length >= TARGET_PLAYER_COUNT) {
+    if (eligible.length >= TARGET_PLAYER_COUNT && !state.pendingMatch) {
       const group = eligible.slice(0, TARGET_PLAYER_COUNT);
-      // Persist before crossing into MatchRoom so deterministic replays can
-      // recover safely after a Durable Object restart.
+      state.pendingMatch = {
+        matchMode: "TEAM_UP",
+        playerCount: TARGET_PLAYER_COUNT,
+        participants: group,
+        retryAt: now + botRetryDelayMs(this.env),
+      };
       await this.#persist(state);
-      const assignment = await this.#materialize(group);
-      const requestIds = new Set(group.map((candidate) => candidate.clientRequestId));
-      state.queue = state.queue.filter(
-        (candidate) => !requestIds.has(candidate.clientRequestId),
-      );
+      const completed = await this.#resumePendingMatch(state, now);
+      if (!completed) {
+        throw httpError(
+          503,
+          "TEAM_MATCHMAKER_RECOVERY_PENDING",
+          "team match setup is being retried; keep searching",
+        );
+      }
 
-      group.forEach((candidate, index) => {
-        state.assignments[candidate.clientRequestId] = {
-          matchId: assignment.matchId,
-          role: index === 0 ? "HOST" : "GUEST",
-          seat: index,
-          teamId: index % 2 === 0 ? "A" : "B",
-          assignedAt: now,
-          expiresAt: now + ASSIGNMENT_TTL_MS,
-          displayName: candidate.displayName,
-          characterId: normalizeCharacterId(candidate.characterId),
-          profileId: candidate.profileId,
-        };
-      });
-      await this.#persist(state);
+      const ownAssignment = state.assignments[participant.clientRequestId];
+      if (!ownAssignment) {
+        throw httpError(
+          503,
+          "TEAM_MATCHMAKER_ASSIGNMENT_MISSING",
+          "team match was created but the player assignment is not available yet",
+        );
+      }
       return this.#matchedResponse(
         {
           ...participant,
-          characterId: normalizeCharacterId(
-            state.assignments[participant.clientRequestId]?.characterId,
-          ),
+          characterId: normalizeCharacterId(ownAssignment.characterId),
         },
-        state.assignments[participant.clientRequestId],
+        ownAssignment,
       );
     }
 
@@ -223,6 +272,23 @@ export class TeamMatchmakerQueue {
       });
     }
 
+    const reserved = state.pendingMatch?.participants.some(
+      (candidate) =>
+        candidate.playerType !== "BOT" &&
+        candidate.clientRequestId === clientRequestId &&
+        candidate.profileId === profileId,
+    );
+    if (reserved) {
+      await this.#persist(state);
+      return json(200, {
+        status: "MATCHED",
+        matchMode: "TEAM_UP",
+        cancelled: false,
+        pending: true,
+        targetPlayerCount: TARGET_PLAYER_COUNT,
+      });
+    }
+
     const queued = state.queue.find(
       (candidate) => candidate.clientRequestId === clientRequestId,
     );
@@ -247,15 +313,13 @@ export class TeamMatchmakerQueue {
     });
   }
 
-  async #materialize(participants) {
+  async #materialize(participants, reservation = {}) {
     const host = participants[0];
     for (let attempt = 0; attempt < 4; attempt += 1) {
       // ONLINE public matchmaking reserves attempts 0..3. Team Up uses 4..7,
       // remaining inside deterministicMatchId's reviewed attempt bounds.
-      const matchId = await deterministicMatchId(
-        host.clientRequestId,
-        4 + attempt,
-      );
+      const matchId = reservation.matchId
+        ?? await deterministicMatchId(host.clientRequestId, 4 + attempt);
       const target = room(this.env, matchId);
       const createResponse = await target.fetch(
         new Request("https://room/create", {
@@ -279,8 +343,21 @@ export class TeamMatchmakerQueue {
           }),
         }),
       );
-      if (createResponse.status === 409) continue;
+      if (createResponse.status === 409) {
+        if (reservation.matchId) {
+          throw httpError(
+            503,
+            "TEAM_MATCH_RESERVED_ID_CONFLICT",
+            "reserved Team Up match ID no longer belongs to its reservation",
+          );
+        }
+        continue;
+      }
       const created = await requireJsonResponse(createResponse);
+      if (!reservation.matchId) {
+        reservation.matchId = matchId;
+        if (reservation.onMatchReserved) await reservation.onMatchReserved(matchId);
+      }
 
       for (let index = 1; index < participants.length; index += 1) {
         const participant = participants[index];
@@ -324,6 +401,60 @@ export class TeamMatchmakerQueue {
       "TEAM_MATCH_ID_EXHAUSTED",
       "could not allocate a team match",
     );
+  }
+
+  async #resumePendingMatch(state, now) {
+    const pending = state.pendingMatch;
+    if (!pending) return true;
+
+    let assignment;
+    try {
+      assignment = await this.#materialize(pending.participants, {
+        matchId: pending.matchId,
+        onMatchReserved: async (matchId) => {
+          pending.matchId = matchId;
+          state.pendingMatch = pending;
+          await this.#persist(state);
+        },
+      });
+    } catch (error) {
+      pending.retryAt = Date.now() + botRetryDelayMs(this.env);
+      state.pendingMatch = pending;
+      await this.#persist(state);
+      console.error("Team Up reserved match could not be materialized; retry scheduled", {
+        code: error?.code ?? "TEAM_MATCH_MATERIALIZE_FAILED",
+      });
+      return false;
+    }
+
+      const realParticipants = pending.participants.filter(
+        (candidate) => candidate.playerType !== "BOT",
+      );
+      const realRequestIds = new Set(
+        realParticipants.map((candidate) => candidate.clientRequestId),
+      );
+      state.queue = state.queue.filter(
+        (candidate) => !realRequestIds.has(candidate.clientRequestId),
+      );
+
+      const assignedAt = Date.now();
+      pending.participants.forEach((candidate, index) => {
+        if (candidate.playerType === "BOT") return;
+        state.assignments[candidate.clientRequestId] = {
+          matchId: assignment.matchId,
+          role: index === 0 ? "HOST" : "GUEST",
+          seat: index,
+          teamId: index % 2 === 0 ? "A" : "B",
+          assignedAt,
+          expiresAt: assignedAt + ASSIGNMENT_TTL_MS,
+          displayName: candidate.displayName,
+          characterId: normalizeCharacterId(candidate.characterId),
+          profileId: candidate.profileId,
+        };
+      });
+      delete state.pendingMatch;
+      await this.#persist(state);
+      return true;
   }
 
   async #matchedResponse(participant, assignment) {
@@ -450,16 +581,30 @@ export class TeamMatchmakerQueue {
     await this.ctx.storage.put(STATE_KEY, state);
     if (typeof this.ctx.storage.setAlarm !== "function") return;
     const deadlines = [
-      ...state.queue.map(
-        (participant) =>
-          Number(participant.lastSeenAt ?? participant.joinedAt ?? Date.now()) + QUEUE_TTL_MS,
-      ),
+      ...(state.pendingMatch
+        ? [Number(state.pendingMatch.retryAt ?? Date.now() + botRetryDelayMs(this.env))]
+        : []),
+      ...state.queue.flatMap((participant) => {
+        const queueExpiry = Number(
+          participant.lastSeenAt ?? participant.joinedAt ?? Date.now(),
+        ) + QUEUE_TTL_MS;
+        const values = [queueExpiry];
+        if (botMatchFillEnabled(this.env) && !state.pendingMatch) {
+          const fallbackAt = Number(
+            participant.botFallbackAt ?? participant.joinedAt + botFillDelayMs(this.env),
+          );
+          values.push(Math.max(Date.now() + 1, fallbackAt));
+        }
+        return values;
+      }),
       ...Object.values(state.assignments).map(
         (assignment) => Number(assignment.expiresAt ?? Date.now() + ASSIGNMENT_TTL_MS),
       ),
-    ].filter(Number.isFinite);
+    ].filter((deadline) => Number.isFinite(deadline) && deadline > Date.now());
     if (deadlines.length > 0) {
       await this.ctx.storage.setAlarm(Math.min(...deadlines));
+    } else if (typeof this.ctx.storage.deleteAlarm === "function") {
+      await this.ctx.storage.deleteAlarm();
     }
   }
 }
@@ -470,6 +615,7 @@ function normalizeParticipant(body, profileId) {
     displayName: normalizeDisplayName(body?.displayName),
     characterId: normalizeCharacterId(body?.characterId),
     profileId,
+    playerType: "HUMAN",
   };
 }
 
@@ -514,6 +660,7 @@ async function issueAssertion(env, matchId, participant) {
   return issueLeaderboardProfileAssertion(env, {
     matchId,
     profileId: participant.profileId,
+    playerType: participant.playerType ?? "HUMAN",
     clientRequestId: participant.clientRequestId,
     expiresAt: Date.now() + PROFILE_ASSERTION_TTL_MS,
   });
