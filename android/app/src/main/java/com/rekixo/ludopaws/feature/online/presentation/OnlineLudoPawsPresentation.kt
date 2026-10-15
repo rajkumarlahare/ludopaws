@@ -135,6 +135,27 @@ internal object OnlineLudoPawsPresentation {
         )
     }
 
+    fun beginPendingMovePreview(
+        activity: MainActivity,
+        state: MatchSnapshot,
+        tokenIndex: Int,
+    ): Boolean {
+        val playerId = activity.playerId ?: return false
+        val boardHost = host(activity) ?: return false
+        return boardHost.board.beginPendingMovePreview(
+            state = state,
+            playerId = playerId,
+            tokenIndex = tokenIndex,
+        )
+    }
+
+    fun cancelPendingMovePreview(
+        activity: MainActivity,
+        authoritative: MatchSnapshot?,
+    ) {
+        host(activity)?.board?.cancelPendingMovePreview(authoritative)
+    }
+
     fun presentRemoteQuickChat(
         activity: MainActivity,
         senderPlayerId: String,
