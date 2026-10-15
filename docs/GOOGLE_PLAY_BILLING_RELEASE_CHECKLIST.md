@@ -35,8 +35,8 @@ In the Cloudflare dashboard, open the `ludoproof-game-api` Worker and add/update
 In GitHub repository settings, open **Settings → Environments → production → Environment variables** and set:
 
 - `GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL`: exact service-account email.
-- `GOOGLE_PLAY_BILLING_ENABLED`: `true` only after the internal purchase tests below pass.
-- `LUDOPROOF_BILLING_ENABLED`: same value as `GOOGLE_PLAY_BILLING_ENABLED`.
+- `GOOGLE_PLAY_BILLING_ENABLED`: keep `false` until service-account access, the secret, exact Play Console SKUs, pricing/availability and license testers are ready. Set it to `true` for the controlled internal-test window so the server can verify test purchases.
+- `LUDOPROOF_BILLING_ENABLED`: same value as `GOOGLE_PLAY_BILLING_ENABLED`; use it to build the Billing-enabled internal-test candidate. Do not publish that candidate to a public track until it passes the test gate.
 
 The production workflow checks that the Cloudflare private-key secret exists, that the email is correctly formatted, and that the Android/Worker flags match. These preflight checks do **not** prove that Google accepts the key or that the service account has permission to read/consume/acknowledge the products. The credential remains a Cloudflare secret; do not add it as a repository variable or print it in logs.
 
@@ -92,7 +92,7 @@ Purchase-processing guidance: https://developer.android.com/google/play/billing/
 
    Confirm `checks.playBillingEnabled = true` and `billingAvailable = true`. The optional `billingChecks` breakdown identifies whether the flag, service-account email, private-key PEM presence, purchase-ledger binding, account directory, or player-account binding is absent. It reports booleans only, not the private key.
 
-5. Install the same Billing-enabled, correctly signed release candidate from the internal test track and repeat the purchase/restore checks against the deployed Worker.
+6. Once all tests pass, keep the Worker/client flag values aligned and promote the reviewed candidate through the intended staged release. Watch purchase verification errors, refunds, and support reports after rollout.
 
 ## Release gate
 
