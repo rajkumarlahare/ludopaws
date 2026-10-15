@@ -78,7 +78,6 @@ export class MatchmakerQueue {
             count: playerCount - humans.length,
             playerCount,
             matchMode: "ONLINE",
-            seedRequestId: humans[0].clientRequestId,
             existingNames: humans.map((candidate) => candidate.displayName),
             now,
           });
@@ -86,7 +85,7 @@ export class MatchmakerQueue {
             matchMode: "ONLINE",
             playerCount,
             participants: [...humans, ...bots],
-            retryAt: now,
+            retryAt: now + botRetryDelayMs(this.env),
           };
           await this.#persist(state);
           const completed = await this.#resumePendingMatch(state, now);
