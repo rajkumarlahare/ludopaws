@@ -227,6 +227,32 @@ export class MatchmakerQueue {
       )
       .sort((left, right) => left.joinedAt - right.joinedAt);
 
+    if (eligible.length >= participant.playerCount && state.pendingMatch) {
+      // A previous reservation is being recovered. Persist the preference for
+      // this newly-complete group so it is resolved as soon as that reservation
+      // finishes rather than waiting for the normal bot-fill timer.
+      const group = selectCharacterDiverseGroup(eligible, participant.playerCount);
+      const key = characterPreferenceKey(participant.playerCount, participant.rulesetKey);
+      const preferences = state.characterPreferences ?? {};
+      const hasUniqueCharacters =
+        group.length === participant.playerCount &&
+        distinctCharacterCount(group) === participant.playerCount;
+      const existing = preferences[key];
+      if (!existing || (hasUniqueCharacters && Number(existing.readyAt ?? 0) > now)) {
+        preferences[key] = {
+          playerCount: participant.playerCount,
+          rulesetKey: participant.rulesetKey,
+          startedAt: existing?.startedAt ?? now,
+          readyAt: hasUniqueCharacters ? now : now + CHARACTER_PREFERENCE_WINDOW_MS,
+        };
+      }
+      state.characterPreferences = preferences;
+      await this.#persist(state);
+      return json(202, searchingPayload(
+        state, participant.playerCount, now, participant.rulesetKey,
+      ));
+    }
+
     if (
       eligible.length >= participant.playerCount &&
       !state.pendingMatch
