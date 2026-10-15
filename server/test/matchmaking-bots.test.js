@@ -145,8 +145,10 @@ test("bot settings are bounded and bots receive non-profile identities", () => {
   assert.equal(botTurnsEnabled({ LUDOPROOF_BOT_TURNS_ENABLED: "off" }), false);
   assert.equal(botFillDelayMs({ LUDOPROOF_BOT_FILL_DELAY_MS: "10" }), 15_000);
   assert.equal(botTurnDelayMs({}), 1_100);
+  assert.equal(botTurnDelayMs({ LUDOPROOF_BOT_TURN_DELAY_MS: "650" }), 1_100);
   assert.equal(botTurnDelayMs({ LUDOPROOF_BOT_TURN_DELAY_MS: "12001" }), 1_100);
   assert.equal(botResultHoldMs({}), 950);
+  assert.equal(botResultHoldMs({ LUDOPROOF_BOT_RESULT_HOLD_MS: "700" }), 950);
   assert.equal(botResultHoldMs({ LUDOPROOF_BOT_RESULT_HOLD_MS: "100" }), 950);
   assert.equal(botResultHoldMs({ LUDOPROOF_BOT_RESULT_HOLD_MS: "1250" }), 1_250);
   const bots = createBotParticipants({
