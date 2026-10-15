@@ -156,6 +156,34 @@ test("bot settings are bounded and bots receive non-profile identities", () => {
   assert.ok(bots.every((bot) => bot.displayName.toLowerCase() !== "aarav"));
 });
 
+test("disabling bot fill keeps an expired real-player search queued without creating a match", async () => {
+  const env = makeEnv();
+  env.LUDOPROOF_BOT_MATCH_FILL_ENABLED = "false";
+  const queue = new MatchmakerQueue({ storage: new FakeStorage() }, env);
+  const person = human(9, 2);
+
+  await queue.fetch(
+    request("/search", {
+      clientRequestId: person.clientRequestId,
+      displayName: person.displayName,
+      playerCount: 2,
+      characterId: person.characterId,
+    }, person.profileToken),
+  );
+  await backdateQueue(queue, "matchmaking-state");
+  await queue.alarm();
+
+  const result = await parse(await queue.fetch(
+    request("/status", {
+      clientRequestId: person.clientRequestId,
+      playerCount: 2,
+    }, person.profileToken),
+  ));
+  assert.equal(result.body.status, "SEARCHING");
+  assert.equal(result.body.queuedPlayers, 1);
+  assert.equal(env.LUDOPROOF_MATCHES.rooms.size, 0);
+});
+
 test("Online 4-player fallback adds only the missing bots and assigns no bot client tickets", async () => {
   const env = makeEnv();
   const queue = new MatchmakerQueue({ storage: new FakeStorage() }, env);
