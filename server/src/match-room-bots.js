@@ -5,8 +5,9 @@ import {
   applyMove,
   globalCellFor,
   isTeamUp,
+  teamIdForSeat,
 } from "./game.js";
-import { botRetryDelayMs, botTurnDelayMs, botTurnsEnabled } from "./matchmaking-bots.js";
+import { botResultHoldMs, botRetryDelayMs, botTurnDelayMs, botTurnsEnabled } from "./matchmaking-bots.js";
 import { MatchRoom as LifecycleMatchRoom, MOVE_SELECTION_TIMEOUT_MS } from "./match-room-lifecycle.js";
 
 const STATE_KEY = "match-state";
@@ -230,12 +231,24 @@ export class MatchRoom extends LifecycleMatchRoom {
         return;
       }
 
+      let justRevealedRoll = false;
       if (pending.status !== "RESOLVED") {
         await this.#internalPlayerRequest(
           "/roll/reveal",
           identity.playerToken,
           { clientSeed: turn.clientSeed },
         );
+        state = await this.ctx.storage.get(STATE_KEY);
+        pending = state?.pendingRoll;
+        justRevealedRoll = true;
+      }
+
+      if (justRevealedRoll && pending?.status === "RESOLVED") {
+        const deferred = await this.#deferResolvedBotMove(
+          turn,
+          botResultHoldMs(this.env),
+        );
+        if (deferred) return;
         state = await this.ctx.storage.get(STATE_KEY);
         pending = state?.pendingRoll;
       }
@@ -292,6 +305,29 @@ export class MatchRoom extends LifecycleMatchRoom {
       throw error;
     }
     return payload;
+  }
+
+  async #deferResolvedBotMove(turn, delayMs) {
+    return this.#withBotMetadata(async () => {
+      const current = await this.ctx.storage.get(STATE_KEY);
+      if (
+        current?.status !== "ACTIVE" ||
+        current.botTurn?.playerId !== turn.playerId ||
+        current.botTurn?.eventIndex !== turn.eventIndex ||
+        current.botTurn?.inProgress !== true ||
+        current.pendingRoll?.status !== "RESOLVED" ||
+        current.pendingRoll?.playerId !== turn.playerId ||
+        typeof this.ctx.storage.setAlarm !== "function"
+      ) {
+        return false;
+      }
+
+      current.botTurn.inProgress = false;
+      current.botTurn.runAt = Date.now() + delayMs;
+      await this.ctx.storage.put(STATE_KEY, current);
+      await this.ctx.storage.setAlarm(current.botTurn.runAt);
+      return true;
+    });
   }
 
   async #scheduleRecoveryAlarm() {
@@ -364,7 +400,7 @@ export class MatchRoom extends LifecycleMatchRoom {
   }
 }
 
-function chooseBotMove(state, playerId, legalTokenIndexes) {
+export function chooseBotMove(state, playerId, legalTokenIndexes) {
   const player = state.players.find((candidate) => candidate.playerId === playerId);
   const seat = state.players.findIndex((candidate) => candidate.playerId === playerId);
   const ranked = legalTokenIndexes.map((tokenIndex) => {
@@ -384,14 +420,31 @@ function chooseBotMove(state, playerId, legalTokenIndexes) {
         const globalCell = globalCellFor(player.color, after);
         if (RULESET.safeGlobalCells.includes(globalCell)) score += 16;
         if (isTeamUp(state)) {
-          const opponentSeats = state.players
-            .map((candidate, index) => ({ candidate, index }))
-            .filter(({ candidate }) => candidate.teamId !== player.teamId);
-          if (opponentSeats.some(({ candidate }) =>
-            candidate.tokens.some((position) => position >= 0 && position <= 50 &&
-              globalCellFor(candidate.color, position) === globalCell))) {
-            score += 90;
-          }
+          // Encourage (but never require) cooperative stacking with a partner:
+          // the authoritative engine already prevents same-team captures.
+          const movingTeam = teamIdForSeat(state, seat);
+          const teammateSharesCell = state.players.some(
+            (candidate, candidateSeat) =>
+              candidateSeat !== seat &&
+              teamIdForSeat(state, candidateSeat) === movingTeam &&
+              candidate.tokens.some((position) =>
+                position >= 0 &&
+                position <= 50 &&
+                globalCellFor(candidate.color, position) === globalCell,
+              ),
+          );
+          if (teammateSharesCell) score += 24;
+
+          const opponentAtCell = state.players.some(
+            (candidate, candidateSeat) =>
+              teamIdForSeat(state, candidateSeat) !== movingTeam &&
+              candidate.tokens.some((position) =>
+                position >= 0 &&
+                position <= 50 &&
+                globalCellFor(candidate.color, position) === globalCell,
+              ),
+          );
+          if (opponentAtCell) score += 90;
         }
       }
     } catch {

@@ -39,6 +39,9 @@ internal object OnlineLudoPawsPresentation {
         val feedbackLedger: LudoPawsFeedbackLedger = LudoPawsFeedbackLedger(),
         var quickChatReactionView: View? = null,
         var lastQuickChatAtMs: Long = 0L,
+        var railBindingKey: String? = null,
+        var activeDiceControl: FrameLayout? = null,
+        var activeDicePlayerId: String? = null,
     )
 
     fun render(
@@ -63,7 +66,7 @@ internal object OnlineLudoPawsPresentation {
         host.board.visibility = View.VISIBLE
         host.board.bind(
             state = current,
-            playerId = activity.playerId,
+            playerId = activity.playerId.takeIf { activity.canSubmitOnlineGameplayAction() },
             perspectiveColor = localColor,
             characterIdsBySeat = characterIdsBySeat,
         )
@@ -87,6 +90,9 @@ internal object OnlineLudoPawsPresentation {
     fun clear(activity: MainActivity) {
         val host = host(activity) ?: return
         host.feedbackLedger.clear()
+        host.railBindingKey = null
+        host.activeDiceControl = null
+        host.activeDicePlayerId = null
         host.board.bind(
             state = null,
             playerId = null,
@@ -103,6 +109,51 @@ internal object OnlineLudoPawsPresentation {
         }
         activity.boardFrame.tag = null
         activity.boardView.visibility = View.VISIBLE
+    }
+
+    fun refreshActionControls(
+        activity: MainActivity,
+        state: MatchSnapshot,
+    ) {
+        val host = host(activity) ?: return
+        val characterIdsBySeat = OnlineLudoPawsCharacterPolicy.characterIdsBySeat(state)
+        val localColor = state.players.firstOrNull {
+            it.playerId == activity.playerId
+        }?.color
+        host.board.bind(
+            state = state,
+            playerId = activity.playerId.takeIf { activity.canSubmitOnlineGameplayAction() },
+            perspectiveColor = localColor,
+            characterIdsBySeat = characterIdsBySeat,
+        )
+        renderRails(
+            activity = activity,
+            host = host,
+            state = state,
+            characterIdsBySeat = characterIdsBySeat,
+            perspectiveColor = localColor,
+        )
+    }
+
+    fun beginPendingMovePreview(
+        activity: MainActivity,
+        state: MatchSnapshot,
+        tokenIndex: Int,
+    ): Boolean {
+        val playerId = activity.playerId ?: return false
+        val boardHost = host(activity) ?: return false
+        return boardHost.board.beginPendingMovePreview(
+            state = state,
+            playerId = playerId,
+            tokenIndex = tokenIndex,
+        )
+    }
+
+    fun cancelPendingMovePreview(
+        activity: MainActivity,
+        authoritative: MatchSnapshot?,
+    ) {
+        host(activity)?.board?.cancelPendingMovePreview(authoritative)
     }
 
     fun presentRemoteQuickChat(
@@ -266,11 +317,6 @@ internal object OnlineLudoPawsPresentation {
         characterIdsBySeat: List<String>,
         perspectiveColor: String?,
     ) {
-        host.topRail.visibility = View.VISIBLE
-        host.bottomRail.visibility = View.VISIBLE
-        host.topRail.removeAllViews()
-        host.bottomRail.removeAllViews()
-
         val activePlayer =
             state.players
                 .getOrNull(state.actingSeat ?: state.turnSeat)
@@ -278,6 +324,48 @@ internal object OnlineLudoPawsPresentation {
             perspectiveColor
                 ?: state.players.firstOrNull()?.color
                 ?: "BLUE"
+        val quickChatEnabled = GameSettingsStore(activity).snapshot().quickChatEnabled
+        val bindingKey = buildString {
+            append(state.matchId).append('|')
+            append(state.matchMode).append('|')
+            append(state.status).append('|')
+            append(activePlayer?.playerId).append('|')
+            append(activity.playerId).append('|')
+            append(perspectiveColor).append('|')
+            append(quickChatEnabled)
+            characterIdsBySeat.forEach { append('|').append(it) }
+            state.players.forEach { player ->
+                append('|').append(player.playerId)
+                append(':').append(player.displayName)
+                append(':').append(player.color)
+                append(':').append(player.teamId)
+                append(':').append(player.playerType)
+                append(':').append(player.seat)
+                player.tokens.forEach { append(',').append(it) }
+            }
+        }
+
+        if (host.railBindingKey == bindingKey) {
+            host.activeDiceControl?.let { control ->
+                val enabled = state.status == "ACTIVE" &&
+                    host.activeDicePlayerId == activity.playerId &&
+                    activity.canSubmitOnlineGameplayAction() &&
+                    activity.onlineRollActionDecision(state).enabled
+                control.isEnabled = enabled
+                control.isClickable = enabled
+                control.isFocusable = enabled
+                activity.diceView.setAttentionEnabled(enabled)
+            }
+            return
+        }
+
+        host.railBindingKey = bindingKey
+        host.activeDiceControl = null
+        host.activeDicePlayerId = null
+        host.topRail.visibility = View.VISIBLE
+        host.bottomRail.visibility = View.VISIBLE
+        host.topRail.removeAllViews()
+        host.bottomRail.removeAllViews()
 
         addPlayerSlot(
             activity = activity,
@@ -338,10 +426,20 @@ internal object OnlineLudoPawsPresentation {
     ) {
         val player =
             state.players.firstOrNull {
-                OfflinePlayerLayout.slotForColor(
-                    color = it.color,
-                    preferredBottomLeftColor = preferredBottomLeftColor,
-                ) == slot
+                val resolvedSlot =
+                    if (state.players.size == 2) {
+                        if (it.playerId == activity.playerId) {
+                            OfflinePlayerLayout.Slot.BOTTOM_LEFT
+                        } else {
+                            OfflinePlayerLayout.Slot.TOP_RIGHT
+                        }
+                    } else {
+                        OfflinePlayerLayout.slotForColor(
+                            color = it.color,
+                            preferredBottomLeftColor = preferredBottomLeftColor,
+                        )
+                    }
+                resolvedSlot == slot
             }
 
         val slotHost =
@@ -360,13 +458,32 @@ internal object OnlineLudoPawsPresentation {
                     player.playerId == activePlayer?.playerId
             val localPlayer = player.playerId == activity.playerId
             val playerWidth = dp(activity, 112)
+            val activeDiceControl =
+                if (active) {
+                    activeOnlineDiceControl(
+                        activity = activity,
+                        player = player,
+                        enabled = localPlayer &&
+                            activity.canSubmitOnlineGameplayAction() &&
+                            activity.onlineRollActionDecision(state).enabled,
+                    )
+                } else {
+                    null
+                }
+            if (activeDiceControl != null) {
+                quickChatHost.activeDiceControl = activeDiceControl
+                quickChatHost.activeDicePlayerId = player.playerId
+            }
+            if (alignEnd && activeDiceControl != null) {
+                slotHost.addView(activeDiceControl)
+            }
             val playerCard =
                 LudoPawsPlayerCardView(activity).apply {
                     bind(
                         player = player,
                         characterId = characterIdsBySeat.getOrNull(player.seat),
                         active = active,
-                        computer = false,
+                        computer = player.playerType == "BOT",
                         compact = true,
                         localPlayer = localPlayer,
                         portraitOnEnd = alignEnd,
@@ -451,6 +568,9 @@ internal object OnlineLudoPawsPresentation {
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                 ),
             )
+            if (!alignEnd && activeDiceControl != null) {
+                slotHost.addView(activeDiceControl)
+            }
         }
 
         rail.addView(
@@ -461,6 +581,51 @@ internal object OnlineLudoPawsPresentation {
                 1f,
             ),
         )
+    }
+
+    private fun activeOnlineDiceControl(
+        activity: MainActivity,
+        player: PlayerSnapshot,
+        enabled: Boolean,
+    ): FrameLayout {
+        val control =
+            FrameLayout(activity).apply {
+                isClickable = true
+                isFocusable = true
+                background = null
+                elevation = 0f
+                clipChildren = false
+                clipToPadding = false
+                contentDescription = "Roll dice for ${player.displayName}"
+                isEnabled = enabled
+                alpha = 1f
+                setOnClickListener {
+                    if (isEnabled) activity.rollVerifiedDice()
+                }
+            }
+        val dice =
+            com.rekixo.ludopaws.DiceView(activity).apply {
+                setPlayerTeamColor(player.color)
+                alpha = 1f
+            }
+        activity.diceView = dice
+        control.addView(
+            dice,
+            FrameLayout.LayoutParams(
+                dp(activity, 54),
+                dp(activity, 54),
+                Gravity.CENTER,
+            ),
+        )
+        control.layoutParams =
+            LinearLayout.LayoutParams(
+                dp(activity, 56),
+                dp(activity, 56),
+            ).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                setMargins(dp(activity, 1), 0, dp(activity, 1), 0)
+            }
+        return control
     }
 
     private fun dispatchFeedback(

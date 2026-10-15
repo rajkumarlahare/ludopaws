@@ -109,7 +109,6 @@ internal fun MainActivity.onlineActionPanel(): LinearLayout =
                     )
                 }
 
-            addView(verificationPanel)
 
             rollButton =
                 button(
@@ -120,15 +119,6 @@ internal fun MainActivity.onlineActionPanel(): LinearLayout =
                     textSize = if (isCompactOnline()) 15f else 17f
                 }
             LudoProofTheme.primary(rollButton)
-            addView(
-                rollButton,
-                LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    dp(if (isCompactOnline()) 48 else 52),
-                ).apply {
-                    topMargin = dp(6)
-                },
-            )
 
             startButton =
                 button(
@@ -184,12 +174,8 @@ internal fun MainActivity.onlineActionPanel(): LinearLayout =
                 }.apply {
                     textSize = if (isCompactOnline()) 10f else 11f
                 }
-            addView(
-                responsiveControlRow(
-                    shareButton,
-                    proofButton,
-                ),
-            )
+            addView(responsiveControlRow(shareButton))
+            proofButton.visibility = View.GONE
 
             proofDetailsText =
                 TextView(
@@ -208,9 +194,10 @@ internal fun MainActivity.onlineActionPanel(): LinearLayout =
                         if (isCompactOnline()) 9.5f else 10.5f,
                         centered = true,
                     )
-                    setPadding(dp(6), dp(5), dp(6), 0)
+                    setPadding(dp(2), dp(2), dp(2), 0)
                     maxLines = 2
                 }
+            addView(statusText)
         }
 
 internal fun MainActivity.responsiveControlRow(

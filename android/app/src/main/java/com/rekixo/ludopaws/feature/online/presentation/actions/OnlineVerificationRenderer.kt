@@ -1,8 +1,13 @@
 package com.rekixo.ludopaws.feature.online
 
+import android.os.SystemClock
 import android.view.View
+import android.widget.FrameLayout
+import android.widget.LinearLayout
+import android.widget.ScrollView
 import com.rekixo.ludopaws.*
 import com.rekixo.ludopaws.ui.online.*
+import com.rekixo.ludopaws.feature.settings.data.local.GameSettingsStore
 
 internal fun MainActivity.updateVerification(
     state: MatchSnapshot,
@@ -16,15 +21,30 @@ internal fun MainActivity.updateVerification(
             val shouldAnimate =
                 uiStateHolder.value.presentedDiceEventKey !=
                     presentation.eventKey
+            val minimumRollDurationMillis =
+                LudoPawsGameplayPacingPolicy.diceResultHoldMillis(
+                    GameSettingsStore(this).snapshot().gameSpeed,
+                )
             diceView.showOutcome(
                 outcome = presentation.outcome,
                 animate = shouldAnimate,
+                eventKey = presentation.eventKey,
+                minimumRollDurationMillis = minimumRollDurationMillis,
             )
             if (shouldAnimate) {
                 uiStateHolder.update {
                     it.copy(
                         presentedDiceEventKey = presentation.eventKey,
                     )
+                }
+                val remainingPresentationMillis =
+                    diceView.remainingOutcomePresentationMillis(minimumRollDurationMillis)
+                if (remainingPresentationMillis > 0L) {
+                    onlineGameplayActionBlockedUntilMillis = maxOf(
+                        onlineGameplayActionBlockedUntilMillis,
+                        SystemClock.uptimeMillis() + remainingPresentationMillis,
+                    )
+                    scheduleOnlineGameplayUnlock()
                 }
             }
 
@@ -124,7 +144,50 @@ internal fun MainActivity.updateControls(
 
     val waiting = state.status == "WAITING"
     val active = state.status == "ACTIVE"
+    onlineHeroPanel?.visibility = if (waiting) View.VISIBLE else View.GONE
     val finished = state.status == "FINISHED"
+
+    // Keep the live board in a fixed center stage for remote Online / Team Up matches.
+    // The parent ScrollView remains scrollable in the lobby, but the active game uses
+    // the full viewport and gives the board the flexible space between player rails.
+    val gameplayContent = boardFrame.parent as? LinearLayout
+    val gameplayContentHost = gameplayContent?.parent as? FrameLayout
+    val gameplayScroll = gameplayContentHost?.parent as? ScrollView
+    val viewportHeight =
+        if (active) FrameLayout.LayoutParams.MATCH_PARENT
+        else FrameLayout.LayoutParams.WRAP_CONTENT
+
+    gameplayContentHost?.let { host ->
+        val params = host.layoutParams
+        if (params.height != viewportHeight) {
+            params.height = viewportHeight
+            host.layoutParams = params
+        }
+    }
+
+    gameplayContent?.let { content ->
+        val params = content.layoutParams as? FrameLayout.LayoutParams
+        if (params != null && params.height != viewportHeight) {
+            params.height = viewportHeight
+            content.layoutParams = params
+        }
+    }
+
+    (boardFrame.layoutParams as? LinearLayout.LayoutParams)?.let { params ->
+        val targetHeight =
+            if (active) 0 else LinearLayout.LayoutParams.WRAP_CONTENT
+        val targetWeight = if (active) 1f else 0f
+        if (params.height != targetHeight || params.weight != targetWeight) {
+            params.height = targetHeight
+            params.weight = targetWeight
+            boardFrame.layoutParams = params
+        }
+    }
+
+    if (active && gameplayScroll != null && gameplayScroll.scrollY != 0) {
+        gameplayScroll.post { gameplayScroll.scrollTo(0, 0) }
+    }
+
     val canEnterAnotherMatch =
         finished && gameMode == GameMode.ONLINE
 
@@ -148,18 +211,40 @@ internal fun MainActivity.updateControls(
     matchInput.isEnabled = canEnterAnotherMatch && authoritativeActions
 
     matchStatusPanel.visibility = View.VISIBLE
+    if (waiting) {
+        matchStatusPanel.background =
+            LudoProofTheme.hudPanelDrawable(this, goldBorder = false)
+        matchStatusPanel.elevation = dp(3).toFloat()
+        matchStatusPanel.setPadding(
+            dp(if (isCompactOnline()) 8 else 10),
+            dp(if (isCompactOnline()) 5 else 7),
+            dp(if (isCompactOnline()) 8 else 10),
+            dp(if (isCompactOnline()) 5 else 7),
+        )
+    } else {
+        matchStatusPanel.background = null
+        matchStatusPanel.elevation = 0f
+        matchStatusPanel.setPadding(0, 0, 0, 0)
+    }
     turnText.visibility = if (waiting) View.VISIBLE else View.GONE
     resultPanel.visibility = if (finished) View.VISIBLE else View.GONE
     boardFrame.visibility = if (active || finished) View.VISIBLE else View.GONE
     actionPanel.visibility = View.VISIBLE
+    if (waiting) {
+        actionPanel.background =
+            LudoProofTheme.hudPanelDrawable(this, goldBorder = false)
+        actionPanel.setPadding(dp(8), dp(6), dp(8), dp(6))
+    } else {
+        actionPanel.background = null
+        actionPanel.setPadding(0, 0, 0, 0)
+    }
 
     // During actual play the character rails carry player identity/progress.
     // Hide duplicate protocol/match copy so the Ludo board stays visually primary.
     matchInfoText.visibility = if (waiting) View.VISIBLE else View.GONE
     playersText.visibility = if (waiting) View.VISIBLE else View.GONE
 
-    verificationPanel.visibility =
-        if (active || finished) View.VISIBLE else View.GONE
+    verificationPanel.visibility = View.GONE
 
     diceView.visibility = View.VISIBLE
     diceView.alpha = 1f
@@ -193,11 +278,11 @@ internal fun MainActivity.updateControls(
             state.matchMode != "TEAM_UP" &&
             state.matchId.isNotBlank()
 
-    proofButton.visibility =
-        if (active || finished) View.VISIBLE else View.GONE
+    proofButton.visibility = View.GONE
 
     val rollAction = onlineRollActionDecision(state)
-    rollButton.visibility = if (active) View.VISIBLE else View.GONE
+    // Tap the dice beside the active player's character to roll.
+    rollButton.visibility = View.GONE
     rollButton.isEnabled = rollAction.enabled
     rollButton.text = rollAction.label
 
@@ -232,7 +317,11 @@ private fun MainActivity.scheduleSingleLegalOnlineMove(
     if (rollButton.tag == eventKey) return
     rollButton.tag = eventKey
 
-    showStatus("Only one move is possible • moving automatically…")
+    showStatus("Only one move is possible • showing the dice result…")
+    val speed = GameSettingsStore(this).snapshot().gameSpeed
+    val autoMoveDelay =
+        LudoPawsGameplayPacingPolicy.diceResultHoldMillis(speed) +
+            LudoPawsGameplayPacingPolicy.postRollAutoMoveDelayMillis(speed)
     rollButton.postDelayed(
         {
             val latest = currentState
@@ -257,7 +346,7 @@ private fun MainActivity.scheduleSingleLegalOnlineMove(
                 rollButton.tag = null
             }
         },
-        320L,
+        autoMoveDelay,
     )
 }
 

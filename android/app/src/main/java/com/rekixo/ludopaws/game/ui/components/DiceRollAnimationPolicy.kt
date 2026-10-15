@@ -24,6 +24,15 @@ object DiceRollAnimationPolicy {
         val finished: Boolean = false,
     )
 
+    fun remainingVisibleRollMillis(
+        elapsedMillis: Long,
+        minimumVisibleRollMillis: Long,
+    ): Long =
+        (
+            minimumVisibleRollMillis.coerceAtLeast(0L) -
+                elapsedMillis.coerceAtLeast(0L)
+        ).coerceAtLeast(0L)
+
     fun rollingFrame(
         elapsedMillis: Long,
     ): Frame {

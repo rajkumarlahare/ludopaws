@@ -469,6 +469,90 @@ test("the final exact move finishes the match and records the winner", () => {
   );
 });
 
+test("public two-player Online assigns the second seat to the top-right Yellow home", () => {
+  let state = newMatch({
+    matchId: "DUO12345",
+    hostPlayerId: "p1",
+    hostDisplayName: "One",
+    now: 1,
+    targetPlayerCount: 2,
+    matchMode: "ONLINE",
+    rulesetKey: "CLASSIC_V3",
+  });
+  state = addPlayer(state, {
+    playerId: "p2",
+    displayName: "Two",
+    tokenAuthHash: "b".repeat(64),
+    now: 2,
+  });
+
+  assert.deepEqual(state.players.map((player) => player.color), ["RED", "YELLOW"]);
+  assert.equal(state.players[0].playerId, "p1");
+  assert.equal(state.players[1].playerId, "p2");
+  assert.equal(globalCellFor(state.players[0].color, 0), 0);
+  assert.equal(globalCellFor(state.players[1].color, 0), 26);
+});
+
+test("Team Up teammates can share a road cell without capturing each other", () => {
+  let state = newMatch({
+    matchId: "TEAM1234",
+    hostPlayerId: "p1",
+    hostDisplayName: "One",
+    now: 1,
+    targetPlayerCount: 4,
+    matchMode: "TEAM_UP",
+    rulesetKey: "TEAM_UP_V3",
+  });
+  state = attachHostAuth(state, "a".repeat(64), 2);
+  for (const [index, id] of [[1, "p2"], [2, "p3"], [3, "p4"]]) {
+    state = addPlayer(state, {
+      playerId: id,
+      displayName: id,
+      tokenAuthHash: String(index + 1).repeat(64),
+      now: index + 2,
+    });
+  }
+  state = startMatch(state, "p1", 6);
+  assert.deepEqual(state.players.map((player) => player.teamId), ["A", "B", "A", "B"]);
+
+  // Red's token advances from relative position 1 to 2, where Yellow's
+  // teammate token already stands (Yellow relative position 28 => global 2).
+  state.players[0].tokens[0] = 1;
+  state.players[2].tokens[0] = 28;
+  state = reserveRoll(state, {
+    playerId: "p1",
+    clientCommitment: "c".repeat(64),
+    eventIndex: 0,
+    actorHash: "1".repeat(64),
+    previousStateHash: "2".repeat(64),
+    rulesetHash: "3".repeat(64),
+    now: 7,
+  });
+  state = attachRoundCommitment(state, {
+    roundId: "11111111-1111-4111-8111-111111111111",
+    serverCommitment: "4".repeat(64),
+    now: 8,
+  });
+  const resolved = registerResolvedRoll(state, {
+    outcome: 1,
+    proofDigest: "5".repeat(64),
+    now: 9,
+  });
+  const moved = applyMove(resolved.state, {
+    playerId: "p1",
+    tokenIndex: 0,
+    now: 10,
+  });
+
+  assert.equal(moved.captures, 0);
+  assert.equal(moved.state.players[0].tokens[0], 2);
+  assert.equal(moved.state.players[2].tokens[0], 28);
+  assert.equal(
+    globalCellFor(moved.state.players[0].color, moved.state.players[0].tokens[0]),
+    globalCellFor(moved.state.players[2].color, moved.state.players[2].tokens[0]),
+  );
+});
+
 test("all color start offsets map to their expected global cells", () => {
   assert.equal(
     globalCellFor("RED", 0),

@@ -115,9 +115,25 @@ export function newMatch({
     randomEventIndex: 0,
     consecutiveSixes: [0],
     pendingRoll: null,
+    turnTimeoutCounts: {},
+    turnTimeoutNotice: null,
     winnerPlayerId: null,
     finishedAt: null,
   };
+}
+
+function colorForSeat(state, seat) {
+  // Public two-player Online matches occupy opposing diagonal bases: host Red
+  // at bottom-left and guest Yellow at top-right. Seat order and turn order
+  // remain sequential; only the color/home quadrant assignment changes.
+  if (
+    state?.matchMode === "ONLINE" &&
+    state?.targetPlayerCount === 2 &&
+    seat === 1
+  ) {
+    return "YELLOW";
+  }
+  return COLORS[seat];
 }
 
 export function addPlayer(
@@ -149,7 +165,7 @@ export function addPlayer(
     displayName,
     characterId: publicCharacterId(characterId),
     playerType: playerType === "BOT" ? "BOT" : "HUMAN",
-    color: COLORS[seat],
+    color: colorForSeat(next, seat),
     ...(isTeamUp(next) ? { teamId: teamIdForSeat(next, seat) } : {}),
     tokenAuthHash,
     tokens: [-1, -1, -1, -1],
@@ -588,9 +604,17 @@ export function publicState(state) {
       playerType: player.playerType === "BOT" ? "BOT" : "HUMAN",
       color: player.color,
       seat,
+      turnTimeoutCount: Math.max(0, Number(state.turnTimeoutCounts?.[player.playerId]) || 0),
+      forfeited: Number.isSafeInteger(player.forfeitedAt),
       ...(teamUp ? { teamId: teamIdForSeat(state, seat) } : {}),
       tokens: [...player.tokens],
     })),
+    turnTimeoutNotice: state.turnTimeoutNotice &&
+      typeof state.turnTimeoutNotice.playerId === "string" &&
+      Number.isSafeInteger(state.turnTimeoutNotice.count) &&
+      Number.isSafeInteger(state.turnTimeoutNotice.at)
+      ? { ...state.turnTimeoutNotice }
+      : null,
     turnSeat: state.turnSeat,
     randomEventIndex: state.randomEventIndex,
     consecutiveSixes: [...state.consecutiveSixes],
@@ -665,8 +689,17 @@ function playerFinished(player) {
 }
 
 function advanceTurn(state) {
-  if (state.players.length < 1) return;
-  state.turnSeat = (state.turnSeat + 1) % state.players.length;
+  const count = state.players.length;
+  if (count < 1) return;
+  const start = Number.isInteger(state.turnSeat) ? state.turnSeat : -1;
+  for (let offset = 1; offset <= count; offset += 1) {
+    const candidate = ((start + offset) % count + count) % count;
+    if (!Number.isSafeInteger(state.players[candidate]?.forfeitedAt)) {
+      state.turnSeat = candidate;
+      return;
+    }
+  }
+  state.turnSeat = start >= 0 && start < count ? start : 0;
 }
 
 function seatForPlayer(state, playerId) {

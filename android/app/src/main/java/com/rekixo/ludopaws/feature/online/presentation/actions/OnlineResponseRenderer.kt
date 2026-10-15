@@ -74,6 +74,7 @@ internal fun MainActivity.applyResponse(
 
     val previousState = currentState
     currentState = state
+    applyOnlineGameplayPacing(previousState, state)
     LudoProofTheme.setGameplayBackground(
         root = arcadeRootView,
         enabled = state.status == "ACTIVE",
@@ -193,6 +194,66 @@ internal fun MainActivity.applyResponse(
             } else {
                 "State revision updated. Event index: " + state.randomEventIndex
             },
+        )
+    }
+
+    val wireState = response.optJSONObject("state") ?: response
+    val timeoutNotice = wireState.optJSONObject("turnTimeoutNotice")
+    val timeoutPlayerId = timeoutNotice?.optString("playerId").orEmpty()
+    val timeoutCount = timeoutNotice?.optInt("count", 0) ?: 0
+    val timeoutAt = timeoutNotice?.optLong("at", 0L) ?: 0L
+    if (
+        source == OnlineStateSource.AUTHORITATIVE &&
+        timeoutPlayerId.isNotBlank() &&
+        timeoutCount > 0 &&
+        timeoutAt > lastTurnTimeoutNoticeAt
+    ) {
+        lastTurnTimeoutNoticeAt = timeoutAt
+        val displayName = state.players.firstOrNull {
+            it.playerId == timeoutPlayerId
+        }?.displayName ?: "Player"
+        showStatus(
+            if (timeoutCount >= 4) {
+                "${displayName} was removed after four missed dice turns."
+            } else {
+                "${displayName} did not roll in 15 seconds • warning ${timeoutCount}/3 • turn passed."
+            },
+        )
+    }
+
+    val wirePlayers = wireState.optJSONArray("players")
+    val localPlayerWasForfeited = wirePlayers != null && (0 until wirePlayers.length()).any { index ->
+        val wirePlayer = wirePlayers.optJSONObject(index)
+        wirePlayer != null &&
+            wirePlayer.optString("playerId") == playerId &&
+            wirePlayer.optBoolean("forfeited", false)
+    }
+    if (
+        source == OnlineStateSource.AUTHORITATIVE &&
+        localPlayerWasForfeited &&
+        !timeoutExitScheduled
+    ) {
+        timeoutExitScheduled = true
+        showStatus("You missed four dice turns and were removed from this match.")
+        mainHandler.postDelayed(
+            {
+                if (canRenderUi()) {
+                    secureSessionStore.clear()
+                    pendingRollStore.clear()
+                    cachedMatchStore.clear()
+                    publicMatchmakingStore.clear()
+                    matchId = null
+                    playerToken = null
+                    playerId = null
+                    currentState = null
+                    pendingSecret = null
+                    realtimeConnected = false
+                    realtimeClient.disconnect()
+                    LudoProofTheme.setGameplayBackground(root = arcadeRootView, enabled = false)
+                    finish()
+                }
+            },
+            1_800L,
         )
     }
 }

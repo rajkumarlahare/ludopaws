@@ -233,6 +233,7 @@ async function read(
 function player(
   suffix,
   playerCount,
+  characterId = "dog",
 ) {
   return {
     displayName:
@@ -247,6 +248,7 @@ function player(
         "0",
       ),
     playerCount,
+    characterId,
   };
 }
 
@@ -259,11 +261,13 @@ test(
       player(
         1,
         2,
+        "dog",
       );
     const second =
       player(
         2,
         2,
+        "goat",
       );
 
     const waiting =
@@ -373,6 +377,7 @@ test(
               player(
                 index,
                 4,
+                ["dog", "goat", "duck", "cat"][index - 1],
               ),
             ),
           ),
@@ -395,6 +400,7 @@ test(
             player(
               4,
               4,
+              "cat",
             ),
           ),
         ),
@@ -426,11 +432,13 @@ test(
       player(
         1,
         2,
+        "dog",
       );
     const second =
       player(
         2,
         2,
+        "goat",
       );
 
     await queue.fetch(
@@ -521,6 +529,7 @@ test(
       player(
         22,
         2,
+        "goat",
       );
 
     const waiting =
@@ -648,3 +657,65 @@ test(
     );
   },
 );
+
+test(
+  "public status reports a reserved room as FINALIZING until assignment is materialized",
+  async () => {
+    const queue = makeQueue();
+    const first = player(1, 2, "dog");
+    const now = Date.now();
+    const profileId = "10000000-0000-4000-8000-000000000001";
+    const human = {
+      ...first,
+      profileId,
+      playerType: "HUMAN",
+      rulesetKey: "CLASSIC_V3",
+      joinedAt: now,
+      lastSeenAt: now,
+    };
+    const bot = {
+      clientRequestId: "bot-pending-000000000001",
+      displayName: "Bot Seat",
+      characterId: "goat",
+      profileId: null,
+      playerType: "BOT",
+      playerCount: 2,
+      matchMode: "ONLINE",
+      rulesetKey: "CLASSIC_V3",
+      joinedAt: now,
+      lastSeenAt: now,
+    };
+    await queue.ctx.storage.put("matchmaking-state", {
+      schemaVersion: 1,
+      queue: [human],
+      assignments: {},
+      characterPreferences: {},
+      pendingMatch: {
+        matchMode: "ONLINE",
+        playerCount: 2,
+        rulesetKey: "CLASSIC_V3",
+        participants: [human, bot],
+        retryAt: now + 3_000,
+      },
+    });
+
+    const result = await read(
+      await queue.fetch(
+        request("/status", {
+          clientRequestId: first.clientRequestId,
+          playerCount: 2,
+        }),
+      ),
+    );
+
+    assert.equal(result.status, 200);
+    assert.equal(result.body.status, "FINALIZING");
+    assert.equal(result.body.pending, true);
+    assert.equal(result.body.targetPlayerCount, 2);
+    assert.equal(result.body.queuedPlayers, 2);
+    assert.equal(result.body.retryAt, now + 3_000);
+    assert.equal(result.body.matchId, undefined);
+    assert.equal(result.body.playerToken, undefined);
+  },
+);
+

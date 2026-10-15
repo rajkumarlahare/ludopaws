@@ -44,6 +44,15 @@ import {
 import {
   normalizeCharacterId,
 } from "./ludo-paws-characters.js";
+import {
+  LEGACY_RULESET_KEY,
+  LEGACY_TEAM_RULESET_KEY,
+  RULESET_KEY,
+  RULESET_V3_KEY,
+  TEAM_RULESET_KEY,
+  TEAM_RULESET_V3_KEY,
+  rulesetKeyForState,
+} from "./rulesets.js";
 
 const STATE_KEY = "match-state";
 const APP_ID = "ludoproof";
@@ -286,6 +295,23 @@ export class MatchRoom {
         body?.matchMode,
         targetPlayerCount,
       );
+    const requestedRulesetKey =
+      body?.rulesetKey == null
+        ? null
+        : String(body.rulesetKey).trim();
+    if (requestedRulesetKey != null) {
+      const acceptedRulesets =
+        matchMode === "TEAM_UP"
+          ? [LEGACY_TEAM_RULESET_KEY, TEAM_RULESET_KEY, TEAM_RULESET_V3_KEY]
+          : [LEGACY_RULESET_KEY, RULESET_KEY, RULESET_V3_KEY];
+      if (!acceptedRulesets.includes(requestedRulesetKey)) {
+        throw httpError(
+          400,
+          "RULESET_MODE_MISMATCH",
+          "rulesetKey is not supported for this match mode",
+        );
+      }
+    }
     const hostFriend =
       matchMode ===
         "FRIENDS"
@@ -338,6 +364,12 @@ export class MatchRoom {
             "FRIENDS" ||
           existing.hostFriendId ===
             hostFriend?.friendId
+        ) &&
+        (
+          requestedRulesetKey == null ||
+          rulesetKeyForState(existing, {
+            teamUp: existing.matchMode === "TEAM_UP",
+          }) === requestedRulesetKey
         )
       ) {
         return json(200, {
@@ -380,6 +412,9 @@ export class MatchRoom {
       now,
       targetPlayerCount,
       matchMode,
+      ...(requestedRulesetKey == null
+        ? {}
+        : { rulesetKey: requestedRulesetKey }),
     });
     state = attachHostAuth(
       state,

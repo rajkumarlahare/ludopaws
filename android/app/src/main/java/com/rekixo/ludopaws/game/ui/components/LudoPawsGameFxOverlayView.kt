@@ -64,6 +64,7 @@ internal class LudoPawsGameFxOverlayView(
         previous: MatchSnapshot?,
         current: MatchSnapshot?,
         perspectiveColor: String?,
+        movementElapsedMillis: Long = 0L,
     ) {
         snapshot = current
         this.perspectiveColor =
@@ -95,10 +96,17 @@ internal class LudoPawsGameFxOverlayView(
                 }
                 ?: 0L
 
-        // Keep every destination-centered reaction hidden until the moving pawn
-        // has actually reached its final square. Capture FX use this same contact
-        // boundary, so no safe/home/capture ring can leak an advance destination.
-        captureContactDelayMillis = movementDurationMillis
+        // Keep the overlay on the same move clock as the 3D pawn. When a
+        // network reply confirms an in-flight preview, resume at elapsed progress
+        // rather than restarting the trail/capture visuals from frame zero.
+        val elapsedMovementMillis =
+            if (forwardMotion != null) {
+                movementElapsedMillis.coerceIn(0L, movementDurationMillis)
+            } else {
+                0L
+            }
+        captureContactDelayMillis =
+            (movementDurationMillis - elapsedMovementMillis).coerceAtLeast(0L)
         captureDurationMillis =
             if (captureTransitions.isNotEmpty()) {
                 LudoPawsGameplayPacingPolicy
@@ -111,6 +119,7 @@ internal class LudoPawsGameFxOverlayView(
             durationMillis = movementDurationMillis
                 .takeIf { forwardMotion != null }
                 ?: TRANSITION_DURATION_MS,
+            elapsedMillis = elapsedMovementMillis,
         )
         startCaptureAnimationIfNeeded()
         invalidate()
@@ -235,7 +244,10 @@ internal class LudoPawsGameFxOverlayView(
         }
     }
 
-    private fun startTransitionAnimationIfNeeded(durationMillis: Long) {
+    private fun startTransitionAnimationIfNeeded(
+        durationMillis: Long,
+        elapsedMillis: Long = 0L,
+    ) {
         transitionAnimator?.cancel()
         if (transitions.isEmpty()) {
             transitionProgress = 1f
@@ -243,10 +255,19 @@ internal class LudoPawsGameFxOverlayView(
             return
         }
 
+        val totalDurationMillis = durationMillis.coerceAtLeast(1L)
+        val elapsed = elapsedMillis.coerceIn(0L, totalDurationMillis)
+        if (elapsed >= totalDurationMillis) {
+            transitionProgress = 1f
+            transitionAnimator = null
+            invalidate()
+            return
+        }
+
         transitionProgress = 0f
         transitionAnimator =
             ValueAnimator.ofFloat(0f, 1f).apply {
-                duration = durationMillis.coerceAtLeast(1L)
+                duration = totalDurationMillis
                 addUpdateListener {
                     transitionProgress = it.animatedValue as Float
                     invalidate()
@@ -265,6 +286,9 @@ internal class LudoPawsGameFxOverlayView(
                     },
                 )
                 start()
+                if (elapsed > 0L) {
+                    setCurrentPlayTime(elapsed)
+                }
             }
     }
 

@@ -3,10 +3,12 @@ import assert from "node:assert/strict";
 
 import { MatchmakerQueue } from "../src/matchmaker-queue.js";
 import { TeamMatchmakerQueue } from "../src/team-matchmaker-queue.js";
-import { MatchRoom } from "../src/match-room-bots.js";
+import { MatchRoom, chooseBotMove } from "../src/match-room-bots.js";
 import {
   botFillDelayMs,
   botMatchFillEnabled,
+  botResultHoldMs,
+  botTurnDelayMs,
   botTurnsEnabled,
   createBotParticipants,
 } from "../src/matchmaking-bots.js";
@@ -142,18 +144,31 @@ test("bot settings are bounded and bots receive non-profile identities", () => {
   assert.equal(botMatchFillEnabled({ LUDOPROOF_BOT_MATCH_FILL_ENABLED: "false" }), false);
   assert.equal(botTurnsEnabled({ LUDOPROOF_BOT_TURNS_ENABLED: "off" }), false);
   assert.equal(botFillDelayMs({ LUDOPROOF_BOT_FILL_DELAY_MS: "10" }), 15_000);
+  assert.equal(botTurnDelayMs({}), 1_100);
+  assert.equal(botTurnDelayMs({ LUDOPROOF_BOT_TURN_DELAY_MS: "650" }), 1_100);
+  assert.equal(botTurnDelayMs({ LUDOPROOF_BOT_TURN_DELAY_MS: "12001" }), 1_100);
+  assert.equal(botResultHoldMs({}), 1_400);
+  assert.equal(botResultHoldMs({ LUDOPROOF_BOT_RESULT_HOLD_MS: "700" }), 1_400);
+  assert.equal(botResultHoldMs({ LUDOPROOF_BOT_RESULT_HOLD_MS: "100" }), 1_400);
+  assert.equal(botResultHoldMs({ LUDOPROOF_BOT_RESULT_HOLD_MS: "1250" }), 1_400);
+  assert.equal(botResultHoldMs({ LUDOPROOF_BOT_RESULT_HOLD_MS: "1650" }), 1_650);
   const bots = createBotParticipants({
     count: 3,
     playerCount: 4,
     matchMode: "ONLINE",
+    rulesetKey: "CLASSIC_V3",
     existingNames: ["Aarav"],
+    existingCharacterIds: ["dog"],
     now: 100,
   });
   assert.equal(bots.length, 3);
   assert.ok(bots.every((bot) => bot.playerType === "BOT" && bot.profileId === null));
+  assert.ok(bots.every((bot) => bot.rulesetKey === "CLASSIC_V3"));
   assert.ok(bots.every((bot) => /^[0-9a-f-]{36}$/i.test(bot.clientRequestId)));
   assert.equal(new Set(bots.map((bot) => bot.displayName.toLowerCase())).size, 3);
   assert.ok(bots.every((bot) => bot.displayName.toLowerCase() !== "aarav"));
+  assert.equal(new Set(["dog", ...bots.map((bot) => bot.characterId)]).size, 4);
+  assert.ok(bots.every((bot) => bot.characterId !== "dog"));
 });
 
 test("disabling bot fill keeps an expired real-player search queued without creating a match", async () => {
@@ -266,6 +281,253 @@ test("Team Up fallback fills remaining seats while retaining A/B/A/B teams", asy
 });
 
 
+test("Online matchmaking never mixes clients that request different rulesets", async () => {
+  const env = makeEnv();
+  env.LUDOPROOF_BOT_MATCH_FILL_ENABLED = "false";
+  const queue = new MatchmakerQueue({ storage: new FakeStorage() }, env);
+  const legacy = human(61, 2);
+  const versioned = human(62, 2);
+  for (const person of [legacy, versioned]) {
+    const result = await parse(await queue.fetch(request("/search", {
+      clientRequestId: person.clientRequestId, displayName: person.displayName,
+      playerCount: 2, characterId: person.characterId,
+      rulesetKey: person === legacy ? "CLASSIC_V1" : "CLASSIC_V3",
+    }, person.profileToken)));
+    assert.equal(result.body.status, "SEARCHING");
+  }
+  for (const person of [legacy, versioned]) {
+    const result = await parse(await queue.fetch(request("/status", {
+      clientRequestId: person.clientRequestId, playerCount: 2,
+    }, person.profileToken)));
+    assert.equal(result.body.status, "SEARCHING");
+    assert.equal(result.body.queuedPlayers, 1);
+  }
+  assert.equal(env.LUDOPROOF_MATCHES.rooms.size, 0);
+});
+
+test("Team Up matchmaking never mixes clients that request different rulesets", async () => {
+  const env = makeEnv();
+  env.LUDOPROOF_BOT_MATCH_FILL_ENABLED = "false";
+  const queue = new TeamMatchmakerQueue({ storage: new FakeStorage() }, env);
+  const legacy = human(63, 4, true);
+  const versioned = human(64, 4, true);
+  for (const person of [legacy, versioned]) {
+    const result = await parse(await queue.fetch(request("/search", {
+      clientRequestId: person.clientRequestId, displayName: person.displayName,
+      characterId: person.characterId,
+      rulesetKey: person === legacy ? "TEAM_UP_V1" : "TEAM_UP_V3",
+    }, person.profileToken)));
+    assert.equal(result.body.status, "SEARCHING");
+  }
+  for (const person of [legacy, versioned]) {
+    const result = await parse(await queue.fetch(request("/status", {
+      clientRequestId: person.clientRequestId,
+    }, person.profileToken)));
+    assert.equal(result.body.status, "SEARCHING");
+    assert.equal(result.body.queuedPlayers, 1);
+  }
+  assert.equal(env.LUDOPROOF_MATCHES.rooms.size, 0);
+});
+
+
+test("Online matchmaking prefers a different-character human without losing queue fairness", async () => {
+  const env = makeEnv();
+  env.LUDOPROOF_BOT_MATCH_FILL_ENABLED = "false";
+  const queue = new MatchmakerQueue({ storage: new FakeStorage() }, env);
+  const first = human(70, 2);
+  const sameCharacter = human(71, 2);
+  const differentCharacter = human(72, 2);
+  first.characterId = "dog";
+  sameCharacter.characterId = "dog";
+  differentCharacter.characterId = "cat";
+
+  for (const person of [first, sameCharacter]) {
+    const result = await parse(await queue.fetch(request("/search", {
+      clientRequestId: person.clientRequestId,
+      displayName: person.displayName,
+      playerCount: 2,
+      characterId: person.characterId,
+      rulesetKey: "CLASSIC_V3",
+    }, person.profileToken)));
+    assert.equal(result.body.status, "SEARCHING");
+  }
+
+  let state = await queue.ctx.storage.get("matchmaking-state");
+  assert.ok(state.characterPreferences["2:CLASSIC_V3"]);
+  assert.equal(state.assignments[first.clientRequestId], undefined);
+  assert.equal(state.assignments[sameCharacter.clientRequestId], undefined);
+
+  const matched = await parse(await queue.fetch(request("/search", {
+    clientRequestId: differentCharacter.clientRequestId,
+    displayName: differentCharacter.displayName,
+    playerCount: 2,
+    characterId: differentCharacter.characterId,
+    rulesetKey: "CLASSIC_V3",
+  }, differentCharacter.profileToken)));
+  assert.equal(matched.body.status, "MATCHED");
+  assert.deepEqual(
+    matched.body.state.players.map((player) => player.characterId),
+    ["dog", "cat"],
+  );
+
+  state = await queue.ctx.storage.get("matchmaking-state");
+  assert.ok(state.assignments[first.clientRequestId]);
+  assert.ok(state.assignments[differentCharacter.clientRequestId]);
+  assert.equal(state.assignments[sameCharacter.clientRequestId], undefined);
+  assert.ok(state.queue.some((player) => player.clientRequestId === sameCharacter.clientRequestId));
+});
+
+test("Online character preference falls back to the available group after its deadline", async () => {
+  const env = makeEnv();
+  env.LUDOPROOF_BOT_MATCH_FILL_ENABLED = "false";
+  const queue = new MatchmakerQueue({ storage: new FakeStorage() }, env);
+  const first = human(73, 2);
+  const second = human(74, 2);
+  first.characterId = "dog";
+  second.characterId = "dog";
+
+  for (const person of [first, second]) {
+    const result = await parse(await queue.fetch(request("/search", {
+      clientRequestId: person.clientRequestId,
+      displayName: person.displayName,
+      playerCount: 2,
+      characterId: person.characterId,
+      rulesetKey: "CLASSIC_V3",
+    }, person.profileToken)));
+    assert.equal(result.body.status, "SEARCHING");
+  }
+
+  const state = await queue.ctx.storage.get("matchmaking-state");
+  state.characterPreferences["2:CLASSIC_V3"].readyAt = Date.now() - 1;
+  await queue.ctx.storage.put("matchmaking-state", state);
+  await queue.alarm();
+
+  const matched = await parse(await queue.fetch(request("/status", {
+    clientRequestId: first.clientRequestId,
+    playerCount: 2,
+  }, first.profileToken)));
+  assert.equal(matched.body.status, "MATCHED");
+  assert.deepEqual(
+    matched.body.state.players.map((player) => player.characterId),
+    ["dog", "dog"],
+  );
+  const finalized = await queue.ctx.storage.get("matchmaking-state");
+  assert.equal(finalized.characterPreferences["2:CLASSIC_V3"], undefined);
+});
+
+test("Team Up selects a fully diverse group when one arrives during the preference window", async () => {
+  const env = makeEnv();
+  env.LUDOPROOF_BOT_MATCH_FILL_ENABLED = "false";
+  const queue = new TeamMatchmakerQueue({ storage: new FakeStorage() }, env);
+  const people = [
+    human(80, 4, true),
+    human(81, 4, true),
+    human(82, 4, true),
+    human(83, 4, true),
+    human(84, 4, true),
+  ];
+  const characters = ["dog", "dog", "goat", "duck", "cat"];
+  people.forEach((person, index) => { person.characterId = characters[index]; });
+
+  for (const person of people.slice(0, 4)) {
+    const result = await parse(await queue.fetch(request("/search", {
+      clientRequestId: person.clientRequestId,
+      displayName: person.displayName,
+      characterId: person.characterId,
+      rulesetKey: "TEAM_UP_V3",
+    }, person.profileToken)));
+    assert.equal(result.body.status, "SEARCHING");
+  }
+
+  let state = await queue.ctx.storage.get("team-matchmaking-state-v1");
+  assert.ok(state.characterPreferences["4:TEAM_UP_V3"]);
+  const matched = await parse(await queue.fetch(request("/search", {
+    clientRequestId: people[4].clientRequestId,
+    displayName: people[4].displayName,
+    characterId: people[4].characterId,
+    rulesetKey: "TEAM_UP_V3",
+  }, people[4].profileToken)));
+  assert.equal(matched.body.status, "MATCHED");
+  assert.deepEqual(
+    matched.body.state.players.map((player) => player.characterId),
+    ["dog", "goat", "duck", "cat"],
+  );
+
+  state = await queue.ctx.storage.get("team-matchmaking-state-v1");
+  assert.ok(state.assignments[people[0].clientRequestId]);
+  assert.equal(state.assignments[people[1].clientRequestId], undefined);
+  assert.ok(state.assignments[people[2].clientRequestId]);
+  assert.ok(state.assignments[people[3].clientRequestId]);
+  assert.ok(state.assignments[people[4].clientRequestId]);
+  assert.ok(state.queue.some((player) => player.clientRequestId === people[1].clientRequestId));
+});
+
+test("Team Up character preference expires to prevent an indefinite wait", async () => {
+  const env = makeEnv();
+  env.LUDOPROOF_BOT_MATCH_FILL_ENABLED = "false";
+  const queue = new TeamMatchmakerQueue({ storage: new FakeStorage() }, env);
+  const people = [human(85, 4, true), human(86, 4, true), human(87, 4, true), human(88, 4, true)];
+  for (const person of people) person.characterId = "dog";
+
+  for (const person of people) {
+    const result = await parse(await queue.fetch(request("/search", {
+      clientRequestId: person.clientRequestId,
+      displayName: person.displayName,
+      characterId: person.characterId,
+      rulesetKey: "TEAM_UP_V3",
+    }, person.profileToken)));
+    assert.equal(result.body.status, "SEARCHING");
+  }
+
+  const state = await queue.ctx.storage.get("team-matchmaking-state-v1");
+  assert.ok(state.characterPreferences["4:TEAM_UP_V3"]);
+  state.characterPreferences["4:TEAM_UP_V3"].readyAt = Date.now() - 1;
+  await queue.ctx.storage.put("team-matchmaking-state-v1", state);
+  await queue.alarm();
+
+  const matched = await parse(await queue.fetch(request("/status", {
+    clientRequestId: people[0].clientRequestId,
+  }, people[0].profileToken)));
+  assert.equal(matched.body.status, "MATCHED");
+  assert.equal(matched.body.state.players.length, 4);
+  assert.ok(matched.body.state.players.every((player) => player.characterId === "dog"));
+});
+
+test("Team Up bot strategy prefers sharing a road cell with its teammate when legal", () => {
+  const state = {
+    schemaVersion: 1,
+    matchId: "TEAMTEST1",
+    status: "ACTIVE",
+    matchMode: "TEAM_UP",
+    targetPlayerCount: 4,
+    rulesetKey: "TEAM_UP_V3",
+    revision: 1,
+    updatedAt: 1,
+    createdAt: 1,
+    turnSeat: 0,
+    teamAssignments: ["A", "B", "A", "B"],
+    players: [
+      { playerId: "bot", color: "RED", teamId: "A", playerType: "BOT", tokens: [1, 0, -1, -1] },
+      { playerId: "opponent1", color: "GREEN", teamId: "B", playerType: "HUMAN", tokens: [-1, -1, -1, -1] },
+      { playerId: "partner", color: "YELLOW", teamId: "A", playerType: "HUMAN", tokens: [28, -1, -1, -1] },
+      { playerId: "opponent2", color: "BLUE", teamId: "B", playerType: "HUMAN", tokens: [-1, -1, -1, -1] },
+    ],
+    pendingRoll: {
+      status: "RESOLVED",
+      seat: 0,
+      scheduledSeat: 0,
+      playerId: "bot",
+      outcome: 1,
+      legalTokenIndexes: [0, 1],
+    },
+    consecutiveSixes: [0, 0, 0, 0],
+    turnTimeoutCounts: {},
+    winnerPlayerId: null,
+    winnerTeamId: null,
+  };
+  assert.equal(chooseBotMove(state, "bot", [0, 1]), 0);
+});
+
 test("Online 2-player fallback adds exactly one bot for a lone queued human", async () => {
   const env = makeEnv();
   const queue = new MatchmakerQueue({ storage: new FakeStorage() }, env);
@@ -276,6 +538,7 @@ test("Online 2-player fallback adds exactly one bot for a lone queued human", as
       displayName: person.displayName,
       playerCount: 2,
       characterId: person.characterId,
+      rulesetKey: "CLASSIC_V3",
     }, person.profileToken),
   ));
   assert.equal(searching.body.status, "SEARCHING");
@@ -291,6 +554,7 @@ test("Online 2-player fallback adds exactly one bot for a lone queued human", as
   ));
   assert.equal(result.body.status, "MATCHED");
   assert.equal(result.body.state.players.length, 2);
+  assert.equal(result.body.state.rulesetId, "ludoproof-standard-v3");
   assert.deepEqual(
     result.body.state.players.map((player) => player.playerType),
     ["HUMAN", "BOT"],
@@ -305,11 +569,13 @@ test("Team Up fallback can fill all three empty seats with bots", async () => {
   const env = makeEnv();
   const queue = new TeamMatchmakerQueue({ storage: new FakeStorage() }, env);
   const person = human(31, 4, true);
+  person.characterId = "dog";
   const searching = await parse(await queue.fetch(
     request("/search", {
       clientRequestId: person.clientRequestId,
       displayName: person.displayName,
       characterId: person.characterId,
+      rulesetKey: "TEAM_UP_V3",
     }, person.profileToken),
   ));
   assert.equal(searching.body.status, "SEARCHING");
@@ -324,6 +590,7 @@ test("Team Up fallback can fill all three empty seats with bots", async () => {
   ));
   assert.equal(result.body.status, "MATCHED");
   assert.equal(result.body.state.players.length, 4);
+  assert.equal(result.body.state.rulesetId, "ludoproof-team-v3");
   assert.deepEqual(
     result.body.state.players.map((player) => player.playerType),
     ["HUMAN", "BOT", "BOT", "BOT"],
@@ -332,6 +599,7 @@ test("Team Up fallback can fill all three empty seats with bots", async () => {
     result.body.state.players.map((player) => player.teamId),
     ["A", "B", "A", "B"],
   );
+  assert.equal(new Set(result.body.state.players.map((player) => player.characterId)).size, 4);
   const stored = await env.LUDOPROOF_MATCHES.rooms
     .get(result.body.matchId).ctx.storage.get("match-state");
   assert.equal(stored.players.filter((player) => player.playerType === "BOT").length, 3);

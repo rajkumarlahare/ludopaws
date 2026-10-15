@@ -12,6 +12,12 @@ import {
   normalizeCharacterId,
 } from "./ludo-paws-characters.js";
 import {
+  CHARACTER_PREFERENCE_WINDOW_MS,
+  characterPreferenceKey,
+  distinctCharacterCount,
+  selectCharacterDiverseGroup,
+} from "./matchmaking-characters.js";
+import {
   botFillDelayMs,
   botMatchFillEnabled,
   botRetryDelayMs,
@@ -23,6 +29,8 @@ const QUEUE_TTL_MS = 2 * 60 * 1000;
 const ASSIGNMENT_TTL_MS = 10 * 60 * 1000;
 const PROFILE_ASSERTION_TTL_MS = 15 * 60 * 1000;
 const TARGET_PLAYER_COUNT = 4;
+const DEFAULT_RULESET_KEY = "TEAM_UP_V1";
+const TEAM_RULESET_KEYS = ["TEAM_UP_V1", "TEAM_UP_V2", "TEAM_UP_V3"];
 
 export class TeamMatchmakerQueue {
   constructor(ctx, env) {
@@ -64,27 +72,76 @@ export class TeamMatchmakerQueue {
         if (!completed) return;
       }
 
+      // Give a four-human group a brief chance to improve character variety.
+      // After the deadline, select the best available group and keep moving.
+      for (const key of Object.keys(state.characterPreferences ?? {})) {
+        state = this.#cleanup(await this.#load(), Date.now());
+        if (state.pendingMatch) break;
+        const preference = state.characterPreferences?.[key];
+        if (!preference || Number(preference.readyAt ?? 0) > Date.now()) continue;
+        const eligible = state.queue.filter(
+          (candidate) =>
+            (candidate.rulesetKey ?? DEFAULT_RULESET_KEY) === preference.rulesetKey,
+        );
+        const group = selectCharacterDiverseGroup(eligible, TARGET_PLAYER_COUNT);
+        delete state.characterPreferences[key];
+        if (group.length < TARGET_PLAYER_COUNT) {
+          await this.#persist(state);
+          continue;
+        }
+        state.pendingMatch = {
+          matchMode: "TEAM_UP",
+          playerCount: TARGET_PLAYER_COUNT,
+          rulesetKey: preference.rulesetKey,
+          participants: group,
+          retryAt: Date.now() + botRetryDelayMs(this.env),
+        };
+        await this.#persist(state);
+        const completed = await this.#resumePendingMatch(state, Date.now());
+        if (!completed) return;
+      }
+
       if (botMatchFillEnabled(this.env)) {
         state = this.#cleanup(await this.#load(), Date.now());
         if (!state.pendingMatch) {
-          const humans = [...state.queue].sort((left, right) => left.joinedAt - right.joinedAt);
-          const oldest = humans[0];
-          const fallbackAt = oldest
-            ? Number(oldest.botFallbackAt ?? oldest.joinedAt + botFillDelayMs(this.env))
-            : Number.POSITIVE_INFINITY;
+          const byRuleset = new Map();
+          [...state.queue]
+            .sort((left, right) => left.joinedAt - right.joinedAt)
+            .forEach((candidate) => {
+              const rulesetKey = candidate.rulesetKey ?? DEFAULT_RULESET_KEY;
+              if (!byRuleset.has(rulesetKey)) byRuleset.set(rulesetKey, []);
+              byRuleset.get(rulesetKey).push(candidate);
+            });
+          const expiredGroup = [...byRuleset.entries()]
+            .map(([rulesetKey, waiting]) => ({
+              rulesetKey,
+              waiting,
+              oldest: waiting[0],
+              fallbackAt: Number(
+                waiting[0].botFallbackAt ??
+                waiting[0].joinedAt + botFillDelayMs(this.env),
+              ),
+            }))
+            .filter((group) => group.oldest && group.fallbackAt <= now)
+            .sort((left, right) => left.oldest.joinedAt - right.oldest.joinedAt)[0];
 
-          if (oldest && fallbackAt <= now) {
-            const realPlayers = humans.slice(0, TARGET_PLAYER_COUNT);
+          if (expiredGroup) {
+            const { rulesetKey, waiting } = expiredGroup;
+            const humanCount = Math.min(waiting.length, TARGET_PLAYER_COUNT);
+            const realPlayers = selectCharacterDiverseGroup(waiting, humanCount);
             const bots = await createBotParticipants({
               count: TARGET_PLAYER_COUNT - realPlayers.length,
               playerCount: TARGET_PLAYER_COUNT,
               matchMode: "TEAM_UP",
+              rulesetKey,
               existingNames: realPlayers.map((candidate) => candidate.displayName),
+              existingCharacterIds: realPlayers.map((candidate) => candidate.characterId),
               now,
             });
             state.pendingMatch = {
               matchMode: "TEAM_UP",
               playerCount: TARGET_PLAYER_COUNT,
+              rulesetKey,
               participants: [...realPlayers, ...bots],
               retryAt: now + botRetryDelayMs(this.env),
             };
@@ -139,6 +196,7 @@ export class TeamMatchmakerQueue {
         ...existing,
         displayName: participant.displayName,
         characterId: participant.characterId,
+        rulesetKey: participant.rulesetKey,
         lastSeenAt: now,
       };
       await this.#persist(state);
@@ -164,15 +222,74 @@ export class TeamMatchmakerQueue {
       lastSeenAt: now,
     });
 
-    const eligible = [...state.queue].sort(
-      (left, right) => left.joinedAt - right.joinedAt,
-    );
+    const eligible = [...state.queue]
+      .filter((candidate) =>
+        (candidate.rulesetKey ?? DEFAULT_RULESET_KEY) === participant.rulesetKey
+      )
+      .sort((left, right) => left.joinedAt - right.joinedAt);
+
+    if (eligible.length >= TARGET_PLAYER_COUNT && state.pendingMatch) {
+      // Keep a completed Team Up group visible to the alarm/recovery path while
+      // another room reservation is being finalized.
+      const group = selectCharacterDiverseGroup(eligible, TARGET_PLAYER_COUNT);
+      const key = characterPreferenceKey(TARGET_PLAYER_COUNT, participant.rulesetKey);
+      const preferences = state.characterPreferences ?? {};
+      const hasUniqueCharacters =
+        group.length === TARGET_PLAYER_COUNT &&
+        distinctCharacterCount(group) === TARGET_PLAYER_COUNT;
+      const existing = preferences[key];
+      if (!existing || (hasUniqueCharacters && Number(existing.readyAt ?? 0) > now)) {
+        preferences[key] = {
+          playerCount: TARGET_PLAYER_COUNT,
+          rulesetKey: participant.rulesetKey,
+          startedAt: existing?.startedAt ?? now,
+          readyAt: hasUniqueCharacters ? now : now + CHARACTER_PREFERENCE_WINDOW_MS,
+        };
+      }
+      state.characterPreferences = preferences;
+      await this.#persist(state);
+      return json(202, searchingPayload(state, now, participant.clientRequestId));
+    }
 
     if (eligible.length >= TARGET_PLAYER_COUNT && !state.pendingMatch) {
-      const group = eligible.slice(0, TARGET_PLAYER_COUNT);
+      const group = selectCharacterDiverseGroup(eligible, TARGET_PLAYER_COUNT);
+      const preferenceKey = characterPreferenceKey(
+        TARGET_PLAYER_COUNT,
+        participant.rulesetKey,
+      );
+      const preferences = state.characterPreferences ?? {};
+      const preference = preferences[preferenceKey];
+      const hasUniqueCharacters =
+        group.length === TARGET_PLAYER_COUNT &&
+        distinctCharacterCount(group) === TARGET_PLAYER_COUNT;
+
+      if (
+        !hasUniqueCharacters &&
+        preference &&
+        Number(preference.readyAt ?? 0) > now
+      ) {
+        await this.#persist(state);
+        return json(202, searchingPayload(state, now, participant.clientRequestId));
+      }
+
+      if (!hasUniqueCharacters && !preference) {
+        preferences[preferenceKey] = {
+          playerCount: TARGET_PLAYER_COUNT,
+          rulesetKey: participant.rulesetKey,
+          startedAt: now,
+          readyAt: now + CHARACTER_PREFERENCE_WINDOW_MS,
+        };
+        state.characterPreferences = preferences;
+        await this.#persist(state);
+        return json(202, searchingPayload(state, now, participant.clientRequestId));
+      }
+
+      delete preferences[preferenceKey];
+      state.characterPreferences = preferences;
       state.pendingMatch = {
         matchMode: "TEAM_UP",
         playerCount: TARGET_PLAYER_COUNT,
+        rulesetKey: participant.rulesetKey,
         participants: group,
         retryAt: now + botRetryDelayMs(this.env),
       };
@@ -340,6 +457,7 @@ export class TeamMatchmakerQueue {
             matchmaking: true,
             targetPlayerCount: TARGET_PLAYER_COUNT,
             matchMode: "TEAM_UP",
+            rulesetKey: host.rulesetKey ?? reservation.rulesetKey ?? DEFAULT_RULESET_KEY,
           }),
         }),
       );
@@ -558,6 +676,7 @@ export class TeamMatchmakerQueue {
         schemaVersion: 1,
         queue: [],
         assignments: {},
+        characterPreferences: {},
       }
     );
   }
@@ -574,6 +693,15 @@ export class TeamMatchmakerQueue {
         delete next.assignments[requestId];
       }
     }
+    const preferences = next.characterPreferences ?? {};
+    for (const [key, preference] of Object.entries(preferences)) {
+      const rulesetKey = String(preference?.rulesetKey ?? DEFAULT_RULESET_KEY);
+      const eligibleCount = next.queue.filter(
+        (candidate) => (candidate.rulesetKey ?? DEFAULT_RULESET_KEY) === rulesetKey,
+      ).length;
+      if (eligibleCount < TARGET_PLAYER_COUNT) delete preferences[key];
+    }
+    next.characterPreferences = preferences;
     return next;
   }
 
@@ -584,6 +712,9 @@ export class TeamMatchmakerQueue {
       ...(state.pendingMatch
         ? [Number(state.pendingMatch.retryAt ?? Date.now() + botRetryDelayMs(this.env))]
         : []),
+      ...Object.values(state.characterPreferences ?? {}).map(
+        (preference) => Number(preference.readyAt ?? Date.now()),
+      ),
       ...state.queue.flatMap((participant) => {
         const queueExpiry = Number(
           participant.lastSeenAt ?? participant.joinedAt ?? Date.now(),
@@ -615,14 +746,27 @@ function normalizeParticipant(body, profileId) {
     displayName: normalizeDisplayName(body?.displayName),
     characterId: normalizeCharacterId(body?.characterId),
     profileId,
+    rulesetKey: normalizeTeamRulesetKey(body?.rulesetKey),
     playerType: "HUMAN",
   };
 }
 
+function normalizeTeamRulesetKey(value) {
+  const key = value == null ? DEFAULT_RULESET_KEY : String(value);
+  if (!TEAM_RULESET_KEYS.includes(key)) {
+    throw httpError(400, "INVALID_RULESET_KEY", "Team Up requires a Team Up ruleset");
+  }
+  return key;
+}
+
 function searchingPayload(state, now, requesterRequestId) {
-  const queued = [...state.queue].sort((a, b) => a.joinedAt - b.joinedAt);
-  const requester = queued.find(
+  const allQueued = [...state.queue].sort((a, b) => a.joinedAt - b.joinedAt);
+  const requester = allQueued.find(
     (candidate) => candidate.clientRequestId === requesterRequestId,
+  );
+  const rulesetKey = requester?.rulesetKey ?? DEFAULT_RULESET_KEY;
+  const queued = allQueued.filter(
+    (candidate) => (candidate.rulesetKey ?? DEFAULT_RULESET_KEY) === rulesetKey,
   );
   const orderedForRequester = requester
     ? [
@@ -637,6 +781,7 @@ function searchingPayload(state, now, requesterRequestId) {
     status: "SEARCHING",
     matchMode: "TEAM_UP",
     playerCount: TARGET_PLAYER_COUNT,
+    rulesetKey,
     queuedPlayers: Math.min(queued.length, TARGET_PLAYER_COUNT),
     targetPlayerCount: TARGET_PLAYER_COUNT,
     queuedCharacterIds: visibleParticipants.map((participant) =>

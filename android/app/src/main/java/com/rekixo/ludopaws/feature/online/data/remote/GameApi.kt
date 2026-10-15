@@ -160,6 +160,7 @@ class GameApi(
         clientRequestId: String,
         playerCount: Int,
         characterId: String = LudoPawsCharacterRuntime.selectedCharacterId(),
+        rulesetKey: String = "CLASSIC_V3",
     ): JSONObject =
         request(
             method = "POST",
@@ -169,7 +170,8 @@ class GameApi(
                 .put("displayName", displayName)
                 .put("clientRequestId", clientRequestId)
                 .put("characterId", characterId)
-                .put("playerCount", playerCount),
+                .put("playerCount", playerCount)
+                .put("rulesetKey", rulesetKey),
         )
 
     fun publicMatchStatus(
@@ -205,6 +207,7 @@ class GameApi(
         displayName: String,
         clientRequestId: String,
         characterId: String = LudoPawsCharacterRuntime.selectedCharacterId(),
+        rulesetKey: String = "CLASSIC_V3",
     ): JSONObject =
         request(
             method = "POST",
@@ -213,7 +216,8 @@ class GameApi(
             body = JSONObject()
                 .put("displayName", displayName)
                 .put("clientRequestId", clientRequestId)
-                .put("characterId", characterId),
+                .put("characterId", characterId)
+                .put("rulesetKey", rulesetKey),
         )
 
     fun joinMatch(

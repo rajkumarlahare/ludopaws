@@ -145,6 +145,9 @@ class LudoPawsReactiveBoardView @JvmOverloads constructor(
         characterIdsBySeat: List<String> = emptyList(),
     ) {
         val nowMillis = monotonicMillis()
+        val committedMovePreviewElapsedMillis =
+            pawn3DScene.acceptedMovePreviewElapsedMillis(state)
+                ?: 0L
         updateIdleClock(
             state = state,
             nowMillis = nowMillis,
@@ -192,6 +195,7 @@ class LudoPawsReactiveBoardView @JvmOverloads constructor(
             previous = previous,
             current = state,
             perspectiveColor = perspectiveColor,
+            movementElapsedMillis = committedMovePreviewElapsedMillis,
         )
         previousSnapshot = state
 
@@ -204,6 +208,21 @@ class LudoPawsReactiveBoardView @JvmOverloads constructor(
             state = state,
             nowMillis = nowMillis,
         )
+    }
+
+    fun beginPendingMovePreview(
+        state: MatchSnapshot,
+        playerId: String,
+        tokenIndex: Int,
+    ): Boolean =
+        pawn3DScene.beginPendingMovePreview(
+            state = state,
+            playerId = playerId,
+            tokenIndex = tokenIndex,
+        )
+
+    fun cancelPendingMovePreview(authoritative: MatchSnapshot?) {
+        pawn3DScene.cancelPendingMovePreview(authoritative)
     }
 
     fun reloadStyle() {
@@ -414,11 +433,16 @@ class LudoPawsReactiveBoardView @JvmOverloads constructor(
                 } ?: return
         val speed = GameSettingsStore(context).snapshot().gameSpeed
         val key = "${capture.matchId}:${capture.eventIndex}"
-        captureContactDelaysByEvent[key] =
+        val fullContactDelay =
             LudoPawsGameplayPacingPolicy.captureContactDelayMillis(
                 speed = speed,
                 visualSteps = motion.visualSteps,
             )
+        val alreadyPresented = pawn3DScene
+            .pendingMovePreviewElapsedMillis(capture.eventIndex)
+            ?: 0L
+        captureContactDelaysByEvent[key] =
+            (fullContactDelay - alreadyPresented).coerceAtLeast(0L)
         while (captureContactDelaysByEvent.size > MAX_CAPTURE_DELAY_EVENTS) {
             val oldestKey = captureContactDelaysByEvent.keys.firstOrNull() ?: break
             captureContactDelaysByEvent.remove(oldestKey)

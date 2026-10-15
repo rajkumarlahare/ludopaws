@@ -30,6 +30,14 @@ class DiceView @JvmOverloads constructor(
 
     private val facePaint =
         Paint(Paint.ANTI_ALIAS_FLAG)
+    private val shadowPaint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = 0x33000000
+            setShadowLayer(dp(3f), 0f, dp(1.5f), 0x26000000)
+        }
+    private var cachedFaceShader: Shader? = null
+    private var cachedFaceShaderSize = 0f
+    private var cachedFaceShaderColors = intArrayOf()
     private val borderPaint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
@@ -93,6 +101,8 @@ class DiceView @JvmOverloads constructor(
     private var playerTeamColor: Int? = null
     private var attentionPulsing = false
     private var attentionPhaseStartedAtMillis = 0L
+    private var lastPresentedOutcomeEventKey: String? = null
+    private var deferredSettleRunnable: Runnable? = null
 
     private val animationTicker =
         object : Runnable {
@@ -183,6 +193,7 @@ class DiceView @JvmOverloads constructor(
 
     fun startRolling() {
         if (rolling) return
+        cancelDeferredSettle()
         attentionPulsing = false
         removeCallbacks(animationTicker)
         rolling = true
@@ -197,25 +208,86 @@ class DiceView @JvmOverloads constructor(
     fun showOutcome(
         outcome: Int,
         animate: Boolean = true,
+        eventKey: String? = null,
+        minimumRollDurationMillis: Long = 0L,
     ) {
         if (outcome !in 1..6) return
-
+        if (eventKey != null && eventKey == lastPresentedOutcomeEventKey && targetOutcome == outcome) {
+            return
+        }
+        cancelDeferredSettle()
         attentionPulsing = false
-        val wasRolling = rolling
-        rolling = false
-        removeCallbacks(animationTicker)
-        targetOutcome = outcome
-        face = outcome
-        contentDescription =
-            "Dice outcome $outcome."
 
         if (!animate) {
+            rolling = false
             settling = false
+            removeCallbacks(animationTicker)
+            targetOutcome = outcome
+            face = outcome
+            contentDescription = "Dice outcome $outcome."
+            if (eventKey != null) lastPresentedOutcomeEventKey = eventKey
             resetTransform()
             invalidate()
             return
         }
 
+        // Keep offline Robot / Pass & Play transitions intact.
+        if (eventKey == null) {
+            targetOutcome = outcome
+            face = outcome
+            contentDescription = "Dice outcome $outcome."
+            beginSettle(outcome)
+            return
+        }
+
+        // A remote poll can skip COMMITTED/RESOLVING snapshots. Show a real
+        // spin for the verified event instead of flashing directly to a face.
+        if (!rolling) startRolling()
+        lastPresentedOutcomeEventKey = eventKey
+        targetOutcome = outcome
+        contentDescription = "Verified dice outcome $outcome; settling."
+
+        val remainingSpinMillis = DiceRollAnimationPolicy.remainingVisibleRollMillis(
+            elapsedMillis = SystemClock.uptimeMillis() - rollStartedAtMillis,
+            minimumVisibleRollMillis = minimumRollDurationMillis,
+        )
+        if (remainingSpinMillis > 0L) {
+            val expectedEventKey = eventKey
+            deferredSettleRunnable = Runnable {
+                deferredSettleRunnable = null
+                if (lastPresentedOutcomeEventKey != expectedEventKey || targetOutcome != outcome) {
+                    return@Runnable
+                }
+                beginSettle(outcome)
+            }
+            postDelayed(requireNotNull(deferredSettleRunnable), remainingSpinMillis)
+        } else {
+            beginSettle(outcome)
+        }
+    }
+
+    fun remainingOutcomePresentationMillis(minimumRollDurationMillis: Long): Long {
+        val now = SystemClock.uptimeMillis()
+        return when {
+            rolling ->
+                DiceRollAnimationPolicy.remainingVisibleRollMillis(
+                    now - rollStartedAtMillis,
+                    minimumRollDurationMillis,
+                ) + DiceRollAnimationPolicy.SETTLE_DURATION_MILLIS
+            settling ->
+                (DiceRollAnimationPolicy.SETTLE_DURATION_MILLIS - (now - settleStartedAtMillis))
+                    .coerceAtLeast(0L)
+            else -> 0L
+        }
+    }
+
+    private fun beginSettle(outcome: Int) {
+        val wasRolling = rolling
+        rolling = false
+        removeCallbacks(animationTicker)
+        targetOutcome = outcome
+        face = outcome
+        contentDescription = "Dice outcome $outcome."
         settleStartRotationDegrees =
             if (wasRolling && kotlin.math.abs(rotationDegrees) > 1f) {
                 rotationDegrees.coerceIn(-20f, 20f)
@@ -223,12 +295,17 @@ class DiceView @JvmOverloads constructor(
                 18f
             }
         settling = true
-        settleStartedAtMillis =
-            SystemClock.uptimeMillis()
+        settleStartedAtMillis = SystemClock.uptimeMillis()
         postOnAnimation(animationTicker)
     }
 
+    private fun cancelDeferredSettle() {
+        deferredSettleRunnable?.let { removeCallbacks(it) }
+        deferredSettleRunnable = null
+    }
+
     fun stopRolling() {
+        cancelDeferredSettle()
         rolling = false
         settling = false
         attentionPulsing = false
@@ -264,6 +341,7 @@ class DiceView @JvmOverloads constructor(
     }
 
     override fun onDetachedFromWindow() {
+        cancelDeferredSettle()
         rolling = false
         settling = false
         attentionPulsing = false
@@ -346,9 +424,8 @@ class DiceView @JvmOverloads constructor(
             shadow,
             size * .16f,
             size * .16f,
-            facePaint,
+            shadowPaint,
         )
-        facePaint.clearShadowLayer()
 
         val inset =
             size * .07f
@@ -363,8 +440,12 @@ class DiceView @JvmOverloads constructor(
             dicePalette()
 
         facePaint.alpha = 255
-        facePaint.shader =
-            LinearGradient(
+        if (
+            cachedFaceShader == null ||
+            cachedFaceShaderSize != size ||
+            !cachedFaceShaderColors.contentEquals(palette.faceColors)
+        ) {
+            cachedFaceShader = LinearGradient(
                 rect.left,
                 rect.top,
                 rect.right,
@@ -373,6 +454,10 @@ class DiceView @JvmOverloads constructor(
                 null,
                 Shader.TileMode.CLAMP,
             )
+            cachedFaceShaderSize = size
+            cachedFaceShaderColors = palette.faceColors.copyOf()
+        }
+        facePaint.shader = cachedFaceShader
         canvas.drawRoundRect(
             rect,
             size * .17f,

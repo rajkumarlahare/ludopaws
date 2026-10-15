@@ -81,16 +81,24 @@ internal fun MainActivity.runNetwork(
     onSuccess: (JSONObject) -> Unit = { applyResponse(it) },
     showWorking: Boolean = true,
     reconcileOnError: Boolean = false,
+    onComplete: () -> Unit = {},
 ) {
-    if (!canRenderUi()) return
+    if (!canRenderUi()) {
+        onComplete()
+        return
+    }
 
     if (!isOnline) {
         diceView.stopRolling()
         showStatus("Offline — this online match is read-only until internet returns.")
         currentState?.let { updateControls(it) }
+        onComplete()
         return
     }
-    if (executor.isShutdown) return
+    if (executor.isShutdown) {
+        onComplete()
+        return
+    }
 
     if (showWorking) showStatus("Working…")
     setNetworkControls(enabled = false)
@@ -101,35 +109,55 @@ internal fun MainActivity.runNetwork(
                 try {
                     val response = action()
                     mainHandler.post {
-                        if (!canRenderUi()) return@post
-                        setNetworkControls(enabled = true)
-                        onSuccess(response)
-                        updateRollButton()
+                        if (!canRenderUi()) {
+                            onComplete()
+                            return@post
+                        }
+                        try {
+                            setNetworkControls(enabled = true)
+                            onSuccess(response)
+                            updateRollButton()
+                        } finally {
+                            onComplete()
+                        }
                     }
                 } catch (error: Exception) {
                     mainHandler.post {
-                        if (!canRenderUi()) return@post
-                        diceView.stopRolling()
-                        val sessionReset = resetInvalidSessionIfNeeded(error)
-                        if (!sessionReset) {
-                            setNetworkControls(enabled = true)
-                            showStatus("Error: " + (error.message ?: error.toString()))
-                            currentState?.let { updateControls(it) }
-                            if (reconcileOnError) {
-                                refreshState(silent = true)
-                            }
+                        if (!canRenderUi()) {
+                            onComplete()
+                            return@post
                         }
-                        updateRollButton()
+                        try {
+                            diceView.stopRolling()
+                            val sessionReset = resetInvalidSessionIfNeeded(error)
+                            if (!sessionReset) {
+                                setNetworkControls(enabled = true)
+                                showStatus("Error: " + (error.message ?: error.toString()))
+                                currentState?.let { updateControls(it) }
+                                if (reconcileOnError) {
+                                    refreshState(silent = true)
+                                }
+                            }
+                            updateRollButton()
+                        } finally {
+                            onComplete()
+                        }
                     }
                 }
             }
         }.isSuccess
 
     if (!submitted && canRenderUi()) {
-        diceView.stopRolling()
-        setNetworkControls(enabled = true)
-        showStatus("Request was cancelled because the screen is closing.")
-        updateRollButton()
+        try {
+            diceView.stopRolling()
+            setNetworkControls(enabled = true)
+            showStatus("Request was cancelled because the screen is closing.")
+            updateRollButton()
+        } finally {
+            onComplete()
+        }
+    } else if (!submitted) {
+        onComplete()
     }
 }
 
