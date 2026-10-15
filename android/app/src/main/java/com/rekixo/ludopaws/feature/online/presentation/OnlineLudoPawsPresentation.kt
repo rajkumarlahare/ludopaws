@@ -63,7 +63,7 @@ internal object OnlineLudoPawsPresentation {
         host.board.visibility = View.VISIBLE
         host.board.bind(
             state = current,
-            playerId = activity.playerId,
+            playerId = activity.playerId.takeIf { activity.canSubmitOnlineGameplayAction() },
             perspectiveColor = localColor,
             characterIdsBySeat = characterIdsBySeat,
         )
@@ -114,6 +114,12 @@ internal object OnlineLudoPawsPresentation {
         val localColor = state.players.firstOrNull {
             it.playerId == activity.playerId
         }?.color
+        host.board.bind(
+            state = state,
+            playerId = activity.playerId.takeIf { activity.canSubmitOnlineGameplayAction() },
+            perspectiveColor = localColor,
+            characterIdsBySeat = characterIdsBySeat,
+        )
         renderRails(
             activity = activity,
             host = host,
