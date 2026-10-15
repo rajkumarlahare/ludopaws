@@ -21,8 +21,11 @@ const constants = Object.fromEntries(
   [...android.matchAll(/const\s+val\s+([A-Z0-9_]+)\s*=\s*\n?\s*"([^"]+)"/g)]
     .map((match) => [match[1], match[2]]),
 );
+const androidProductCatalogStart = android.indexOf("val products =");
+assert.ok(androidProductCatalogStart >= 0, "Android must define the one-time products catalog");
+const androidProductCatalog = android.slice(androidProductCatalogStart);
 const androidProducts = {};
-for (const match of android.matchAll(/StoreProduct\(([\s\S]*?)\n {12}\),/g)) {
+for (const match of androidProductCatalog.matchAll(/StoreProduct\(([\s\S]*?)\n {12}\),/g)) {
   const block = match[1];
   const constant = block.match(/productId\s*=\s*([A-Z0-9_]+)/)?.[1];
   const gemText = block.match(/gemAmount\s*=\s*([0-9_]+)/)?.[1];
