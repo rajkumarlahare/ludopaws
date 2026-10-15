@@ -1792,7 +1792,7 @@ export class MatchRoom {
     if (authorization == null || authorization.trim() === "") {
       return { profileId: null, playerType: "HUMAN" };
     }
-    if (!/^Bearer\\s+lpp_[A-Za-z0-9_-]{32,}$/i.test(authorization)) {
+    if (!/^Bearer\s+lpp_[A-Za-z0-9_-]{32,}$/i.test(authorization)) {
       throw httpError(
         401,
         "PROFILE_AUTH_INVALID",
