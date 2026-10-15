@@ -131,4 +131,36 @@ class LudoPawsGameplayPacingPolicyTest {
         assertEquals(600L, extra)
         assertTrue(extra > normal)
     }
+
+    @Test
+    fun onlinePreviewConsumesAlreadyPresentedTimeWithoutNegativeDelay() {
+        assertEquals(
+            0L,
+            LudoPawsGameplayPacingPolicy.remainingPresentationDelayMillis(
+                totalDelayMillis = 1_000L,
+                alreadyPresentedMillis = 1_250L,
+            ),
+        )
+        assertEquals(
+            250L,
+            LudoPawsGameplayPacingPolicy.remainingPresentationDelayMillis(
+                totalDelayMillis = 1_000L,
+                alreadyPresentedMillis = 750L,
+            ),
+        )
+        assertEquals(
+            1_000L,
+            LudoPawsGameplayPacingPolicy.remainingPresentationDelayMillis(
+                totalDelayMillis = 1_000L,
+                alreadyPresentedMillis = 0L,
+            ),
+        )
+        assertEquals(
+            1_000L,
+            LudoPawsGameplayPacingPolicy.remainingPresentationDelayMillis(
+                totalDelayMillis = 1_000L,
+                alreadyPresentedMillis = -50L,
+            ),
+        )
+    }
 }
