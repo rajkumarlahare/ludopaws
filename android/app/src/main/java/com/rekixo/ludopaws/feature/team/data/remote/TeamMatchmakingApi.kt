@@ -25,7 +25,8 @@ class TeamMatchmakingApi(
             body = JSONObject()
                 .put("displayName", displayName)
                 .put("clientRequestId", clientRequestId)
-                .put("characterId", characterId),
+                .put("characterId", characterId)
+                .put("rulesetKey", "TEAM_UP_V3"),
         )
 
     fun status(

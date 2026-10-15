@@ -11,7 +11,8 @@ These are Worker runtime variables, not Android build flags:
 | `LUDOPROOF_BOT_MATCH_FILL_ENABLED` | `true` | Set `false`, `0`, `off`, or `no` to stop creating new bot-filled matches. |
 | `LUDOPROOF_BOT_TURNS_ENABLED` | `true` | Set `false`, `0`, `off`, or `no` to stop automated bot turns. |
 | `LUDOPROOF_BOT_FILL_DELAY_MS` | `15000` | 250–120000 ms. |
-| `LUDOPROOF_BOT_TURN_DELAY_MS` | `650` | 100–10000 ms. |
+| `LUDOPROOF_BOT_TURN_DELAY_MS` | `1100` | 1100–10000 ms. |
+| `LUDOPROOF_BOT_RESULT_HOLD_MS` | `1400` | 1400–5000 ms after a resolved Bot roll. |
 | `LUDOPROOF_BOT_RETRY_DELAY_MS` | `3000` | 250–30000 ms. |
 
 Missing, invalid, or out-of-range delays use the documented defaults. Test and staging environments can use a shorter fill delay without modifying source code.

@@ -20,6 +20,8 @@ const QUEUE_TTL_MS = 2 * 60 * 1000;
 const ASSIGNMENT_TTL_MS = 10 * 60 * 1000;
 const PROFILE_ASSERTION_TTL_MS = 15 * 60 * 1000;
 const ALLOWED_PLAYER_COUNTS = new Set([2, 4]);
+const DEFAULT_RULESET_KEY = "CLASSIC_V1";
+const CLASSIC_RULESET_KEYS = ["CLASSIC_V1", "CLASSIC_V2", "CLASSIC_V3"];
 
 export class MatchmakerQueue {
   constructor(ctx, env) {
@@ -65,25 +67,43 @@ export class MatchmakerQueue {
         for (const playerCount of [2, 4]) {
           state = this.#cleanup(await this.#load(), Date.now());
           if (state.pendingMatch) break;
-          const waiting = state.queue
+          const byRuleset = new Map();
+          state.queue
             .filter((candidate) => candidate.playerCount === playerCount)
-            .sort((left, right) => left.joinedAt - right.joinedAt);
-          if (waiting.length === 0) continue;
-          const oldest = waiting[0];
-          const fallbackAt = Number(oldest.botFallbackAt ?? oldest.joinedAt + botFillDelayMs(this.env));
-          if (fallbackAt > now) continue;
+            .sort((left, right) => left.joinedAt - right.joinedAt)
+            .forEach((candidate) => {
+              const rulesetKey = candidate.rulesetKey ?? DEFAULT_RULESET_KEY;
+              if (!byRuleset.has(rulesetKey)) byRuleset.set(rulesetKey, []);
+              byRuleset.get(rulesetKey).push(candidate);
+            });
+          const expiredGroup = [...byRuleset.entries()]
+            .map(([rulesetKey, waiting]) => ({
+              rulesetKey,
+              waiting,
+              oldest: waiting[0],
+              fallbackAt: Number(
+                waiting[0].botFallbackAt ??
+                waiting[0].joinedAt + botFillDelayMs(this.env),
+              ),
+            }))
+            .filter((group) => group.oldest && group.fallbackAt <= now)
+            .sort((left, right) => left.oldest.joinedAt - right.oldest.joinedAt)[0];
+          if (!expiredGroup) continue;
 
+          const { rulesetKey, waiting } = expiredGroup;
           const humans = waiting.slice(0, playerCount);
           const bots = await createBotParticipants({
             count: playerCount - humans.length,
             playerCount,
             matchMode: "ONLINE",
+            rulesetKey,
             existingNames: humans.map((candidate) => candidate.displayName),
             now,
           });
           state.pendingMatch = {
             matchMode: "ONLINE",
             playerCount,
+            rulesetKey,
             participants: [...humans, ...bots],
             retryAt: now + botRetryDelayMs(this.env),
           };
@@ -138,10 +158,11 @@ export class MatchmakerQueue {
         displayName: participant.displayName,
         profileId: participant.profileId,
         characterId: participant.characterId,
+        rulesetKey: participant.rulesetKey,
         lastSeenAt: now,
       };
       await this.#persist(state);
-      return json(200, searchingPayload(state, participant.playerCount, now));
+      return json(200, searchingPayload(state, participant.playerCount, now, participant.rulesetKey));
     }
 
     if (
@@ -162,7 +183,10 @@ export class MatchmakerQueue {
     });
 
     const eligible = state.queue
-      .filter((candidate) => candidate.playerCount === participant.playerCount)
+      .filter((candidate) =>
+        candidate.playerCount === participant.playerCount &&
+        (candidate.rulesetKey ?? DEFAULT_RULESET_KEY) === participant.rulesetKey
+      )
       .sort((left, right) => left.joinedAt - right.joinedAt);
 
     if (
@@ -173,6 +197,7 @@ export class MatchmakerQueue {
       state.pendingMatch = {
         matchMode: "ONLINE",
         playerCount: participant.playerCount,
+        rulesetKey: participant.rulesetKey,
         participants: group,
         retryAt: now + botRetryDelayMs(this.env),
       };
@@ -204,7 +229,7 @@ export class MatchmakerQueue {
     }
 
     await this.#persist(state);
-    return json(202, searchingPayload(state, participant.playerCount, now));
+    return json(202, searchingPayload(state, participant.playerCount, now, participant.rulesetKey));
   }
 
   async #status(request, body) {
@@ -256,7 +281,12 @@ export class MatchmakerQueue {
 
     queued.lastSeenAt = now;
     await this.#persist(state);
-    return json(200, searchingPayload(state, playerCount, now));
+    return json(200, searchingPayload(
+      state,
+      playerCount,
+      now,
+      queued.rulesetKey ?? DEFAULT_RULESET_KEY,
+    ));
   }
 
   async #cancel(request, body) {
@@ -352,6 +382,7 @@ export class MatchmakerQueue {
             clientRequestId: host.clientRequestId,
             matchmaking: true,
             targetPlayerCount,
+            rulesetKey: host.rulesetKey ?? reservation.rulesetKey ?? DEFAULT_RULESET_KEY,
           }),
         }),
       );
@@ -660,8 +691,17 @@ function normalizeParticipant(body, profileId) {
     characterId: normalizeCharacterId(body?.characterId),
     profileId,
     playerCount: requirePlayerCount(body?.playerCount),
+    rulesetKey: normalizeClassicRulesetKey(body?.rulesetKey),
     playerType: "HUMAN",
   };
+}
+
+function normalizeClassicRulesetKey(value) {
+  const key = value == null ? DEFAULT_RULESET_KEY : String(value);
+  if (!CLASSIC_RULESET_KEYS.includes(key)) {
+    throw httpError(400, "INVALID_RULESET_KEY", "public Online requires a classic ruleset");
+  }
+  return key;
 }
 
 function requirePlayerCount(value) {
@@ -676,13 +716,17 @@ function requirePlayerCount(value) {
   return count;
 }
 
-function searchingPayload(state, playerCount, now) {
+function searchingPayload(state, playerCount, now, rulesetKey = DEFAULT_RULESET_KEY) {
   const queued = state.queue
-    .filter((participant) => participant.playerCount === playerCount)
+    .filter((participant) =>
+      participant.playerCount === playerCount &&
+      (participant.rulesetKey ?? DEFAULT_RULESET_KEY) === rulesetKey
+    )
     .sort((left, right) => left.joinedAt - right.joinedAt);
   return {
     status: "SEARCHING",
     playerCount,
+    rulesetKey,
     queuedPlayers: Math.min(queued.length, playerCount),
     targetPlayerCount: playerCount,
     searchStartedAt: queued[0]?.joinedAt ?? now,

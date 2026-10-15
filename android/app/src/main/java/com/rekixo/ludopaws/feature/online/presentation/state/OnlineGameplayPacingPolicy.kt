@@ -119,6 +119,9 @@ internal fun MainActivity.applyOnlineGameplayPacing(
     if (transition.key == lastOnlineGameplayPacingKey) return
 
     lastOnlineGameplayPacingKey = transition.key
+    // The dice renderer owns the remaining spin + settle lock, avoiding a
+    // second full hold after the result has already waited on the network.
+    if (transition.key.startsWith("${current.matchId}:roll:")) return
     onlineGameplayActionBlockedUntilMillis = maxOf(
         onlineGameplayActionBlockedUntilMillis,
         SystemClock.uptimeMillis() + transition.delayMillis,

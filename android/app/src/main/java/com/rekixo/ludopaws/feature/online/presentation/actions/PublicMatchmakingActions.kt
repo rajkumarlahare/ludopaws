@@ -143,6 +143,7 @@ internal fun MainActivity.beginPublicMatchmaking() {
                     ticket.requestId,
                 playerCount =
                     ticket.playerCount,
+                rulesetKey = "CLASSIC_V3",
             )
         },
         onSuccess = {

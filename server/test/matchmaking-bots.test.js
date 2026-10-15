@@ -147,19 +147,22 @@ test("bot settings are bounded and bots receive non-profile identities", () => {
   assert.equal(botTurnDelayMs({}), 1_100);
   assert.equal(botTurnDelayMs({ LUDOPROOF_BOT_TURN_DELAY_MS: "650" }), 1_100);
   assert.equal(botTurnDelayMs({ LUDOPROOF_BOT_TURN_DELAY_MS: "12001" }), 1_100);
-  assert.equal(botResultHoldMs({}), 950);
-  assert.equal(botResultHoldMs({ LUDOPROOF_BOT_RESULT_HOLD_MS: "700" }), 950);
-  assert.equal(botResultHoldMs({ LUDOPROOF_BOT_RESULT_HOLD_MS: "100" }), 950);
-  assert.equal(botResultHoldMs({ LUDOPROOF_BOT_RESULT_HOLD_MS: "1250" }), 1_250);
+  assert.equal(botResultHoldMs({}), 1_400);
+  assert.equal(botResultHoldMs({ LUDOPROOF_BOT_RESULT_HOLD_MS: "700" }), 1_400);
+  assert.equal(botResultHoldMs({ LUDOPROOF_BOT_RESULT_HOLD_MS: "100" }), 1_400);
+  assert.equal(botResultHoldMs({ LUDOPROOF_BOT_RESULT_HOLD_MS: "1250" }), 1_400);
+  assert.equal(botResultHoldMs({ LUDOPROOF_BOT_RESULT_HOLD_MS: "1650" }), 1_650);
   const bots = createBotParticipants({
     count: 3,
     playerCount: 4,
     matchMode: "ONLINE",
+    rulesetKey: "CLASSIC_V3",
     existingNames: ["Aarav"],
     now: 100,
   });
   assert.equal(bots.length, 3);
   assert.ok(bots.every((bot) => bot.playerType === "BOT" && bot.profileId === null));
+  assert.ok(bots.every((bot) => bot.rulesetKey === "CLASSIC_V3"));
   assert.ok(bots.every((bot) => /^[0-9a-f-]{36}$/i.test(bot.clientRequestId)));
   assert.equal(new Set(bots.map((bot) => bot.displayName.toLowerCase())).size, 3);
   assert.ok(bots.every((bot) => bot.displayName.toLowerCase() !== "aarav"));
@@ -275,6 +278,54 @@ test("Team Up fallback fills remaining seats while retaining A/B/A/B teams", asy
 });
 
 
+test("Online matchmaking never mixes clients that request different rulesets", async () => {
+  const env = makeEnv();
+  env.LUDOPROOF_BOT_MATCH_FILL_ENABLED = "false";
+  const queue = new MatchmakerQueue({ storage: new FakeStorage() }, env);
+  const legacy = human(61, 2);
+  const versioned = human(62, 2);
+  for (const person of [legacy, versioned]) {
+    const result = await parse(await queue.fetch(request("/search", {
+      clientRequestId: person.clientRequestId, displayName: person.displayName,
+      playerCount: 2, characterId: person.characterId,
+      rulesetKey: person === legacy ? "CLASSIC_V1" : "CLASSIC_V3",
+    }, person.profileToken)));
+    assert.equal(result.body.status, "SEARCHING");
+  }
+  for (const person of [legacy, versioned]) {
+    const result = await parse(await queue.fetch(request("/status", {
+      clientRequestId: person.clientRequestId, playerCount: 2,
+    }, person.profileToken)));
+    assert.equal(result.body.status, "SEARCHING");
+    assert.equal(result.body.queuedPlayers, 1);
+  }
+  assert.equal(env.LUDOPROOF_MATCHES.rooms.size, 0);
+});
+
+test("Team Up matchmaking never mixes clients that request different rulesets", async () => {
+  const env = makeEnv();
+  env.LUDOPROOF_BOT_MATCH_FILL_ENABLED = "false";
+  const queue = new TeamMatchmakerQueue({ storage: new FakeStorage() }, env);
+  const legacy = human(63, 4, true);
+  const versioned = human(64, 4, true);
+  for (const person of [legacy, versioned]) {
+    const result = await parse(await queue.fetch(request("/search", {
+      clientRequestId: person.clientRequestId, displayName: person.displayName,
+      characterId: person.characterId,
+      rulesetKey: person === legacy ? "TEAM_UP_V1" : "TEAM_UP_V3",
+    }, person.profileToken)));
+    assert.equal(result.body.status, "SEARCHING");
+  }
+  for (const person of [legacy, versioned]) {
+    const result = await parse(await queue.fetch(request("/status", {
+      clientRequestId: person.clientRequestId,
+    }, person.profileToken)));
+    assert.equal(result.body.status, "SEARCHING");
+    assert.equal(result.body.queuedPlayers, 1);
+  }
+  assert.equal(env.LUDOPROOF_MATCHES.rooms.size, 0);
+});
+
 test("Online 2-player fallback adds exactly one bot for a lone queued human", async () => {
   const env = makeEnv();
   const queue = new MatchmakerQueue({ storage: new FakeStorage() }, env);
@@ -285,6 +336,7 @@ test("Online 2-player fallback adds exactly one bot for a lone queued human", as
       displayName: person.displayName,
       playerCount: 2,
       characterId: person.characterId,
+      rulesetKey: "CLASSIC_V3",
     }, person.profileToken),
   ));
   assert.equal(searching.body.status, "SEARCHING");
@@ -300,6 +352,7 @@ test("Online 2-player fallback adds exactly one bot for a lone queued human", as
   ));
   assert.equal(result.body.status, "MATCHED");
   assert.equal(result.body.state.players.length, 2);
+  assert.equal(result.body.state.rulesetId, "ludoproof-standard-v3");
   assert.deepEqual(
     result.body.state.players.map((player) => player.playerType),
     ["HUMAN", "BOT"],
@@ -319,6 +372,7 @@ test("Team Up fallback can fill all three empty seats with bots", async () => {
       clientRequestId: person.clientRequestId,
       displayName: person.displayName,
       characterId: person.characterId,
+      rulesetKey: "TEAM_UP_V3",
     }, person.profileToken),
   ));
   assert.equal(searching.body.status, "SEARCHING");
@@ -333,6 +387,7 @@ test("Team Up fallback can fill all three empty seats with bots", async () => {
   ));
   assert.equal(result.body.status, "MATCHED");
   assert.equal(result.body.state.players.length, 4);
+  assert.equal(result.body.state.rulesetId, "ludoproof-team-v3");
   assert.deepEqual(
     result.body.state.players.map((player) => player.playerType),
     ["HUMAN", "BOT", "BOT", "BOT"],

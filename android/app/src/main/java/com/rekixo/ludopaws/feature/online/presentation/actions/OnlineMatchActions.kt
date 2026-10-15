@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
+import android.view.HapticFeedbackConstants
 import android.os.Looper
 import android.text.InputType
 import android.view.Gravity
@@ -70,6 +71,7 @@ internal fun MainActivity.createMatch() {
                     displayName,
                 clientRequestId =
                     requestId,
+                rulesetKey = "CLASSIC_V3",
             )
         },
         onSuccess = {
@@ -332,6 +334,9 @@ internal fun MainActivity.moveToken(
             token,
         ->
         onlineMoveRequestInFlight = true
+        // Immediate acknowledgement while waiting for authoritative movement.
+        // Never change token positions optimistically.
+        boardFrame.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
         runNetwork(
             action = {
                 api.move(

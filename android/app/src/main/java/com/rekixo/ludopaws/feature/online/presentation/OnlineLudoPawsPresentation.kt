@@ -39,6 +39,9 @@ internal object OnlineLudoPawsPresentation {
         val feedbackLedger: LudoPawsFeedbackLedger = LudoPawsFeedbackLedger(),
         var quickChatReactionView: View? = null,
         var lastQuickChatAtMs: Long = 0L,
+        var railBindingKey: String? = null,
+        var activeDiceControl: FrameLayout? = null,
+        var activeDicePlayerId: String? = null,
     )
 
     fun render(
@@ -87,6 +90,9 @@ internal object OnlineLudoPawsPresentation {
     fun clear(activity: MainActivity) {
         val host = host(activity) ?: return
         host.feedbackLedger.clear()
+        host.railBindingKey = null
+        host.activeDiceControl = null
+        host.activeDicePlayerId = null
         host.board.bind(
             state = null,
             playerId = null,
@@ -290,11 +296,6 @@ internal object OnlineLudoPawsPresentation {
         characterIdsBySeat: List<String>,
         perspectiveColor: String?,
     ) {
-        host.topRail.visibility = View.VISIBLE
-        host.bottomRail.visibility = View.VISIBLE
-        host.topRail.removeAllViews()
-        host.bottomRail.removeAllViews()
-
         val activePlayer =
             state.players
                 .getOrNull(state.actingSeat ?: state.turnSeat)
@@ -302,6 +303,48 @@ internal object OnlineLudoPawsPresentation {
             perspectiveColor
                 ?: state.players.firstOrNull()?.color
                 ?: "BLUE"
+        val quickChatEnabled = GameSettingsStore(activity).snapshot().quickChatEnabled
+        val bindingKey = buildString {
+            append(state.matchId).append('|')
+            append(state.matchMode).append('|')
+            append(state.status).append('|')
+            append(activePlayer?.playerId).append('|')
+            append(activity.playerId).append('|')
+            append(perspectiveColor).append('|')
+            append(quickChatEnabled)
+            characterIdsBySeat.forEach { append('|').append(it) }
+            state.players.forEach { player ->
+                append('|').append(player.playerId)
+                append(':').append(player.displayName)
+                append(':').append(player.color)
+                append(':').append(player.teamId)
+                append(':').append(player.playerType)
+                append(':').append(player.seat)
+                player.tokens.forEach { append(',').append(it) }
+            }
+        }
+
+        if (host.railBindingKey == bindingKey) {
+            host.activeDiceControl?.let { control ->
+                val enabled = state.status == "ACTIVE" &&
+                    host.activeDicePlayerId == activity.playerId &&
+                    activity.canSubmitOnlineGameplayAction() &&
+                    activity.onlineRollActionDecision(state).enabled
+                control.isEnabled = enabled
+                control.isClickable = enabled
+                control.isFocusable = enabled
+                activity.diceView.setAttentionEnabled(enabled)
+            }
+            return
+        }
+
+        host.railBindingKey = bindingKey
+        host.activeDiceControl = null
+        host.activeDicePlayerId = null
+        host.topRail.visibility = View.VISIBLE
+        host.bottomRail.visibility = View.VISIBLE
+        host.topRail.removeAllViews()
+        host.bottomRail.removeAllViews()
 
         addPlayerSlot(
             activity = activity,
@@ -406,6 +449,10 @@ internal object OnlineLudoPawsPresentation {
                 } else {
                     null
                 }
+            if (activeDiceControl != null) {
+                host.activeDiceControl = activeDiceControl
+                host.activeDicePlayerId = player.playerId
+            }
             if (alignEnd && activeDiceControl != null) {
                 slotHost.addView(activeDiceControl)
             }

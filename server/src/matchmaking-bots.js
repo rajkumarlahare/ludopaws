@@ -9,7 +9,7 @@ const BOT_NAMES = Object.freeze([
 
 const DEFAULT_FILL_DELAY_MS = 15_000;
 const DEFAULT_TURN_DELAY_MS = 1_100;
-const DEFAULT_RESULT_HOLD_MS = 950;
+const DEFAULT_RESULT_HOLD_MS = 1_400;
 const DEFAULT_RETRY_DELAY_MS = 3_000;
 
 function isEnabled(value, fallback = true) {
@@ -56,7 +56,7 @@ export function botResultHoldMs(env) {
   return boundedMilliseconds(
     env?.LUDOPROOF_BOT_RESULT_HOLD_MS,
     DEFAULT_RESULT_HOLD_MS,
-    950,
+    1_400,
     5_000,
   );
 }
@@ -79,6 +79,7 @@ export function createBotParticipants({
   count,
   playerCount,
   matchMode,
+  rulesetKey = matchMode === "TEAM_UP" ? "TEAM_UP_V1" : "CLASSIC_V1",
   existingNames = [],
   now = Date.now(),
 }) {
@@ -93,6 +94,12 @@ export function createBotParticipants({
   }
   if (matchMode === "TEAM_UP" && playerCount !== 4) {
     throw new RangeError("Team Up bots require four seats");
+  }
+  const allowedRulesets = matchMode === "TEAM_UP"
+    ? ["TEAM_UP_V1", "TEAM_UP_V2", "TEAM_UP_V3"]
+    : ["CLASSIC_V1", "CLASSIC_V2", "CLASSIC_V3"];
+  if (!allowedRulesets.includes(rulesetKey)) {
+    throw new RangeError("bot ruleset does not match the selected match mode");
   }
 
   const usedNames = new Set(existingNames.map((name) => String(name).trim().toLocaleLowerCase("en")));
@@ -116,6 +123,7 @@ export function createBotParticipants({
       playerType: "BOT",
       playerCount,
       matchMode,
+      rulesetKey,
       joinedAt: now,
       lastSeenAt: now,
     });

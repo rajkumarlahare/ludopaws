@@ -1,5 +1,6 @@
 package com.rekixo.ludopaws.feature.online
 
+import android.os.SystemClock
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -20,15 +21,30 @@ internal fun MainActivity.updateVerification(
             val shouldAnimate =
                 uiStateHolder.value.presentedDiceEventKey !=
                     presentation.eventKey
+            val minimumRollDurationMillis =
+                LudoPawsGameplayPacingPolicy.diceResultHoldMillis(
+                    GameSettingsStore(this).snapshot().gameSpeed,
+                )
             diceView.showOutcome(
                 outcome = presentation.outcome,
                 animate = shouldAnimate,
+                eventKey = presentation.eventKey,
+                minimumRollDurationMillis = minimumRollDurationMillis,
             )
             if (shouldAnimate) {
                 uiStateHolder.update {
                     it.copy(
                         presentedDiceEventKey = presentation.eventKey,
                     )
+                }
+                val remainingPresentationMillis =
+                    diceView.remainingOutcomePresentationMillis(minimumRollDurationMillis)
+                if (remainingPresentationMillis > 0L) {
+                    onlineGameplayActionBlockedUntilMillis = maxOf(
+                        onlineGameplayActionBlockedUntilMillis,
+                        SystemClock.uptimeMillis() + remainingPresentationMillis,
+                    )
+                    scheduleOnlineGameplayUnlock()
                 }
             }
 

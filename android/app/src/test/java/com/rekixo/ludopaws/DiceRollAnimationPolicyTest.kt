@@ -21,6 +21,35 @@ class DiceRollAnimationPolicyTest {
     }
 
     @Test
+    fun minimumSpinTimeAccountsForTimeAlreadySpentRolling() {
+        assertEquals(
+            450L,
+            DiceRollAnimationPolicy.remainingVisibleRollMillis(
+                elapsedMillis = 250L,
+                minimumVisibleRollMillis = 700L,
+            ),
+        )
+        assertEquals(
+            0L,
+            DiceRollAnimationPolicy.remainingVisibleRollMillis(
+                elapsedMillis = 900L,
+                minimumVisibleRollMillis = 700L,
+            ),
+        )
+    }
+
+    @Test
+    fun minimumSpinTimeNeverGoesBelowZero() {
+        assertEquals(
+            0L,
+            DiceRollAnimationPolicy.remainingVisibleRollMillis(
+                elapsedMillis = -5L,
+                minimumVisibleRollMillis = -10L,
+            ),
+        )
+    }
+
+    @Test
     fun rollingFrameHasPhysicalTransform() {
         val frame =
             DiceRollAnimationPolicy.rollingFrame(170L)
