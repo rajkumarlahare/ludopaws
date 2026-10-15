@@ -25,12 +25,17 @@ export class MatchRoom extends LifecycleMatchRoom {
 
   async fetch(request) {
     const response = await super.fetch(request);
-    try {
-      await this.#withBotMetadata(() => this.#scheduleBotTurn());
-    } catch (error) {
-      console.error("Could not schedule Ludo Paws bot turn", {
-        code: error?.code ?? "BOT_TURN_SCHEDULE_FAILED",
-      });
+    // Do not let unauthorized or malformed requests trigger side effects in
+    // an otherwise valid bot match. Successful game requests schedule turns;
+    // alarms provide recovery if the response path is interrupted.
+    if (response.ok) {
+      try {
+        await this.#withBotMetadata(() => this.#scheduleBotTurn());
+      } catch (error) {
+        console.error("Could not schedule Ludo Paws bot turn", {
+          code: error?.code ?? "BOT_TURN_SCHEDULE_FAILED",
+        });
+      }
     }
     return response;
   }
