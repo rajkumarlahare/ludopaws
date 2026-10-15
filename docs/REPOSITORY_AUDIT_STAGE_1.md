@@ -37,10 +37,11 @@ No production Worker was deployed, no public website/legal page was published, n
 - **Disposition:** CI concurrency is keyed to the PR source branch, so updates to a PR supersede prior validation on that source branch.
 - **Verification:** A run on the latest audit commit must complete successfully; stale runs may be cancelled by concurrency.
 
-### AUD-05 — Current PR removes the monthly subscription implementation
-- **Paths:** `android/app/src/main/java/com/rekixo/ludopaws/feature/account/data/AccountRepository.kt`; `android/app/src/main/java/com/rekixo/ludopaws/feature/store/data/billing/GooglePlayBillingGateway.kt`; `server/src/google-play-billing.js`; `server/src/index-account.js`; `server/src/player-account.js`; `server/test/google-play-billing.test.js`; `server/test/player-account.test.js`; `docs/STORE_MONETIZATION_ROADMAP.md`
-- **Risk:** The PR removes `paws_plus` / `/api/store/subscription/verify`, subscription entitlement state and tests, and changes the roadmap to one-time products only. The current code can therefore support one-time purchases but does not provide the monthly auto-renewing subscription lifecycle.
-- **Disposition:** **Product/release blocker if monthly subscription is still required.** Do not enable Billing until scope is explicitly reconciled and any required purchase verification, renewal/expiry/revocation handling, restore, and tests are implemented. This audit deliberately does not reintroduce the removed code without reviewing the complete lifecycle.
+### AUD-05 — Store purchase IDs and fulfillment must remain consistent
+- **Paths:** Android Billing gateway and purchase verifier; `server/src/google-play-billing.js`; store purchase tests and `docs/GOOGLE_PLAY_ONE_TIME_BILLING_SETUP.md`
+- **Risk:** A mismatch between app product IDs, Google Play configuration, server verification, and the purchase ledger can cause a valid purchase to fail or an invalid purchase to be granted.
+- **Disposition:** Keep the current one-time purchase contract aligned across Android, Worker verification, Play Console products, and tests. Preserve the existing product IDs; never trust a client-reported price or purchase result.
+- **Verification:** Repository tests cover the implementation contract. Live Play Console configuration and a signed internal-test purchase still require external acceptance testing.
 
 ### AUD-06 — Public privacy/deletion pages are correctly gated, but not approved for publication
 - **Paths:** `docs/privacy-policy.html`; `docs/account-deletion.html`; `docs/landing-page.html`; `.github/workflows/account-deletion-pages.yml`; `scripts/check-account-deletion-pages.mjs`
@@ -70,5 +71,5 @@ No production Worker was deployed, no public website/legal page was published, n
 
 - **Source fixes made on this branch:** outdated brand gate and dice-catalog regression.
 - **CI workflow fixes made on this branch:** artifact-quota handling for PR validation and PR-source-branch concurrency.
-- **Not green by definition until separately resolved:** monthly-subscription product requirement (if still in scope), publisher/legal approval and public deletion verification, live Cloudflare/Play Console/AdMob configuration, artifact availability for push/release evidence, and CodeQL eligibility.
+- **Not green by definition until separately resolved:** publisher/legal approval and public deletion verification, live Cloudflare/Play Console/AdMob configuration, artifact availability for push/release evidence, and CodeQL eligibility.
 - **Release restriction:** A green CI is necessary but not sufficient for production release. Keep production deployment and monetization opt-in flags disabled until the applicable external and end-to-end gates pass.
