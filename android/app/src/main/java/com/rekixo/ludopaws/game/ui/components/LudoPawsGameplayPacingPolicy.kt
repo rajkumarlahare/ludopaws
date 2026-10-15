@@ -87,6 +87,18 @@ object LudoPawsGameplayPacingPolicy {
                 .div(visualSteps.toLong())
         }
 
+    /**
+     * Returns only the presentation time that has not already elapsed while an
+     * online move preview was visible. Network confirmation must not restart the
+     * same movement hold from zero.
+     */
+    fun remainingPresentationDelayMillis(
+        totalDelayMillis: Long,
+        alreadyPresentedMillis: Long,
+    ): Long =
+        (totalDelayMillis - alreadyPresentedMillis.coerceAtLeast(0L))
+            .coerceAtLeast(0L)
+
     fun postMoveBreathMillis(
         speed: GameSpeed,
         extraTurn: Boolean,
