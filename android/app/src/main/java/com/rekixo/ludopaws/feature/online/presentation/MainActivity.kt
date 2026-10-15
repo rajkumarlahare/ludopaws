@@ -570,9 +570,10 @@ class MainActivity : ComponentActivity() {
             gameMode !=
             GameMode.ONLINE
         ) {
-            onlineHeroPanel = onlineHero()
+            val hero = onlineHero()
+            onlineHeroPanel = hero
             content.addView(
-                onlineHeroPanel,
+                hero,
                 onlineSectionParams(
                     if (isCompactOnline()) 12 else 16,
                 ).apply {
