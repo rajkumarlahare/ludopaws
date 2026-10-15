@@ -2302,6 +2302,20 @@ test(
     });
     await room.alarm();
 
+    const rollShown = await ctx.storage.get("match-state");
+    assert.equal(rollShown.status, "ACTIVE");
+    assert.equal(rollShown.pendingRoll?.status, "RESOLVED");
+    assert.ok(rollShown.players[1].tokens.every((position) => position === -1));
+    assert.equal(rollShown.botTurn?.inProgress, false);
+    assert.ok(rollShown.botTurn?.runAt > Date.now());
+    assert.equal(mock.createCalls(), 1);
+    assert.equal(mock.resolveCalls(), 1);
+
+    // Simulate the result-hold window elapsing before the bot selects its paw.
+    rollShown.botTurn.runAt = Date.now() - 1;
+    await ctx.storage.put("match-state", rollShown);
+    await room.alarm();
+
     const after = await ctx.storage.get("match-state");
     assert.equal(after.status, "ACTIVE");
     assert.equal(after.pendingRoll, null);
