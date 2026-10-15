@@ -389,6 +389,52 @@ export class MatchmakerQueue {
     );
   }
 
+  async #resumePendingMatch(state, now) {
+    const pending = state.pendingMatch;
+    if (!pending) return true;
+
+    try {
+      const assignment = await this.#materialize(
+        pending.participants,
+        pending.playerCount,
+      );
+      const realParticipants = pending.participants.filter(
+        (candidate) => candidate.playerType !== "BOT",
+      );
+      const realRequestIds = new Set(
+        realParticipants.map((candidate) => candidate.clientRequestId),
+      );
+      state.queue = state.queue.filter(
+        (candidate) => !realRequestIds.has(candidate.clientRequestId),
+      );
+
+      const assignedAt = Date.now();
+      pending.participants.forEach((candidate, index) => {
+        if (candidate.playerType === "BOT") return;
+        state.assignments[candidate.clientRequestId] = {
+          matchId: assignment.matchId,
+          targetPlayerCount: pending.playerCount,
+          role: index === 0 ? "HOST" : "GUEST",
+          assignedAt,
+          expiresAt: assignedAt + ASSIGNMENT_TTL_MS,
+          displayName: candidate.displayName,
+          characterId: normalizeCharacterId(candidate.characterId),
+          profileId: candidate.profileId,
+        };
+      });
+      delete state.pendingMatch;
+      await this.#persist(state);
+      return true;
+    } catch (error) {
+      pending.retryAt = Date.now() + botRetryDelayMs(this.env);
+      await this.#persist(state);
+      console.error("Online reserved match could not be materialized; retry scheduled", {
+        code: error?.code ?? "MATCH_MATERIALIZE_FAILED",
+      });
+      return false;
+    }
+  }
+
   async #matchedResponse(participant, assignment) {
     if (assignment.profileId !== participant.profileId) {
       throw httpError(
