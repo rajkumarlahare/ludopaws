@@ -112,38 +112,32 @@ internal object LudoPawsAudioAssetPlayer {
         rawResourceNames: List<String>,
         assetPaths: List<String> = emptyList(),
     ) {
-        var loadedAuthoredAsset = false
+        // Preload all authored takes and every packaged fallback. The fallback
+        // chain can be selected after an asset-open/play failure, and rotating
+        // numbered takes must not introduce a new first-play load delay.
         for (assetPath in availableAssetPaths(context, assetPaths)) {
-            if (
-                LudoPawsSoundPool.preloadAsset(
-                    context = context,
-                    assetPath = assetPath,
-                )
-            ) {
-                loadedAuthoredAsset = true
-            }
-        }
-        // Preload every available numbered take so deterministic rotation never
-        // introduces a first-play load delay on a later step or event.
-        if (loadedAuthoredAsset) return
-
-        val resourceId =
-            rawResourceNames
-                .asSequence()
-                .map {
-                    rawResourceId(
-                        context = context,
-                        resourceName = it,
-                    )
-                }
-                .firstOrNull { it != 0 }
-
-        if (resourceId != null) {
-            LudoPawsSoundPool.preload(
+            LudoPawsSoundPool.preloadAsset(
                 context = context,
-                resourceId = resourceId,
+                assetPath = assetPath,
             )
         }
+
+        rawResourceNames
+            .asSequence()
+            .map { resourceName ->
+                rawResourceId(
+                    context = context,
+                    resourceName = resourceName,
+                )
+            }
+            .filter { it != 0 }
+            .distinct()
+            .forEach { resourceId ->
+                LudoPawsSoundPool.preload(
+                    context = context,
+                    resourceId = resourceId,
+                )
+            }
     }
 
     @Synchronized
