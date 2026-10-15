@@ -610,7 +610,7 @@ internal fun MainActivity.setPublicSearchUi(
             when {
                 remaining <=
                     0 ->
-                    "ALL PLAYERS FOUND • FINALIZING…"
+                    "ALL PLAYERS FOUND • MATCHING…"
 
                 opponentsFound ==
                     0 ->
