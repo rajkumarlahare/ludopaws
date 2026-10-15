@@ -5,9 +5,4 @@
             <solid android:color="#03153F" />
         </shape>
     </item>
-    <item
-        android:drawable="@drawable/ic_ludo_paws"
-        android:width="240dp"
-        android:height="240dp"
-        android:gravity="center" />
 </layer-list>
