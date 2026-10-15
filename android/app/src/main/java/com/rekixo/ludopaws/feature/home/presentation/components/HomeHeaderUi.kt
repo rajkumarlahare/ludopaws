@@ -183,6 +183,7 @@ private fun HomeActivity.homeCurrencyPill(): LinearLayout =
             HomeIconView(this@homeCurrencyPill).apply {
                 kind = HomeIconKind.ADD
                 iconColor = Color.WHITE
+                addIconScale = 0.5f
                 isClickable = true
                 isFocusable = true
                 contentDescription = "Add currency"
