@@ -378,6 +378,50 @@ export class TeamMatchmakerQueue {
     );
   }
 
+  async #resumePendingMatch(state, now) {
+    const pending = state.pendingMatch;
+    if (!pending) return true;
+
+    try {
+      const assignment = await this.#materialize(pending.participants);
+      const realParticipants = pending.participants.filter(
+        (candidate) => candidate.playerType !== "BOT",
+      );
+      const realRequestIds = new Set(
+        realParticipants.map((candidate) => candidate.clientRequestId),
+      );
+      state.queue = state.queue.filter(
+        (candidate) => !realRequestIds.has(candidate.clientRequestId),
+      );
+
+      const assignedAt = Date.now();
+      pending.participants.forEach((candidate, index) => {
+        if (candidate.playerType === "BOT") return;
+        state.assignments[candidate.clientRequestId] = {
+          matchId: assignment.matchId,
+          role: index === 0 ? "HOST" : "GUEST",
+          seat: index,
+          teamId: index % 2 === 0 ? "A" : "B",
+          assignedAt,
+          expiresAt: assignedAt + ASSIGNMENT_TTL_MS,
+          displayName: candidate.displayName,
+          characterId: normalizeCharacterId(candidate.characterId),
+          profileId: candidate.profileId,
+        };
+      });
+      delete state.pendingMatch;
+      await this.#persist(state);
+      return true;
+    } catch (error) {
+      pending.retryAt = Date.now() + botRetryDelayMs(this.env);
+      await this.#persist(state);
+      console.error("Team Up reserved match could not be materialized; retry scheduled", {
+        code: error?.code ?? "TEAM_MATCH_MATERIALIZE_FAILED",
+      });
+      return false;
+    }
+  }
+
   async #matchedResponse(participant, assignment) {
     assertOwner(assignment, participant.profileId);
     const target = room(this.env, assignment.matchId);
