@@ -105,6 +105,24 @@ internal object OnlineLudoPawsPresentation {
         activity.boardView.visibility = View.VISIBLE
     }
 
+    fun refreshActionControls(
+        activity: MainActivity,
+        state: MatchSnapshot,
+    ) {
+        val host = host(activity) ?: return
+        val characterIdsBySeat = OnlineLudoPawsCharacterPolicy.characterIdsBySeat(state)
+        val localColor = state.players.firstOrNull {
+            it.playerId == activity.playerId
+        }?.color
+        renderRails(
+            activity = activity,
+            host = host,
+            state = state,
+            characterIdsBySeat = characterIdsBySeat,
+            perspectiveColor = localColor,
+        )
+    }
+
     fun presentRemoteQuickChat(
         activity: MainActivity,
         senderPlayerId: String,
@@ -376,6 +394,7 @@ internal object OnlineLudoPawsPresentation {
                         activity = activity,
                         player = player,
                         enabled = localPlayer &&
+                            activity.canSubmitOnlineGameplayAction() &&
                             activity.onlineRollActionDecision(state).enabled,
                     )
                 } else {
