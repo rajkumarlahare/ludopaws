@@ -353,7 +353,7 @@ requireText(
 requireText(
   ".github/workflows/android-signed-release.yml",
   signedReleaseWorkflow,
-  "APP_SUBSCRIPTIONS !== SERVER_SUBSCRIPTIONS",
+  '[ "$APP_SUBSCRIPTIONS" != "$SERVER_SUBSCRIPTIONS" ]',
   "signed release must reject an Android/Worker Paws Plus feature-flag mismatch.",
 );
 requireText(
