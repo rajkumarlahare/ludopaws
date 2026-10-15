@@ -134,8 +134,8 @@ EntroNex usage is an important unknown: the repository identifies the current v4
 A robust monthly operating model must include Workers, Durable Objects, R2, EntroNex, store fees/tax, customer support, privacy/legal operations and release monitoring. Advertising revenue is variable and should not be assumed to cover API expense until actual eCPM and fill rates are measured.
 
 ## Main-branch audit findings recorded for implementation
-- `StoreCatalog.kt` currently defines `remove_ads` as `NON_CONSUMABLE_REMOVE_ADS`; the Worker grants a persistent `ads_removed` boolean. Keep that ID's existing behavior for compatibility and do not add recurring billing.
-- `server/src/google-play-billing.js` currently verifies one-time `INAPP` purchases via products APIs and its hard-coded `GOOGLE_PLAY_PRODUCTS` map. Only one-time product verification and fulfillment should remain; recurring purchase verification is intentionally out of scope.
+- `StoreCatalog.kt` currently defines `remove_ads` as `NON_CONSUMABLE_REMOVE_ADS`; the Worker grants a persistent `ads_removed` boolean. Keep that ID's existing behavior for compatibility.
+- `server/src/google-play-billing.js` currently verifies one-time `INAPP` purchases via products APIs and its hard-coded `GOOGLE_PLAY_PRODUCTS` map. The Worker verifies and fulfills the configured Google Play one-time products listed in its authoritative product map.
 - `server/src/player-account.js` has a hard-coded `COSMETICS` map and wallet/ad progress tables. Existing channels include FREE, GEMS and REWARDED_ADS, but new server-owned catalogue entries and arbitrary direct-purchase cosmetics require a catalog authority and SKU-to-item mapping.
 - `server/src/index-account.js` exposes wallet, cosmetic purchase/select, one-time purchase verification, store status and SSV routes, and catalog-management/admin routes.
 - Current ad SSV grants 5 Gems on a cosmetic-targeted rewarded view as well as one unit of that item's ad progress. Product design must preserve this explicitly or migrate it only with tests and clear UI disclosure.
