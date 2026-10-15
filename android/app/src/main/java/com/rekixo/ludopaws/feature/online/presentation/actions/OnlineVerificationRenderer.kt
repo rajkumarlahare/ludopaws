@@ -6,6 +6,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import com.rekixo.ludopaws.*
 import com.rekixo.ludopaws.ui.online.*
+import com.rekixo.ludopaws.feature.settings.data.local.GameSettingsStore
 
 internal fun MainActivity.updateVerification(
     state: MatchSnapshot,
@@ -300,7 +301,11 @@ private fun MainActivity.scheduleSingleLegalOnlineMove(
     if (rollButton.tag == eventKey) return
     rollButton.tag = eventKey
 
-    showStatus("Only one move is possible • moving automatically…")
+    showStatus("Only one move is possible • showing the dice result…")
+    val speed = GameSettingsStore(this).snapshot().gameSpeed
+    val autoMoveDelay =
+        LudoPawsGameplayPacingPolicy.diceResultHoldMillis(speed) +
+            LudoPawsGameplayPacingPolicy.postRollAutoMoveDelayMillis(speed)
     rollButton.postDelayed(
         {
             val latest = currentState
@@ -325,7 +330,7 @@ private fun MainActivity.scheduleSingleLegalOnlineMove(
                 rollButton.tag = null
             }
         },
-        320L,
+        autoMoveDelay,
     )
 }
 
