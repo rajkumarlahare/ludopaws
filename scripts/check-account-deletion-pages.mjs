@@ -70,6 +70,7 @@ has(pagesWorkflow, "https://ludopaws.rekixo.com", "Rekixo site origin");
 has(pagesWorkflow, "https://api.ludopaws.rekixo.com", "Rekixo API origin");
 has(pagesWorkflow, "cp docs/landing-page.html site/index.html", "landing page publication mapping");
 has(pagesWorkflow, "actions/deploy-pages", "explicit Pages publishing step");
+has(pagesWorkflow, "Verify published public policy routes", "post-deployment HTTPS smoke test for the legal and sign-in pages");
 
 
 const pricing = read("../docs/pricing.html");
