@@ -7,7 +7,7 @@ import {
   isTeamUp,
 } from "./game.js";
 import { botRetryDelayMs, botTurnDelayMs, botTurnsEnabled } from "./matchmaking-bots.js";
-import { MatchRoom as LifecycleMatchRoom } from "./match-room-lifecycle.js";
+import { MatchRoom as LifecycleMatchRoom, MOVE_SELECTION_TIMEOUT_MS } from "./match-room-lifecycle.js";
 
 const STATE_KEY = "match-state";
 const BOT_TURN_RECOVERY_MS = 25_000;
@@ -83,10 +83,10 @@ export class MatchRoom extends LifecycleMatchRoom {
         const retryAt = currentRunAt > Date.now()
           ? currentRunAt
           : Date.now() + botRetryDelayMs(this.env);
-        existing.runAt = Math.min(
-          retryAt,
-          Number(pending.revealDeadlineAt ?? retryAt),
-        );
+        const actionDeadline = pending.status === "RESOLVED"
+          ? Number(pending.resolvedAt ?? Date.now()) + MOVE_SELECTION_TIMEOUT_MS
+          : Number(pending.revealDeadlineAt ?? retryAt);
+        existing.runAt = Math.min(retryAt, actionDeadline);
         await this.ctx.storage.put(STATE_KEY, state);
         await this.ctx.storage.setAlarm(existing.runAt);
       }
@@ -303,10 +303,13 @@ export class MatchRoom extends LifecycleMatchRoom {
       // Restore an early recovery wake-up after parent roll/move handlers
       // schedule their own deadline on the single Durable Object alarm.
       const recoveryAt = Date.now() + BOT_TURN_RECOVERY_MS;
-      const revealDeadline = Number(current.pendingRoll?.revealDeadlineAt ?? recoveryAt);
+      const pending = current.pendingRoll;
+      const actionDeadline = pending?.status === "RESOLVED"
+        ? Number(pending.resolvedAt ?? Date.now()) + MOVE_SELECTION_TIMEOUT_MS
+        : Number(pending?.revealDeadlineAt ?? recoveryAt);
       await this.ctx.storage.setAlarm(
-        Number.isSafeInteger(revealDeadline) && revealDeadline > 0
-          ? Math.min(recoveryAt, revealDeadline)
+        Number.isSafeInteger(actionDeadline) && actionDeadline > 0
+          ? Math.min(recoveryAt, actionDeadline)
           : recoveryAt,
       );
     });
@@ -343,7 +346,10 @@ export class MatchRoom extends LifecycleMatchRoom {
       }
       current.botTurn.inProgress = false;
       const retryAt = Date.now() + botRetryDelayMs(this.env);
-      const deadline = Number(current.pendingRoll?.revealDeadlineAt ?? retryAt);
+      const pending = current.pendingRoll;
+      const deadline = pending?.status === "RESOLVED"
+        ? Number(pending.resolvedAt ?? Date.now()) + MOVE_SELECTION_TIMEOUT_MS
+        : Number(pending?.revealDeadlineAt ?? retryAt);
       current.botTurn.runAt = Math.min(retryAt, deadline);
       await this.ctx.storage.put(STATE_KEY, current);
       if (typeof this.ctx.storage.setAlarm === "function") {
