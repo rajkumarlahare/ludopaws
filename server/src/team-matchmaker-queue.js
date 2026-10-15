@@ -11,6 +11,12 @@ import {
 import {
   normalizeCharacterId,
 } from "./ludo-paws-characters.js";
+import {
+  botFillDelayMs,
+  botMatchFillEnabled,
+  botRetryDelayMs,
+  createBotParticipants,
+} from "./matchmaking-bots.js";
 
 const STATE_KEY = "team-matchmaking-state-v1";
 const QUEUE_TTL_MS = 2 * 60 * 1000;
@@ -45,9 +51,69 @@ export class TeamMatchmakerQueue {
   }
 
   async alarm() {
-    await this.#persist(
-      this.#cleanup(await this.#load(), Date.now()),
-    );
+    return this.#mutate(async () => {
+      const now = Date.now();
+      let state = this.#cleanup(await this.#load(), now);
+
+      if (botMatchFillEnabled(this.env)) {
+        state = this.#cleanup(await this.#load(), Date.now());
+        const humans = [...state.queue].sort((left, right) => left.joinedAt - right.joinedAt);
+        const oldest = humans[0];
+        const fallbackAt = oldest
+          ? Number(oldest.botFallbackAt ?? oldest.joinedAt + botFillDelayMs(this.env))
+          : Number.POSITIVE_INFINITY;
+
+        if (oldest && fallbackAt <= now) {
+          const realPlayers = humans.slice(0, TARGET_PLAYER_COUNT);
+          const bots = createBotParticipants({
+            count: TARGET_PLAYER_COUNT - realPlayers.length,
+            playerCount: TARGET_PLAYER_COUNT,
+            matchMode: "TEAM_UP",
+            existingNames: realPlayers.map((candidate) => candidate.displayName),
+            now,
+          });
+          const group = [...realPlayers, ...bots];
+          await this.#persist(state);
+
+          let assignment;
+          try {
+            assignment = await this.#materialize(group);
+          } catch (error) {
+            for (const candidate of realPlayers) {
+              candidate.botFallbackAt = now + botRetryDelayMs(this.env);
+            }
+            await this.#persist(state);
+            console.error("Team Up bot fallback could not materialize a match", {
+              code: error?.code ?? "BOT_MATCH_MATERIALIZE_FAILED",
+            });
+            return;
+          }
+
+          const realRequestIds = new Set(realPlayers.map((candidate) => candidate.clientRequestId));
+          state.queue = state.queue.filter(
+            (candidate) => !realRequestIds.has(candidate.clientRequestId),
+          );
+          group.forEach((candidate, index) => {
+            if (candidate.playerType === "BOT") return;
+            state.assignments[candidate.clientRequestId] = {
+              matchId: assignment.matchId,
+              role: index === 0 ? "HOST" : "GUEST",
+              seat: index,
+              teamId: index % 2 === 0 ? "A" : "B",
+              assignedAt: now,
+              expiresAt: now + ASSIGNMENT_TTL_MS,
+              displayName: candidate.displayName,
+              characterId: normalizeCharacterId(candidate.characterId),
+              profileId: candidate.profileId,
+            };
+          });
+          await this.#persist(state);
+        }
+      }
+
+      state = this.#cleanup(await this.#load(), Date.now());
+      await this.#persist(state);
+    });
   }
 
   #mutate(work) {
@@ -130,6 +196,7 @@ export class TeamMatchmakerQueue {
       );
 
       group.forEach((candidate, index) => {
+        if (candidate.playerType === "BOT") return;
         state.assignments[candidate.clientRequestId] = {
           matchId: assignment.matchId,
           role: index === 0 ? "HOST" : "GUEST",
@@ -450,16 +517,26 @@ export class TeamMatchmakerQueue {
     await this.ctx.storage.put(STATE_KEY, state);
     if (typeof this.ctx.storage.setAlarm !== "function") return;
     const deadlines = [
-      ...state.queue.map(
-        (participant) =>
-          Number(participant.lastSeenAt ?? participant.joinedAt ?? Date.now()) + QUEUE_TTL_MS,
-      ),
+      ...state.queue.flatMap((participant) => {
+        const queueExpiry = Number(
+          participant.lastSeenAt ?? participant.joinedAt ?? Date.now(),
+        ) + QUEUE_TTL_MS;
+        const values = [queueExpiry];
+        if (botMatchFillEnabled(this.env)) {
+          values.push(
+            Number(participant.botFallbackAt ?? participant.joinedAt + botFillDelayMs(this.env)),
+          );
+        }
+        return values;
+      }),
       ...Object.values(state.assignments).map(
         (assignment) => Number(assignment.expiresAt ?? Date.now() + ASSIGNMENT_TTL_MS),
       ),
-    ].filter(Number.isFinite);
+    ].filter((deadline) => Number.isFinite(deadline) && deadline > Date.now());
     if (deadlines.length > 0) {
       await this.ctx.storage.setAlarm(Math.min(...deadlines));
+    } else if (typeof this.ctx.storage.deleteAlarm === "function") {
+      await this.ctx.storage.deleteAlarm();
     }
   }
 }
