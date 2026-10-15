@@ -112,6 +112,37 @@ internal fun showPrivacyPolicyDialog(
 
     panel.addView(
         TextView(context).apply {
+            text = "OPEN PRICING & IN-APP PURCHASE POLICY"
+            textSize = 13f
+            setTypeface(Typeface.DEFAULT_BOLD)
+            setTextColor(0xFFFFD34E.toInt())
+            gravity = Gravity.CENTER
+            setPadding(
+                0,
+                settingsDp(context, 8),
+                0,
+                settingsDp(context, 8),
+            )
+            isClickable = true
+            isFocusable = true
+            contentDescription = "Open the Ludo Paws pricing and in-app purchase policy"
+            setOnClickListener {
+                try {
+                    context.startActivity(
+                        Intent(
+                            Intent.ACTION_VIEW,
+                            Uri.parse("https://ludopaws.rekixo.com/pricing.html"),
+                        ),
+                    )
+                } catch (_: ActivityNotFoundException) {
+                    Toast.makeText(context, "No browser is available to open this page.", Toast.LENGTH_LONG).show()
+                }
+            }
+        },
+    )
+
+    panel.addView(
+        TextView(context).apply {
             text = "CLOSE"
             textSize = 14f
             setTypeface(Typeface.DEFAULT_BOLD)
@@ -154,7 +185,7 @@ WHY DATA IS USED AND WHO MAY PROCESS IT
 Data is used to run the game and accounts, authenticate sessions, provide online/social/leaderboard features, sync entitlements, verify purchases and rewarded ads, protect match integrity, prevent abuse, troubleshoot errors and respond to privacy requests. Depending on features enabled, providers include Cloudflare hosting/storage, the configured EntroNex dice-proof service, Google sign-in services, Google Play Games Services for supported achievements/leaderboard integration, Google Play Billing, Google's public STUN service for optional voice-chat setup, and Google Mobile Ads/AdMob with Google's consent tools. Providers apply their own privacy notices and terms. Ludo Paws does not sell personal information.
 
 PURCHASES AND ADS
-When one-time Google Play Billing is enabled, the server checks a purchase with Google before granting the configured item. Google Play separately keeps its order/payment history. When ads are enabled, Google Mobile Ads/AdMob may process ad requests, device or advertising identifiers, consent signals and ad-interaction information under Google's policies. Rewarded items are granted only after the configured server-side validation succeeds.
+The one-time product contract and Google Play price behavior are described at https://ludopaws.rekixo.com/pricing.html. Google Play supplies the localized checkout price; the website does not take payment. The server checks a purchase with Google before granting its configured gem amount or non-consumable entitlement. Google Play separately keeps its order/payment history. When advertising is enabled, Google Mobile Ads/AdMob may process ad requests, device or advertising identifiers, consent signals and ad-interaction information under Google's policies. A player chooses whether to watch an opt-in rewarded ad; the configured reward is five Gems and is granted only after server-side verification succeeds. The Remove Ads purchase suppresses eligible non-rewarded ads but does not prevent voluntary rewarded ads.
 
 LOCAL STORAGE AND SECURITY
 The app uses Android Keystore-backed protection for account credentials and selected sensitive local records where implemented. API requests use HTTPS, and local wallet caches are not trusted as proof of paid entitlement. If local cleanup fails after account deletion, clear Ludo Paws app storage on that device before handing it over.

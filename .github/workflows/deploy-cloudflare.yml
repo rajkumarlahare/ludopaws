@@ -157,6 +157,9 @@ jobs:
       - name: Repository security gate
         run: node scripts/security-check.mjs
 
+      - name: Pricing and in-app purchase policy contract gate
+        run: node scripts/check-pricing-policy.mjs
+
       - name: Server tests
         working-directory: server
         run: npm test

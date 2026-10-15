@@ -32,7 +32,7 @@ In the Cloudflare dashboard, open the `ludoproof-game-api` Worker and add/update
 
 - `GOOGLE_PLAY_SERVICE_ACCOUNT_PRIVATE_KEY`: the service-account JSON's `private_key` PEM value, including the BEGIN/END PRIVATE KEY lines.
 
-In GitHub repository settings, open **Settings → Environments → production → Environment variables** and set:
+The production deploy job declares `environment: production`. In GitHub, open **Settings → Environments → production → Environment variables** and set these values there (not only under **Settings → Secrets and variables → Actions → Variables**). When a variable exists at both scopes, the `production` environment value takes precedence for this job:
 
 - `GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL`: exact service-account email.
 - `GOOGLE_PLAY_BILLING_ENABLED`: keep `false` until service-account access, the secret, exact Play Console SKUs, pricing/availability and license testers are ready. Set it to `true` for the controlled internal-test window so the server can verify test purchases.
