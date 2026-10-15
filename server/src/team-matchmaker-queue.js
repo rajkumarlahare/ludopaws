@@ -55,59 +55,44 @@ export class TeamMatchmakerQueue {
       const now = Date.now();
       let state = this.#cleanup(await this.#load(), now);
 
+      if (state.pendingMatch) {
+        if (Number(state.pendingMatch.retryAt ?? 0) > now) {
+          await this.#persist(state);
+          return;
+        }
+        const completed = await this.#resumePendingMatch(state, now);
+        if (!completed) return;
+      }
+
       if (botMatchFillEnabled(this.env)) {
         state = this.#cleanup(await this.#load(), Date.now());
-        const humans = [...state.queue].sort((left, right) => left.joinedAt - right.joinedAt);
-        const oldest = humans[0];
-        const fallbackAt = oldest
-          ? Number(oldest.botFallbackAt ?? oldest.joinedAt + botFillDelayMs(this.env))
-          : Number.POSITIVE_INFINITY;
+        if (!state.pendingMatch) {
+          const humans = [...state.queue].sort((left, right) => left.joinedAt - right.joinedAt);
+          const oldest = humans[0];
+          const fallbackAt = oldest
+            ? Number(oldest.botFallbackAt ?? oldest.joinedAt + botFillDelayMs(this.env))
+            : Number.POSITIVE_INFINITY;
 
-        if (oldest && fallbackAt <= now) {
-          const realPlayers = humans.slice(0, TARGET_PLAYER_COUNT);
-          const bots = createBotParticipants({
-            count: TARGET_PLAYER_COUNT - realPlayers.length,
-            playerCount: TARGET_PLAYER_COUNT,
-            matchMode: "TEAM_UP",
-            existingNames: realPlayers.map((candidate) => candidate.displayName),
-            now,
-          });
-          const group = [...realPlayers, ...bots];
-          await this.#persist(state);
-
-          let assignment;
-          try {
-            assignment = await this.#materialize(group);
-          } catch (error) {
-            for (const candidate of realPlayers) {
-              candidate.botFallbackAt = now + botRetryDelayMs(this.env);
-            }
-            await this.#persist(state);
-            console.error("Team Up bot fallback could not materialize a match", {
-              code: error?.code ?? "BOT_MATCH_MATERIALIZE_FAILED",
+          if (oldest && fallbackAt <= now) {
+            const realPlayers = humans.slice(0, TARGET_PLAYER_COUNT);
+            const bots = await createBotParticipants({
+              count: TARGET_PLAYER_COUNT - realPlayers.length,
+              playerCount: TARGET_PLAYER_COUNT,
+              matchMode: "TEAM_UP",
+              seedRequestId: realPlayers[0].clientRequestId,
+              existingNames: realPlayers.map((candidate) => candidate.displayName),
+              now,
             });
-            return;
-          }
-
-          const realRequestIds = new Set(realPlayers.map((candidate) => candidate.clientRequestId));
-          state.queue = state.queue.filter(
-            (candidate) => !realRequestIds.has(candidate.clientRequestId),
-          );
-          group.forEach((candidate, index) => {
-            if (candidate.playerType === "BOT") return;
-            state.assignments[candidate.clientRequestId] = {
-              matchId: assignment.matchId,
-              role: index === 0 ? "HOST" : "GUEST",
-              seat: index,
-              teamId: index % 2 === 0 ? "A" : "B",
-              assignedAt: now,
-              expiresAt: now + ASSIGNMENT_TTL_MS,
-              displayName: candidate.displayName,
-              characterId: normalizeCharacterId(candidate.characterId),
-              profileId: candidate.profileId,
+            state.pendingMatch = {
+              matchMode: "TEAM_UP",
+              playerCount: TARGET_PLAYER_COUNT,
+              participants: [...realPlayers, ...bots],
+              retryAt: now + botRetryDelayMs(this.env),
             };
-          });
-          await this.#persist(state);
+            await this.#persist(state);
+            const completed = await this.#resumePendingMatch(state, now);
+            if (!completed) return;
+          }
         }
       }
 
