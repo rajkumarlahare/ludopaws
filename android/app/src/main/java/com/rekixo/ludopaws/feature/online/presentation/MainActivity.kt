@@ -209,7 +209,6 @@ class MainActivity : ComponentActivity() {
         onlineMoveRequestInFlight = false
         if (!canRenderUi()) return
         currentState?.let { state ->
-            updateControls(state)
             updateRollButton()
             OnlineLudoPawsPresentation.refreshActionControls(this, state)
         }
