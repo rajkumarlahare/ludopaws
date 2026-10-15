@@ -2,6 +2,7 @@ package com.rekixo.ludopaws.feature.store.data.ads
 
 import android.app.Activity
 import android.util.Log
+import com.rekixo.ludopaws.BuildConfig
 import com.rekixo.ludopaws.feature.account.data.AccountRepository
 import com.rekixo.ludopaws.feature.store.data.local.GemWalletStore
 import com.rekixo.ludopaws.feature.store.domain.PostWinInterstitialPolicy
@@ -54,16 +55,25 @@ internal class PostWinInterstitialExitGate(
                     check(wallet.has("adsRemoved") && wallet.opt("adsRemoved") is Boolean) {
                         "The server wallet did not include a verified Remove Ads entitlement."
                     }
+                    val pawsPlusActive = if (BuildConfig.LUDOPROOF_SUBSCRIPTIONS_ENABLED) {
+                        check(wallet.has("pawsPlusActive") && wallet.opt("pawsPlusActive") is Boolean) {
+                            "The server wallet did not include a verified Paws Plus entitlement."
+                        }
+                        wallet.getBoolean("pawsPlusActive")
+                    } else {
+                        false
+                    }
                     check(walletStore.applyServerSnapshot(wallet, session.accountId)) {
                         "The server wallet snapshot could not be applied to the active account."
                     }
                     PostWinInterstitialPolicy.shouldShowFillerInterstitial(
                         adsRemoved = wallet.getBoolean("adsRemoved"),
+                        pawsPlusActive = pawsPlusActive,
                     )
                 } catch (error: Exception) {
                     // Fail open to navigation, not to ads: never show a filler ad if ownership
                     // is stale or the server cannot confirm whether Remove Ads was purchased.
-                    Log.w(TAG, "Could not verify the Remove Ads entitlement; skipping interstitial", error)
+                    Log.w(TAG, "Could not verify ad-suppression entitlements; skipping interstitial", error)
                     false
                 }
 
