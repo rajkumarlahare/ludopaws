@@ -134,7 +134,7 @@ if (vars.GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED === "true") {
     console.error("Subscriptions require GOOGLE_PLAY_RTDN_AUDIENCE to equal the public RTDN endpoint.");
     process.exit(2);
   }
-  if (!/^[^@\\s]+@[^@\\s]+\\.iam\\.gserviceaccount\\.com$/.test(String(vars.GOOGLE_PLAY_RTDN_EMAIL ?? ""))) {
+  if (!/^[^@\s]+@[^@\s]+\.iam\.gserviceaccount\.com$/.test(String(vars.GOOGLE_PLAY_RTDN_EMAIL ?? ""))) {
     console.error("Subscriptions are enabled but GOOGLE_PLAY_RTDN_EMAIL is missing or malformed.");
     process.exit(2);
   }
