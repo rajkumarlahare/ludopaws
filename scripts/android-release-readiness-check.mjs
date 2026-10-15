@@ -337,6 +337,13 @@ requireText(
   "ready.ready !== true || ready.ok !== true",
   "signed release must verify that the Worker readiness response is actually ready.",
 );
+
+requireText(
+  ".github/workflows/android-signed-release.yml",
+  signedReleaseWorkflow,
+  "environment: production",
+  "signed release must read Billing, Ads, and OAuth variables from the protected production environment.",
+);
 requireText(
   ".github/workflows/android-signed-release.yml",
   signedReleaseWorkflow,
