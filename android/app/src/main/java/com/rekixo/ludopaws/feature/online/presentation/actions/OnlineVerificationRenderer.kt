@@ -140,17 +140,19 @@ internal fun MainActivity.updateControls(
         if (active) FrameLayout.LayoutParams.MATCH_PARENT
         else FrameLayout.LayoutParams.WRAP_CONTENT
 
-    gameplayContentHost?.layoutParams?.let { params ->
+    gameplayContentHost?.let { host ->
+        val params = host.layoutParams
         if (params.height != viewportHeight) {
             params.height = viewportHeight
-            gameplayContentHost.layoutParams = params
+            host.layoutParams = params
         }
     }
 
-    (gameplayContent?.layoutParams as? FrameLayout.LayoutParams)?.let { params ->
-        if (params.height != viewportHeight) {
+    gameplayContent?.let { content ->
+        val params = content.layoutParams as? FrameLayout.LayoutParams
+        if (params != null && params.height != viewportHeight) {
             params.height = viewportHeight
-            gameplayContent.layoutParams = params
+            content.layoutParams = params
         }
     }
 
