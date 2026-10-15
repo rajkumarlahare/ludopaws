@@ -306,7 +306,7 @@ export class MatchRoom {
       );
     }
 
-    const profileId =
+    const { profileId, playerType } =
       await this.#resolveLeaderboardProfile(
         request,
         {
@@ -375,6 +375,8 @@ export class MatchRoom {
         displayName,
       hostCharacterId:
         characterId,
+      hostPlayerType:
+        playerType,
       now,
       targetPlayerCount,
       matchMode,
@@ -439,7 +441,7 @@ export class MatchRoom {
       requireClientRequestId(
         body?.clientRequestId,
       );
-    const profileId =
+    const { profileId, playerType } =
       await this.#resolveLeaderboardProfile(
         request,
         {
@@ -615,6 +617,7 @@ export class MatchRoom {
           identity.playerId,
         displayName,
         characterId,
+        playerType,
         tokenAuthHash,
         now: Date.now(),
       },
@@ -1196,6 +1199,15 @@ export class MatchRoom {
       return next;
     }
 
+    // Bot-filled games are casual/unranked; never let bot seats influence
+    // competitive leaderboard submissions. Mark the decision idempotently.
+    if (state.players.some((player) => player.playerType === "BOT")) {
+      const next = structuredClone(state);
+      next.leaderboardRecordedAt = Date.now();
+      await this.#persist(next);
+      return next;
+    }
+
     const players =
       state.players
         .map((player) => ({
@@ -1753,30 +1765,16 @@ export class MatchRoom {
       matchMode,
     },
   ) {
-    if (
-      matchMode ===
-        "FRIENDS"
-    ) {
-      return null;
+    if (matchMode === "FRIENDS") {
+      return { profileId: null, playerType: "HUMAN" };
     }
 
-    const assertion =
-      request.headers.get(
-        "x-ludoproof-profile-assertion",
-      );
-    if (
-      assertion
-    ) {
-      const claims =
-        await verifyLeaderboardProfileAssertion(
-          this.env,
-          assertion,
-        );
+    const assertion = request.headers.get("x-ludoproof-profile-assertion");
+    if (assertion) {
+      const claims = await verifyLeaderboardProfileAssertion(this.env, assertion);
       if (
-        claims.matchId !==
-          matchId ||
-        claims.clientRequestId !==
-          clientRequestId
+        claims.matchId !== matchId ||
+        claims.clientRequestId !== clientRequestId
       ) {
         throw httpError(
           403,
@@ -1784,36 +1782,24 @@ export class MatchRoom {
           "leaderboard profile assertion is not valid for this match request",
         );
       }
-      return claims.profileId;
+      return {
+        profileId: claims.profileId,
+        playerType: claims.playerType ?? "HUMAN",
+      };
     }
 
-    const authorization =
-      request.headers.get(
-        "authorization",
-      );
-    if (
-      authorization == null ||
-      authorization.trim() ===
-        ""
-    ) {
-      return null;
+    const authorization = request.headers.get("authorization");
+    if (authorization == null || authorization.trim() === "") {
+      return { profileId: null, playerType: "HUMAN" };
     }
-    if (
-      !/^Bearer\s+lpp_[A-Za-z0-9_-]{32,}$/i
-        .test(
-          authorization,
-        )
-    ) {
+    if (!/^Bearer\\s+lpp_[A-Za-z0-9_-]{32,}$/i.test(authorization)) {
       throw httpError(
         401,
         "PROFILE_AUTH_INVALID",
         "leaderboard profile credential is invalid",
       );
     }
-    if (
-      !this.env
-        .LUDOPROOF_LEADERBOARD
-    ) {
+    if (!this.env.LUDOPROOF_LEADERBOARD) {
       throw httpError(
         503,
         "LEADERBOARD_NOT_CONFIGURED",
@@ -1821,34 +1807,18 @@ export class MatchRoom {
       );
     }
 
-    const id =
-      this.env
-        .LUDOPROOF_LEADERBOARD
-        .idFromName(
-          "global",
-        );
-    const target =
-      this.env
-        .LUDOPROOF_LEADERBOARD
-        .get(id);
-    const response =
-      await target.fetch(
-        new Request(
-          "https://leaderboard/profile/identity",
-          {
-            method:
-              "GET",
-            headers: {
-              authorization,
-            },
-          },
-        ),
-      );
+    const id = this.env.LUDOPROOF_LEADERBOARD.idFromName("global");
+    const target = this.env.LUDOPROOF_LEADERBOARD.get(id);
+    const response = await target.fetch(
+      new Request("https://leaderboard/profile/identity", {
+        method: "GET",
+        headers: { authorization },
+      }),
+    );
 
     let value;
     try {
-      value =
-        await response.json();
+      value = await response.json();
     } catch {
       throw httpError(
         503,
@@ -1857,28 +1827,16 @@ export class MatchRoom {
       );
     }
 
-    const profileId =
-      normalizeLeaderboardProfileId(
-        value?.profileId,
-      );
-    if (
-      !response.ok ||
-      value?.ok !== true ||
-      profileId == null
-    ) {
+    const profileId = normalizeLeaderboardProfileId(value?.profileId);
+    if (!response.ok || value?.ok !== true || profileId == null) {
       throw httpError(
-        response.status ===
-          401
-          ? 401
-          : 403,
-        value?.error ??
-          "PROFILE_AUTH_INVALID",
-        value?.message ??
-          "leaderboard profile credential is invalid",
+        response.status === 401 ? 401 : 403,
+        value?.error ?? "PROFILE_AUTH_INVALID",
+        value?.message ?? "leaderboard profile credential is invalid",
       );
     }
 
-    return profileId;
+    return { profileId, playerType: "HUMAN" };
   }
 
   async #assertFriendHost(
