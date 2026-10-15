@@ -229,6 +229,22 @@ export class TeamMatchmakerQueue {
       );
     }
 
+    const reserved = state.pendingMatch?.participants.some(
+      (candidate) =>
+        candidate.playerType !== "BOT" &&
+        candidate.clientRequestId === clientRequestId,
+    );
+    if (reserved) {
+      await this.#persist(state);
+      return json(200, {
+        status: "MATCHED",
+        matchMode: "TEAM_UP",
+        cancelled: false,
+        pending: true,
+        targetPlayerCount: TARGET_PLAYER_COUNT,
+      });
+    }
+
     const queued = state.queue.find(
       (candidate) => candidate.clientRequestId === clientRequestId,
     );
@@ -544,15 +560,19 @@ export class TeamMatchmakerQueue {
     await this.ctx.storage.put(STATE_KEY, state);
     if (typeof this.ctx.storage.setAlarm !== "function") return;
     const deadlines = [
+      ...(state.pendingMatch
+        ? [Number(state.pendingMatch.retryAt ?? Date.now() + botRetryDelayMs(this.env))]
+        : []),
       ...state.queue.flatMap((participant) => {
         const queueExpiry = Number(
           participant.lastSeenAt ?? participant.joinedAt ?? Date.now(),
         ) + QUEUE_TTL_MS;
         const values = [queueExpiry];
-        if (botMatchFillEnabled(this.env)) {
-          values.push(
-            Number(participant.botFallbackAt ?? participant.joinedAt + botFillDelayMs(this.env)),
+        if (botMatchFillEnabled(this.env) && !state.pendingMatch) {
+          const fallbackAt = Number(
+            participant.botFallbackAt ?? participant.joinedAt + botFillDelayMs(this.env),
           );
+          values.push(Math.max(Date.now() + 1, fallbackAt));
         }
         return values;
       }),
