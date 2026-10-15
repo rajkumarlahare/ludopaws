@@ -51,7 +51,7 @@ jobs:
           test -f docs/pricing.html
           test -f docs/terms-of-service.html
           if grep -Eq "POLICY_RELEASE_REVIEW_REQUIRED|PRICING_RELEASE_REVIEW_REQUIRED|TERMS_RELEASE_REVIEW_REQUIRED" docs/privacy-policy.html docs/pricing.html docs/terms-of-service.html; then
-            echo "A privacy or pricing policy release-review marker remains. Complete publisher/legal review before publishing." >&2
+            echo "A privacy, pricing, or Terms of Service release-review marker remains. Complete publisher/legal review before publishing." >&2
             exit 2
           fi
           if [ "$LUDOPROOF_POLICY_RELEASE_APPROVED" != "true" ]; then
