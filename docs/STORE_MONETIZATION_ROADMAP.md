@@ -87,7 +87,7 @@ Optional LEVEL/EVENT methods require server-authoritative progression/event evid
 ### Phase 7 — Stable Google Play product catalogue and pricing
 - Existing one-time IDs remain stable: `gems_300`, `gems_1500`, `gems_3500`, `gems_20000`, `gems_40000`, `gems_200000`, and the existing `remove_ads` one-time product for compatibility.
 - New product IDs must be added only after server verifier, Android Billing query types, and tests support them.
-- This project will use one-time Play products only. Add any future one-time product only after the server verifier, Android Billing query and tests support it.
+- One-time products remain the six Gem packs plus `remove_ads`. The only planned recurring product is the explicit `paws_plus` monthly auto-renewing subscription with base plan ID `monthly-auto`; it must stay independently gated until subscription verification, acknowledgement, Google Play RTDN, cancellation/expiry/refund handling, Play Console provisioning and license-tester tests all pass. Do not generalize subscription support to arbitrary admin-created SKUs.
 - Currency prices are configured in Play Console by region. Use the localized Play price from ProductDetails at runtime. Any admin-authored direct-purchase price must be tied to an actual provisioned product/offer.
 - Initial pricing is a hypothesis to test, not a promise of profitable unit economics: test low-friction India tiers and regional Play Console defaults first; review conversion, refund rate, payer retention and net revenue after fees/taxes. Avoid equal numeric prices across countries.
 - Acceptance: every production-visible SKU exists in the correct product type, has regional availability/pricing, is queryable by the app and verifiable on the backend.
