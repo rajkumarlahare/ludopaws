@@ -11,6 +11,7 @@ data class PlayerSnapshot(
     val tokens: List<Int>,
     val teamId: String? = null,
     val characterId: String? = null,
+    val playerType: String = "HUMAN",
 )
 
 data class PendingRollSnapshot(
@@ -235,6 +236,12 @@ object GameJson {
             schema(playerIds.add(playerId), "duplicate playerId")
             schema(player.requireInt("seat") == index, "player seat does not match array position")
             schema(player.requireString("color") == colors[index], "player color does not match seat")
+            if (player.has("playerType")) {
+                schema(
+                    player.requireString("playerType") in setOf("HUMAN", "BOT"),
+                    "invalid playerType",
+                )
+            }
 
             val tokens = player.requireArray("tokens")
             schema(tokens.length() == 4, "player must have exactly four tokens")
@@ -459,6 +466,7 @@ object GameJson {
                                 .trim()
                                 .lowercase()
                                 .takeIf { it.isNotBlank() && it != "null" },
+                        playerType = player.optString("playerType", "HUMAN"),
                     ),
                 )
             }
