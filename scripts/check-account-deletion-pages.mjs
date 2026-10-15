@@ -91,6 +91,7 @@ has(pagesWorkflow, 'cp docs/terms-of-service.html site/terms-of-service.html', "
 has(pagesWorkflow, 'cp docs/pricing.html site/pricing.html', "pricing page publication mapping");
 has(pagesWorkflow, 'node scripts/check-pricing-policy.mjs', "pricing contract check before publication");
 has(inAppPolicy, 'https://ludopaws.rekixo.com/pricing.html', "in-app pricing-policy URL");
+has(inAppPolicy, 'https://ludopaws.rekixo.com/terms-of-service.html', "in-app Terms of Service URL");
 
 
 has(terms, "<title>Ludo Paws — Terms of Service</title>", "Terms of Service page title");
