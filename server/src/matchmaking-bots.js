@@ -81,6 +81,7 @@ export function createBotParticipants({
   matchMode,
   rulesetKey = matchMode === "TEAM_UP" ? "TEAM_UP_V1" : "CLASSIC_V1",
   existingNames = [],
+  existingCharacterIds = [],
   now = Date.now(),
 }) {
   if (!Number.isInteger(count) || count < 0 || count > 3) {
@@ -103,17 +104,33 @@ export function createBotParticipants({
   }
 
   const usedNames = new Set(existingNames.map((name) => String(name).trim().toLocaleLowerCase("en")));
+  const usedCharacters = new Set(
+    existingCharacterIds
+      .map((id) => String(id ?? "").trim().toLowerCase())
+      .filter((id) => LUDO_PAWS_CHARACTER_IDS.includes(id)),
+  );
   const bots = [];
   for (let index = 0; index < count; index += 1) {
     const availableNames = BOT_NAMES.filter(
       (name) => !usedNames.has(name.toLocaleLowerCase("en")),
     );
-    const pool = availableNames.length > 0 ? availableNames : BOT_NAMES;
+    const namePool = availableNames.length > 0 ? availableNames : BOT_NAMES;
     const random = new Uint8Array(2);
     crypto.getRandomValues(random);
-    const displayName = pool[((random[0] << 8) | random[1]) % pool.length];
+    const displayName = namePool[((random[0] << 8) | random[1]) % namePool.length];
     usedNames.add(displayName.toLocaleLowerCase("en"));
-    const characterId = LUDO_PAWS_CHARACTER_IDS[random[1] % LUDO_PAWS_CHARACTER_IDS.length];
+
+    // Prefer a character not already assigned to a human or earlier bot.
+    // With the current four-character roster and at most four seats, a unique
+    // character is always available whenever the selected group has a vacancy.
+    const availableCharacters = LUDO_PAWS_CHARACTER_IDS.filter(
+      (id) => !usedCharacters.has(id),
+    );
+    const characterPool = availableCharacters.length > 0
+      ? availableCharacters
+      : LUDO_PAWS_CHARACTER_IDS;
+    const characterId = characterPool[random[1] % characterPool.length];
+    usedCharacters.add(characterId);
 
     bots.push({
       clientRequestId: crypto.randomUUID(),
