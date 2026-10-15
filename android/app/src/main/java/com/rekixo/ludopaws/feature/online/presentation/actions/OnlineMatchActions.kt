@@ -255,6 +255,7 @@ internal fun MainActivity.rollVerifiedDice() {
                     return@withSession
                 }
 
+        onlineRollRequestInFlight = true
         GameSoundFeedback.roll(this)
         diceView.startRolling()
         verificationText.text =
@@ -292,6 +293,7 @@ internal fun MainActivity.rollVerifiedDice() {
                 revealed
             },
             reconcileOnError = true,
+            onComplete = { releaseOnlineGameplayRequest() },
         )
     }
 }
@@ -325,6 +327,7 @@ internal fun MainActivity.moveToken(
                 return
             }
 
+    onlineMoveRequestInFlight = true
     withSession {
             code,
             token,
@@ -339,6 +342,7 @@ internal fun MainActivity.moveToken(
                 )
             },
             reconcileOnError = true,
+            onComplete = { releaseOnlineGameplayRequest() },
         )
     }
 }
