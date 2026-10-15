@@ -228,6 +228,29 @@ export class TeamMatchmakerQueue {
       )
       .sort((left, right) => left.joinedAt - right.joinedAt);
 
+    if (eligible.length >= TARGET_PLAYER_COUNT && state.pendingMatch) {
+      // Keep a completed Team Up group visible to the alarm/recovery path while
+      // another room reservation is being finalized.
+      const group = selectCharacterDiverseGroup(eligible, TARGET_PLAYER_COUNT);
+      const key = characterPreferenceKey(TARGET_PLAYER_COUNT, participant.rulesetKey);
+      const preferences = state.characterPreferences ?? {};
+      const hasUniqueCharacters =
+        group.length === TARGET_PLAYER_COUNT &&
+        distinctCharacterCount(group) === TARGET_PLAYER_COUNT;
+      const existing = preferences[key];
+      if (!existing || (hasUniqueCharacters && Number(existing.readyAt ?? 0) > now)) {
+        preferences[key] = {
+          playerCount: TARGET_PLAYER_COUNT,
+          rulesetKey: participant.rulesetKey,
+          startedAt: existing?.startedAt ?? now,
+          readyAt: hasUniqueCharacters ? now : now + CHARACTER_PREFERENCE_WINDOW_MS,
+        };
+      }
+      state.characterPreferences = preferences;
+      await this.#persist(state);
+      return json(202, searchingPayload(state, now, participant.clientRequestId));
+    }
+
     if (eligible.length >= TARGET_PLAYER_COUNT && !state.pendingMatch) {
       const group = selectCharacterDiverseGroup(eligible, TARGET_PLAYER_COUNT);
       const preferenceKey = characterPreferenceKey(
