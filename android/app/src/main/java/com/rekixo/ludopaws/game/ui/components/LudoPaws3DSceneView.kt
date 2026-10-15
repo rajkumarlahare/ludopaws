@@ -86,6 +86,30 @@ internal class LudoPaws3DSceneView @JvmOverloads constructor(
         surfaceTextureListener = this
     }
 
+    fun pendingMovePreviewElapsedMillis(eventIndex: Int? = null): Long? {
+        val current = sceneState
+        val pendingEventIndex = current.pendingPreviewEventIndex ?: return null
+        if (eventIndex != null && eventIndex != pendingEventIndex) return null
+        return (SystemClock.uptimeMillis() - current.forwardStartedAtMillis).coerceAtLeast(0L)
+    }
+
+    fun acceptedMovePreviewElapsedMillis(authoritative: MatchSnapshot?): Long? {
+        val state = authoritative ?: return null
+        val current = sceneState
+        val eventIndex = current.pendingPreviewEventIndex ?: return null
+        val motion = current.forwardMotion ?: return null
+        if (state.matchId != current.snapshot?.matchId) return null
+        val player = state.players.firstOrNull { it.playerId == motion.playerId } ?: return null
+        if (player.tokens.getOrNull(motion.tokenIndex) != motion.toPosition) return null
+        val committed = state.history.any { event ->
+            event.eventIndex == eventIndex &&
+                event.playerId == motion.playerId &&
+                event.moveTokenIndex == motion.tokenIndex
+        }
+        if (!committed) return null
+        return (SystemClock.uptimeMillis() - current.forwardStartedAtMillis).coerceAtLeast(0L)
+    }
+
     fun beginPendingMovePreview(
         state: MatchSnapshot,
         playerId: String,
