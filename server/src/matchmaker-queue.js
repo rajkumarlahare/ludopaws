@@ -166,33 +166,35 @@ export class MatchmakerQueue {
       .filter((candidate) => candidate.playerCount === participant.playerCount)
       .sort((left, right) => left.joinedAt - right.joinedAt);
 
-    if (eligible.length >= participant.playerCount) {
+    if (
+      eligible.length >= participant.playerCount &&
+      !state.pendingMatch
+    ) {
       const group = eligible.slice(0, participant.playerCount);
-      // Persist before crossing into MatchRoom. Deterministic request IDs make
-      // create/join/start replays safe after a Durable Object restart.
+      state.pendingMatch = {
+        matchMode: "ONLINE",
+        playerCount: participant.playerCount,
+        participants: group,
+        retryAt: now + botRetryDelayMs(this.env),
+      };
       await this.#persist(state);
-      const assignment = await this.#materialize(group, participant.playerCount);
-      const requestIds = new Set(group.map((candidate) => candidate.clientRequestId));
-      state.queue = state.queue.filter(
-        (candidate) => !requestIds.has(candidate.clientRequestId),
-      );
-
-      group.forEach((candidate, index) => {
-        if (candidate.playerType === "BOT") return;
-        state.assignments[candidate.clientRequestId] = {
-          matchId: assignment.matchId,
-          targetPlayerCount: participant.playerCount,
-          role: index === 0 ? "HOST" : "GUEST",
-          assignedAt: now,
-          expiresAt: now + ASSIGNMENT_TTL_MS,
-          displayName: candidate.displayName,
-          characterId: normalizeCharacterId(candidate.characterId),
-          profileId: candidate.profileId,
-        };
-      });
-      await this.#persist(state);
+      const completed = await this.#resumePendingMatch(state, now);
+      if (!completed) {
+        throw httpError(
+          503,
+          "MATCHMAKER_RECOVERY_PENDING",
+          "match setup is being retried; keep searching",
+        );
+      }
 
       const ownAssignment = state.assignments[participant.clientRequestId];
+      if (!ownAssignment) {
+        throw httpError(
+          503,
+          "MATCHMAKER_ASSIGNMENT_MISSING",
+          "match was created but the player assignment is not available yet",
+        );
+      }
       return await this.#matchedResponse(
         {
           ...participant,
