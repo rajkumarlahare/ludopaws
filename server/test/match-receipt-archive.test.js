@@ -10,7 +10,7 @@ import {
 } from "../src/fairness.js";
 
 const TEST_MATCH_CREATED_AT = Date.now();
-const RECEIPT_RETENTION_MS = 180 * 24 * 60 * 60 * 1000;
+const RECEIPT_RETENTION_MS = 365 * 24 * 60 * 60 * 1000;
 
 class FakeStorage {
   constructor() {
@@ -520,7 +520,7 @@ test(
 );
 
 test(
-  "receipt archive schedules a 180-day deadline from match completion and purges expired evidence",
+  "receipt archive schedules a 365-day deadline from match completion and purges expired evidence",
   async () => {
     const { archive, ctx } = room();
     const history = [proofEvent([], 0, 6)];
