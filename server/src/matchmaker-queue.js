@@ -267,6 +267,7 @@ export class MatchmakerQueue {
               {
                 matchId,
                 profileId: host.profileId,
+                playerType: host.playerType ?? "HUMAN",
                 clientRequestId: host.clientRequestId,
                 expiresAt: Date.now() + PROFILE_ASSERTION_TTL_MS,
               },
@@ -297,6 +298,7 @@ export class MatchmakerQueue {
                 {
                   matchId,
                   profileId: participant.profileId,
+                  playerType: participant.playerType ?? "HUMAN",
                   clientRequestId: participant.clientRequestId,
                   expiresAt: Date.now() + PROFILE_ASSERTION_TTL_MS,
                 },
@@ -375,6 +377,7 @@ export class MatchmakerQueue {
             {
               matchId: assignment.matchId,
               profileId: participant.profileId,
+              playerType: participant.playerType ?? "HUMAN",
               clientRequestId: participant.clientRequestId,
               expiresAt: Date.now() + PROFILE_ASSERTION_TTL_MS,
             },
@@ -501,6 +504,7 @@ function normalizeParticipant(body, profileId) {
     characterId: normalizeCharacterId(body?.characterId),
     profileId,
     playerCount: requirePlayerCount(body?.playerCount),
+    playerType: "HUMAN",
   };
 }
 
