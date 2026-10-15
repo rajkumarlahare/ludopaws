@@ -52,13 +52,16 @@ jobs:
         run: node scripts/generate-sbom.mjs
       - name: Upload SBOM evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        # PR validation remains focused on tests/builds if the account artifact quota is exhausted.
+        # Push/release runs remain strict so release evidence cannot silently be omitted.
+        continue-on-error: ${{ github.event_name == 'pull_request' }}
         with:
           name: ludoproof-sbom
           path: |
             ludoproof-sbom.cdx.json
             ludoproof-sbom.sha256
           if-no-files-found: error
-          retention-days: 90
+          retention-days: 7
 
   android:
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
@@ -142,6 +145,9 @@ jobs:
         run: node scripts/hash-android-release.mjs
       - name: Upload release candidate evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        # PR validation remains focused on tests/builds if the account artifact quota is exhausted.
+        # Push/release runs remain strict so release evidence cannot silently be omitted.
+        continue-on-error: ${{ github.event_name == 'pull_request' }}
         with:
           name: ludoproof-release-candidate
           path: |
@@ -153,11 +159,14 @@ jobs:
           retention-days: 90
       - name: Upload debug APK
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        # PR validation remains focused on tests/builds if the account artifact quota is exhausted.
+        # Push/release runs remain strict so release evidence cannot silently be omitted.
+        continue-on-error: ${{ github.event_name == 'pull_request' }}
         with:
           name: ludoproof-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 3
 
   android-instrumentation:
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
@@ -338,6 +347,9 @@ jobs:
       - name: Upload instrumentation evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        # PR validation remains focused on tests/builds if the account artifact quota is exhausted.
+        # Push/release runs remain strict so release evidence cannot silently be omitted.
+        continue-on-error: ${{ github.event_name == 'pull_request' }}
         with:
           name: ludoproof-android-instrumentation
           path: |
