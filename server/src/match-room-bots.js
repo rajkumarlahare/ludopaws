@@ -21,7 +21,6 @@ export class MatchRoom extends LifecycleMatchRoom {
   constructor(ctx, env) {
     super(ctx, env);
     this.botRunPromise = null;
-    this.botMetadataTail = Promise.resolve();
   }
 
   async fetch(request) {
@@ -42,8 +41,10 @@ export class MatchRoom extends LifecycleMatchRoom {
   }
 
   #withBotMetadata(work) {
-    const run = this.botMetadataTail.then(work, work);
-    this.botMetadataTail = run.catch(() => {});
+    // Bot metadata shares the MatchRoom mutation queue so stale bot-turn writes
+    // cannot overwrite a concurrent authoritative game mutation.
+    const run = this.mutationTail.then(work, work);
+    this.mutationTail = run.catch(() => {});
     return run;
   }
 
