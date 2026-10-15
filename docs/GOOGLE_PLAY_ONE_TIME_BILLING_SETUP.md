@@ -1,6 +1,6 @@
 # Google Play One-Time Billing Setup — Ludo Paws
 
-This setup covers the Google Play one-time products used by Ludo Paws. Do not enable a billing flag merely because code is present.
+This document covers the six Gem-pack INAPP products and the non-consumable Remove Ads product. The separately documented Paws Plus monthly subscription has a different Play API product type, acknowledgement/lifecycle and RTDN requirements. Do not enable a billing flag merely because code is present.
 
 ## Product contract
 
@@ -30,11 +30,12 @@ This setup covers the Google Play one-time products used by Ludo Paws. Do not en
 4. The Worker configuration already declares the `LUDOPROOF_STORE_PURCHASES` Durable Object binding used by the idempotent purchase ledger. Confirm the binding is present in the active Cloudflare deployment/environment.
 5. The Worker deployment job declares `environment: production`. Set `GOOGLE_PLAY_BILLING_ENABLED` and `LUDOPROOF_BILLING_ENABLED` together under **Settings → Environments → production → Environment variables**. Environment-scoped variables take precedence over repository-level variables of the same name, so changing only **Settings → Secrets and variables → Actions → Variables** may not change the value consumed by the production workflow. Keep both flags false until service-account access, product availability, regional prices, the ledger binding, and license-tester purchase/restore checks are ready.
 6. Set `LUDOPROOF_BILLING_ENABLED=true` for a controlled internal/license-tester Android build after the server is ready. This build flag is separate from the Worker-side `GOOGLE_PLAY_BILLING_ENABLED` gate, and release workflow validation requires them to match.
+8. Keep `GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED=false` and Android `LUDOPROOF_SUBSCRIPTIONS_ENABLED=false` until the separate subscription setup in `docs/GOOGLE_PLAY_SUBSCRIPTIONS_SETUP.md` has been completed and independently checked.
 7. Do not place service-account private keys in `gradle.properties`, `local.properties`, GitHub source, APK resources, or client logs. Rotate a key if it is ever exposed.
 
 ## Required acceptance before any public rollout
 
-- The app queries only one-time `INAPP` products and receives localized prices for each available SKU.
+- The app queries the six Gem packs and `remove_ads` as `INAPP` products and receives localized prices for each available SKU.
 - The Play purchase dialog price matches the price shown in the app for the testing country/region.
 - A successful purchase is independently verified by the server before any gems or entitlement are granted.
 - Gem packs are consumed only after verification; Remove Ads is acknowledged and remains owned across app restarts and account restore.
@@ -43,3 +44,4 @@ This setup covers the Google Play one-time products used by Ludo Paws. Do not en
 - Refund/revocation behavior is checked with appropriate Play test facilities and the entitlement policy before rollout.
 - Run the full Android and backend test suites after the implementation batch is complete, then verify the purchase flow with Play license testers on an internal testing track.
 - Production deployment, monetization activation, and public rollout require a separate explicit approval. Passing unit tests alone is not proof of real Play Console configuration or end-to-end purchase readiness.
+- The one-time purchase verifier must never accept the `paws_plus` subscription SKU; its verification and lifecycle belong only to `/api/store/subscriptions/verify` and the separately gated subscription API.
