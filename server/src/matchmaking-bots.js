@@ -8,7 +8,8 @@ const BOT_NAMES = Object.freeze([
 ]);
 
 const DEFAULT_FILL_DELAY_MS = 15_000;
-const DEFAULT_TURN_DELAY_MS = 650;
+const DEFAULT_TURN_DELAY_MS = 1_100;
+const DEFAULT_RESULT_HOLD_MS = 950;
 const DEFAULT_RETRY_DELAY_MS = 3_000;
 
 function isEnabled(value, fallback = true) {
@@ -48,6 +49,15 @@ export function botTurnDelayMs(env) {
     DEFAULT_TURN_DELAY_MS,
     100,
     10_000,
+  );
+}
+
+export function botResultHoldMs(env) {
+  return boundedMilliseconds(
+    env?.LUDOPROOF_BOT_RESULT_HOLD_MS,
+    DEFAULT_RESULT_HOLD_MS,
+    250,
+    5_000,
   );
 }
 
