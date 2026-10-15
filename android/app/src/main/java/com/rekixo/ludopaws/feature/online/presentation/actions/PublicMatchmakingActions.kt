@@ -330,6 +330,8 @@ internal fun MainActivity.applyPublicMatchmakingResponse(
                     "targetPlayerCount",
                     selectedPublicPlayerCount,
                 )
+                .coerceIn(2, 4)
+                .let { if (it == 4) 4 else 2 }
             val queued =
                 response.optInt(
                     "queuedPlayers",
@@ -345,6 +347,33 @@ internal fun MainActivity.applyPublicMatchmakingResponse(
                     queued,
                 targetPlayerCount =
                     target,
+            )
+        }
+
+        "FINALIZING" -> {
+            val target =
+                response.optInt(
+                    "targetPlayerCount",
+                    selectedPublicPlayerCount,
+                )
+                .coerceIn(2, 4)
+                .let { if (it == 4) 4 else 2 }
+            val queued =
+                response.optInt(
+                    "queuedPlayers",
+                    target,
+                )
+                .coerceIn(1, target)
+            setPublicSearchUi(
+                searching = true,
+                queuedPlayers = queued,
+                targetPlayerCount = target,
+            )
+            if (isMatchmakingUiReady()) {
+                matchmakingStatusText.text = "FINALIZING MATCH • CONNECTING…"
+            }
+            showStatus(
+                "The match room is being finalized. Reconnecting automatically…",
             )
         }
 
@@ -581,7 +610,7 @@ internal fun MainActivity.setPublicSearchUi(
             when {
                 remaining <=
                     0 ->
-                    "MATCH FOUND • STARTING…"
+                    "ALL PLAYERS FOUND • FINALIZING…"
 
                 opponentsFound ==
                     0 ->
