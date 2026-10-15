@@ -1,0 +1,92 @@
+package com.rekixo.ludopaws
+
+import com.rekixo.ludopaws.feature.settings.data.local.GameSpeed
+
+internal data class OnlineGameplayPacingTransition(
+    val key: String,
+    val delayMillis: Long,
+)
+
+/**
+ * Reuses the proven offline pacing values for remote match presentation.
+ * This policy delays presentation/input only; server-authoritative game rules
+ * and the 15-second turn timeout remain unchanged.
+ */
+internal object OnlineGameplayPacingPolicy {
+    fun resolve(
+        previous: MatchSnapshot?,
+        current: MatchSnapshot,
+        speed: GameSpeed,
+    ): OnlineGameplayPacingTransition? {
+        if (previous == null || previous.matchId != current.matchId) return null
+        if (previous.status != "ACTIVE" || current.status !in setOf("ACTIVE", "FINISHED")) return null
+
+        val pending = current.pendingRoll
+        if (
+            current.status == "ACTIVE" &&
+            pending?.status == "RESOLVED" &&
+            (
+                previous.pendingRoll?.status != "RESOLVED" ||
+                    previous.pendingRoll.eventIndex != pending.eventIndex
+            )
+        ) {
+            return OnlineGameplayPacingTransition(
+                key = "${current.matchId}:roll:${pending.eventIndex}",
+                delayMillis = LudoPawsGameplayPacingPolicy.diceResultHoldMillis(speed),
+            )
+        }
+
+        val previousLatestEvent = previous.history.lastOrNull()?.eventIndex
+        val latestEvent = current.history.lastOrNull()
+        if (
+            current.status == "ACTIVE" &&
+            pending == null &&
+            current.randomEventIndex > previous.randomEventIndex &&
+            latestEvent != null &&
+            latestEvent.eventIndex == previous.randomEventIndex &&
+            latestEvent.eventIndex != previousLatestEvent &&
+            latestEvent.moveTokenIndex == null
+        ) {
+            // A roll with no legal move may pass the turn in the same server response,
+            // without exposing an intermediate RESOLVED snapshot.
+            return OnlineGameplayPacingTransition(
+                key = "${current.matchId}:roll:${latestEvent.eventIndex}",
+                delayMillis = LudoPawsGameplayPacingPolicy.diceResultHoldMillis(speed),
+            )
+        }
+
+        if (current.players.none { next ->
+                val before = previous.players.firstOrNull { it.playerId == next.playerId }
+                before != null && before.tokens != next.tokens
+            }
+        ) {
+            return null
+        }
+
+        val motions = LudoPawsPawnAnimationPolicy.plans(
+            previous = previous,
+            current = current,
+        )
+        if (motions.isEmpty()) return null
+
+        val forward = motions.firstOrNull { it.kind == LudoPawsPawnMotionKind.FORWARD }
+        val forwardDuration = forward?.let {
+            LudoPawsGameplayPacingPolicy.forwardTravelDurationMillis(
+                speed = speed,
+                visualSteps = it.visualSteps,
+            )
+        } ?: 0L
+        val hasCapture = motions.any { it.kind == LudoPawsPawnMotionKind.CAPTURE_RETURN }
+        val previousActor = previous.actingSeat ?: previous.turnSeat
+        val currentActor = current.actingSeat ?: current.turnSeat
+        val extraTurn = previousActor == currentActor
+        val delay = forwardDuration +
+            if (hasCapture) LudoPawsGameplayPacingPolicy.captureReturnDurationMillis(speed) else 0L +
+            LudoPawsGameplayPacingPolicy.postMoveBreathMillis(speed, extraTurn)
+
+        return OnlineGameplayPacingTransition(
+            key = "${current.matchId}:move:${current.randomEventIndex}:${currentActor}",
+            delayMillis = delay.coerceAtLeast(0L),
+        )
+    }
+}
