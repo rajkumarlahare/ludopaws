@@ -2253,7 +2253,7 @@ test(
     const ctx = makeContext();
     const env = makeEnv();
     const room = new BotMatchRoom(ctx, env);
-    const host = await createMatch(room, "LPB0TTEST1");
+    const host = await createMatch(room, "LPBOTTEST2");
     const botRequestId = crypto.randomUUID();
     const profileAssertion = await issueLeaderboardProfileAssertion(env, {
       matchId: host.matchId,
