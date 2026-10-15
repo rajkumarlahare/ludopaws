@@ -236,3 +236,77 @@ test("Team Up fallback fills remaining seats while retaining A/B/A/B teams", asy
   assert.equal(stored.players[3].profileId, null);
   assert.equal(stored.players[3].playerType, "BOT");
 });
+
+
+test("Online 2-player fallback adds exactly one bot for a lone queued human", async () => {
+  const env = makeEnv();
+  const queue = new MatchmakerQueue({ storage: new FakeStorage() }, env);
+  const person = human(21, 2);
+  const searching = await parse(await queue.fetch(
+    request("/search", {
+      clientRequestId: person.clientRequestId,
+      displayName: person.displayName,
+      playerCount: 2,
+      characterId: person.characterId,
+    }, person.profileToken),
+  ));
+  assert.equal(searching.body.status, "SEARCHING");
+
+  await backdateQueue(queue, "matchmaking-state");
+  await queue.alarm();
+
+  const result = await parse(await queue.fetch(
+    request("/status", {
+      clientRequestId: person.clientRequestId,
+      playerCount: 2,
+    }, person.profileToken),
+  ));
+  assert.equal(result.body.status, "MATCHED");
+  assert.equal(result.body.state.players.length, 2);
+  assert.deepEqual(
+    result.body.state.players.map((player) => player.playerType),
+    ["HUMAN", "BOT"],
+  );
+  assert.equal(
+    (await queue.ctx.storage.get("matchmaking-state")).queue.length,
+    0,
+  );
+});
+
+test("Team Up fallback can fill all three empty seats with bots", async () => {
+  const env = makeEnv();
+  const queue = new TeamMatchmakerQueue({ storage: new FakeStorage() }, env);
+  const person = human(31, 4, true);
+  const searching = await parse(await queue.fetch(
+    request("/search", {
+      clientRequestId: person.clientRequestId,
+      displayName: person.displayName,
+      characterId: person.characterId,
+    }, person.profileToken),
+  ));
+  assert.equal(searching.body.status, "SEARCHING");
+
+  await backdateQueue(queue, "team-matchmaking-state-v1");
+  await queue.alarm();
+
+  const result = await parse(await queue.fetch(
+    request("/status", {
+      clientRequestId: person.clientRequestId,
+    }, person.profileToken),
+  ));
+  assert.equal(result.body.status, "MATCHED");
+  assert.equal(result.body.state.players.length, 4);
+  assert.deepEqual(
+    result.body.state.players.map((player) => player.playerType),
+    ["HUMAN", "BOT", "BOT", "BOT"],
+  );
+  assert.deepEqual(
+    result.body.state.players.map((player) => player.teamId),
+    ["A", "B", "A", "B"],
+  );
+  const stored = await env.LUDOPROOF_MATCHES.rooms
+    .get(result.body.matchId).ctx.storage.get("match-state");
+  assert.equal(stored.players.filter((player) => player.playerType === "BOT").length, 3);
+  assert.ok(stored.players.filter((player) => player.playerType === "BOT")
+    .every((player) => player.profileId == null));
+});
