@@ -135,7 +135,11 @@ jobs:
               echo "Paws Plus requires GOOGLE_PLAY_RTDN_AUDIENCE to match the production RTDN endpoint exactly." >&2
               exit 2
             fi
-            if ! printf '%s' "$RTDN_EMAIL" | grep -Eq '^[^@[:space:]]+@[^@[:space:]]+\.iam\.gserviceaccount\.com
+            if ! printf '%s' "$RTDN_EMAIL" | grep -Eq '^[^@[:space:]]+@[^@[:space:]]+\.iam\.gserviceaccount\.com$'; then
+              echo "Paws Plus requires GOOGLE_PLAY_RTDN_EMAIL to be a service-account email." >&2
+              exit 2
+            fi
+          fi
 
           if [ "$APP_ADS" = "true" ]; then
             if [ -z "$ADMOB_APP_ID" ] || [ -z "$ADMOB_REWARDED_AD_UNIT_ID" ]; then
