@@ -54,11 +54,25 @@ export class MatchRoom extends LifecycleMatchRoom {
     }
 
     const state = await this.ctx.storage.get(STATE_KEY);
-    if (!state || state.status !== "ACTIVE") return;
+    if (!state) return;
+    if (state.status !== "ACTIVE") {
+      if (state.botTurn) {
+        delete state.botTurn;
+        await this.ctx.storage.put(STATE_KEY, state);
+      }
+      return;
+    }
 
     const pending = state.pendingRoll;
     if (pending) {
       const existing = state.botTurn;
+      if (!existing || existing.playerId !== pending.playerId) {
+        if (existing) {
+          delete state.botTurn;
+          await this.ctx.storage.put(STATE_KEY, state);
+        }
+        return;
+      }
       if (
         existing &&
         existing.playerId === pending.playerId &&
