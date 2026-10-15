@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   MatchRoom,
   MOVE_SELECTION_TIMEOUT_MS,
+  TURN_ROLL_TIMEOUT_MS,
 } from "../src/match-room-lifecycle.js";
 
 class FakeStorage {
@@ -136,6 +137,77 @@ test("expired resolved roll forfeits the move and advances the turn", async () =
     "MOVE_SELECTION_TIMEOUT",
   );
   assert.ok(Number.isSafeInteger(stored.history[0].moveTimedOutAt));
+});
+
+test("an unrolled turn times out after 15 seconds, warns and advances", async () => {
+  const now = Date.now();
+  const state = stateWithResolvedMove(now - TURN_ROLL_TIMEOUT_MS - 1);
+  state.pendingRoll = null;
+  state.updatedAt = now - TURN_ROLL_TIMEOUT_MS - 1;
+  state.turnTimeoutCounts = {};
+  const { room, storage } = makeRoom(state);
+
+  await room.alarm();
+
+  const stored = await storage.get("match-state");
+  assert.equal(stored.status, "ACTIVE");
+  assert.equal(stored.turnSeat, 1);
+  assert.equal(stored.turnTimeoutCounts.p1, 1);
+  assert.equal(stored.turnTimeoutNotice.playerId, "p1");
+  assert.equal(stored.turnTimeoutNotice.count, 1);
+  assert.ok(stored.turnTimeoutNotice.at >= now);
+  assert.equal(storage.alarmAt, stored.updatedAt + TURN_ROLL_TIMEOUT_MS);
+});
+
+test("four missed dice turns forfeit a classic player and finish a two-player match", async () => {
+  const now = Date.now();
+  const state = stateWithResolvedMove(now - TURN_ROLL_TIMEOUT_MS - 1);
+  state.pendingRoll = null;
+  state.updatedAt = now - TURN_ROLL_TIMEOUT_MS - 1;
+  state.turnTimeoutCounts = { p1: 3 };
+  const { room, storage } = makeRoom(state);
+
+  await room.alarm();
+
+  const stored = await storage.get("match-state");
+  assert.equal(stored.status, "FINISHED");
+  assert.equal(stored.players[0].forfeitedAt, stored.turnTimeoutNotice.at);
+  assert.equal(stored.turnTimeoutNotice.count, 4);
+  assert.equal(stored.winnerPlayerId, "p2");
+  assert.equal(stored.winnerTeamId, null);
+});
+
+test("four missed dice turns in Team Up award the other team", async () => {
+  const now = Date.now();
+  const state = stateWithResolvedMove(now - TURN_ROLL_TIMEOUT_MS - 1);
+  state.matchMode = "TEAM_UP";
+  state.teamAssignments = ["A", "B", "A", "B"];
+  state.targetPlayerCount = 4;
+  state.players[0].teamId = "A";
+  state.players[1].teamId = "B";
+  state.players.push(
+    {
+      playerId: "p3", displayName: "Three", characterId: "goat", playerType: "HUMAN",
+      color: "YELLOW", teamId: "A", tokenAuthHash: "c".repeat(64), tokens: [-1, -1, -1, -1],
+    },
+    {
+      playerId: "p4", displayName: "Four", characterId: "cat", playerType: "HUMAN",
+      color: "BLUE", teamId: "B", tokenAuthHash: "d".repeat(64), tokens: [-1, -1, -1, -1],
+    },
+  );
+  state.consecutiveSixes = [0, 0, 0, 0];
+  state.turnTimeoutCounts = { p1: 3 };
+  state.pendingRoll = null;
+  state.updatedAt = now - TURN_ROLL_TIMEOUT_MS - 1;
+  const { room, storage } = makeRoom(state);
+
+  await room.alarm();
+
+  const stored = await storage.get("match-state");
+  assert.equal(stored.status, "FINISHED");
+  assert.equal(stored.winnerPlayerId, null);
+  assert.equal(stored.winnerTeamId, "B");
+  assert.equal(stored.turnTimeoutNotice.count, 4);
 });
 
 test("move timeout skips players that already forfeited", async () => {

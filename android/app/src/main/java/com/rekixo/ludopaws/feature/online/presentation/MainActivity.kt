@@ -189,6 +189,9 @@ class MainActivity : ComponentActivity() {
     internal var lastRealtimeRevision =
         -1
 
+    internal var lastTurnTimeoutNoticeAt = 0L
+    internal var timeoutExitScheduled = false
+
     internal val realtimeRefreshRunnable =
         Runnable {
             if (

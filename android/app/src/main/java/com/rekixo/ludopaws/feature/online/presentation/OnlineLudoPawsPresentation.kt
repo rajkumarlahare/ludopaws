@@ -360,13 +360,27 @@ internal object OnlineLudoPawsPresentation {
                     player.playerId == activePlayer?.playerId
             val localPlayer = player.playerId == activity.playerId
             val playerWidth = dp(activity, 112)
+            val activeDiceControl =
+                if (active) {
+                    activeOnlineDiceControl(
+                        activity = activity,
+                        player = player,
+                        enabled = localPlayer &&
+                            activity.onlineRollActionDecision(state).enabled,
+                    )
+                } else {
+                    null
+                }
+            if (alignEnd && activeDiceControl != null) {
+                slotHost.addView(activeDiceControl)
+            }
             val playerCard =
                 LudoPawsPlayerCardView(activity).apply {
                     bind(
                         player = player,
                         characterId = characterIdsBySeat.getOrNull(player.seat),
                         active = active,
-                        computer = false,
+                        computer = player.playerType == "BOT",
                         compact = true,
                         localPlayer = localPlayer,
                         portraitOnEnd = alignEnd,
@@ -451,6 +465,9 @@ internal object OnlineLudoPawsPresentation {
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                 ),
             )
+            if (!alignEnd && activeDiceControl != null) {
+                slotHost.addView(activeDiceControl)
+            }
         }
 
         rail.addView(
@@ -461,6 +478,51 @@ internal object OnlineLudoPawsPresentation {
                 1f,
             ),
         )
+    }
+
+    private fun activeOnlineDiceControl(
+        activity: MainActivity,
+        player: PlayerSnapshot,
+        enabled: Boolean,
+    ): FrameLayout {
+        val control =
+            FrameLayout(activity).apply {
+                isClickable = true
+                isFocusable = true
+                background = null
+                elevation = 0f
+                clipChildren = false
+                clipToPadding = false
+                contentDescription = "Roll dice for ${player.displayName}"
+                isEnabled = enabled
+                alpha = 1f
+                setOnClickListener {
+                    if (isEnabled) activity.rollVerifiedDice()
+                }
+            }
+        val dice =
+            com.rekixo.ludopaws.DiceView(activity).apply {
+                setPlayerTeamColor(player.color)
+                alpha = 1f
+            }
+        activity.diceView = dice
+        control.addView(
+            dice,
+            FrameLayout.LayoutParams(
+                dp(activity, 54),
+                dp(activity, 54),
+                Gravity.CENTER,
+            ),
+        )
+        control.layoutParams =
+            LinearLayout.LayoutParams(
+                dp(activity, 56),
+                dp(activity, 56),
+            ).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                setMargins(dp(activity, 1), 0, dp(activity, 1), 0)
+            }
+        return control
     }
 
     private fun dispatchFeedback(

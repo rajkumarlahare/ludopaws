@@ -148,18 +148,40 @@ internal fun MainActivity.updateControls(
     matchInput.isEnabled = canEnterAnotherMatch && authoritativeActions
 
     matchStatusPanel.visibility = View.VISIBLE
+    if (waiting) {
+        matchStatusPanel.background =
+            LudoProofTheme.hudPanelDrawable(this, goldBorder = false)
+        matchStatusPanel.elevation = dp(3).toFloat()
+        matchStatusPanel.setPadding(
+            dp(if (isCompactOnline()) 8 else 10),
+            dp(if (isCompactOnline()) 5 else 7),
+            dp(if (isCompactOnline()) 8 else 10),
+            dp(if (isCompactOnline()) 5 else 7),
+        )
+    } else {
+        matchStatusPanel.background = null
+        matchStatusPanel.elevation = 0f
+        matchStatusPanel.setPadding(0, 0, 0, 0)
+    }
     turnText.visibility = if (waiting) View.VISIBLE else View.GONE
     resultPanel.visibility = if (finished) View.VISIBLE else View.GONE
     boardFrame.visibility = if (active || finished) View.VISIBLE else View.GONE
     actionPanel.visibility = View.VISIBLE
+    if (waiting) {
+        actionPanel.background =
+            LudoProofTheme.hudPanelDrawable(this, goldBorder = false)
+        actionPanel.setPadding(dp(8), dp(6), dp(8), dp(6))
+    } else {
+        actionPanel.background = null
+        actionPanel.setPadding(0, 0, 0, 0)
+    }
 
     // During actual play the character rails carry player identity/progress.
     // Hide duplicate protocol/match copy so the Ludo board stays visually primary.
     matchInfoText.visibility = if (waiting) View.VISIBLE else View.GONE
     playersText.visibility = if (waiting) View.VISIBLE else View.GONE
 
-    verificationPanel.visibility =
-        if (active || finished) View.VISIBLE else View.GONE
+    verificationPanel.visibility = View.GONE
 
     diceView.visibility = View.VISIBLE
     diceView.alpha = 1f
@@ -193,11 +215,11 @@ internal fun MainActivity.updateControls(
             state.matchMode != "TEAM_UP" &&
             state.matchId.isNotBlank()
 
-    proofButton.visibility =
-        if (active || finished) View.VISIBLE else View.GONE
+    proofButton.visibility = View.GONE
 
     val rollAction = onlineRollActionDecision(state)
-    rollButton.visibility = if (active) View.VISIBLE else View.GONE
+    // Tap the dice beside the active player's character to roll.
+    rollButton.visibility = View.GONE
     rollButton.isEnabled = rollAction.enabled
     rollButton.text = rollAction.label
 
