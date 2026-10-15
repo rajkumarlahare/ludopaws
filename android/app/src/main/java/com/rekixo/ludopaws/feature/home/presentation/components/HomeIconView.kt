@@ -44,13 +44,6 @@ internal class HomeIconView(
             invalidate()
         }
 
-    // Scales only the plus glyph; its surrounding button and touch target stay unchanged.
-    var addIconScale: Float = 1f
-        set(value) {
-            field = value.coerceIn(0f, 1f)
-            invalidate()
-        }
-
     private val stroke =
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
@@ -202,15 +195,10 @@ internal class HomeIconView(
     }
 
     private fun drawAdd(canvas: Canvas) {
-        // Scale around the glyph center so the plus itself becomes smaller,
-        // without shrinking the plywood circle or its clickable hit area.
-        canvas.save()
-        canvas.scale(addIconScale, addIconScale, 50f, 50f)
         stroke.color = iconColor
         stroke.strokeWidth = 11f
         canvas.drawLine(50f, 25f, 50f, 75f, stroke)
         canvas.drawLine(25f, 50f, 75f, 50f, stroke)
-        canvas.restore()
     }
 
     private fun drawShop(canvas: Canvas) {
