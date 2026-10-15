@@ -46,23 +46,37 @@ export const GOOGLE_PLAY_PRODUCTS = Object.freeze({
 
 let cachedAccessToken = null;
 
-export function googlePlayBillingConfigured(env) {
-  return (
+export function googlePlayBillingChecks(env) {
+  const serviceAccountEmailConfigured =
     typeof env?.GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL === "string" &&
-    /^[^@\s]+@[^@\s]+\.iam\.gserviceaccount\.com$/.test(
+    /^[^@\\s]+@[^@\\s]+\\.iam\\.gserviceaccount\\.com$/.test(
       env.GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL,
-    ) &&
-    typeof env?.GOOGLE_PLAY_SERVICE_ACCOUNT_PRIVATE_KEY === "string" &&
-    env.GOOGLE_PLAY_SERVICE_ACCOUNT_PRIVATE_KEY.includes("PRIVATE KEY")
-  );
+    );
+  const privateKey = env?.GOOGLE_PLAY_SERVICE_ACCOUNT_PRIVATE_KEY;
+  const privateKeyPemPresent =
+    typeof privateKey === "string" &&
+    privateKey.includes("-----BEGIN PRIVATE KEY-----") &&
+    privateKey.includes("-----END PRIVATE KEY-----");
+  const purchaseLedgerBindingConfigured = Boolean(env?.LUDOPROOF_STORE_PURCHASES);
+  const featureFlagEnabled = env?.GOOGLE_PLAY_BILLING_ENABLED === "true";
+  const credentialsConfigured = serviceAccountEmailConfigured && privateKeyPemPresent;
+  return Object.freeze({
+    featureFlagEnabled,
+    serviceAccountEmailConfigured,
+    privateKeyPemPresent,
+    purchaseLedgerBindingConfigured,
+    credentialsConfigured,
+    enabled: featureFlagEnabled && credentialsConfigured && purchaseLedgerBindingConfigured,
+  });
+}
+
+export function googlePlayBillingConfigured(env) {
+  const checks = googlePlayBillingChecks(env);
+  return checks.credentialsConfigured;
 }
 
 export function googlePlayBillingEnabled(env) {
-  return (
-    env?.GOOGLE_PLAY_BILLING_ENABLED === "true" &&
-    googlePlayBillingConfigured(env) &&
-    Boolean(env?.LUDOPROOF_STORE_PURCHASES)
-  );
+  return googlePlayBillingChecks(env).enabled;
 }
 
 export async function verifyAndRedeemGooglePlayPurchase(
