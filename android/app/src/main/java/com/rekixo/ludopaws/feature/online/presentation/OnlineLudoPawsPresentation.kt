@@ -338,10 +338,20 @@ internal object OnlineLudoPawsPresentation {
     ) {
         val player =
             state.players.firstOrNull {
-                OfflinePlayerLayout.slotForColor(
-                    color = it.color,
-                    preferredBottomLeftColor = preferredBottomLeftColor,
-                ) == slot
+                val resolvedSlot =
+                    if (state.players.size == 2) {
+                        if (it.playerId == activity.playerId) {
+                            OfflinePlayerLayout.Slot.BOTTOM_LEFT
+                        } else {
+                            OfflinePlayerLayout.Slot.TOP_RIGHT
+                        }
+                    } else {
+                        OfflinePlayerLayout.slotForColor(
+                            color = it.color,
+                            preferredBottomLeftColor = preferredBottomLeftColor,
+                        )
+                    }
+                resolvedSlot == slot
             }
 
         val slotHost =
