@@ -191,6 +191,10 @@ internal fun MainActivity.refreshState(
 }
 
 internal fun MainActivity.rollVerifiedDice() {
+    if (!canSubmitOnlineGameplayAction()) {
+        showStatus("Showing the dice result or finishing the paw animation…")
+        return
+    }
     val state =
         currentState
             ?: run {
@@ -295,6 +299,10 @@ internal fun MainActivity.rollVerifiedDice() {
 internal fun MainActivity.moveToken(
     index: Int,
 ) {
+    if (!canSubmitOnlineGameplayAction()) {
+        showStatus("Wait for the current dice or paw animation to finish.")
+        return
+    }
     if (!hasAuthoritativeActionState()) {
         showStatus("Syncing the latest authoritative match state before moving.")
         if (isOnline) {
