@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.view.HapticFeedbackConstants
 import android.os.Looper
+import android.os.SystemClock
 import android.text.InputType
 import android.view.Gravity
 import android.view.View
@@ -315,9 +316,14 @@ internal fun MainActivity.moveToken(
         return
     }
 
-    val eventIndex =
+    val state =
         currentState
-            ?.pendingRoll
+            ?: run {
+                showStatus("Sync the active match before moving.")
+                return
+            }
+    val eventIndex =
+        state.pendingRoll
             ?.eventIndex
             ?.takeIf {
                 it >= 0
@@ -334,8 +340,17 @@ internal fun MainActivity.moveToken(
             token,
         ->
         onlineMoveRequestInFlight = true
-        // Immediate acknowledgement while waiting for authoritative movement.
-        // Never change token positions optimistically.
+        val previewRequestedAt = SystemClock.uptimeMillis()
+        val previewStarted =
+            OnlineLudoPawsPresentation.beginPendingMovePreview(
+                activity = this,
+                state = state,
+                tokenIndex = index,
+            )
+        onlineMovePreviewStartedAtMillis =
+            previewRequestedAt.takeIf { previewStarted }
+        // The pawn begins a presentation-only preview immediately. The server
+        // response remains the sole source of truth for its committed position.
         boardFrame.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
         runNetwork(
             action = {
