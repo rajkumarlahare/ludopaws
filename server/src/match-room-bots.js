@@ -63,10 +63,11 @@ export class MatchRoom extends LifecycleMatchRoom {
         existing.playerId === pending.playerId &&
         existing.inProgress !== true
       ) {
-        const retryAt = Math.max(
-          Date.now() + botRetryDelayMs(this.env),
-          Number(existing.runAt ?? 0),
-        );
+        const currentRunAt = Number(existing.runAt ?? 0);
+        // State polling must not keep pushing a failed bot action further out.
+        const retryAt = currentRunAt > Date.now()
+          ? currentRunAt
+          : Date.now() + botRetryDelayMs(this.env);
         existing.runAt = Math.min(
           retryAt,
           Number(pending.revealDeadlineAt ?? retryAt),
@@ -154,7 +155,11 @@ export class MatchRoom extends LifecycleMatchRoom {
             activeTurn.playerId !== player.playerId ||
             activeTurn.eventIndex !== eventIndex
           ) {
-            return null;
+            if (activeTurn) {
+              delete current.botTurn;
+              await this.ctx.storage.put(STATE_KEY, current);
+            }
+            return { reschedule: true };
           }
         }
 
@@ -172,6 +177,10 @@ export class MatchRoom extends LifecycleMatchRoom {
         return { turn: structuredClone(activeTurn), state: current };
       });
       if (!prepared) return;
+      if (prepared.reschedule) {
+        await this.#withBotMetadata(() => this.#scheduleBotTurn());
+        return;
+      }
       turn = prepared.turn;
       state = prepared.state;
 
