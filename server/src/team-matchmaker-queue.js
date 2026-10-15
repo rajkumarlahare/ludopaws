@@ -470,6 +470,7 @@ function normalizeParticipant(body, profileId) {
     displayName: normalizeDisplayName(body?.displayName),
     characterId: normalizeCharacterId(body?.characterId),
     profileId,
+    playerType: "HUMAN",
   };
 }
 
@@ -514,6 +515,7 @@ async function issueAssertion(env, matchId, participant) {
   return issueLeaderboardProfileAssertion(env, {
     matchId,
     profileId: participant.profileId,
+    playerType: participant.playerType ?? "HUMAN",
     clientRequestId: participant.clientRequestId,
     expiresAt: Date.now() + PROFILE_ASSERTION_TTL_MS,
   });
