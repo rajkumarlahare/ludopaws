@@ -134,7 +134,7 @@ object StoreCatalog {
     fun find(
         productId: String,
     ): StoreProduct? =
-        products.firstOrNull {
+        if (productId == PAWS_PLUS) pawsPlus else products.firstOrNull {
             it.productId ==
                 productId
         }
