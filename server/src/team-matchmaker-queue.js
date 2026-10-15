@@ -169,40 +169,38 @@ export class TeamMatchmakerQueue {
       (left, right) => left.joinedAt - right.joinedAt,
     );
 
-    if (eligible.length >= TARGET_PLAYER_COUNT) {
+    if (eligible.length >= TARGET_PLAYER_COUNT && !state.pendingMatch) {
       const group = eligible.slice(0, TARGET_PLAYER_COUNT);
-      // Persist before crossing into MatchRoom so deterministic replays can
-      // recover safely after a Durable Object restart.
+      state.pendingMatch = {
+        matchMode: "TEAM_UP",
+        playerCount: TARGET_PLAYER_COUNT,
+        participants: group,
+        retryAt: now + botRetryDelayMs(this.env),
+      };
       await this.#persist(state);
-      const assignment = await this.#materialize(group);
-      const requestIds = new Set(group.map((candidate) => candidate.clientRequestId));
-      state.queue = state.queue.filter(
-        (candidate) => !requestIds.has(candidate.clientRequestId),
-      );
+      const completed = await this.#resumePendingMatch(state, now);
+      if (!completed) {
+        throw httpError(
+          503,
+          "TEAM_MATCHMAKER_RECOVERY_PENDING",
+          "team match setup is being retried; keep searching",
+        );
+      }
 
-      group.forEach((candidate, index) => {
-        if (candidate.playerType === "BOT") return;
-        state.assignments[candidate.clientRequestId] = {
-          matchId: assignment.matchId,
-          role: index === 0 ? "HOST" : "GUEST",
-          seat: index,
-          teamId: index % 2 === 0 ? "A" : "B",
-          assignedAt: now,
-          expiresAt: now + ASSIGNMENT_TTL_MS,
-          displayName: candidate.displayName,
-          characterId: normalizeCharacterId(candidate.characterId),
-          profileId: candidate.profileId,
-        };
-      });
-      await this.#persist(state);
+      const ownAssignment = state.assignments[participant.clientRequestId];
+      if (!ownAssignment) {
+        throw httpError(
+          503,
+          "TEAM_MATCHMAKER_ASSIGNMENT_MISSING",
+          "team match was created but the player assignment is not available yet",
+        );
+      }
       return this.#matchedResponse(
         {
           ...participant,
-          characterId: normalizeCharacterId(
-            state.assignments[participant.clientRequestId]?.characterId,
-          ),
+          characterId: normalizeCharacterId(ownAssignment.characterId),
         },
-        state.assignments[participant.clientRequestId],
+        ownAssignment,
       );
     }
 
