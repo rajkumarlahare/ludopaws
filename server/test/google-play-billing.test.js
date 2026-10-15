@@ -538,8 +538,6 @@ test("store status and verification routes stay closed until server billing is e
   assert.deepEqual(await status.json(), {
     ok: true,
     billingAvailable: false,
-    subscriptionsAvailable: false,
-    rewardedAdsAvailable: false,
   });
 
   const verification = await worker.fetch(
@@ -568,8 +566,6 @@ test("store status and verification routes stay closed until server billing is e
   assert.deepEqual(await enabledStatus.json(), {
     ok: true,
     billingAvailable: true,
-    subscriptionsAvailable: false,
-    rewardedAdsAvailable: false,
   });
 });
 
