@@ -17,12 +17,28 @@ import {
 const META_KEY = "receipt:meta:v1";
 const SEAL_KEY = "receipt:seal:v1";
 const EVENT_PREFIX = "receipt:event:v1:";
+const RECEIPT_RETENTION_MS = 180 * 24 * 60 * 60 * 1000;
 const RECEIPT_PROTOCOL = "ludoproof-match-receipt-v1";
 const RECEIPT_DIGEST_DOMAIN = "ludoproof:match-receipt:v1:";
 
 export class MatchReceiptArchive {
   constructor(ctx) {
     this.ctx = ctx;
+  }
+
+  async alarm() {
+    const meta = await this.ctx.storage.get(META_KEY);
+    if (!meta) {
+      await this.ctx.storage.deleteAlarm();
+      return;
+    }
+    const expiresAt = receiptExpiresAt(meta);
+    if (expiresAt > Date.now()) {
+      await this.ctx.storage.setAlarm(expiresAt);
+      return;
+    }
+    await this.ctx.storage.deleteAlarm();
+    await this.ctx.storage.deleteAll();
   }
 
   async fetch(request) {
@@ -43,6 +59,14 @@ export class MatchReceiptArchive {
   async #sync(request) {
     const incoming = normalizeSnapshot(await readJson(request));
     const existingMeta = await this.ctx.storage.get(META_KEY);
+    if (existingMeta) await this.#requireWithinRetention(existingMeta);
+    if (receiptExpiresAt(incoming) <= Date.now()) {
+      throw httpError(
+        410,
+        "MATCH_RECEIPT_RETENTION_EXPIRED",
+        "match receipt is outside the 180-day retention window",
+      );
+    }
     if (
       existingMeta &&
       canonicalJson(staticMetadata(existingMeta)) !==
@@ -82,6 +106,7 @@ export class MatchReceiptArchive {
       ...teamFields,
     };
     await this.ctx.storage.put(META_KEY, meta);
+    await this.ctx.storage.setAlarm(receiptExpiresAt(meta));
 
     const receipt = await this.#buildReceipt(meta);
     const seal = await this.#sealIfEligible(receipt);
@@ -209,6 +234,7 @@ export class MatchReceiptArchive {
         "match receipt has not been archived",
       );
     }
+    await this.#requireWithinRetention(meta);
     const receipt = await this.#buildReceipt(meta);
     const seal = await this.ctx.storage.get(SEAL_KEY);
     if (seal) {
@@ -229,12 +255,31 @@ export class MatchReceiptArchive {
     });
   }
 
+  async #requireWithinRetention(meta) {
+    if (receiptExpiresAt(meta) > Date.now()) return;
+    await this.ctx.storage.deleteAlarm();
+    await this.ctx.storage.deleteAll();
+    throw httpError(
+      410,
+      "MATCH_RECEIPT_RETENTION_EXPIRED",
+      "match receipt is outside the 180-day retention window",
+    );
+  }
+
   async #events() {
     const rows = await this.ctx.storage.list({ prefix: EVENT_PREFIX });
     return [...rows.values()].sort(
       (left, right) => left.eventIndex - right.eventIndex,
     );
   }
+}
+
+function receiptExpiresAt(meta) {
+  const anchor = meta?.status === "FINISHED" && Number.isSafeInteger(meta.finishedAt) && meta.finishedAt > 0
+    ? meta.finishedAt
+    : meta?.createdAt;
+  if (!Number.isSafeInteger(anchor) || anchor <= 0) return 0;
+  return anchor + RECEIPT_RETENTION_MS;
 }
 
 export async function syncMatchReceipt(env, state) {
