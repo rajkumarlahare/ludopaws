@@ -17,7 +17,7 @@ const inAppPolicy = read("../android/app/src/main/java/com/rekixo/ludopaws/featu
 const pagesWorkflow = read("../.github/workflows/account-deletion-pages.yml");
 
 const constants = Object.fromEntries(
-  [...android.matchAll(/const\s+([A-Z0-9_]+)\s*=\s*\n?\s*"([^"]+)"/g)]
+  [...android.matchAll(/const\s+val\s+([A-Z0-9_]+)\s*=\s*\n?\s*"([^"]+)"/g)]
     .map((match) => [match[1], match[2]]),
 );
 const androidProducts = {};
