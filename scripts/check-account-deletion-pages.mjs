@@ -19,6 +19,7 @@ const policy = read("../docs/privacy-policy.html");
 const worker = read("../server/src/index-account.js");
 const directory = read("../server/src/account-directory.js");
 const player = read("../server/src/player-account.js");
+const receiptArchive = read("../server/src/match-receipt-archive.js");
 const pagesWorkflow = read("../.github/workflows/account-deletion-pages.yml");
 
 has(page, 'id="guest-deletion-code" type="password" maxlength="64"', "guest delete-only credential input");
@@ -42,8 +43,15 @@ has(worker, 'ludoproof:guest-deletion-credential:v1:', "domain-separated guest c
 has(directory, "deleted_guest_deletion_credentials", "guest deletion replay tombstone");
 has(directory, "ACCOUNT_DELETION_IN_PROGRESS", "guest deletion claim lock");
 has(player, "const guestRecoveryVerified = body?.guestRecoveryVerified === true", "guest deletion server-owned verification boundary");
-has(policy, "delete-only code", "guest deletion disclosure in privacy-policy draft");
-has(policy, "<h2>8. Account and data deletion</h2>", "privacy-policy deletion section");
+has(policy, "delete-only code", "guest deletion disclosure in privacy policy");
+has(policy, 'href="./account-deletion.html">official account and data deletion page</a>', "privacy policy links to the external deletion page");
+has(policy, "180 days from match completion", "privacy policy receipt retention period");
+has(policy, "AI@rekixo.com", "privacy support contact");
+has(page, "180 days after a match finishes", "deletion page receipt retention disclosure");
+has(page, "AI@rekixo.com", "deletion page support contact");
+has(receiptArchive, "const RECEIPT_RETENTION_MS = 180 * 24 * 60 * 60 * 1000;", "180-day receipt retention constant");
+has(receiptArchive, "async alarm()", "scheduled receipt expiration handler");
+has(receiptArchive, "MATCH_RECEIPT_RETENTION_EXPIRED", "expired receipt access protection");
 
 has(pagesWorkflow, "LUDOPROOF_POLICY_RELEASE_APPROVED", "publisher approval gate");
 has(pagesWorkflow, "GOOGLE_SIGN_IN_WEB_CLIENT_ID", "Google OAuth Web Client ID release gate");
