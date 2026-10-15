@@ -124,6 +124,7 @@ internal fun MainActivity.updateControls(
 
     val waiting = state.status == "WAITING"
     val active = state.status == "ACTIVE"
+    onlineHeroPanel?.visibility = if (waiting) View.VISIBLE else View.GONE
     val finished = state.status == "FINISHED"
     val canEnterAnotherMatch =
         finished && gameMode == GameMode.ONLINE

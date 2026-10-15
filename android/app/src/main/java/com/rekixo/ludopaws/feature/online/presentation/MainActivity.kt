@@ -77,6 +77,7 @@ class MainActivity : ComponentActivity() {
 
     internal lateinit var arcadeRootView: FrameLayout
     internal lateinit var lobbyPanel: LinearLayout
+    internal var onlineHeroPanel: View? = null
     internal lateinit var matchStatusPanel: LinearLayout
     internal lateinit var resultPanel: FrameLayout
     internal lateinit var resultTitleText: TextView
@@ -569,8 +570,9 @@ class MainActivity : ComponentActivity() {
             gameMode !=
             GameMode.ONLINE
         ) {
+            onlineHeroPanel = onlineHero()
             content.addView(
-                onlineHero(),
+                onlineHeroPanel,
                 onlineSectionParams(
                     if (isCompactOnline()) 12 else 16,
                 ).apply {
