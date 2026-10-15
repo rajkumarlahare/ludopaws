@@ -234,37 +234,6 @@ export class MatchmakerQueue {
       return await this.#matchedResponse(participant, assignment);
     }
 
-    const reserved = state.pendingMatch?.participants.some(
-      (candidate) =>
-        candidate.playerType !== "BOT" &&
-        candidate.clientRequestId === clientRequestId,
-    );
-    if (reserved) {
-      await this.#persist(state);
-      return json(200, {
-        status: "MATCHED",
-        cancelled: false,
-        pending: true,
-        playerCount,
-      });
-    }
-
-    const reserved = state.pendingMatch?.participants.some(
-      (candidate) =>
-        candidate.playerType !== "BOT" &&
-        candidate.clientRequestId === clientRequestId &&
-        candidate.profileId === profile.profileId,
-    );
-    if (reserved) {
-      await this.#persist(state);
-      return json(200, {
-        status: "MATCHED",
-        cancelled: false,
-        pending: true,
-        playerCount,
-      });
-    }
-
     const queued = state.queue.find(
       (candidate) => candidate.clientRequestId === clientRequestId,
     );
@@ -312,6 +281,22 @@ export class MatchmakerQueue {
         cancelled: false,
         playerCount,
         matchId: assignment.matchId,
+      });
+    }
+
+    const reserved = state.pendingMatch?.participants.some(
+      (candidate) =>
+        candidate.playerType !== "BOT" &&
+        candidate.clientRequestId === clientRequestId &&
+        candidate.profileId === profile.profileId,
+    );
+    if (reserved) {
+      await this.#persist(state);
+      return json(200, {
+        status: "MATCHED",
+        cancelled: false,
+        pending: true,
+        playerCount,
       });
     }
 
