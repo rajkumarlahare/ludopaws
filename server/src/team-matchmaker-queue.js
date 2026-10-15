@@ -228,39 +228,6 @@ export class TeamMatchmakerQueue {
       );
     }
 
-    const reserved = state.pendingMatch?.participants.some(
-      (candidate) =>
-        candidate.playerType !== "BOT" &&
-        candidate.clientRequestId === clientRequestId,
-    );
-    if (reserved) {
-      await this.#persist(state);
-      return json(200, {
-        status: "MATCHED",
-        matchMode: "TEAM_UP",
-        cancelled: false,
-        pending: true,
-        targetPlayerCount: TARGET_PLAYER_COUNT,
-      });
-    }
-
-    const reserved = state.pendingMatch?.participants.some(
-      (candidate) =>
-        candidate.playerType !== "BOT" &&
-        candidate.clientRequestId === clientRequestId &&
-        candidate.profileId === profileId,
-    );
-    if (reserved) {
-      await this.#persist(state);
-      return json(200, {
-        status: "MATCHED",
-        matchMode: "TEAM_UP",
-        cancelled: false,
-        pending: true,
-        targetPlayerCount: TARGET_PLAYER_COUNT,
-      });
-    }
-
     const queued = state.queue.find(
       (candidate) => candidate.clientRequestId === clientRequestId,
     );
@@ -302,6 +269,23 @@ export class TeamMatchmakerQueue {
         cancelled: false,
         targetPlayerCount: TARGET_PLAYER_COUNT,
         matchId: assignment.matchId,
+      });
+    }
+
+    const reserved = state.pendingMatch?.participants.some(
+      (candidate) =>
+        candidate.playerType !== "BOT" &&
+        candidate.clientRequestId === clientRequestId &&
+        candidate.profileId === profileId,
+    );
+    if (reserved) {
+      await this.#persist(state);
+      return json(200, {
+        status: "MATCHED",
+        matchMode: "TEAM_UP",
+        cancelled: false,
+        pending: true,
+        targetPlayerCount: TARGET_PLAYER_COUNT,
       });
     }
 
