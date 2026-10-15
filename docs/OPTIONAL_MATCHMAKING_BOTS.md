@@ -29,7 +29,15 @@ Missing, invalid, or out-of-range delays use the documented defaults. Test and s
 
 To stop creating new bot-filled matches, set `LUDOPROOF_BOT_MATCH_FILL_ENABLED=false`. Keep bot turns enabled while already-started bot matches finish. After active bot matches are drained or safely ended, set `LUDOPROOF_BOT_TURNS_ENABLED=false`. Do not disable automated turns while users are still in active bot-filled matches: their bot seats would stop taking turns.
 
-To remove the implementation later, remove the bot queue fallback from `matchmaker-queue.js` and `team-matchmaker-queue.js`, restore the `MatchRoom` export in `index-forfeit.js` to `match-room-lifecycle.js`, and delete `matchmaking-bots.js`, `match-room-bots.js`, and their targeted tests. Keep `playerType` reading in snapshots tolerant of old payloads during the migration; do not remove that compatibility in the same deployment that drains active bot matches.
+To remove the implementation later:
+
+1. Set `LUDOPROOF_BOT_MATCH_FILL_ENABLED=false`, drain or safely finish bot-filled matches, then set `LUDOPROOF_BOT_TURNS_ENABLED=false`.
+2. Remove the timeout fallback blocks and bot imports from `matchmaker-queue.js` and `team-matchmaker-queue.js`; remove the signed `playerType` claim extension in `crypto.js`, the bot-type resolver/leaderboard guard in `match-room.js`, and the bot type field from `game-v1-core.js`.
+3. Restore the `MatchRoom` export in `index-forfeit.js` to `match-room-lifecycle.js`; delete `matchmaking-bots.js`, `match-room-bots.js`, and `matchmaking-bots.test.js`.
+4. Revert the bot label/count handling in `LudoPawsPlayerCardView.kt` and `PublicMatchmakingActions.kt`. The `GameModels.kt` `playerType` field and its tolerant parser can be left in place for backward-compatible snapshots or removed with the corresponding `GameJsonAuthoritativeSnapshotTest.kt` cases.
+5. Remove the bot-specific additions from `crypto.test.js` and `match-room.integration.test.js`, delete this document, and rerun the relevant CI gates.
+
+Keep snapshot parsing tolerant of older payloads during the migration; do not remove the bot turn controller while active bot-filled matches still require it.
 
 ## Release verification
 
