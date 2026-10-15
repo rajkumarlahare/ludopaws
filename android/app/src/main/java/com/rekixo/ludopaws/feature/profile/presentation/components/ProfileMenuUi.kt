@@ -19,7 +19,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import com.rekixo.ludopaws.core.ui.art.plywoodBackground
-import com.rekixo.ludopaws.core.ui.art.recessedPlywoodBackground
+import com.rekixo.ludopaws.core.ui.art.transparentDarkBlueStrokeBackground
 import com.rekixo.ludopaws.core.ui.components.AppFocusRing
 import com.rekixo.ludopaws.feature.profile.presentation.ProfileActivity
 import com.rekixo.ludopaws.ui.dialogs.showPrivacyPolicyDialog
@@ -113,7 +113,7 @@ internal fun ProfileActivity.showProfileMenu(anchor: View) {
                 gravity = Gravity.CENTER_VERTICAL
                 minimumHeight = dp(48)
                 setPadding(dp(11), dp(8), dp(8), dp(8))
-                background = recessedPlywoodBackground(this@showProfileMenu, outerCornerRadiusDp = 12f)
+                background = transparentDarkBlueStrokeBackground(this@showProfileMenu, cornerRadiusDp = 12f)
                 isClickable = true
                 isFocusable = true
                 contentDescription = "$title. $description"
@@ -190,6 +190,10 @@ internal fun ProfileActivity.showProfileMenu(anchor: View) {
     }
 
     addSection("ACCOUNT & DATA")
+    addItem(
+        "Save / Restore Account",
+        if (accountGoogleLinked) "Manage or restore your Google-linked account" else "Link this Guest account or restore a saved account",
+    ) { openAccountActions() }
     addItem(
         "Delete account and data",
         "Permanently delete this Ludo Paws account",
