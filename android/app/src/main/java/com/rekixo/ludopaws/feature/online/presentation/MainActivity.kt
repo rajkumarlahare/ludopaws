@@ -198,6 +198,7 @@ class MainActivity : ComponentActivity() {
     internal var lastOnlineGameplayPacingKey: String? = null
     internal var onlineRollRequestInFlight = false
     internal var onlineMoveRequestInFlight = false
+    internal var onlineMovePreviewStartedAtMillis: Long? = null
 
     internal fun canSubmitOnlineGameplayAction(): Boolean =
         SystemClock.uptimeMillis() >= onlineGameplayActionBlockedUntilMillis &&
@@ -205,6 +206,10 @@ class MainActivity : ComponentActivity() {
             !onlineMoveRequestInFlight
 
     internal fun releaseOnlineGameplayRequest() {
+        if (onlineMovePreviewStartedAtMillis != null) {
+            OnlineLudoPawsPresentation.cancelPendingMovePreview(this, currentState)
+        }
+        onlineMovePreviewStartedAtMillis = null
         onlineRollRequestInFlight = false
         onlineMoveRequestInFlight = false
         if (!canRenderUi()) return
