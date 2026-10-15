@@ -29,7 +29,7 @@ internal object OnlineGameplayPacingPolicy {
             pending?.status == "RESOLVED" &&
             (
                 previous.pendingRoll?.status != "RESOLVED" ||
-                    previous.pendingRoll.eventIndex != pending.eventIndex
+                    previous.pendingRoll?.eventIndex != pending.eventIndex
             )
         ) {
             return OnlineGameplayPacingTransition(
