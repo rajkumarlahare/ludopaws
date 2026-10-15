@@ -74,6 +74,7 @@ internal fun MainActivity.applyResponse(
 
     val previousState = currentState
     currentState = state
+    applyOnlineGameplayPacing(previousState, state)
     LudoProofTheme.setGameplayBackground(
         root = arcadeRootView,
         enabled = state.status == "ACTIVE",
