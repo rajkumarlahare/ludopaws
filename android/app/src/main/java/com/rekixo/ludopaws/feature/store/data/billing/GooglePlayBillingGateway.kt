@@ -388,8 +388,9 @@ class GooglePlayBillingGateway(
                         }
                         return@forEach
                     }
-                    val finish = {
+                    val finish: () -> Unit = {
                         processingPurchaseTokens.remove(purchase.purchaseToken)
+                        Unit
                     }
                     if (isSubscription) {
                         listener.onSubscriptionRequiresVerification(
