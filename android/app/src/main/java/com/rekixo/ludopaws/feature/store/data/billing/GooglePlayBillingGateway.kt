@@ -168,35 +168,42 @@ class GooglePlayBillingGateway(
             return
         }
 
-        val offerToken = if (productId == StoreCatalog.PAWS_PLUS) {
-            details.subscriptionOfferDetails
-                ?.firstOrNull { it.basePlanId == "monthly-auto" && it.offerId == null }
-                ?.offerToken
-        } else {
+        val listedOffer =
             details.oneTimePurchaseOfferDetailsList
                 ?.firstOrNull()
-                ?.offerToken
-        }
+        val offer =
+            listedOffer
+                ?: details.oneTimePurchaseOfferDetails
 
-        if (offerToken.isNullOrBlank()) {
+        if (offer == null) {
             listener
                 .onBillingUnavailable(
                     "No eligible Google Play offer is available for this product.",
                 )
             return
         }
+        // Offer-token based one-time products must supply the token for the
+        // selected offer. Legacy single-offer products may have no token.
+        if (listedOffer != null && listedOffer.offerToken.isNullOrBlank()) {
+            listener
+                .onBillingUnavailable(
+                    "Google Play returned an incomplete offer for this product.",
+                )
+            return
+        }
 
-        val productParams =
+        val productParamsBuilder =
             BillingFlowParams
                 .ProductDetailsParams
                 .newBuilder()
                 .setProductDetails(
                     details,
                 )
-                .setOfferToken(
-                    offerToken,
-                )
-                .build()
+        offer.offerToken
+            ?.takeIf(String::isNotBlank)
+            ?.let(productParamsBuilder::setOfferToken)
+        val productParams =
+            productParamsBuilder.build()
 
         val result =
             billingClient
@@ -281,21 +288,21 @@ class GooglePlayBillingGateway(
 
     private fun queryExistingPurchases() {
         if (closed || !billingClient.isReady) return
-        listOf(BillingClient.ProductType.INAPP, BillingClient.ProductType.SUBS).forEach { type ->
-            billingClient.queryPurchasesAsync(
-                QueryPurchasesParams.newBuilder().setProductType(type).build(),
-            ) { billingResult, purchases ->
-                if (closed) return@queryPurchasesAsync
-                if (billingResult.responseCode != BillingClient.BillingResponseCode.OK) {
-                    listener.onBillingUnavailable(
-                        billingResult.debugMessage.ifBlank {
-                            "Google Play could not reload previous purchases."
-                        },
-                    )
-                    return@queryPurchasesAsync
-                }
-                processPurchases(purchases)
+        billingClient.queryPurchasesAsync(
+            QueryPurchasesParams.newBuilder()
+                .setProductType(BillingClient.ProductType.INAPP)
+                .build(),
+        ) { billingResult, purchases ->
+            if (closed) return@queryPurchasesAsync
+            if (billingResult.responseCode != BillingClient.BillingResponseCode.OK) {
+                listener.onBillingUnavailable(
+                    billingResult.debugMessage.ifBlank {
+                        "Google Play could not reload previous purchases."
+                    },
+                )
+                return@queryPurchasesAsync
             }
+            processPurchases(purchases)
         }
     }
 
@@ -376,74 +383,42 @@ class GooglePlayBillingGateway(
     private fun queryProducts() {
         if (closed) return
 
-        val mapped = linkedMapOf<String, StoreBillingProduct>()
-        var remainingQueries = 2
-        var failureMessage: String? = null
-
-        fun finishQuery(
-            billingResult: BillingResult,
-            detailsList: List<ProductDetails>,
-            subscriptionQuery: Boolean,
-        ) {
-            if (closed) return
-            if (billingResult.responseCode != BillingClient.BillingResponseCode.OK) {
-                if (failureMessage == null) {
-                    failureMessage = billingResult.debugMessage.ifBlank {
-                        "Google Play catalog could not be loaded."
-                    }
-                }
-            } else {
-                detailsList.forEach { details ->
-                    val formattedPrice: String = (if (details.productId == StoreCatalog.PAWS_PLUS && subscriptionQuery) {
-                        details.subscriptionOfferDetails
-                            ?.firstOrNull { it.basePlanId == "monthly-auto" && it.offerId == null }
-                            ?.pricingPhases
-                            ?.pricingPhaseList
-                            ?.lastOrNull()
-                            ?.formattedPrice
-                    } else if (details.productId != StoreCatalog.PAWS_PLUS && !subscriptionQuery) {
-                        details.oneTimePurchaseOfferDetailsList?.firstOrNull()?.formattedPrice
-                    } else {
-                        null
-                    })?.takeIf { it.isNotBlank() } ?: return@forEach
-                    productDetails[details.productId] = details
-                    mapped[details.productId] = StoreBillingProduct(
-                        productId = details.productId,
-                        formattedPrice = formattedPrice,
-                    )
-                }
-            }
-            remainingQueries -= 1
-            if (remainingQueries == 0) {
-                if (failureMessage != null) {
-                    listener.onBillingUnavailable(failureMessage!!)
-                }
-                listener.onCatalogLoaded(mapped.toMap())
-            }
-        }
-
-        val oneTimeProducts = StoreCatalog.playProductIds.map { productId ->
+        val products = StoreCatalog.playProductIds.map { productId ->
             QueryProductDetailsParams.Product.newBuilder()
                 .setProductId(productId)
                 .setProductType(BillingClient.ProductType.INAPP)
                 .build()
         }
-        val subscriptionProducts = listOf(
-            QueryProductDetailsParams.Product.newBuilder()
-                .setProductId(StoreCatalog.PAWS_PLUS)
-                .setProductType(BillingClient.ProductType.SUBS)
-                .build(),
-        )
+        val params = QueryProductDetailsParams.newBuilder()
+            .setProductList(products)
+            .build()
 
-        billingClient.queryProductDetailsAsync(
-            QueryProductDetailsParams.newBuilder().setProductList(oneTimeProducts).build(),
-        ) { billingResult, result ->
-            finishQuery(billingResult, result.productDetailsList, subscriptionQuery = false)
-        }
-        billingClient.queryProductDetailsAsync(
-            QueryProductDetailsParams.newBuilder().setProductList(subscriptionProducts).build(),
-        ) { billingResult, result ->
-            finishQuery(billingResult, result.productDetailsList, subscriptionQuery = true)
+        billingClient.queryProductDetailsAsync(params) { billingResult, result ->
+            if (closed) return@queryProductDetailsAsync
+            if (billingResult.responseCode != BillingClient.BillingResponseCode.OK) {
+                listener.onBillingUnavailable(
+                    billingResult.debugMessage.ifBlank {
+                        "Google Play catalog could not be loaded."
+                    },
+                )
+                return@queryProductDetailsAsync
+            }
+
+            productDetails.clear()
+            val mapped = linkedMapOf<String, StoreBillingProduct>()
+            result.productDetailsList.forEach { details ->
+                val offer =
+                    details.oneTimePurchaseOfferDetailsList
+                        ?.firstOrNull()
+                        ?: details.oneTimePurchaseOfferDetails
+                        ?: return@forEach
+                productDetails[details.productId] = details
+                mapped[details.productId] = StoreBillingProduct(
+                    productId = details.productId,
+                    formattedPrice = offer.formattedPrice,
+                )
+            }
+            listener.onCatalogLoaded(mapped)
         }
     }
 

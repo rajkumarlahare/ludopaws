@@ -31,7 +31,7 @@ import com.rekixo.ludopaws.feature.store.presentation.StoreActivity
 
 internal fun ProfileActivity.profileTopBar(): FrameLayout =
     FrameLayout(this).apply {
-        // Place the title at the true center of the whole top bar, independent of the Back button.
+        // Keep the title centered independently of the two symmetric action buttons.
         addView(
             TextView(this@profileTopBar).apply {
                 text = "Profile"
@@ -54,11 +54,30 @@ internal fun ProfileActivity.profileTopBar(): FrameLayout =
                 contentDescription = "Back",
                 iconName = AppIconName.CHEVRON_LEFT,
                 sizeDp = 50,
-            ) { finish() }.apply {
-                // Keep the Back button circular while using the shared plywood texture.
+                onClick = { this@profileTopBar.finish() },
+            ).apply {
+                // Keep both navigation controls on the same circular plywood skin.
                 background = plywoodBackground(this@profileTopBar, cornerRadiusDp = 25f)
             },
             FrameLayout.LayoutParams(dp(50), dp(50), Gravity.START or Gravity.CENTER_VERTICAL),
+        )
+
+        val menuButton =
+            appIconActionButton(
+                context = this@profileTopBar,
+                contentDescription = "Open profile menu",
+                iconName = AppIconName.MENU,
+                sizeDp = 50,
+                onClick = {},
+            ).apply {
+                background = plywoodBackground(this@profileTopBar, cornerRadiusDp = 25f)
+            }
+        menuButton.setOnClickListener {
+            this@profileTopBar.showProfileMenu(menuButton)
+        }
+        addView(
+            menuButton,
+            FrameLayout.LayoutParams(dp(50), dp(50), Gravity.END or Gravity.CENTER_VERTICAL),
         )
     }
 
@@ -223,46 +242,6 @@ internal fun ProfileActivity.profileIdentityPanel(profile: ProfileSnapshot): Lin
             ),
         )
         details.addView(signInRow)
-
-        details.addView(
-            Button(this@profileIdentityPanel).apply {
-                text = when {
-                    accountAuthInProgress -> "SECURING ACCOUNT…"
-                    accountGoogleLinked -> "ACCOUNT SAVED"
-                    else -> "SAVE / RESTORE ACCOUNT"
-                }
-                textSize = 10.5f
-                setTypeface(Typeface.DEFAULT_BOLD)
-                setTextColor(Color.WHITE)
-                minWidth = 0
-                minHeight = 0
-                setPadding(dp(6), 0, dp(6), 0)
-                background = playGamesSignInBackground(this@profileIdentityPanel)
-                contentDescription = "Save or restore Ludo Paws account"
-                isEnabled = !accountAuthInProgress
-                alpha = if (isEnabled) 1f else 0.78f
-                setOnClickListener { openAccountActions() }
-                AppFocusRing.apply(this, cornerRadiusDp = 13f)
-            },
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(36),
-            ).apply { topMargin = dp(5) },
-        )
-        details.addView(
-            TextView(this@profileIdentityPanel).apply {
-                text = accountStatus
-                textSize = 9.5f
-                maxLines = 2
-                setTextColor(if (accountGoogleLinked) 0xFFB8FFD7.toInt() else 0xFFFFE6A8.toInt())
-                setPadding(dp(2), dp(2), dp(2), 0)
-                contentDescription = "Account status: $accountStatus"
-            },
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            ),
-        )
 
         val profileScreenWidthDp = resources.displayMetrics.widthPixels / resources.displayMetrics.density
         val pageHorizontalPaddingDp =

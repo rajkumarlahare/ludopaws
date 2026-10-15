@@ -4,10 +4,10 @@ import com.rekixo.ludopaws.feature.store.domain.model.StoreProduct
 import com.rekixo.ludopaws.feature.store.domain.model.StoreProductKind
 
 object StoreCatalog {
+    private const val PRICE_UNAVAILABLE = "Price unavailable"
+
     const val REMOVE_ADS =
         "remove_ads"
-    const val PAWS_PLUS =
-        "paws_plus"
     const val GEMS_300 =
         "gems_300"
     const val GEMS_1500 =
@@ -21,15 +21,6 @@ object StoreCatalog {
     const val GEMS_200000 =
         "gems_200000"
 
-    val pawsPlus = StoreProduct(
-        productId = PAWS_PLUS,
-        title = "Paws Plus Monthly",
-        gemAmount = 0,
-        kind = StoreProductKind.SUBSCRIPTION,
-        fallbackPrice = "Monthly price from Google Play",
-        featured = true,
-    )
-
     val products =
         listOf(
             StoreProduct(
@@ -42,7 +33,7 @@ object StoreCatalog {
                 kind =
                     StoreProductKind.NON_CONSUMABLE_REMOVE_ADS,
                 fallbackPrice =
-                    "₹99.00",
+                    PRICE_UNAVAILABLE,
                 featured =
                     true,
             ),
@@ -56,7 +47,7 @@ object StoreCatalog {
                 kind =
                     StoreProductKind.CONSUMABLE_GEMS,
                 fallbackPrice =
-                    "₹29.00",
+                    PRICE_UNAVAILABLE,
             ),
             StoreProduct(
                 productId =
@@ -68,7 +59,7 @@ object StoreCatalog {
                 kind =
                     StoreProductKind.CONSUMABLE_GEMS,
                 fallbackPrice =
-                    "₹79.00",
+                    PRICE_UNAVAILABLE,
             ),
             StoreProduct(
                 productId =
@@ -80,7 +71,7 @@ object StoreCatalog {
                 kind =
                     StoreProductKind.CONSUMABLE_GEMS,
                 fallbackPrice =
-                    "₹179.00",
+                    PRICE_UNAVAILABLE,
             ),
             StoreProduct(
                 productId =
@@ -92,7 +83,7 @@ object StoreCatalog {
                 kind =
                     StoreProductKind.CONSUMABLE_GEMS,
                 fallbackPrice =
-                    "₹399.00",
+                    PRICE_UNAVAILABLE,
             ),
             StoreProduct(
                 productId =
@@ -104,7 +95,7 @@ object StoreCatalog {
                 kind =
                     StoreProductKind.CONSUMABLE_GEMS,
                 fallbackPrice =
-                    "₹799.00",
+                    PRICE_UNAVAILABLE,
             ),
             StoreProduct(
                 productId =
@@ -116,7 +107,7 @@ object StoreCatalog {
                 kind =
                     StoreProductKind.CONSUMABLE_GEMS,
                 fallbackPrice =
-                    "₹1,499.00",
+                    PRICE_UNAVAILABLE,
             ),
         )
 

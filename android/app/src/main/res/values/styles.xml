@@ -8,4 +8,8 @@
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
     </style>
+    <!-- Applied only to the launcher Activity. Other screens keep the normal app window background. -->
+    <style name="Theme.LudoPaws.Launch" parent="@style/Theme.LudoPaws">
+        <item name="android:windowBackground">@drawable/ludo_paws_launch_window_background</item>
+    </style>
 </resources>

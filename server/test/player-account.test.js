@@ -8,7 +8,6 @@ class FakeAccountSql {
     this.deletedAccounts = new Map();
     this.deletionClaims = new Map();
     this.wallet = new Map();
-    this.subscriptions = new Map();
     this.sessions = new Map();
     this.ownedCosmetics = new Map();
     this.selectedCosmetics = new Map();
@@ -43,7 +42,6 @@ class FakeAccountSql {
     if (/^DELETE FROM selected_cosmetics$/.test(sql)) { this.selectedCosmetics.clear(); return { rowsWritten: 1 }; }
     if (/^DELETE FROM owned_cosmetics$/.test(sql)) { this.ownedCosmetics.clear(); return { rowsWritten: 1 }; }
     if (/^DELETE FROM wallet$/.test(sql)) { this.wallet.clear(); return { rowsWritten: 1 }; }
-    if (sql.startsWith("DELETE FROM subscription_entitlements WHERE account_id = ?")) { this.subscriptions.delete(params[0]); return { rowsWritten: 1 }; }
     if (sql.startsWith("DELETE FROM account_meta WHERE account_id = ?")) { this.accountMeta.delete(params[0]); return { rowsWritten: 1 }; }
     if (sql.startsWith("INSERT INTO account_deletions")) { this.deletedAccounts.set(params[0], { deleted_at: params[1] }); return { rowsWritten: 1 }; }
     if (sql.startsWith("SELECT account_id FROM account_meta WHERE account_id = ?")) {
@@ -73,14 +71,6 @@ class FakeAccountSql {
       this.wallet.set(accountId, {
         account_id: accountId, balance: 0, ads_removed: 0, updated_at: Number(params[1]),
       });
-      return { rowsWritten: 1 };
-    }
-    if (sql.startsWith("SELECT product_id, subscription_state, expiry_time, auto_renew_enabled FROM subscription_entitlements WHERE account_id = ?")) {
-      const row = this.subscriptions.get(params[0]);
-      return row ? [structuredClone(row)] : [];
-    }
-    if (sql.startsWith("INSERT INTO subscription_entitlements")) {
-      this.subscriptions.set(params[0], { account_id: params[0], product_id: params[1], purchase_token_hash: params[2], subscription_state: params[3], expiry_time: params[4], auto_renew_enabled: params[5], updated_at: params[6] });
       return { rowsWritten: 1 };
     }
     if (sql.startsWith("SELECT balance, ads_removed, updated_at FROM wallet WHERE account_id = ?")) {
@@ -705,61 +695,3 @@ test("deletion preview locks account mutations until the deletion saga commits o
   assert.equal(sql.deletedAccounts.has(accountId), true);
 });
 
-
-test("Paws Plus entitlement is account-bound, reflected in wallet, and expires automatically", async () => {
-  const { account, sql } = makeAccount();
-  const accountId = "a7c63b53-1e4f-4d53-a95b-8f0e8a26b001";
-  const created = await post(account, "/session/create", { accountId, displayName: "Subscription tester" });
-  const session = await created.json();
-  assert.equal(created.status, 200);
-  const now = Date.now();
-  const active = await post(account, "/subscription/refresh", {
-    accountId,
-    sessionId: session.sessionId,
-    productId: "paws_plus",
-    purchaseTokenHash: "a".repeat(64),
-    subscriptionState: "SUBSCRIPTION_STATE_ACTIVE",
-    expiryTime: now + 60_000,
-    autoRenewEnabled: true,
-  });
-  const activeBody = await active.json();
-  assert.equal(active.status, 200);
-  assert.equal(activeBody.subscription.active, true);
-  assert.equal(activeBody.wallet.pawsPlusActive, true);
-  assert.equal(activeBody.wallet.adsRemoved, true);
-  assert.equal(activeBody.wallet.subscriptionAutoRenewEnabled, true);
-
-  const expired = await post(account, "/subscription/refresh", {
-    accountId,
-    sessionId: session.sessionId,
-    productId: "paws_plus",
-    purchaseTokenHash: "a".repeat(64),
-    subscriptionState: "SUBSCRIPTION_STATE_EXPIRED",
-    expiryTime: now - 60_000,
-    autoRenewEnabled: false,
-  });
-  const expiredBody = await expired.json();
-  assert.equal(expired.status, 200);
-  assert.equal(expiredBody.subscription.active, false);
-  assert.equal(expiredBody.wallet.pawsPlusActive, false);
-  assert.equal(expiredBody.wallet.adsRemoved, false);
-  assert.equal(sql.subscriptions.get(accountId).subscription_state, "SUBSCRIPTION_STATE_EXPIRED");
-});
-
-test("Paws Plus entitlement refresh rejects malformed or unverified-looking state", async () => {
-  const { account } = makeAccount();
-  const accountId = "b7c63b53-1e4f-4d53-a95b-8f0e8a26b002";
-  const created = await post(account, "/session/create", { accountId, displayName: "Subscription tester" });
-  const session = await created.json();
-  const response = await post(account, "/subscription/refresh", {
-    accountId,
-    sessionId: session.sessionId,
-    productId: "remove_ads",
-    purchaseTokenHash: "not-a-hash",
-    subscriptionState: "SUBSCRIPTION_STATE_ACTIVE",
-    expiryTime: Date.now() + 60_000,
-    autoRenewEnabled: true,
-  });
-  assert.equal(response.status, 400);
-  assert.equal((await response.json()).error, "INVALID_SUBSCRIPTION_STATE");
-});

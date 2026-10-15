@@ -11,7 +11,7 @@ Build a server-authoritative, editable catalogue for Paws, dice, boards, and fut
 - Preserve the existing Android application ID `com.rekixo.ludopaws`.
 - Preserve deployed Worker/Durable Object names, namespaces, persisted schema semantics, match/proof identifiers, and protocol identifiers unless a separately reviewed migration explicitly authorizes a change.
 - Keep `GOOGLE_PLAY_BILLING_ENABLED=false`, `LUDOPROOF_BILLING_ENABLED=false`, `LUDOPROOF_ADMOB_SSV_ENABLED=false`, and `LUDOPROOF_ADS_ENABLED=false` until internal end-to-end acceptance passes.
-- Never trust client-supplied price, gem cost, ad progress, ownership, purchase state, subscription state, or entitlement expiry.
+- Never trust client-supplied price, gem cost, ad progress, ownership, purchase state, entitlement expiry.
 - Do not publish incomplete assets or catalog entries. A disabled/unavailable item must not accept purchase, consume gems, or become equipable.
 - Existing four starter Paws (Dog, Cat, Goat, Duck) remain free and unlocked. Do not remove ownership already granted.
 - Keep catalog changes separate from production deployment. Production Worker deployment remains manual workflow dispatch only.
@@ -75,22 +75,19 @@ Optional LEVEL/EVENT methods require server-authoritative progression/event evid
 - Direct cosmetic purchases must be modeled as non-consumable one-time products unless a separate clearly defined consumable makes commercial sense.
 - Acceptance: duplicate callbacks/purchase retries cannot double-charge or double-grant; already-owned items do not charge again.
 
-### Phase 6 — Paws Plus monthly subscription
+### Phase 6 — Remove Ads one-time purchase
 
-Implementation update (feature branch; not yet production-ready): server-side Google Play subscriptionsv2 verification now validates the account binding and `paws_plus` product, handles pending/active/grace/canceled/expired states, acknowledges pending acknowledgement, and stores the server-derived expiry/renewal status on the account wallet. Android now queries both INAPP and SUBS products, launches the monthly offer using the Play-provided offer token, restores owned subscription tokens on store startup, routes subscription tokens to the dedicated verification endpoint, and presents a monthly Paws Plus offer using the localized Google Play price. Subscription entitlement automatically stops at the verified expiry timestamp. CI, Play license-tester lifecycle checks, production secrets, and live Play Console product/base-plan setup are still required; do not enable billing or deploy until those checks pass. The current implementation refreshes subscription state when the client restores/queries purchases; real-time developer notifications are not yet implemented.
-- Create a new subscription product ID and monthly auto-renewing base plan. Keep legacy `remove_ads` semantics intact; do not silently reinterpret an existing one-time product ID as a subscription.
-- Proposed subscription ID: `paws_plus`; base plan: `monthly-auto`.
-- Active entitlement: suppress forced/post-win interstitial ads and other explicitly documented forced ads; keep opt-in rewarded ads available so players can still earn rewards. This does not mean all advertisements are disabled if the player deliberately chooses a reward ad.
-- Add recurring value that is real and delivered every cycle, such as a monthly cosmetic rental/perk, rotating subscribers-only cosmetics, or a fixed monthly Gem allowance. Any bonus must be supplemental to the core ongoing benefits and must be granted once per verified billing period.
-- Verify subscription state through Google Play Developer API subscription endpoints. Store current state/expiry server-side; process renewal, grace period, account hold, pause where offered, cancellation, expiry, revocation/refund and replacement/upgrade. Integrate Real-time Developer Notifications or an equally reliable reconciliation process.
-- Provide restore/refresh status and an easy Google Play subscription-management/cancellation entry in the app.
-- Clearly disclose price, billing period, auto-renewal, cancellation and what remains accessible without subscribing.
-- Acceptance: sandbox/license-tester flows pass initial purchase, renewal, cancellation, expiry, restore, hold/grace period and refund/revocation; expired subscriptions do not keep benefits.
+- Keep `remove_ads` as a non-consumable Google Play one-time product.
+- A successful, server-verified purchase permanently sets the account's `ads_removed` entitlement. Optional rewarded ads remain available for players who choose to watch them for rewards.
+- Set the source price to exactly US$1.00 in the Remove Ads purchase option in Play Console and apply Google's localized conversion to all intended distribution regions. If Play Console rejects that amount for this product, stop and check the supported price setup rather than silently substituting a different price. Review the generated local prices, taxes and regional pricing patterns, and refresh converted prices when appropriate; never calculate foreign prices in the app.
+- Android must show the localized `ProductDetails` price. Do not display a hard-coded INR or USD price as if it were the live checkout price.
+- All bundled Store SKU fallbacks use the neutral `Price unavailable` label until Google Play returns a localized price; no region-specific fallback price may appear as a checkout price.
+- Acceptance: license testers verify purchase, permanent entitlement, restore/re-query, duplicate callback idempotency, refund/revocation behavior, and matching of the displayed localized price to Google Play checkout.
 
 ### Phase 7 — Stable Google Play product catalogue and pricing
 - Existing one-time IDs remain stable: `gems_300`, `gems_1500`, `gems_3500`, `gems_20000`, `gems_40000`, `gems_200000`, and the existing `remove_ads` one-time product for compatibility.
 - New product IDs must be added only after server verifier, Android Billing query types, and tests support them.
-- Use a new ID such as `paws_plus` for subscription. Do not create Play Console products until code and test contracts agree.
+- This project will use one-time Play products only. Add any future one-time product only after the server verifier, Android Billing query and tests support it.
 - Currency prices are configured in Play Console by region. Use the localized Play price from ProductDetails at runtime. Any admin-authored direct-purchase price must be tied to an actual provisioned product/offer.
 - Initial pricing is a hypothesis to test, not a promise of profitable unit economics: test low-friction India tiers and regional Play Console defaults first; review conversion, refund rate, payer retention and net revenue after fees/taxes. Avoid equal numeric prices across countries.
 - Acceptance: every production-visible SKU exists in the correct product type, has regional availability/pricing, is queryable by the app and verifiable on the backend.
@@ -98,7 +95,7 @@ Implementation update (feature branch; not yet production-ready): server-side Go
 ### Phase 8 — Security and automated quality gates
 - Unit/integration tests for catalog validation, admin authorization, Gem atomicity, ad SSV duplicates, purchase-token replay, account deletion races, asset validation and version rollback.
 - Google Play Billing license testers and internal testing track.
-- Subscription lifecycle tests.
+- One-time purchase, restore, duplicate-callback, refund/revocation, and account-binding tests.
 - CI gates: server tests, Wrangler dry-run, Android JVM tests, lint, build/AAB generation, asset/schema tests and security checks.
 - Acceptance: no failed required CI checks; no secret or production flag is introduced in source.
 
@@ -109,13 +106,15 @@ Track:
 - R2 storage, Class A/Class B operations and asset bundle sizes;
 - upstream EntroNex requests and actual provider cost/latency/failure rate;
 - AdMob impressions, fill, completed rewarded views, eCPM and net revenue;
-- purchase conversion, average revenue per paying user, refunds, churn and subscription retention.
+- purchase conversion, average revenue per paying user, refunds and payer retention.
 Use actual billing dashboards and observed request counts to calculate unit economics. Do not claim a precise cost per user from MAU alone.
 Rollout: internal license testers → small closed/limited test cohort → staged public rollout → worldwide availability after policy, privacy, payment, ads and reliability checks.
 
-## Subscription and monetization recommendation
+## Remove Ads pricing recommendation
 
-A monthly plan that only hides one set of ads can be commercially fragile. Make Paws Plus an honest recurring-value plan with ongoing forced-ad suppression and at least one transparent recurring benefit. Proposed initial experiment: ₹29/month in India, then evaluate ₹39/month as an A/B candidate only if retention and conversion data support it. This is a pricing experiment, not a verified market benchmark. Keep optional rewarded ads usable for users who want ad rewards.
+Offer `remove_ads` as a permanent, non-consumable one-time product at a US$1.00 source price in Play Console. Apply localized prices to all intended distribution regions, then review Google's generated amounts. Google Play uses a one-off conversion for the regions selected; it does not recalculate every user's price from a live exchange rate during each purchase. The app must display the formatted price returned by Google Play and must not invent exchange rates or promise a live FX conversion.
+
+Keep opt-in rewarded ads available even after Remove Ads is purchased, and disclose this clearly before checkout.
 
 ## Initial cosmetics price bands (test hypotheses; India starting point)
 
@@ -135,10 +134,10 @@ EntroNex usage is an important unknown: the repository identifies the current v4
 A robust monthly operating model must include Workers, Durable Objects, R2, EntroNex, store fees/tax, customer support, privacy/legal operations and release monitoring. Advertising revenue is variable and should not be assumed to cover API expense until actual eCPM and fill rates are measured.
 
 ## Main-branch audit findings recorded for implementation
-- `StoreCatalog.kt` currently defines `remove_ads` as `NON_CONSUMABLE_REMOVE_ADS`; the Worker grants a persistent `ads_removed` boolean. Keep that ID's existing behavior for compatibility and create a new subscription ID for monthly Paws Plus.
-- `server/src/google-play-billing.js` currently verifies one-time `INAPP` purchases via products APIs and its hard-coded `GOOGLE_PLAY_PRODUCTS` map. Subscription purchase tokens, subscription status, acknowledgement, renewals and expiry are not implemented in that verifier yet.
+- `StoreCatalog.kt` currently defines `remove_ads` as `NON_CONSUMABLE_REMOVE_ADS`; the Worker grants a persistent `ads_removed` boolean. Keep that ID's existing behavior for compatibility.
+- `server/src/google-play-billing.js` currently verifies one-time `INAPP` purchases via products APIs and its hard-coded `GOOGLE_PLAY_PRODUCTS` map. The Worker verifies and fulfills the configured Google Play one-time products listed in its authoritative product map.
 - `server/src/player-account.js` has a hard-coded `COSMETICS` map and wallet/ad progress tables. Existing channels include FREE, GEMS and REWARDED_ADS, but new server-owned catalogue entries and arbitrary direct-purchase cosmetics require a catalog authority and SKU-to-item mapping.
-- `server/src/index-account.js` exposes wallet, cosmetic purchase/select, one-time purchase verification, store status and SSV routes, but no catalog-management/admin routes or subscription lifecycle routes.
+- `server/src/index-account.js` exposes wallet, cosmetic purchase/select, one-time purchase verification, store status and SSV routes, and catalog-management/admin routes.
 - Current ad SSV grants 5 Gems on a cosmetic-targeted rewarded view as well as one unit of that item's ad progress. Product design must preserve this explicitly or migrate it only with tests and clear UI disclosure.
 - `server/wrangler.json` currently binds no R2 bucket. R2 upload/delivery requires adding a new explicit binding and deployment configuration; this plan does not modify Worker routing yet.
 - The repository contains a Store tab and category catalog, but its local cosmetic metadata is not yet a remote, operator-editable published catalog. The proposed admin workflow must not claim dynamic publishing until catalog persistence/API and Android fetch/cache are implemented.

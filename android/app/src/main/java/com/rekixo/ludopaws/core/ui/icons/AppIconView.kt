@@ -31,6 +31,7 @@ internal enum class AppIconName {
     MESSAGE,
     CLOCK,
     MORE,
+    MENU,
 }
 
 /**
@@ -139,6 +140,7 @@ internal class AppIconView(
             AppIconName.MESSAGE -> drawMessage(canvas)
             AppIconName.CLOCK -> drawClock(canvas)
             AppIconName.MORE -> drawMore(canvas)
+            AppIconName.MENU -> drawMenu(canvas)
         }
 
         canvas.restore()
@@ -289,6 +291,13 @@ internal class AppIconView(
         canvas.drawCircle(50f, 50f, 28f, stroke)
         canvas.drawLine(50f, 50f, 50f, 32f, stroke)
         canvas.drawLine(50f, 50f, 65f, 58f, stroke)
+    }
+
+    private fun drawMenu(canvas: Canvas) {
+        // Three balanced strokes form the classic hamburger menu, not an overflow ellipsis.
+        canvas.drawLine(24f, 31f, 76f, 31f, stroke)
+        canvas.drawLine(24f, 50f, 76f, 50f, stroke)
+        canvas.drawLine(24f, 69f, 76f, 69f, stroke)
     }
 
     private fun drawMore(canvas: Canvas) {

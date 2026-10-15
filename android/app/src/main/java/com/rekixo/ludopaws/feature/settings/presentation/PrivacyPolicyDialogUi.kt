@@ -1,13 +1,17 @@
 package com.rekixo.ludopaws.ui.dialogs
 
+import android.content.ActivityNotFoundException
 import android.content.Context
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.net.Uri
 import android.view.Gravity
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.Toast
 
 internal fun showPrivacyPolicyDialog(
     context: Context,
@@ -77,6 +81,37 @@ internal fun showPrivacyPolicyDialog(
 
     panel.addView(
         TextView(context).apply {
+            text = "OPEN FULL ONLINE PRIVACY POLICY"
+            textSize = 13f
+            setTypeface(Typeface.DEFAULT_BOLD)
+            setTextColor(0xFFFFD34E.toInt())
+            gravity = Gravity.CENTER
+            setPadding(
+                0,
+                settingsDp(context, 8),
+                0,
+                settingsDp(context, 8),
+            )
+            isClickable = true
+            isFocusable = true
+            contentDescription = "Open the full online Ludo Paws Privacy Policy"
+            setOnClickListener {
+                try {
+                    context.startActivity(
+                        Intent(
+                            Intent.ACTION_VIEW,
+                            Uri.parse("https://ludopaws.rekixo.com/privacy-policy.html"),
+                        ),
+                    )
+                } catch (_: ActivityNotFoundException) {
+                    Toast.makeText(context, "No browser is available to open this page.", Toast.LENGTH_LONG).show()
+                }
+            }
+        },
+    )
+
+    panel.addView(
+        TextView(context).apply {
             text = "CLOSE"
             textSize = 14f
             setTypeface(Typeface.DEFAULT_BOLD)
@@ -102,24 +137,26 @@ internal fun showPrivacyPolicyDialog(
 }
 
 private const val PRIVACY_POLICY_TEXT =
-    """Last updated: October 3, 2026
+    """Last updated: October 15, 2026
 
-Ludo Paws uses information that is necessary to provide its game features. Depending on the features you use, this can include your in-game display/profile information, Friend ID and friend relationships, match and proof data, leaderboard/progression information, and game settings or cosmetic selections.
+Ludo Paws is published under the Rekixo brand. This policy describes information that may be processed by the Android game and its connected services. Which information is used depends on the features you choose and which services the publisher has enabled.
 
-ONLINE FEATURES
-Online matchmaking, Team Up, Friends, private rooms, leaderboards and proof verification communicate with Ludo Paws game services. The app is configured to use encrypted network connections for these services.
+INFORMATION THAT MAY BE PROCESSED
+• Account and profile information, such as an internal account identifier, display name, account/session status, and links to Google, Friend ID, or leaderboard identities when you choose to link those features.
+• Online game and integrity information, such as match/player identifiers, moves, outcomes, dice/proof commitments, proof digests, and event history needed to operate multiplayer games and investigate game-integrity issues.
+• Social and leaderboard information, such as Friend IDs, friend relationships, invitations/messages when used, and submitted player names, scores, wins, or points.
+• Store and entitlement information, such as selected cosmetics, gem balance, cosmetics inventory, rewarded-ad progress when enabled, purchase product IDs, and transaction references used to verify entitlements and prevent duplicate grants.
+• Device-local information, such as settings, local game state, selected appearance, and account-scoped cache data.
+• Technical and security records needed to authenticate requests, maintain sessions, limit abuse, troubleshoot errors, and protect the service.
 
-ON-DEVICE DATA
-Gameplay preferences such as music, sound, quick chat and game speed are stored on the device. Cosmetic selections and local game state can also be stored locally so the app can render the selected experience and operate supported local features.
+HOW INFORMATION IS USED AND SHARED
+Information is used to provide account and game features, synchronize supported progress and entitlements, operate online matches and social/leaderboard features, verify game integrity and purchases, prevent abuse, troubleshoot service errors, and respond to privacy requests. Data may be processed by Google sign-in/Google Play Games, Google Play billing, advertising services such as AdMob when enabled, and infrastructure or network providers to the extent needed for configured features. Those providers also apply their own privacy notices and terms. Ludo Paws does not need your Google password to verify Google sign-in.
 
-ACCOUNT AND SESSION SECURITY
-Public Friend IDs are designed to be shareable. Private friend credentials and match/session credentials are separate from the public Friend ID and are handled by the app's protected local-storage and authenticated service flows.
+ON-DEVICE DATA, PURCHASES AND ADS
+Game settings and some local profile or wallet information can be stored on your device for display and offline use; local caches are not authoritative proof of paid entitlements. Google Play handles its own order history and payment process. If ads or rewarded ads are enabled, Google Mobile Ads/AdMob may process ad requests and consent signals under Google's policies; rewards are applied only through the configured validation flow. This text does not mean ads or every online feature are currently enabled.
 
-MATCH INTEGRITY
-Ludo Paws can retain match and proof information needed to operate multiplayer features, verify game integrity, resolve match state and support match history. Settings that change audio, appearance or animation timing do not change dice outcomes or Ludo rules.
+RETENTION AND ACCOUNT DELETION
+Service data may be kept while needed to operate features, secure accounts, prevent abuse or duplicate grants, resolve disputes, maintain game integrity, or meet legal obligations. Any specific retention period and justified exception must be described in the official published policy. Use Profile → menu → Delete account and data to request deletion in the app. A guest-only account may use its optional delete-only guest code; save it privately before uninstalling. The official online deletion page is available at https://ludopaws.rekixo.com/account-deletion.html when the publisher-hosted site is published and available. Deleting a Ludo Paws account does not delete your Google account or erase Google's separate Play order history.
 
-THIRD-PARTY PLATFORM SERVICES
-Android, Google Play features when enabled, and infrastructure/network providers can process technical information needed to deliver their respective services under their own terms and privacy practices.
-
-RETENTION AND CHANGES
-Service data can be retained for as long as reasonably needed to operate game, friend, integrity and security features. This policy may be updated as Ludo Paws features and data flows change. The policy shown in the app should be reviewed together with the current store listing before a public release."""
+CHANGES AND CONTACT
+This policy may be updated when the game, service providers, or applicable requirements change. Before public release, the publisher must verify the final provider list, data-retention details, support contact, and Play Console Data safety answers against the final app and server configuration."""

@@ -6,9 +6,11 @@ const androidRoot = path.join(repoRoot, "android", "app", "src", "main");
 const manifestPath = path.join(androidRoot, "AndroidManifest.xml");
 const stringsPath = path.join(androidRoot, "res", "values", "strings.xml");
 
+// Scan the current production source namespace. The old com/ludoproof/game
+// paths no longer exist after the Rekixo package migration and silently skipped
+// the branding check for the real presentation code.
 const presentationRoots = [
-  path.join(androidRoot, "java", "com", "ludoproof", "game", "feature"),
-  path.join(androidRoot, "java", "com", "ludoproof", "game", "game", "ui"),
+  path.join(androidRoot, "java", "com", "rekixo", "ludopaws"),
 ];
 
 const requiredStrings = new Map([
@@ -67,11 +69,15 @@ const manifest = fs.readFileSync(manifestPath, "utf8");
 if (!manifest.includes('android:label="@string/app_name"')) {
   violations.push("AndroidManifest.xml must use @string/app_name for the application label.");
 }
-if (!manifest.includes('android:icon="@drawable/ic_ludo_paws"')) {
-  violations.push("AndroidManifest.xml must use the Ludo Paws launcher icon.");
+if (!manifest.includes('android:icon="@mipmap/ic_ludo_paws_launcher"')) {
+  violations.push("AndroidManifest.xml must use @mipmap/ic_ludo_paws_launcher for the launcher icon.");
 }
-if (!manifest.includes('android:roundIcon="@drawable/ic_ludo_paws"')) {
-  violations.push("AndroidManifest.xml must use the Ludo Paws round launcher icon.");
+if (!manifest.includes('android:roundIcon="@mipmap/ic_ludo_paws_launcher"')) {
+  violations.push("AndroidManifest.xml must use @mipmap/ic_ludo_paws_launcher for the round launcher icon.");
+}
+const adaptiveIconPath = path.join(androidRoot, "res", "mipmap-anydpi-v26", "ic_ludo_paws_launcher.xml");
+if (!fs.existsSync(adaptiveIconPath)) {
+  violations.push("Missing adaptive Ludo Paws launcher resource: res/mipmap-anydpi-v26/ic_ludo_paws_launcher.xml");
 }
 
 const strings = fs.readFileSync(stringsPath, "utf8");

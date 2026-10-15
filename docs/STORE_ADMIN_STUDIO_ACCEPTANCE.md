@@ -33,7 +33,6 @@ This defines the planned acceptance contract. It is not a claim that the Admin S
 - [ ] One-time Play purchases are verified with the Google Play Developer API and reserved in the existing purchase ledger.
 - [ ] Server maps SKU to item; client cannot supply the amount, category or entitlement.
 - [ ] Items purchased by one route stay owned when catalog prices or channels change.
-- [ ] Subscription entitlement is separate from item ownership and is granted only for the verified active billing period.
 
 ## Admin UX
 - [ ] Draft, preview, save, publish, schedule, archive and rollback actions have explicit confirmation for destructive/unpublishing changes.

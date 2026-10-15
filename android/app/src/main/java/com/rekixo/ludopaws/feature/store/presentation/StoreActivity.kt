@@ -23,10 +23,12 @@ import com.rekixo.ludopaws.feature.store.data.local.CosmeticInventoryStore
 import com.rekixo.ludopaws.feature.store.data.local.GemWalletStore
 import com.rekixo.ludopaws.feature.profile.data.local.ProfileStore
 import com.rekixo.ludopaws.feature.store.domain.StoreCosmeticCatalog
+import com.rekixo.ludopaws.feature.store.domain.StoreCatalog
 import com.rekixo.ludopaws.feature.store.domain.model.StoreBillingProduct
 import com.rekixo.ludopaws.feature.store.domain.model.StoreTab
 import com.rekixo.ludopaws.feature.store.presentation.components.storeContent
 import com.rekixo.ludopaws.feature.store.presentation.components.storeHeader
+import com.rekixo.ludopaws.feature.store.presentation.components.pinnedRemoveAdsContent
 import com.rekixo.ludopaws.feature.store.presentation.components.storeTabs
 import java.util.concurrent.Executors
 import org.json.JSONObject
@@ -50,6 +52,8 @@ class StoreActivity :
             > =
         emptyMap()
     private var billingAvailable = false
+    private var billingProductCatalogLoaded = false
+    private var pendingAutoPurchaseProductId: String? = null
     private var rewardedAdsEnabledByServer = false
     private var rewardedAdsStatusLoaded = false
     private var rewardedAdsStatusError: Exception? = null
@@ -125,12 +129,17 @@ class StoreActivity :
         selectedTab =
             requestedInitialTab()
                 ?: StoreTab.GEMS
+        pendingAutoPurchaseProductId =
+            intent
+                .getStringExtra(EXTRA_PURCHASE_PRODUCT_ID)
+                ?.takeIf { it == StoreCatalog.REMOVE_ADS }
         renderStore()
     }
 
     override fun onStart() {
         super.onStart()
         billingAvailable = false
+        billingProductCatalogLoaded = false
 
         // Refresh catalog off the UI thread. Stale cached offers are display-only and
         // locked; all purchase/equip requests still go to the authoritative server.
@@ -219,6 +228,16 @@ class StoreActivity :
             runOnUiThread {
                 if (!canRenderStoreUi()) return@runOnUiThread
                 billingAvailable = available
+
+                val requestedProduct = pendingAutoPurchaseProductId
+                if (
+                    requestedProduct == StoreCatalog.REMOVE_ADS &&
+                    wallet.adsRemoved()
+                ) {
+                    pendingAutoPurchaseProductId = null
+                    showStoreMessage("Remove Ads is already active for this account.")
+                }
+
                 if (BuildConfig.LUDOPROOF_BILLING_ENABLED && billingAvailable) {
                     val binding = activeBillingAccountId
                     if (binding.isNullOrBlank()) {
@@ -227,7 +246,15 @@ class StoreActivity :
                     }
                     billing.updateAccountId(binding)
                     billing.connect()
-                } else if (BuildConfig.LUDOPROOF_BILLING_ENABLED) {
+                } else if (pendingAutoPurchaseProductId != null) {
+                    val productId = pendingAutoPurchaseProductId
+                        ?: return@runOnUiThread
+                    pendingAutoPurchaseProductId = null
+                    requestPurchase(productId)
+                } else if (
+                    BuildConfig.LUDOPROOF_BILLING_ENABLED &&
+                    requestedProduct == null
+                ) {
                     val message = availabilityError?.message
                         ?: "Google Play payments are not configured yet."
                     showStoreMessage(message)
@@ -388,8 +415,33 @@ class StoreActivity :
             }
             liveProducts =
                 products
+            billingProductCatalogLoaded = true
             renderStore()
+            launchPendingAutoPurchaseIfReady()
         }
+    }
+
+    private fun launchPendingAutoPurchaseIfReady() {
+        if (
+            !canRenderStoreUi() ||
+            !billingProductCatalogLoaded ||
+            !BuildConfig.LUDOPROOF_BILLING_ENABLED ||
+            !billingAvailable
+        ) {
+            return
+        }
+
+        val productId = pendingAutoPurchaseProductId ?: return
+        pendingAutoPurchaseProductId = null
+
+        if (productId == StoreCatalog.REMOVE_ADS && wallet.adsRemoved()) {
+            showStoreMessage("Remove Ads is already active for this account.")
+            return
+        }
+
+        // Called only after Google Play has returned the product catalog, so this opens
+        // the native Google Play purchase sheet rather than merely showing the Store page.
+        requestPurchase(productId)
     }
 
     override fun onPurchaseRequiresVerification(
@@ -681,7 +733,7 @@ class StoreActivity :
                 BuildConfig
                     .LUDOPROOF_BILLING_ENABLED
             ) {
-                "UNAVAILABLE"
+                "Price unavailable"
             } else {
                 fallback
             }
@@ -725,44 +777,17 @@ class StoreActivity :
     }
 
     internal fun renderStore() {
-        if (
-            !canRenderStoreUi()
-        ) {
-            return
-        }
+        if (!canRenderStoreUi()) return
 
         val (root, host) =
-            LudoProofTheme
-                .arcadeRoot(
-                    this,
-                    gameplayBackground = true,
-                )
-
-        val scroll =
-            ScrollView(this).apply {
-                isFillViewport =
-                    true
-                overScrollMode =
-                    View.OVER_SCROLL_NEVER
-            }
-        val contentHost =
-            FrameLayout(this)
-        scroll.addView(
-            contentHost,
-            FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-            ),
-        )
+            LudoProofTheme.arcadeRoot(
+                this,
+                gameplayBackground = true,
+            )
 
         val horizontalPadding =
             dp(
-                if (
-                    LudoProofTheme
-                        .isCompactWidth(
-                            this,
-                        )
-                ) {
+                if (LudoProofTheme.isCompactWidth(this)) {
                     10
                 } else {
                     14
@@ -770,75 +795,113 @@ class StoreActivity :
             )
         val contentWidth =
             minOf(
-                resources
-                    .displayMetrics
-                    .widthPixels -
-                    horizontalPadding *
-                        2,
-                dp(
-                    LudoProofTheme
-                        .pageMaxContentWidthDp(
-                            this,
-                        ),
-                ),
+                resources.displayMetrics.widthPixels - horizontalPadding * 2,
+                dp(LudoProofTheme.pageMaxContentWidthDp(this)),
             )
 
-        val content =
+        // The page itself does not scroll. Store navigation stays visible while only
+        // the active tab's catalog below it can move.
+        val page =
             LinearLayout(this).apply {
-                orientation =
-                    LinearLayout.VERTICAL
-                setPadding(
-                    0,
-                    dp(12),
-                    0,
-                    dp(30),
-                )
+                orientation = LinearLayout.VERTICAL
+                setPadding(0, dp(12), 0, dp(8))
+                // The scrolling catalog must never draw outside its allocated viewport
+                // and over the pinned navigation/Remove Ads area.
+                clipChildren = true
+                clipToPadding = true
             }
-
-        contentHost.addView(
-            content,
-            FrameLayout.LayoutParams(
-                contentWidth,
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                Gravity.TOP or
-                    Gravity.CENTER_HORIZONTAL,
-            ),
-        )
         host.addView(
-            scroll,
+            page,
             FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT,
             ),
         )
 
-        content.addView(
-            storeHeader(),
+        val fixedHeader =
+            LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                clipChildren = true
+                clipToPadding = true
+                // Keep the pinned header above the catalog if a child has an elevation shadow.
+                elevation = dp(6).toFloat()
+            }
+        page.addView(
+            fixedHeader,
+            LinearLayout.LayoutParams(
+                contentWidth,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                gravity = Gravity.CENTER_HORIZONTAL
+            },
         )
-        content.addView(
+
+        fixedHeader.addView(storeHeader())
+        fixedHeader.addView(
             storeTabs(),
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(58),
             ).apply {
-                // Separate category tabs from the back button and gem/plus pill above.
+                // Keep category tabs beneath the back button and wallet pill.
                 topMargin = dp(14)
             },
         )
-        content.addView(
-            storeContent(),
+
+        if (selectedTab == StoreTab.GEMS) {
+            fixedHeader.addView(
+                pinnedRemoveAdsContent(),
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ).apply {
+                    topMargin = dp(12)
+                },
+            )
+        }
+
+        val scroll =
+            ScrollView(this).apply {
+                isFillViewport = true
+                overScrollMode = View.OVER_SCROLL_NEVER
+                // Clip card artwork/elevation shadows at the scroll viewport edge.
+                clipChildren = true
+                clipToPadding = true
+                elevation = 0f
+            }
+        page.addView(
+            scroll,
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
+                0,
+                1f,
             ).apply {
-                topMargin =
-                    dp(12)
+                topMargin = dp(8)
             },
         )
 
-        setContentView(
-            root,
+        val scrollContentHost =
+            FrameLayout(this).apply {
+                clipChildren = true
+                clipToPadding = true
+            }
+        scroll.addView(
+            scrollContentHost,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+            ),
         )
+        scrollContentHost.addView(
+            storeContent(),
+            FrameLayout.LayoutParams(
+                contentWidth,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP or Gravity.CENTER_HORIZONTAL,
+            ),
+        )
+
+        setContentView(root)
     }
 
     internal fun showStoreMessage(
@@ -868,6 +931,8 @@ class StoreActivity :
     companion object {
         const val EXTRA_INITIAL_TAB =
             "ludo_paws_store_initial_tab"
+        const val EXTRA_PURCHASE_PRODUCT_ID =
+            "ludo_paws_store_purchase_product_id"
         private const val TAG = "StoreBilling"
     }
 }

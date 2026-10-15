@@ -1,8 +1,6 @@
 package com.rekixo.ludopaws.feature.store.presentation.components
 
-import android.content.Intent
 import android.graphics.Color
-import android.net.Uri
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
@@ -21,6 +19,14 @@ import com.rekixo.ludopaws.feature.store.presentation.StoreActivity
 import com.rekixo.ludopaws.feature.store.presentation.art.GemClusterView
 import com.rekixo.ludopaws.ui.home.HomeIconKind
 import com.rekixo.ludopaws.ui.home.HomeIconView
+
+internal fun StoreActivity.pinnedRemoveAdsContent(): LinearLayout {
+    val product =
+        requireNotNull(
+            StoreCatalog.find(StoreCatalog.REMOVE_ADS),
+        )
+    return featuredRemoveAdsCard(product)
+}
 
 internal fun StoreActivity.storeContent():
     LinearLayout =
@@ -44,41 +50,6 @@ private fun StoreActivity.gemsContent():
     LinearLayout(this).apply {
         orientation =
             LinearLayout.VERTICAL
-
-        val removeAds =
-            requireNotNull(
-                StoreCatalog
-                    .find(
-                        StoreCatalog
-                            .REMOVE_ADS,
-                    ),
-            )
-
-        // Keep the one-time Remove Ads SKU separate from the monthly subscription.
-        addView(
-            pawsPlusSubscriptionCard(),
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            ).apply {
-                topMargin = dp(6)
-                bottomMargin = dp(6)
-            },
-        )
-
-        // Feature Remove Ads before the six gem price cards.
-        addView(
-            featuredRemoveAdsCard(
-                removeAds,
-            ),
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            ).apply {
-                topMargin = dp(4)
-                bottomMargin = dp(6)
-            },
-        )
 
         val packs =
             StoreCatalog
@@ -399,47 +370,6 @@ private fun StoreActivity.featuredRemoveAdsCard(
                 dp(52),
             ),
         )
-    }
-
-private fun StoreActivity.pawsPlusSubscriptionCard(): LinearLayout =
-    LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
-        background = plywoodBackground(context = this@pawsPlusSubscriptionCard, cornerRadiusDp = 15f)
-        setPadding(dp(14), dp(12), dp(14), dp(12))
-        addView(TextView(this@pawsPlusSubscriptionCard).apply {
-            text = "Paws Plus Monthly"
-            textSize = 17f
-            setTypeface(Typeface.DEFAULT_BOLD)
-            setTextColor(Color.WHITE)
-        })
-        addView(TextView(this@pawsPlusSubscriptionCard).apply {
-            text = "Auto-renews monthly until canceled in Google Play. Forced ads stay off while active; optional rewarded ads remain available."
-            textSize = 12f
-            setTextColor(0xFFEED9B7.toInt())
-            setPadding(0, dp(4), 0, dp(6))
-        })
-        addView(Button(this@pawsPlusSubscriptionCard).apply {
-            val price = liveProducts[StoreCatalog.PAWS_PLUS]?.formattedPrice
-            text = if (price.isNullOrBlank()) "Subscribe — price shown by Google Play" else "Subscribe · $price / month"
-            isAllCaps = false
-            setOnClickListener { requestPurchase(StoreCatalog.PAWS_PLUS) }
-        }, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT,
-        ))
-        addView(Button(this@pawsPlusSubscriptionCard).apply {
-            text = "Manage or cancel subscription"
-            isAllCaps = false
-            setOnClickListener {
-                val url = Uri.parse(
-                    "https://play.google.com/store/account/subscriptions?sku=${StoreCatalog.PAWS_PLUS}&package=com.rekixo.ludopaws",
-                )
-                startActivity(Intent(Intent.ACTION_VIEW, url))
-            }
-        }, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT,
-        ))
     }
 
 private fun StoreActivity.rewardedAdCard():
