@@ -341,13 +341,12 @@ internal fun MainActivity.moveToken(
         ->
         onlineMoveRequestInFlight = true
         val previewRequestedAt = SystemClock.uptimeMillis()
-        val previewStarted = playerId?.let {
+        val previewStarted =
             OnlineLudoPawsPresentation.beginPendingMovePreview(
                 activity = this,
                 state = state,
                 tokenIndex = index,
             )
-        } ?: false
         onlineMovePreviewStartedAtMillis =
             previewRequestedAt.takeIf { previewStarted }
         // The pawn begins a presentation-only preview immediately. The server
