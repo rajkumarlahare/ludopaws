@@ -9,10 +9,26 @@ import {
   sealFairnessEvent,
 } from "../src/fairness.js";
 
+const TEST_MATCH_CREATED_AT = Date.now();
+const RECEIPT_RETENTION_MS = 180 * 24 * 60 * 60 * 1000;
+
 class FakeStorage {
   constructor() {
-    this.values =
-      new Map();
+    this.values = new Map();
+    this.alarmTime = null;
+  }
+
+  async setAlarm(timestamp) {
+    this.alarmTime = timestamp;
+  }
+
+  async deleteAlarm() {
+    this.alarmTime = null;
+  }
+
+  async deleteAll() {
+    this.values.clear();
+    this.alarmTime = null;
   }
 
   async get(key) {
@@ -187,8 +203,9 @@ function matchState(
     matchId:
       "LPABCDEFGH",
     status,
-    createdAt: 100,
+    createdAt: TEST_MATCH_CREATED_AT,
     updatedAt:
+      TEST_MATCH_CREATED_AT +
       2_000 +
       history.length,
     revision:
@@ -229,7 +246,7 @@ function matchState(
     finishedAt:
       status ===
         "FINISHED"
-        ? 3_000
+        ? TEST_MATCH_CREATED_AT + 3_000
         : null,
     history:
       structuredClone(
@@ -499,5 +516,39 @@ test(
       result.body.receiptDigest,
       null,
     );
+  },
+);
+
+test(
+  "receipt archive schedules a 180-day deadline from match completion and purges expired evidence",
+  async () => {
+    const { archive, ctx } = room();
+    const history = [proofEvent([], 0, 6)];
+    const finishedState = matchState(history, {
+      status: "FINISHED",
+      randomEventIndex: 1,
+    });
+
+    const synced = await sync(archive, finishedState);
+    assert.equal(synced.response.status, 200);
+    assert.equal(
+      ctx.storage.alarmTime,
+      TEST_MATCH_CREATED_AT + 3_000 + RECEIPT_RETENTION_MS,
+    );
+    assert.ok(ctx.storage.values.size > 0);
+
+    const realNow = Date.now;
+    Date.now = () =>
+      TEST_MATCH_CREATED_AT + 3_000 + RECEIPT_RETENTION_MS + 1;
+    try {
+      await archive.alarm();
+    } finally {
+      Date.now = realNow;
+    }
+
+    assert.equal(ctx.storage.values.size, 0);
+    assert.equal(ctx.storage.alarmTime, null);
+    const expired = await json(await archive.fetch(request("/receipt")));
+    assert.equal(expired.response.status, 404);
   },
 );
