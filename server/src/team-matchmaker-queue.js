@@ -313,15 +313,13 @@ export class TeamMatchmakerQueue {
     });
   }
 
-  async #materialize(participants) {
+  async #materialize(participants, reservation = {}) {
     const host = participants[0];
     for (let attempt = 0; attempt < 4; attempt += 1) {
       // ONLINE public matchmaking reserves attempts 0..3. Team Up uses 4..7,
       // remaining inside deterministicMatchId's reviewed attempt bounds.
-      const matchId = await deterministicMatchId(
-        host.clientRequestId,
-        4 + attempt,
-      );
+      const matchId = reservation.matchId
+        ?? await deterministicMatchId(host.clientRequestId, 4 + attempt);
       const target = room(this.env, matchId);
       const createResponse = await target.fetch(
         new Request("https://room/create", {
@@ -345,8 +343,21 @@ export class TeamMatchmakerQueue {
           }),
         }),
       );
-      if (createResponse.status === 409) continue;
+      if (createResponse.status === 409) {
+        if (reservation.matchId) {
+          throw httpError(
+            503,
+            "TEAM_MATCH_RESERVED_ID_CONFLICT",
+            "reserved Team Up match ID no longer belongs to its reservation",
+          );
+        }
+        continue;
+      }
       const created = await requireJsonResponse(createResponse);
+      if (!reservation.matchId) {
+        reservation.matchId = matchId;
+        if (reservation.onMatchReserved) await reservation.onMatchReserved(matchId);
+      }
 
       for (let index = 1; index < participants.length; index += 1) {
         const participant = participants[index];
@@ -398,7 +409,14 @@ export class TeamMatchmakerQueue {
 
     let assignment;
     try {
-      assignment = await this.#materialize(pending.participants);
+      assignment = await this.#materialize(pending.participants, {
+        matchId: pending.matchId,
+        onMatchReserved: async (matchId) => {
+          pending.matchId = matchId;
+          state.pendingMatch = pending;
+          await this.#persist(state);
+        },
+      });
     } catch (error) {
       pending.retryAt = Date.now() + botRetryDelayMs(this.env);
       state.pendingMatch = pending;
