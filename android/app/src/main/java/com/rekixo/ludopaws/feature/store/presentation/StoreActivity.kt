@@ -200,6 +200,9 @@ class StoreActivity :
                 rewardedAdsStatusError = adsStatusError
                 rewardedAdsEnabledByServer = adsAvailable
                 subscriptionsAvailableByServer = subscriptionsAvailable
+                // If Billing connected before this asynchronous status request returned,
+                // reopen the subscription catalog only after the server flag is confirmed.
+                if (billingWasCreated) billing.updateSubscriptionsEnabled(pawsPlusSubscriptionsConfigured)
                 if (adsEnabledForBuild) rewardedAds.prepare()
                 renderStore()
             }
