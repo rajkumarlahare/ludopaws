@@ -323,10 +323,11 @@ export class MatchmakerQueue {
     });
   }
 
-  async #materialize(participants, targetPlayerCount) {
+  async #materialize(participants, targetPlayerCount, reservation = {}) {
     const host = participants[0];
     for (let attempt = 0; attempt < 4; attempt += 1) {
-      const matchId = await deterministicMatchId(host.clientRequestId, attempt);
+      const matchId = reservation.matchId
+        ?? await deterministicMatchId(host.clientRequestId, attempt);
       const target = room(this.env, matchId);
       const createResponse = await target.fetch(
         new Request("https://room/create", {
@@ -354,8 +355,21 @@ export class MatchmakerQueue {
           }),
         }),
       );
-      if (createResponse.status === 409) continue;
+      if (createResponse.status === 409) {
+        if (reservation.matchId) {
+          throw httpError(
+            503,
+            "MATCH_RESERVED_ID_CONFLICT",
+            "reserved match ID no longer belongs to its reservation",
+          );
+        }
+        continue;
+      }
       const created = await requireJsonResponse(createResponse);
+      if (!reservation.matchId) {
+        reservation.matchId = matchId;
+        if (reservation.onMatchReserved) await reservation.onMatchReserved(matchId);
+      }
 
       for (let index = 1; index < participants.length; index += 1) {
         const participant = participants[index];
@@ -415,6 +429,14 @@ export class MatchmakerQueue {
       assignment = await this.#materialize(
         pending.participants,
         pending.playerCount,
+        {
+          matchId: pending.matchId,
+          onMatchReserved: async (matchId) => {
+            pending.matchId = matchId;
+            state.pendingMatch = pending;
+            await this.#persist(state);
+          },
+        },
       );
     } catch (error) {
       pending.retryAt = Date.now() + botRetryDelayMs(this.env);
