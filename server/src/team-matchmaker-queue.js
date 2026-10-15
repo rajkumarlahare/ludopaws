@@ -395,8 +395,19 @@ export class TeamMatchmakerQueue {
     const pending = state.pendingMatch;
     if (!pending) return true;
 
+    let assignment;
     try {
       const assignment = await this.#materialize(pending.participants);
+    } catch (error) {
+      pending.retryAt = Date.now() + botRetryDelayMs(this.env);
+      state.pendingMatch = pending;
+      await this.#persist(state);
+      console.error("Team Up reserved match could not be materialized; retry scheduled", {
+        code: error?.code ?? "TEAM_MATCH_MATERIALIZE_FAILED",
+      });
+      return false;
+    }
+
       const realParticipants = pending.participants.filter(
         (candidate) => candidate.playerType !== "BOT",
       );
@@ -425,14 +436,6 @@ export class TeamMatchmakerQueue {
       delete state.pendingMatch;
       await this.#persist(state);
       return true;
-    } catch (error) {
-      pending.retryAt = Date.now() + botRetryDelayMs(this.env);
-      await this.#persist(state);
-      console.error("Team Up reserved match could not be materialized; retry scheduled", {
-        code: error?.code ?? "TEAM_MATCH_MATERIALIZE_FAILED",
-      });
-      return false;
-    }
   }
 
   async #matchedResponse(participant, assignment) {
