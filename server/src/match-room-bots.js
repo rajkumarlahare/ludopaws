@@ -6,7 +6,7 @@ import {
   globalCellFor,
   isTeamUp,
 } from "./game.js";
-import { botRetryDelayMs, botTurnDelayMs, botTurnsEnabled } from "./matchmaking-bots.js";
+import { botResultHoldMs, botRetryDelayMs, botTurnDelayMs, botTurnsEnabled } from "./matchmaking-bots.js";
 import { MatchRoom as LifecycleMatchRoom, MOVE_SELECTION_TIMEOUT_MS } from "./match-room-lifecycle.js";
 
 const STATE_KEY = "match-state";
@@ -230,12 +230,24 @@ export class MatchRoom extends LifecycleMatchRoom {
         return;
       }
 
+      let justRevealedRoll = false;
       if (pending.status !== "RESOLVED") {
         await this.#internalPlayerRequest(
           "/roll/reveal",
           identity.playerToken,
           { clientSeed: turn.clientSeed },
         );
+        state = await this.ctx.storage.get(STATE_KEY);
+        pending = state?.pendingRoll;
+        justRevealedRoll = true;
+      }
+
+      if (justRevealedRoll && pending?.status === "RESOLVED") {
+        const deferred = await this.#deferResolvedBotMove(
+          turn,
+          botResultHoldMs(this.env),
+        );
+        if (deferred) return;
         state = await this.ctx.storage.get(STATE_KEY);
         pending = state?.pendingRoll;
       }
@@ -292,6 +304,29 @@ export class MatchRoom extends LifecycleMatchRoom {
       throw error;
     }
     return payload;
+  }
+
+  async #deferResolvedBotMove(turn, delayMs) {
+    return this.#withBotMetadata(async () => {
+      const current = await this.ctx.storage.get(STATE_KEY);
+      if (
+        current?.status !== "ACTIVE" ||
+        current.botTurn?.playerId !== turn.playerId ||
+        current.botTurn?.eventIndex !== turn.eventIndex ||
+        current.botTurn?.inProgress !== true ||
+        current.pendingRoll?.status !== "RESOLVED" ||
+        current.pendingRoll?.playerId !== turn.playerId ||
+        typeof this.ctx.storage.setAlarm !== "function"
+      ) {
+        return false;
+      }
+
+      current.botTurn.inProgress = false;
+      current.botTurn.runAt = Date.now() + delayMs;
+      await this.ctx.storage.put(STATE_KEY, current);
+      await this.ctx.storage.setAlarm(current.botTurn.runAt);
+      return true;
+    });
   }
 
   async #scheduleRecoveryAlarm() {
