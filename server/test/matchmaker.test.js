@@ -708,7 +708,7 @@ test(
       ),
     );
 
-    assert.equal(result.status, 202);
+    assert.equal(result.status, 200);
     assert.equal(result.body.status, "FINALIZING");
     assert.equal(result.body.pending, true);
     assert.equal(result.body.targetPlayerCount, 2);
