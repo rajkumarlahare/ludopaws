@@ -47,7 +47,7 @@ export function botTurnDelayMs(env) {
   return boundedMilliseconds(
     env?.LUDOPROOF_BOT_TURN_DELAY_MS,
     DEFAULT_TURN_DELAY_MS,
-    100,
+    1_100,
     10_000,
   );
 }
@@ -56,7 +56,7 @@ export function botResultHoldMs(env) {
   return boundedMilliseconds(
     env?.LUDOPROOF_BOT_RESULT_HOLD_MS,
     DEFAULT_RESULT_HOLD_MS,
-    250,
+    950,
     5_000,
   );
 }
