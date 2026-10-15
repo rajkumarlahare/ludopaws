@@ -228,7 +228,11 @@ internal fun MainActivity.cancelPublicMatchmaking() {
             ) {
                 "MATCHED" -> {
                     showStatus(
-                        "A match was found while cancelling. Opening it now…",
+                        if (response.optBoolean("pending", false)) {
+                            "A match is being finalized and can no longer be cancelled. Reconnecting…"
+                        } else {
+                            "A match was found while cancelling. Opening it now…"
+                        },
                     )
                     pollPublicMatchmaking()
                 }
