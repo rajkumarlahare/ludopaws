@@ -289,6 +289,29 @@ export class MatchRoom extends LifecycleMatchRoom {
     return payload;
   }
 
+  async #scheduleRecoveryAlarm() {
+    await this.#withBotMetadata(async () => {
+      const current = await this.ctx.storage.get(STATE_KEY);
+      if (
+        current?.status !== "ACTIVE" ||
+        current.botTurn?.inProgress !== true ||
+        typeof this.ctx.storage.setAlarm !== "function"
+      ) {
+        return;
+      }
+
+      // Restore an early recovery wake-up after parent roll/move handlers
+      // schedule their own deadline on the single Durable Object alarm.
+      const recoveryAt = Date.now() + BOT_TURN_RECOVERY_MS;
+      const revealDeadline = Number(current.pendingRoll?.revealDeadlineAt ?? recoveryAt);
+      await this.ctx.storage.setAlarm(
+        Number.isSafeInteger(revealDeadline) && revealDeadline > 0
+          ? Math.min(recoveryAt, revealDeadline)
+          : recoveryAt,
+      );
+    });
+  }
+
   async #clearBotTurn(turn) {
     await this.#withBotMetadata(async () => {
       const current = await this.ctx.storage.get(STATE_KEY);
