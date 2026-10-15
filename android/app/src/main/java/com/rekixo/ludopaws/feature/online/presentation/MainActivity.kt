@@ -196,9 +196,23 @@ class MainActivity : ComponentActivity() {
 
     internal var onlineGameplayActionBlockedUntilMillis = 0L
     internal var lastOnlineGameplayPacingKey: String? = null
+    internal var onlineRollRequestInFlight = false
+    internal var onlineMoveRequestInFlight = false
 
     internal fun canSubmitOnlineGameplayAction(): Boolean =
-        SystemClock.uptimeMillis() >= onlineGameplayActionBlockedUntilMillis
+        SystemClock.uptimeMillis() >= onlineGameplayActionBlockedUntilMillis &&
+            !onlineRollRequestInFlight &&
+            !onlineMoveRequestInFlight
+
+    internal fun releaseOnlineGameplayRequest() {
+        onlineRollRequestInFlight = false
+        onlineMoveRequestInFlight = false
+        currentState?.let { state ->
+            updateControls(state)
+            updateRollButton()
+            OnlineLudoPawsPresentation.refreshActionControls(this, state)
+        }
+    }
 
     internal fun scheduleOnlineGameplayUnlock() {
         val remaining =
