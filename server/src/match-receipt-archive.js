@@ -17,7 +17,7 @@ import {
 const META_KEY = "receipt:meta:v1";
 const SEAL_KEY = "receipt:seal:v1";
 const EVENT_PREFIX = "receipt:event:v1:";
-const RECEIPT_RETENTION_MS = 180 * 24 * 60 * 60 * 1000;
+const RECEIPT_RETENTION_MS = 365 * 24 * 60 * 60 * 1000;
 const RECEIPT_PROTOCOL = "ludoproof-match-receipt-v1";
 const RECEIPT_DIGEST_DOMAIN = "ludoproof:match-receipt:v1:";
 
@@ -64,7 +64,7 @@ export class MatchReceiptArchive {
       throw httpError(
         410,
         "MATCH_RECEIPT_RETENTION_EXPIRED",
-        "match receipt is outside the 180-day retention window",
+        "match receipt is outside the 365-day retention window",
       );
     }
     if (
