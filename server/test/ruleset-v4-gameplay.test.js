@@ -68,6 +68,33 @@ test("four missed classic turns forfeit that player and finish a two-player matc
   assert.equal(result.state.turnDeadlineAt, null);
 });
 
+test("four missed Team Up turns forfeit both teammates and award the opposing team", () => {
+  const active = activeMatch({
+    matchId: "LPV4TEAMTO",
+    mode: "TEAM_UP",
+    playerCount: 4,
+    rulesetKey: TEAM_RULESET_V4_KEY,
+  });
+  const state = {
+    ...active,
+    turnTimeoutCounts: { p0: 3 },
+    turnDeadlineAt: 3_000,
+    turnDeadlineSeat: 0,
+  };
+
+  const result = forfeitTimedOutTurn(state, { now: 3_000 });
+
+  assert.equal(result.count, 4);
+  assert.equal(result.forfeited, true);
+  assert.equal(result.state.status, "FINISHED");
+  assert.equal(result.state.winnerTeamId, "B");
+  assert.equal(result.state.players[0].forfeitReason, "TURN_TIMEOUT");
+  assert.equal(result.state.players[2].forfeitReason, "TEAMMATE_TURN_TIMEOUT");
+  assert.equal(result.state.players[2].forfeitedAt, 3_000);
+  assert.deepEqual(result.state.players[2].tokens, [-1, -1, -1, -1]);
+  assert.equal(result.state.leaderboardRecordedAt, 3_000);
+});
+
 test("two opposing Team-Up tokens on one cell protect the whole stack", () => {
   let state = activeMatch({
     matchId: "LPV4STAK01", mode: "TEAM_UP", playerCount: 4, rulesetKey: TEAM_RULESET_V4_KEY,

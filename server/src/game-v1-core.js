@@ -415,6 +415,16 @@ export function forfeitTimedOutTurn(state, { now }) {
 
     if (isTeamUp(next)) {
       const losingTeam = teamIdForSeat(next, seat);
+      // Team Up is a shared 2-vs-2 result. Forfeiting one partner forfeits
+      // the whole team; persist both partners as forfeited, not just the actor.
+      next.players.forEach((teammate, teammateSeat) => {
+        if (teamIdForSeat(next, teammateSeat) !== losingTeam) return;
+        teammate.forfeitedAt = now;
+        teammate.forfeitReason =
+          teammateSeat === seat ? "TURN_TIMEOUT" : "TEAMMATE_TURN_TIMEOUT";
+        teammate.tokens = [-1, -1, -1, -1];
+        if (Array.isArray(next.consecutiveSixes)) next.consecutiveSixes[teammateSeat] = 0;
+      });
       next.status = "FINISHED";
       next.winnerPlayerId = null;
       next.winnerTeamId = losingTeam === "A" ? "B" : "A";
