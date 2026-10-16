@@ -71,6 +71,7 @@ data class MatchSnapshot(
     // Ordered player IDs from a trusted finish-order source, when available.
     val finishOrderPlayerIds: List<String> = emptyList(),
     val revision: Long = 0L,
+    val turnDeadlineAt: Long? = null,
 )
 
 data class GameEnvelope(
@@ -88,12 +89,14 @@ object GameJson {
             "ludoproof-standard-v1",
             "ludoproof-standard-v2",
             "ludoproof-standard-v3",
+            "ludoproof-standard-v4",
         )
     private val teamRulesetIds =
         setOf(
             "ludoproof-team-v1",
             "ludoproof-team-v2",
             "ludoproof-team-v3",
+            "ludoproof-team-v4",
         )
     private val colors = listOf("RED", "GREEN", "YELLOW", "BLUE")
     private val teamAssignments = listOf("A", "B", "A", "B")
@@ -159,6 +162,12 @@ object GameJson {
                     .takeIf { it == "A" || it == "B" },
             finishOrderPlayerIds = value.optJSONArray("finishOrderPlayerIds").toStringList(),
             revision = value.optLong("revision", 0L),
+            turnDeadlineAt =
+                if (value.has("turnDeadlineAt") && !value.isNull("turnDeadlineAt")) {
+                    value.optLong("turnDeadlineAt").takeIf { it > 0L }
+                } else {
+                    null
+                },
         )
     }
 

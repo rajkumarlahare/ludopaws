@@ -250,6 +250,29 @@ class GameJsonAuthoritativeSnapshotTest {
         GameJson.envelope(JSONObject().put("state", state))
     }
 
+    @Test
+    fun classicV4SnapshotParsesAuthoritativeTurnDeadline() {
+        val state = classicState(status = "ACTIVE", playerCount = 2)
+            .put("rulesetId", "ludoproof-standard-v4")
+            .put("turnDeadlineAt", 1_800_000_000_000L)
+
+        val parsed = GameJson.envelope(JSONObject().put("state", state)).state
+
+        requireNotNull(parsed)
+        assertEquals("ludoproof-standard-v4", parsed.rulesetId)
+        assertEquals(1_800_000_000_000L, parsed.turnDeadlineAt)
+    }
+
+    @Test
+    fun teamV4SnapshotIsAcceptedWithoutChangingLegacyTeamContract() {
+        val state = teamState().put("rulesetId", "ludoproof-team-v4")
+        val parsed = GameJson.envelope(JSONObject().put("state", state)).state
+
+        requireNotNull(parsed)
+        assertEquals("ludoproof-team-v4", parsed.rulesetId)
+        assertEquals(null, parsed.turnDeadlineAt)
+    }
+
     private fun classicState(
         status: String,
         playerCount: Int,
