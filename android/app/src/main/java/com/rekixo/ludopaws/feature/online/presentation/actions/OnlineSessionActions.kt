@@ -97,8 +97,8 @@ internal fun MainActivity.runNetwork(
     if (!isOnline) {
         if (prioritizeGameplay) diceView.stopRolling()
         if (showWorking) {
-            showStatus("Offline — this online match is read-only until internet returns.")
             currentState?.let { updateControls(it) }
+            showStatus("Offline — this online match is read-only until internet returns.")
         }
         onComplete()
         return
@@ -153,8 +153,8 @@ internal fun MainActivity.runNetwork(
                             if (!sessionReset) {
                                 if (showWorking) {
                                     setNetworkControls(enabled = true)
-                                    showStatus("Error: " + (error.message ?: error.toString()))
                                     currentState?.let { updateControls(it) }
+                                    showStatus("Error: " + (error.message ?: error.toString()))
                                 }
                                 if (reconcileOnError && prioritizeGameplay) {
                                     refreshState(silent = true)
