@@ -64,8 +64,7 @@ internal fun MainActivity.applyResponse(
     val currentStateIsAuthoritative =
         uiStateHolder.value.currentStateSource == OnlineStateSource.AUTHORITATIVE
     val incomingBehindRealtime =
-        source == OnlineStateSource.AUTHORITATIVE &&
-            previousState?.matchId == state.matchId &&
+        previousState?.matchId == state.matchId &&
             state.revision < lastRealtimeRevision.toLong()
     if (incomingBehindRealtime) {
         // A WebSocket event may announce a revision before the state-fetch reply
