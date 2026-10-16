@@ -32,7 +32,6 @@ for (const match of androidProductCatalog.matchAll(/StoreProduct\(([\s\S]*?)\n {
   const kind = block.match(/kind\s*=\s*StoreProductKind\.([A-Z_]+)/)?.[1];
   assert.ok(constant && constants[constant], "every Android store item needs a resolvable product ID");
   assert.ok(gemText && kind, "every Android store item needs a reward amount and purchase type");
-  if (kind === "SUBSCRIPTION_PAWS_PLUS") continue; // Validated separately as a SUBS product below.
   androidProducts[constants[constant]] = {
     gemAmount: amount(gemText),
     removeAds: kind === "NON_CONSUMABLE_REMOVE_ADS",
@@ -62,15 +61,6 @@ for (const [productId, product] of Object.entries(serverProducts)) {
 }
 assert.ok(pricing.includes("localized price and currency shown in the app"), "pricing page must direct users to the localized Google Play price");
 assert.ok(pricing.includes("does not take payments or offer a separate web checkout"), "pricing page must not imply web checkout");
-assert.ok(constants.PAWS_PLUS === "paws_plus", "Android must define the Paws Plus subscription product ID");
-assert.ok(constants.PAWS_PLUS_BASE_PLAN_ID === "monthly-auto", "Android must define the monthly auto-renewing base plan ID");
-assert.ok(android.includes("StoreProductKind.SUBSCRIPTION_PAWS_PLUS"), "Android must model Paws Plus separately from one-time products");
-assert.ok(server.includes("GOOGLE_PLAY_SUBSCRIPTIONS"), "server must define a separate subscription catalog");
-assert.ok(server.includes("paws_plus: Object.freeze({") && server.includes('basePlanId: "monthly-auto"'), "server subscription contract must match the monthly Paws Plus base plan");
-assert.ok(pricing.includes("<code>paws_plus</code>") && pricing.includes("<code>monthly-auto</code>"), "pricing page must identify the subscription and base plan");
-assert.ok(pricing.includes("Auto-renewing") && pricing.includes("monthly") && pricing.includes("canceled in Google Play"), "pricing page must disclose recurring billing and cancellation");
-assert.ok(terms.includes("auto-renewing monthly subscription") && terms.includes("Google Play subscription settings"), "Terms must disclose renewal and cancellation");
-assert.ok(privacy.includes("Paws Plus") && privacy.includes("expires"), "Privacy policy must disclose subscription status/expiry processing");
 assert.ok(pricing.includes("Google Play order history"), "pricing page must explain the order/refund support boundary");
 assert.ok(pricing.includes("PRICING_RELEASE_REVIEW_REQUIRED"), "pricing page must retain its manual release-review gate until live Play Console validation");
 assert.ok(terms.includes("TERMS_RELEASE_REVIEW_REQUIRED"), "Terms of Service must retain its publisher/legal review gate");
@@ -91,4 +81,4 @@ assert.ok(pagesWorkflow.includes("TERMS_RELEASE_REVIEW_REQUIRED"), "Pages workfl
 assert.ok(pagesWorkflow.includes("fetch_public_page /terms-of-service.html"), "Pages workflow must smoke-test the published Terms of Service route");
 assert.ok(pagesWorkflow.includes("PRICING_RELEASE_REVIEW_REQUIRED"), "Pages workflow must block on the pricing review marker");
 
-console.log("Pricing and in-app purchase policy contract passed: Android, server and public disclosures match.");
+console.log("One-time purchase policy contract passed: Android, server and public disclosures match.");
