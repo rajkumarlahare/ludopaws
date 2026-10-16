@@ -138,6 +138,8 @@ test("expired resolved roll forfeits the move and advances the turn", async () =
     "MOVE_SELECTION_TIMEOUT",
   );
   assert.ok(Number.isSafeInteger(stored.history[0].moveTimedOutAt));
+  assert.equal(stored.turnDeadlineAt, stored.updatedAt + TURN_ROLL_TIMEOUT_MS);
+  assert.equal(stored.turnDeadlineSeat, 1);
 });
 
 test("legacy rulesets do not inherit the V4 inactivity forfeit policy", async () => {

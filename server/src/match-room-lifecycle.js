@@ -89,24 +89,30 @@ export class MatchRoom extends SocialMatchRoom {
       return false;
     }
 
-    // Safely initialize a V4 match migrated without timer metadata rather than
-    // treating an older updatedAt timestamp as an immediately missed turn.
+    // If persisted V4 timer metadata is missing, derive it from the last
+    // authoritative turn-state write instead of restarting it on reconnect.
+    let deadlineState = state;
     if (
       !Number.isSafeInteger(state.turnDeadlineAt) ||
       state.turnDeadlineSeat !== actingSeat
     ) {
-      const next = structuredClone(state);
-      next.turnDeadlineAt = now + timeoutMs;
-      next.turnDeadlineSeat = actingSeat;
-      next.revision = (Number.isSafeInteger(next.revision) ? next.revision : 0) + 1;
-      await this.ctx.storage.put(STATE_KEY, next);
-      broadcastStateChanged(this.ctx, next);
-      return false;
+      deadlineState = structuredClone(state);
+      const turnStartedAt = Number(state.updatedAt ?? state.createdAt ?? now);
+      const safeTurnStartedAt = Number.isSafeInteger(turnStartedAt) ? turnStartedAt : now;
+      deadlineState.turnDeadlineAt = safeTurnStartedAt + timeoutMs;
+      deadlineState.turnDeadlineSeat = actingSeat;
+      if (now < deadlineState.turnDeadlineAt) {
+        deadlineState.revision =
+          (Number.isSafeInteger(deadlineState.revision) ? deadlineState.revision : 0) + 1;
+        await this.ctx.storage.put(STATE_KEY, deadlineState);
+        broadcastStateChanged(this.ctx, deadlineState);
+        return false;
+      }
     }
 
-    if (now < state.turnDeadlineAt) return false;
+    if (now < deadlineState.turnDeadlineAt) return false;
 
-    const result = forfeitTimedOutTurn(state, { now });
+    const result = forfeitTimedOutTurn(deadlineState, { now });
     await this.ctx.storage.put(STATE_KEY, result.state);
     broadcastStateChanged(this.ctx, result.state);
     if (result.state.status === "FINISHED") {
@@ -214,6 +220,21 @@ export class MatchRoom extends SocialMatchRoom {
         ? next.turnSeat
         : seat,
     );
+    const nextTimeoutMs = rulesetForState(next).turnRollTimeoutMs;
+    const nextActingSeat = actingSeatForTurn(next);
+    if (
+      Number.isSafeInteger(nextTimeoutMs) &&
+      nextTimeoutMs > 0 &&
+      Number.isInteger(nextActingSeat) &&
+      nextActingSeat >= 0 &&
+      nextActingSeat < next.players.length
+    ) {
+      next.turnDeadlineSeat = nextActingSeat;
+      next.turnDeadlineAt = now + nextTimeoutMs;
+    } else {
+      next.turnDeadlineSeat = null;
+      next.turnDeadlineAt = null;
+    }
     next.updatedAt = now;
     next.revision = Number(next.revision ?? 0) + 1;
 
