@@ -228,6 +228,7 @@ class MainActivity : ComponentActivity() {
         currentState?.let { state ->
             updateRollButton()
             OnlineLudoPawsPresentation.refreshActionControls(this, state)
+            scheduleOnlineAutoMove(state)
         }
     }
 
@@ -886,6 +887,7 @@ class MainActivity : ComponentActivity() {
         screenStarted = true
         connectivityMonitor.start()
         scheduleOnlineGameplayUnlock()
+        currentState?.let(::scheduleOnlineAutoMove)
         mainHandler.removeCallbacks(
             statePollRunnable,
         )
@@ -911,6 +913,7 @@ class MainActivity : ComponentActivity() {
     override fun onStop() {
         stopFriendsVoice("Voice paused when you left the match.")
         screenStarted = false
+        cancelScheduledOnlineAutoMove()
         mainHandler.removeCallbacks(onlineGameplayUnlockRunnable)
         uiStateHolder.update {
             it.copy(
@@ -941,6 +944,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         stopFriendsVoice("Voice is off")
+        cancelScheduledOnlineAutoMove()
+        remoteExitConfirmationDialog?.dismiss()
+        remoteExitConfirmationDialog = null
         postWinInterstitialExitGate?.close()
         postWinInterstitialExitGate = null
         postWinInterstitialAd?.close()
