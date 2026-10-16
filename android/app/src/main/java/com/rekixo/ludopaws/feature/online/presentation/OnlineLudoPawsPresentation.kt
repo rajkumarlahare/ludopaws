@@ -156,19 +156,6 @@ internal object OnlineLudoPawsPresentation {
         host(activity)?.board?.cancelPendingMovePreview(authoritative)
     }
 
-    /**
-     * Records the local sound already played at input time so the authoritative
-     * snapshot cannot replay the same roll locally. Remote clients have no mark
-     * and play the same event-indexed take on arrival.
-     */
-    fun noteLocalRollStarted(activity: MainActivity, matchId: String, eventIndex: Int) {
-        val host = host(activity) ?: return
-        host.feedbackLedger.once(
-            matchId = matchId,
-            key = "ROLL_START:${eventIndex}",
-        )
-    }
-
     fun presentRemoteQuickChat(
         activity: MainActivity,
         senderPlayerId: String,
@@ -217,7 +204,7 @@ internal object OnlineLudoPawsPresentation {
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
             ).apply {
-                topMargin = dp(activity, 4)
+                topMargin = dp(activity, 2)
             },
         )
 
@@ -229,7 +216,7 @@ internal object OnlineLudoPawsPresentation {
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
             ).apply {
-                bottomMargin = dp(activity, 4)
+                bottomMargin = dp(activity, 2)
             },
         )
 
@@ -369,6 +356,7 @@ internal object OnlineLudoPawsPresentation {
                 control.isFocusable = enabled
                 activity.diceView.setAttentionEnabled(enabled)
             }
+            bindTurnCountdown(activity, state)
             return
         }
 
@@ -424,6 +412,19 @@ internal object OnlineLudoPawsPresentation {
             preferredBottomLeftColor = preferredBottomLeftColor,
             characterIdsBySeat = characterIdsBySeat,
         )
+        bindTurnCountdown(activity, state)
+    }
+
+    private fun bindTurnCountdown(activity: MainActivity, state: MatchSnapshot) {
+        val versionSupportsTimer =
+            state.rulesetId == "ludoproof-standard-v4" ||
+                state.rulesetId == "ludoproof-team-v4"
+        val deadline = state.turnDeadlineAt.takeIf {
+            versionSupportsTimer &&
+                state.status == "ACTIVE" &&
+                state.pendingRoll == null
+        }
+        activity.diceView.setTurnDeadlineAt(deadline)
     }
 
     private fun addPlayerSlot(
@@ -657,62 +658,18 @@ internal object OnlineLudoPawsPresentation {
 
         val pending = current.pendingRoll
         val previousPending = previous.pendingRoll
-        val newRollEvent =
-            pending != null &&
-                previousPending?.eventIndex != pending.eventIndex
-
         if (
-            newRollEvent &&
+            pending != null &&
+            (
+                previousPending == null ||
+                    previousPending.eventIndex != pending.eventIndex
+                ) &&
             host.feedbackLedger.once(
                 matchId = current.matchId,
-                key = "ROLL_START:${pending!!.eventIndex}",
+                key = "ROLL:${pending.eventIndex}",
             )
         ) {
-            GameSoundFeedback.roll(activity, pending!!.eventIndex)
-        }
-
-        val newlyResolvedPending =
-            pending != null &&
-                pending.status == "RESOLVED" &&
-                (
-                    previousPending?.eventIndex != pending.eventIndex ||
-                        previousPending?.status != "RESOLVED"
-                )
-        if (
-            newlyResolvedPending &&
-            host.feedbackLedger.once(
-                matchId = current.matchId,
-                key = "ROLL_SETTLE:${pending!!.eventIndex}",
-            )
-        ) {
-            // If a realtime update skipped COMMITTED/RESOLVING, leave a short
-            // spin-audio window before the shared settle tick.
-            val eventIndex = pending!!.eventIndex
-            activity.mainHandler.postDelayed(
-                {
-                    if (activity.canRenderUi()) GameSoundFeedback.diceSettle(activity, eventIndex)
-                },
-                if (newRollEvent) 320L else 0L,
-            )
-        } else if (
-            pending == null &&
-            current.history.lastOrNull()?.let { latest ->
-                latest.eventIndex != previous.history.lastOrNull()?.eventIndex &&
-                    latest.moveTokenIndex == null &&
-                    latest.status != "TIMED_OUT" &&
-                    ((latest.effectiveOutcome ?: latest.outcome)?.let { it in 1..6 } == true) &&
-                    !latest.proofDigest.isNullOrBlank()
-            } == true
-        ) {
-            val latest = requireNotNull(current.history.lastOrNull())
-            if (
-                host.feedbackLedger.once(
-                    matchId = current.matchId,
-                    key = "ROLL_SETTLE:${latest.eventIndex}",
-                )
-            ) {
-                GameSoundFeedback.diceSettle(activity, latest.eventIndex)
-            }
+            GameSoundFeedback.diceSettle(activity)
         }
 
         val reactions =
