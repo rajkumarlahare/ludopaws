@@ -10,6 +10,7 @@ import org.json.JSONObject
 internal fun MainActivity.applyResponse(
     response: JSONObject,
     announce: Boolean = true,
+    silentValidationFailure: Boolean = false,
 ) {
     val source =
         if (
@@ -27,15 +28,18 @@ internal fun MainActivity.applyResponse(
         try {
             GameJson.envelope(response)
         } catch (error: GameSchemaException) {
-            diceView.stopRolling()
+            // Passive refreshes can overlap a live roll animation. A malformed
+            // background snapshot must never cancel that animation or replace its
+            // visible status; explicit action responses still fail visibly closed.
+            if (!silentValidationFailure) {
+                diceView.stopRolling()
+                showStatus(
+                    "Server state validation failed. Your last verified state was kept; refresh to retry.",
+                )
+            }
             currentState?.let { safeState ->
                 updateControls(safeState)
             }
-            // Refresh action controls from the last known-good snapshot first,
-            // then leave the validation warning visible as the final UI status.
-            showStatus(
-                "Server state validation failed. Your last verified state was kept; refresh to retry.",
-            )
             updateRollButton()
             return
         }
