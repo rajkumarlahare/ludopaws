@@ -81,6 +81,7 @@ internal fun MainActivity.runNetwork(
     onSuccess: (JSONObject) -> Unit = { applyResponse(it) },
     showWorking: Boolean = true,
     reconcileOnError: Boolean = false,
+    prioritizeGameplay: Boolean = false,
     onComplete: () -> Unit = {},
 ) {
     if (!canRenderUi()) {
@@ -91,11 +92,10 @@ internal fun MainActivity.runNetwork(
     // A slow reply from a room we already left must not resurrect that session
     // or reset a newer one. Capture the active session identity per request.
     val expectedSessionMatchId = matchId
-    val gameplayMutation = onlineRollRequestInFlight || onlineMoveRequestInFlight
-    val requestExecutor = if (gameplayMutation) gameplayExecutor else executor
+    val requestExecutor = if (prioritizeGameplay) gameplayExecutor else executor
 
     if (!isOnline) {
-        if (gameplayMutation) diceView.stopRolling()
+        if (prioritizeGameplay) diceView.stopRolling()
         if (showWorking) {
             showStatus("Offline — this online match is read-only until internet returns.")
             currentState?.let { updateControls(it) }
@@ -146,7 +146,7 @@ internal fun MainActivity.runNetwork(
                             return@post
                         }
                         try {
-                            if (gameplayMutation) diceView.stopRolling()
+                            if (prioritizeGameplay) diceView.stopRolling()
                             val sessionReset = resetInvalidSessionIfNeeded(error)
                             if (!sessionReset) {
                                 if (showWorking) {
@@ -154,7 +154,7 @@ internal fun MainActivity.runNetwork(
                                     showStatus("Error: " + (error.message ?: error.toString()))
                                     currentState?.let { updateControls(it) }
                                 }
-                                if (reconcileOnError && gameplayMutation) {
+                                if (reconcileOnError && prioritizeGameplay) {
                                     refreshState(silent = true)
                                 }
                             }
@@ -169,7 +169,7 @@ internal fun MainActivity.runNetwork(
 
     if (!submitted && canRenderUi()) {
         try {
-            if (gameplayMutation) diceView.stopRolling()
+            if (prioritizeGameplay) diceView.stopRolling()
             if (showWorking) {
                 setNetworkControls(enabled = true)
                 showStatus("Request was cancelled because the screen is closing.")
