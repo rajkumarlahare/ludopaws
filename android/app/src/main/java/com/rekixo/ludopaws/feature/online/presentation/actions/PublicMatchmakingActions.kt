@@ -267,36 +267,47 @@ internal fun MainActivity.applyPublicMatchmakingResponse(
                     "targetPlayerCount",
                     selectedPublicPlayerCount,
                 )
-                .coerceIn(
-                    2,
-                    4,
-                )
+                .let { if (it == 4) 4 else 2 }
+            val assignedMatchId = response.optString("matchId").trim().uppercase()
+            val assignedPlayerId = response.optString("playerId").trim()
+            val assignedPlayerToken = response.optString("playerToken").trim()
+            val assignedState = runCatching {
+                GameJson.envelope(response).state
+            }.getOrNull()
 
-            if (
-                isMatchmakingUiReady()
-            ) {
-                matchmakingOpponentRail
-                    .updateState(
-                        queuedPlayers =
-                            count,
-                        targetPlayerCount =
-                            count,
-                        searching =
-                            true,
-                    )
-                matchmakingStatusText.text =
-                    "MATCH FOUND • STARTING…"
+            // A MATCHED envelope is not enough: only hand off to the board after the
+            // complete authoritative room state and credentials pass validation. Keep
+            // the ticket on failure so the normal status poll can recover/replay it.
+            val validAssignment =
+                assignedState != null &&
+                    assignedState.matchId == assignedMatchId &&
+                    assignedState.matchMode == "ONLINE" &&
+                    assignedState.status == "ACTIVE" &&
+                    assignedState.targetPlayerCount == count &&
+                    assignedState.players.size == count &&
+                    assignedPlayerId.isNotBlank() &&
+                    assignedPlayerToken.isNotBlank()
+            if (!validAssignment) {
+                if (isMatchmakingUiReady()) {
+                    matchmakingStatusText.text = "MATCH RESERVED • RECONNECTING…"
+                }
+                showStatus("Match was assigned; waiting for a complete, verified room snapshot…")
+                return
             }
 
-            publicMatchmakingStore
-                .clear()
-            captureSession(
-                response,
-            )
-            applyResponse(
-                response,
-                announce = false,
-            )
+            if (isMatchmakingUiReady()) {
+                matchmakingOpponentRail
+                    .updateState(
+                        queuedPlayers = count,
+                        targetPlayerCount = count,
+                        searching = false,
+                    )
+                matchmakingStatusText.text = "MATCH FOUND • STARTING…"
+            }
+
+            publicMatchmakingStore.clear()
+            captureSession(response)
+            applyResponse(response, announce = false)
             connectRealtimeIfPossible()
 
             val matchPlayers = response.optJSONObject("state")?.optJSONArray("players")
