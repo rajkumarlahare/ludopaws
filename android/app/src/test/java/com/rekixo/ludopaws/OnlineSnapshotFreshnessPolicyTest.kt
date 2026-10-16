@@ -92,6 +92,22 @@ class OnlineSnapshotFreshnessPolicyTest {
         )
     }
 
+
+    @Test
+    fun cacheCannotReplaceNewerDisplayedStateEvenIfSourceWasReset() {
+        assertFalse(
+            OnlineSnapshotFreshnessPolicy.shouldApply(
+                sessionMatchId = MATCH_ID,
+                incomingMatchId = MATCH_ID,
+                incomingSource = OnlineStateSource.CACHE,
+                currentStateSource = null,
+                currentStateMatchId = MATCH_ID,
+                incomingRevision = 7L,
+                lastAppliedAuthoritativeRevision = 12L,
+            ),
+        )
+    }
+
     private companion object {
         const val MATCH_ID = "LPABCDEFGH"
     }
