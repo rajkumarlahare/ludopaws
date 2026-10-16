@@ -61,17 +61,36 @@ internal fun MainActivity.applyResponse(
     }
 
     val previousState = currentState
+    val currentStateIsAuthoritative =
+        uiStateHolder.value.currentStateSource == OnlineStateSource.AUTHORITATIVE
+    val currentRevision =
+        if (
+            currentStateIsAuthoritative &&
+            previousState?.matchId == state.matchId
+        ) {
+            maxOf(previousState.revision, lastRealtimeRevision.toLong())
+        } else {
+            previousState?.revision
+        }
     if (
         source == OnlineStateSource.AUTHORITATIVE &&
         !OnlineSnapshotRevisionPolicy.shouldApply(
             currentMatchId = previousState?.matchId,
-            currentRevision = previousState?.revision,
-            currentIsAuthoritative =
-                uiStateHolder.value.currentStateSource == OnlineStateSource.AUTHORITATIVE,
+            currentRevision = currentRevision,
+            currentIsAuthoritative = currentStateIsAuthoritative,
             incomingMatchId = state.matchId,
             incomingRevision = state.revision,
         )
     ) {
+        // If realtime has already announced a newer revision than this HTTP
+        // reply contains, schedule one trailing snapshot fetch to catch up.
+        if (
+            previousState?.matchId == state.matchId &&
+            state.revision < lastRealtimeRevision.toLong()
+        ) {
+            mainHandler.removeCallbacks(realtimeRefreshRunnable)
+            mainHandler.postDelayed(realtimeRefreshRunnable, 120L)
+        }
         return
     }
 
