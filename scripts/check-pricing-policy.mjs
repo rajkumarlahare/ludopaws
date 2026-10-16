@@ -18,11 +18,14 @@ const inAppPolicy = read("../android/app/src/main/java/com/rekixo/ludopaws/featu
 const pagesWorkflow = read("../.github/workflows/account-deletion-pages.yml");
 const androidBillingGateway = read("../android/app/src/main/java/com/rekixo/ludopaws/feature/store/data/billing/GooglePlayBillingGateway.kt");
 const storeActivity = read("../android/app/src/main/java/com/rekixo/ludopaws/feature/store/presentation/StoreActivity.kt");
+const storeContent = read("../android/app/src/main/java/com/rekixo/ludopaws/feature/store/presentation/components/StoreContentUi.kt");
+const androidBuildConfig = read("../android/app/build.gradle.kts");
 const accountRepository = read("../android/app/src/main/java/com/rekixo/ludopaws/feature/account/data/AccountRepository.kt");
 const oneTimeBillingSetup = read("../docs/GOOGLE_PLAY_ONE_TIME_BILLING_SETUP.md");
 const billingReleaseChecklist = read("../docs/GOOGLE_PLAY_BILLING_RELEASE_CHECKLIST.md");
 const monetizationRoadmap = read("../docs/STORE_MONETIZATION_ROADMAP.md");
 const accountWorker = read("../server/src/index-account.js");
+const baseWorker = read("../server/src/index.js");
 const playerAccount = read("../server/src/player-account.js");
 const purchaseLedger = read("../server/src/store-purchase-ledger.js");
 const releaseWorkflow = read("../.github/workflows/android-signed-release.yml");
@@ -85,6 +88,8 @@ const retiredMonthlyPlanFiles = [
   ["Android store catalog", android],
   ["Android Billing gateway", androidBillingGateway],
   ["Android Store activity", storeActivity],
+  ["Android store content", storeContent],
+  ["Android build configuration", androidBuildConfig],
   ["Android account repository", accountRepository],
   ["Pricing page", pricing],
   ["Terms of Service", terms],
@@ -94,6 +99,7 @@ const retiredMonthlyPlanFiles = [
   ["One-time billing release checklist", billingReleaseChecklist],
   ["Monetization roadmap", monetizationRoadmap],
   ["Account API routes", accountWorker],
+  ["Base Worker routes", baseWorker],
   ["Purchase ledger", purchaseLedger],
   ["Android release workflow", releaseWorkflow],
   ["Backend release workflow", backendWorkflow],
