@@ -544,8 +544,11 @@ function closePendingRollForTeamForfeit(state, now) {
   if (!alreadyArchived) {
     const eventIndex = Number(pending.eventIndex);
     if (Number.isSafeInteger(eventIndex) && eventIndex >= 0) {
+      const currentEventIndex = Number(state.randomEventIndex ?? 0);
       state.randomEventIndex = Math.max(
-        Number(state.randomEventIndex ?? 0),
+        Number.isSafeInteger(currentEventIndex) && currentEventIndex >= 0
+          ? currentEventIndex
+          : 0,
         eventIndex + 1,
       );
       const fairnessEvent = sealFairnessEvent(history, {

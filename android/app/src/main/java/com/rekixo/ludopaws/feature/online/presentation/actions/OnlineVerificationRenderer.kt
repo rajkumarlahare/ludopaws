@@ -364,6 +364,12 @@ private fun MainActivity.scheduleSingleLegalOnlineMove(
                 return
             }
 
+            if (onlineRollRequestInFlight || onlineMoveRequestInFlight) {
+                // A slow network request can outlast the dice animation. Keep
+                // the unique legal move pending until the action lane is free.
+                rollButton.postDelayed(this, 120L)
+                return
+            }
             moveToken(tokenIndex)
         }
     }
