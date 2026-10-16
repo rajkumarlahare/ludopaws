@@ -187,15 +187,15 @@ private fun HomeActivity.homeCurrencyPill(): LinearLayout =
                 isFocusable = true
                 contentDescription = "Add currency"
                 setPadding(
-                    dp(9),
-                    dp(9),
-                    dp(9),
-                    dp(9),
+                    dp(if (isCompact()) 5 else 6),
+                    dp(if (isCompact()) 5 else 6),
+                    dp(if (isCompact()) 5 else 6),
+                    dp(if (isCompact()) 5 else 6),
                 )
                 background =
                     plywoodBackground(
                         context = this@homeCurrencyPill,
-                        cornerRadiusDp = if (isCompact()) 19.5f else 22f,
+                        cornerRadiusDp = if (isCompact()) 11.7f else 13.2f,
                     )
                 setOnClickListener {
                     startActivity(
@@ -207,8 +207,8 @@ private fun HomeActivity.homeCurrencyPill(): LinearLayout =
                 }
             },
             LinearLayout.LayoutParams(
-                dp(if (isCompact()) 39 else 44),
-                dp(if (isCompact()) 39 else 44),
+                dp(if (isCompact()) 24 else 26),
+                dp(if (isCompact()) 24 else 26),
             ),
         )
     }
