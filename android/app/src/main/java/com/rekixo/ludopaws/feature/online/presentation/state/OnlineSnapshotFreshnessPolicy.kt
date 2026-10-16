@@ -23,7 +23,10 @@ internal object OnlineSnapshotFreshnessPolicy {
             // Do not roll a currently displayed match back to a cache copy.
             if (
                 sameCurrentMatch &&
-                currentStateSource == OnlineStateSource.AUTHORITATIVE
+                (
+                    currentStateSource == OnlineStateSource.AUTHORITATIVE ||
+                    lastAppliedAuthoritativeRevision >= 0L
+                )
             ) {
                 return false
             }
