@@ -4,7 +4,7 @@ on:
   # Small, iterative changes are validated locally and can be grouped on a draft PR.
   # Full CI runs when the batch is marked ready, and on pushes to main.
   pull_request:
-    types: [opened, reopened, ready_for_review]
+    types: [opened, reopened, ready_for_review, synchronize]
   push:
     branches: [main, feat/ludopaws-production-readiness]
   workflow_dispatch:
@@ -19,9 +19,9 @@ permissions:
   contents: read
 
 concurrency:
-  # Use the PR source branch, not GitHub's synthetic refs/pull/<number>/merge ref,
-  # so successive updates to the same PR correctly supersede its previous validation run.
-  group: ludoproof-ci-${{ github.event.pull_request.head.ref || github.ref }}
+  # Keep one active validation batch per PR (or per pushed branch). A newer commit
+  # cancels stale emulator/build jobs instead of consuming more private-repo minutes.
+  group: ludopaws-ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -51,6 +51,9 @@ jobs:
       - name: Account deletion page source checks
         working-directory: .
         run: node scripts/check-account-deletion-pages.mjs
+      - name: Pricing and in-app purchase policy contract gate
+        working-directory: .
+        run: node scripts/check-pricing-policy.mjs
       - name: Server tests
         run: npm test
       - name: Production smoke syntax check
@@ -63,9 +66,9 @@ jobs:
         run: node scripts/generate-sbom.mjs
       - name: Upload SBOM evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        # PR validation remains focused on tests/builds if the account artifact quota is exhausted.
-        # Push/release runs remain strict so release evidence cannot silently be omitted.
-        continue-on-error: ${{ github.event_name == 'pull_request' }}
+        # Keep build/test CI status independent of GitHub's shared artifact quota.
+        # Official release workflows remain responsible for publishing release evidence.
+        continue-on-error: true
         with:
           name: ludoproof-sbom
           path: |
@@ -156,9 +159,9 @@ jobs:
         run: node scripts/hash-android-release.mjs
       - name: Upload release candidate evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        # PR validation remains focused on tests/builds if the account artifact quota is exhausted.
-        # Push/release runs remain strict so release evidence cannot silently be omitted.
-        continue-on-error: ${{ github.event_name == 'pull_request' }}
+        # Keep build/test CI status independent of GitHub's shared artifact quota.
+        # Official release workflows remain responsible for publishing release evidence.
+        continue-on-error: true
         with:
           name: ludoproof-release-candidate
           path: |
@@ -170,9 +173,9 @@ jobs:
           retention-days: 90
       - name: Upload debug APK
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        # PR validation remains focused on tests/builds if the account artifact quota is exhausted.
-        # Push/release runs remain strict so release evidence cannot silently be omitted.
-        continue-on-error: ${{ github.event_name == 'pull_request' }}
+        # Keep build/test CI status independent of GitHub's shared artifact quota.
+        # Official release workflows remain responsible for publishing release evidence.
+        continue-on-error: true
         with:
           name: ludoproof-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
@@ -230,18 +233,43 @@ jobs:
       - name: Install emulator and Android SDK
         shell: bash
         run: |
+          set -Eeuo pipefail
           SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
           SDKMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
           if [ ! -x "$SDKMANAGER" ]; then
             SDKMANAGER="$(command -v sdkmanager)"
           fi
           yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
-          "$SDKMANAGER" \
-            "platform-tools" \
-            "emulator" \
-            "platforms;android-36" \
-            "build-tools;35.0.0" \
+
+          # Android SDK downloads can occasionally return a truncated emulator
+          # archive from the package CDN. Retry the install after discarding only
+          # incomplete SDK download/temp state; do not continue without every package.
+          packages=(
+            "platform-tools"
+            "emulator"
+            "platforms;android-36"
+            "build-tools;35.0.0"
             "system-images;android-35;google_apis;x86_64"
+          )
+          installed=""
+          for attempt in 1 2 3; do
+            echo "Installing Android emulator packages (attempt $attempt/3)."
+            if "$SDKMANAGER" "${packages[@]}"; then
+              installed="true"
+              break
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "SDK package install failed; cleaning partial download state before retry." >&2
+              rm -rf "$SDK_ROOT/.temp" "$SDK_ROOT/temp" "$SDK_ROOT/.downloadIntermediates"
+              sleep $((attempt * 5))
+            fi
+          done
+          if [ "$installed" != "true" ]; then
+            echo "Android SDK package installation failed after three attempts." >&2
+            exit 1
+          fi
+          test -x "$SDK_ROOT/platform-tools/adb"
+          test -x "$SDK_ROOT/emulator/emulator"
           echo "$SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
           echo "$SDK_ROOT/emulator" >> "$GITHUB_PATH"
           echo "$SDK_ROOT/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
@@ -360,9 +388,9 @@ jobs:
       - name: Upload instrumentation evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        # PR validation remains focused on tests/builds if the account artifact quota is exhausted.
-        # Push/release runs remain strict so release evidence cannot silently be omitted.
-        continue-on-error: ${{ github.event_name == 'pull_request' }}
+        # Keep build/test CI status independent of GitHub's shared artifact quota.
+        # Official release workflows remain responsible for publishing release evidence.
+        continue-on-error: true
         with:
           name: ludoproof-android-instrumentation
           path: |

@@ -121,6 +121,24 @@ if (!["true", "false"].includes(String(vars.GOOGLE_PLAY_BILLING_ENABLED))) {
   console.error("GOOGLE_PLAY_BILLING_ENABLED must be explicitly set to true or false.");
   process.exit(2);
 }
+if (!["true", "false"].includes(String(vars.GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED))) {
+  console.error("GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED must be explicitly set to true or false.");
+  process.exit(2);
+}
+if (vars.GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED === "true") {
+  if (vars.GOOGLE_PLAY_BILLING_ENABLED !== "true") {
+    console.error("Paws Plus subscriptions cannot be enabled while Billing is disabled.");
+    process.exit(2);
+  }
+  if (vars.GOOGLE_PLAY_RTDN_AUDIENCE !== "https://api.ludopaws.rekixo.com/api/google-play/rtdn") {
+    console.error("Subscriptions require GOOGLE_PLAY_RTDN_AUDIENCE to equal the public RTDN endpoint.");
+    process.exit(2);
+  }
+  if (!/^[^@\s]+@[^@\s]+\.iam\.gserviceaccount\.com$/.test(String(vars.GOOGLE_PLAY_RTDN_EMAIL ?? ""))) {
+    console.error("Subscriptions are enabled but GOOGLE_PLAY_RTDN_EMAIL is missing or malformed.");
+    process.exit(2);
+  }
+}
 if (!["true", "false"].includes(String(vars.LUDOPROOF_ADMOB_SSV_ENABLED))) {
   console.error("LUDOPROOF_ADMOB_SSV_ENABLED must be explicitly set to true or false.");
   process.exit(2);

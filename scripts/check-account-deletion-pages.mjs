@@ -16,6 +16,7 @@ function matches(source, pattern, label) {
 const landingPage = read("../docs/landing-page.html");
 const page = read("../docs/account-deletion.html");
 const policy = read("../docs/privacy-policy.html");
+const terms = read("../docs/terms-of-service.html");
 const worker = read("../server/src/index-account.js");
 const directory = read("../server/src/account-directory.js");
 const player = read("../server/src/player-account.js");
@@ -33,6 +34,7 @@ has(page, 'post("/api/account/delete"', "Google-linked deletion API request");
 has(page, 'credentials: "omit"', "credential-free cross-origin fetch mode");
 has(page, 'cache: "no-store"', "no-store fetch caching");
 has(landingPage, 'href="./account-deletion.html"', "landing-page account-deletion link");
+has(landingPage, 'href="./terms-of-service.html"', "landing-page terms link");
 has(landingPage, 'href="./privacy-policy.html"', "landing-page privacy-policy link");
 has(landingPage, "https://rekixo.com", "publisher website link");
 has(page, 'connect-src \'self\' https://api.ludopaws.rekixo.com', "account API Content Security Policy allowlist");
@@ -52,7 +54,7 @@ has(policy, "365 days from match completion", "privacy policy receipt retention 
 has(policy, "AI@rekixo.com", "privacy support contact");
 has(page, "365 days after a match finishes", "deletion page receipt retention disclosure");
 has(page, "AI@rekixo.com", "deletion page support contact");
-has(receiptArchive, "const RECEIPT_RETENTION_MS = 365 * 24 * 60 * 60 * 1000;", "180-day receipt retention constant");
+has(receiptArchive, "const RECEIPT_RETENTION_MS = 365 * 24 * 60 * 60 * 1000;", "365-day receipt retention constant");
 has(receiptArchive, "async alarm()", "scheduled receipt expiration handler");
 has(receiptArchive, "MATCH_RECEIPT_RETENTION_EXPIRED", "expired receipt access protection");
 has(policy, "Optional Friends voice chat", "published microphone and voice-chat disclosure");
@@ -70,5 +72,36 @@ has(pagesWorkflow, "https://ludopaws.rekixo.com", "Rekixo site origin");
 has(pagesWorkflow, "https://api.ludopaws.rekixo.com", "Rekixo API origin");
 has(pagesWorkflow, "cp docs/landing-page.html site/index.html", "landing page publication mapping");
 has(pagesWorkflow, "actions/deploy-pages", "explicit Pages publishing step");
+has(pagesWorkflow, "Verify published public policy routes", "post-deployment HTTPS smoke test for the legal and sign-in pages");
+has(pagesWorkflow, "fetch_public_page /terms-of-service.html", "post-deployment Terms of Service route smoke test");
+
+
+const pricing = read("../docs/pricing.html");
+has(landingPage, 'href="./pricing.html"', "landing-page pricing-policy link");
+has(policy, 'href="./pricing.html">Pricing and in-app purchase policy</a>', "privacy-policy pricing link");
+has(policy, 'href="./terms-of-service.html">Terms of Service</a>', "privacy-policy terms link");
+has(policy, 'href="./pricing.html">Pricing & in-app purchases</a>', "privacy footer pricing link");
+has(pricing, "PRICING_RELEASE_REVIEW_REQUIRED", "pricing publisher/legal release-review marker");
+has(pricing, 'href="./privacy-policy.html"', "pricing page privacy-policy link");
+has(pricing, 'href="./account-deletion.html"', "pricing page account-deletion link");
+has(pagesWorkflow, 'test -f docs/pricing.html', "pricing page publication file gate");
+has(pagesWorkflow, 'test -f docs/terms-of-service.html', "terms page publication file gate");
+has(pagesWorkflow, "TERMS_RELEASE_REVIEW_REQUIRED", "terms review marker blocks publishing");
+has(pagesWorkflow, 'cp docs/terms-of-service.html site/terms-of-service.html', "terms page publication mapping");
+has(pagesWorkflow, 'cp docs/pricing.html site/pricing.html', "pricing page publication mapping");
+has(pagesWorkflow, 'node scripts/check-pricing-policy.mjs', "pricing contract check before publication");
+has(inAppPolicy, 'https://ludopaws.rekixo.com/pricing.html', "in-app pricing-policy URL");
+has(inAppPolicy, 'https://ludopaws.rekixo.com/terms-of-service.html', "in-app Terms of Service URL");
+
+
+has(terms, "<title>Ludo Paws — Terms of Service</title>", "Terms of Service page title");
+has(terms, "TERMS_RELEASE_REVIEW_REQUIRED", "Terms of Service publisher/legal review marker");
+has(terms, 'href="./pricing.html"', "terms page links to pricing policy");
+has(terms, 'href="./privacy-policy.html"', "terms page links to privacy policy");
+has(terms, 'href="./account-deletion.html"', "terms page links to account deletion");
+has(landingPage, 'href="./terms-of-service.html"', "landing page links to terms");
+has(pricing, 'href="./terms-of-service.html"', "pricing page links to terms");
+has(policy, 'href="./terms-of-service.html"', "privacy policy links to terms");
+has(page, 'href="./terms-of-service.html"', "account deletion page links to terms");
 
 console.log("Account-deletion source checks passed. Public publication remains gated by publisher/legal, OAuth, support and origin configuration.");

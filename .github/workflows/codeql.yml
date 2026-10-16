@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
     branches: [main]
   schedule:
     - cron: '37 4 * * 1'
@@ -12,10 +13,15 @@ permissions:
   contents: read
   security-events: write
 
+concurrency:
+  # Do not run overlapping scans for successive commits in the same PR.
+  group: ludopaws-codeql-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   javascript:
     name: Analyze JavaScript
-    if: ${{ github.event.repository.private == false || vars.LUDOPROOF_CODEQL_PRIVATE == 'true' }}
+    if: ${{ (github.event.repository.private == false || vars.LUDOPROOF_CODEQL_PRIVATE == 'true') && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -32,7 +38,7 @@ jobs:
 
   android-kotlin:
     name: Analyze Android Kotlin
-    if: ${{ github.event.repository.private == false || vars.LUDOPROOF_CODEQL_PRIVATE == 'true' }}
+    if: ${{ (github.event.repository.private == false || vars.LUDOPROOF_CODEQL_PRIVATE == 'true') && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:

@@ -18,6 +18,7 @@ test("runtime vars require a valid Google Web OAuth client and the account-site 
 test("runtime store flags fail closed when GitHub variables are unset", () => {
   const vars = buildCloudflareRuntimeVars({}, valid);
   assert.equal(vars.GOOGLE_PLAY_BILLING_ENABLED, "false");
+  assert.equal(vars.GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED, "false");
   assert.equal(vars.LUDOPROOF_ADMOB_SSV_ENABLED, "false");
   assert.equal(vars.LUDOPROOF_ADMOB_REWARD_ITEM, "gems");
   assert.equal("GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL" in vars, false);
@@ -105,4 +106,45 @@ test("feature flags reject ambiguous or non-canonical values instead of interpre
     () => buildCloudflareRuntimeVars({}, { ...valid, GOOGLE_PLAY_BILLING_ENABLED: "TRUE", LUDOPROOF_BILLING_ENABLED: "TRUE" }),
     /must be exactly "true" or "false"/,
   );
+});
+
+test("subscription flags must match and cannot be enabled while one-time Billing is disabled", () => {
+  assert.throws(
+    () => buildCloudflareRuntimeVars({}, {
+      ...valid,
+      GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED: "true",
+    }),
+    /GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED and LUDOPROOF_SUBSCRIPTIONS_ENABLED must match/,
+  );
+  assert.throws(
+    () => buildCloudflareRuntimeVars({}, {
+      ...valid,
+      GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED: "true",
+      LUDOPROOF_SUBSCRIPTIONS_ENABLED: "true",
+    }),
+    /cannot be enabled while one-time Billing is disabled/,
+  );
+});
+
+test("Paws Plus subscriptions require exact RTDN audience and a verified-push identity configuration", () => {
+  const common = {
+    ...valid,
+    GOOGLE_PLAY_BILLING_ENABLED: "true",
+    LUDOPROOF_BILLING_ENABLED: "true",
+    GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED: "true",
+    LUDOPROOF_SUBSCRIPTIONS_ENABLED: "true",
+    GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL: "play-api@ludopaws-prod.iam.gserviceaccount.com",
+  };
+  assert.throws(
+    () => buildCloudflareRuntimeVars({}, common),
+    /require Billing, GOOGLE_PLAY_RTDN_AUDIENCE, and GOOGLE_PLAY_RTDN_EMAIL/,
+  );
+  const vars = buildCloudflareRuntimeVars({}, {
+    ...common,
+    GOOGLE_PLAY_RTDN_AUDIENCE: "https://api.ludopaws.rekixo.com/api/google-play/rtdn",
+    GOOGLE_PLAY_RTDN_EMAIL: "pubsub-push@ludopaws-prod.iam.gserviceaccount.com",
+  });
+  assert.equal(vars.GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED, "true");
+  assert.equal(vars.GOOGLE_PLAY_RTDN_AUDIENCE, "https://api.ludopaws.rekixo.com/api/google-play/rtdn");
+  assert.equal(vars.GOOGLE_PLAY_RTDN_EMAIL, "pubsub-push@ludopaws-prod.iam.gserviceaccount.com");
 });

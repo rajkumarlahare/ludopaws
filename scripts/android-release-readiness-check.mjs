@@ -220,11 +220,11 @@ requireText(
   'matchStatus != FINISHED_STATUS',
   "post-win placement must reject unfinished matches.",
 );
-requireText(
+requirePattern(
   "PostWinInterstitialPolicy.kt",
   interstitialPolicy,
-  "shouldShowFillerInterstitial(adsRemoved: Boolean): Boolean = !adsRemoved",
-  "Remove Ads must suppress the unsolicited interstitial placement.",
+  /shouldShowFillerInterstitial\(\s*adsRemoved:\s*Boolean,\s*pawsPlusActive:\s*Boolean\s*=\s*false,\s*\):\s*Boolean\s*=\s*!adsRemoved\s*&&\s*!pawsPlusActive/,
+  "Remove Ads and an active Paws Plus subscription must suppress the unsolicited interstitial placement.",
 );
 requireText(
   "PostWinInterstitialExitGate.kt",
@@ -316,6 +316,7 @@ for (const property of [
   "LUDOPROOF_BILLING_ENABLED",
   "LUDOPROOF_ADS_ENABLED",
   "LUDOPROOF_INTERSTITIAL_ADS_ENABLED",
+  "LUDOPROOF_SUBSCRIPTIONS_ENABLED",
   "ADMOB_APP_ID",
   "ADMOB_REWARDED_AD_UNIT_ID",
   "ADMOB_INTERSTITIAL_AD_UNIT_ID",
@@ -336,11 +337,37 @@ requireText(
   "ready.ready !== true || ready.ok !== true",
   "signed release must verify that the Worker readiness response is actually ready.",
 );
+
+requireText(
+  ".github/workflows/android-signed-release.yml",
+  signedReleaseWorkflow,
+  "environment: production",
+  "signed release must read Billing, Ads, and OAuth variables from the protected production environment.",
+);
 requireText(
   ".github/workflows/android-signed-release.yml",
   signedReleaseWorkflow,
   "ready.productionClaim !== false",
   "signed release must fail closed unless the Worker explicitly reports productionClaim=false.",
+);
+
+requireText(
+  ".github/workflows/android-signed-release.yml",
+  signedReleaseWorkflow,
+  "GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED: ${{ vars.GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED }}",
+  "signed release must use the production server subscription gate.",
+);
+requireText(
+  ".github/workflows/android-signed-release.yml",
+  signedReleaseWorkflow,
+  '[ "$APP_SUBSCRIPTIONS" != "$SERVER_SUBSCRIPTIONS" ]',
+  "signed release must reject an Android/Worker Paws Plus feature-flag mismatch.",
+);
+requireText(
+  ".github/workflows/android-signed-release.yml",
+  signedReleaseWorkflow,
+  "status.subscriptionsAvailable !== true",
+  "signed release must fail closed when Paws Plus is enabled but the production Worker is not subscription-ready.",
 );
 
 if (failures.length > 0) {

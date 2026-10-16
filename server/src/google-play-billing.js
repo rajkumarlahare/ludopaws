@@ -5,6 +5,26 @@ const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const PUBLISHER_URL = "https://androidpublisher.googleapis.com/androidpublisher/v3";
 const PUBLISHER_SCOPE = "https://www.googleapis.com/auth/androidpublisher";
 const MAX_TOKEN_LENGTH = 2_048;
+const SUBSCRIPTION_STATES = new Set([
+  "SUBSCRIPTION_STATE_UNSPECIFIED",
+  "SUBSCRIPTION_STATE_PENDING",
+  "SUBSCRIPTION_STATE_ACTIVE",
+  "SUBSCRIPTION_STATE_PAUSED",
+  "SUBSCRIPTION_STATE_IN_GRACE_PERIOD",
+  "SUBSCRIPTION_STATE_ON_HOLD",
+  "SUBSCRIPTION_STATE_CANCELED",
+  "SUBSCRIPTION_STATE_EXPIRED",
+  "SUBSCRIPTION_STATE_PENDING_PURCHASE_CANCELED",
+]);
+const ACCOUNT_ID_REGEX = /^[a-f0-9]{64}$/;
+const OWNER_ACCOUNT_ID_REGEX = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
+
+export const GOOGLE_PLAY_SUBSCRIPTIONS = Object.freeze({
+  paws_plus: Object.freeze({
+    basePlanId: "monthly-auto",
+  }),
+});
+
 
 export const GOOGLE_PLAY_PRODUCTS = Object.freeze({
   remove_ads: Object.freeze({
@@ -81,6 +101,191 @@ export function googlePlayBillingConfigured(env) {
 
 export function googlePlayBillingEnabled(env) {
   return googlePlayBillingChecks(env).enabled;
+}
+
+export function googlePlaySubscriptionsEnabled(env) {
+  return (
+    env?.GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED === "true" &&
+    googlePlayBillingEnabled(env) &&
+    typeof env?.GOOGLE_PLAY_RTDN_AUDIENCE === "string" &&
+    /^https:\/\//.test(env.GOOGLE_PLAY_RTDN_AUDIENCE) &&
+    typeof env?.GOOGLE_PLAY_RTDN_EMAIL === "string" &&
+    /^[^@\s]+@[^@\s]+\.iam\.gserviceaccount\.com$/.test(env.GOOGLE_PLAY_RTDN_EMAIL)
+  );
+}
+
+export async function verifyAndSyncGooglePlaySubscription(
+  env,
+  { productId, purchaseToken, accountId, ownerAccountId },
+  fetchImpl = fetch,
+  nowMs = Date.now(),
+) {
+  const product = GOOGLE_PLAY_SUBSCRIPTIONS[productId];
+  if (!product) {
+    throw httpError(400, "UNKNOWN_SUBSCRIPTION_PRODUCT", "subscription product is not recognized");
+  }
+  if (
+    typeof purchaseToken !== "string" ||
+    purchaseToken.length < 8 ||
+    purchaseToken.length > MAX_TOKEN_LENGTH ||
+    !ACCOUNT_ID_REGEX.test(String(accountId ?? "")) ||
+    !OWNER_ACCOUNT_ID_REGEX.test(String(ownerAccountId ?? ""))
+  ) {
+    throw httpError(400, "INVALID_SUBSCRIPTION", "subscription information is invalid");
+  }
+  if (!googlePlaySubscriptionsEnabled(env)) {
+    throw httpError(503, "PLAY_SUBSCRIPTIONS_NOT_ENABLED", "Google Play subscriptions are not enabled by the server");
+  }
+
+  const purchaseTokenHash = await sha256Hex(
+    "ludopaws:google-play-subscription:v1:" + purchaseToken,
+  );
+  const ledger = env.LUDOPROOF_STORE_PURCHASES.get(
+    env.LUDOPROOF_STORE_PURCHASES.idFromName(purchaseTokenHash),
+  );
+  const priorResponse = await ledgerRequest(ledger, "/subscription/status", "GET");
+  const priorSubscription = priorResponse.subscription;
+  if (priorSubscription && (
+    priorSubscription.accountId !== accountId ||
+    priorSubscription.ownerAccountId !== ownerAccountId ||
+    priorSubscription.productId !== productId
+  )) {
+    throw httpError(409, "SUBSCRIPTION_ACCOUNT_MISMATCH", "subscription token is already bound to another account");
+  }
+
+  const accessToken = await googleAccessToken(env, fetchImpl);
+  const url =
+    PUBLISHER_URL +
+    "/applications/" + encodeURIComponent(PACKAGE_NAME) +
+    "/purchases/subscriptionsv2/tokens/" + encodeURIComponent(purchaseToken);
+  let response;
+  try {
+    response = await fetchImpl(url, {
+      method: "GET",
+      headers: { authorization: "Bearer " + accessToken },
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch {
+    throw httpError(503, "PLAY_SUBSCRIPTION_API_UNAVAILABLE", "Google Play subscription verification is temporarily unavailable");
+  }
+  if (response.status === 404 || response.status === 410) {
+    throw httpError(400, "PLAY_SUBSCRIPTION_NOT_FOUND", "Google Play did not recognize this subscription purchase");
+  }
+  if (!response.ok) {
+    throw httpError(
+      response.status === 401 || response.status === 403 ? 503 : 502,
+      "PLAY_SUBSCRIPTION_API_FAILED",
+      "Google Play could not verify this subscription right now",
+    );
+  }
+
+  let purchase;
+  try {
+    purchase = await response.json();
+  } catch {
+    throw httpError(502, "PLAY_SUBSCRIPTION_RESPONSE_INVALID", "Google Play returned an invalid subscription response");
+  }
+  const lineItems = purchase?.lineItems;
+  if (!Array.isArray(lineItems) || lineItems.length !== 1) {
+    throw httpError(400, "PLAY_SUBSCRIPTION_PRODUCT_INVALID", "subscription must contain exactly one supported plan");
+  }
+  const lineItem = lineItems[0];
+  if (
+    lineItem?.productId !== productId ||
+    lineItem?.offerDetails?.basePlanId !== product.basePlanId
+  ) {
+    throw httpError(400, "PLAY_SUBSCRIPTION_PRODUCT_INVALID", "Google Play subscription does not match the configured product and base plan");
+  }
+  if (purchase?.externalAccountIdentifiers?.obfuscatedExternalAccountId !== accountId) {
+    throw httpError(400, "PLAY_SUBSCRIPTION_ACCOUNT_MISMATCH", "Google Play subscription does not belong to the signed-in Ludo Paws account");
+  }
+  const state = purchase?.subscriptionState;
+  if (!SUBSCRIPTION_STATES.has(state) || state === "SUBSCRIPTION_STATE_UNSPECIFIED") {
+    throw httpError(502, "PLAY_SUBSCRIPTION_STATE_INVALID", "Google Play returned an unrecognized subscription state");
+  }
+  const parsedExpiryTimeMs = Date.parse(String(lineItem?.expiryTime ?? ""));
+  const needsKnownExpiry = [
+    "SUBSCRIPTION_STATE_ACTIVE",
+    "SUBSCRIPTION_STATE_IN_GRACE_PERIOD",
+    "SUBSCRIPTION_STATE_CANCELED",
+  ].includes(state);
+  const expiryTimeMs = Number.isFinite(parsedExpiryTimeMs) && parsedExpiryTimeMs > 0
+    ? parsedExpiryTimeMs
+    : needsKnownExpiry && priorSubscription?.purchaseTokenHash === purchaseTokenHash &&
+        Number.isSafeInteger(priorSubscription?.expiryTimeMs) && priorSubscription.expiryTimeMs > 0
+      ? priorSubscription.expiryTimeMs
+      : needsKnownExpiry
+        ? 0
+        : nowMs;
+  if (expiryTimeMs <= 0) {
+    throw httpError(502, "PLAY_SUBSCRIPTION_EXPIRY_INVALID", "Google Play did not provide a reliable subscription expiry time");
+  }
+  const entitlementState =
+    ["SUBSCRIPTION_STATE_ACTIVE", "SUBSCRIPTION_STATE_IN_GRACE_PERIOD", "SUBSCRIPTION_STATE_CANCELED"].includes(state) &&
+    expiryTimeMs > nowMs;
+  const autoRenewEnabled = lineItem?.autoRenewingPlan?.autoRenewEnabled === true;
+
+  if (
+    entitlementState &&
+    purchase?.acknowledgementState === "ACKNOWLEDGEMENT_STATE_PENDING"
+  ) {
+    await acknowledgeGooglePlaySubscription(env, productId, purchaseToken, accessToken, fetchImpl);
+  } else if (
+    entitlementState &&
+    !["ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED", "ACKNOWLEDGEMENT_STATE_PENDING"].includes(purchase?.acknowledgementState)
+  ) {
+    throw httpError(502, "PLAY_SUBSCRIPTION_ACK_STATE_INVALID", "Google Play returned an invalid subscription acknowledgement state");
+  }
+
+  const synced = await ledgerRequest(ledger, "/subscription/sync", "POST", {
+    accountId,
+    ownerAccountId: ownerAccountId.toLowerCase(),
+    productId,
+    subscriptionState: state,
+    expiryTimeMs,
+    autoRenewEnabled,
+    purchaseTokenHash,
+  });
+  return {
+    verified: true,
+    productId,
+    subscriptionState: state,
+    expiryTimeMs,
+    autoRenewEnabled,
+    pawsPlusActive: entitlementState,
+    purchaseTokenHash,
+    subscriptionLedgerId: purchaseTokenHash,
+    replay: synced.replay === true,
+  };
+}
+
+async function acknowledgeGooglePlaySubscription(env, productId, purchaseToken, accessToken, fetchImpl) {
+  const url =
+    PUBLISHER_URL +
+    "/applications/" + encodeURIComponent(PACKAGE_NAME) +
+    "/purchases/subscriptions/" + encodeURIComponent(productId) +
+    "/tokens/" + encodeURIComponent(purchaseToken) + ":acknowledge";
+  let response;
+  try {
+    response = await fetchImpl(url, {
+      method: "POST",
+      headers: {
+        authorization: "Bearer " + accessToken,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({}),
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch {
+    throw httpError(503, "PLAY_SUBSCRIPTION_ACK_UNAVAILABLE", "Google Play could not acknowledge the subscription right now");
+  }
+  if (!response.ok) {
+    throw httpError(
+      response.status === 401 || response.status === 403 ? 503 : 502,
+      "PLAY_SUBSCRIPTION_ACK_FAILED",
+      "Google Play did not confirm subscription acknowledgement",
+    );
+  }
 }
 
 export async function verifyAndRedeemGooglePlayPurchase(

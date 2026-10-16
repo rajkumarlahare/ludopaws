@@ -9,7 +9,10 @@ internal object PostWinInterstitialPolicy {
      * Remove Ads suppresses only unsolicited interstitial placements.
      * Explicit user-requested rewarded ads are handled by RewardedAdsController independently.
      */
-    fun shouldShowFillerInterstitial(adsRemoved: Boolean): Boolean = !adsRemoved
+    fun shouldShowFillerInterstitial(
+        adsRemoved: Boolean,
+        pawsPlusActive: Boolean = false,
+    ): Boolean = !adsRemoved && !pawsPlusActive
 
     fun shouldShowOffline(
         matchStatus: String?,
