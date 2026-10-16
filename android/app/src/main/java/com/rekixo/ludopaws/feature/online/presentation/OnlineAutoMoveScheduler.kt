@@ -3,6 +3,7 @@ package com.rekixo.ludopaws.feature.online
 import android.os.SystemClock
 import com.rekixo.ludopaws.MainActivity
 import com.rekixo.ludopaws.MatchSnapshot
+import com.rekixo.ludopaws.OnlineStateSource
 
 internal fun MainActivity.scheduleOnlineAutoMove(snapshot: MatchSnapshot) {
     val authoritative =
