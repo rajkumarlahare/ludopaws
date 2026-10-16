@@ -26,6 +26,7 @@ import com.rekixo.ludopaws.ConnectivityMonitor
 import com.rekixo.ludopaws.ArcadeDialogs
 import com.rekixo.ludopaws.GameApi
 import com.rekixo.ludopaws.GameApiException
+import com.rekixo.ludopaws.GameJson
 import com.rekixo.ludopaws.GameMode
 import com.rekixo.ludopaws.GameModeIntent
 import com.rekixo.ludopaws.LudoProofTheme
@@ -1421,10 +1422,23 @@ class FriendsActivity : Activity() {
                 )
             },
             onSuccess = success@ { response ->
+                val roomId = response.optString("matchId").trim().uppercase(Locale.ROOT)
+                val resolvedPlayerId = response.optString("playerId").trim()
+                val roomToken = response.optString("playerToken").trim()
+                if (!isValidFriendRoomHandoff(
+                        response = response,
+                        expectedMatchId = roomId,
+                        expectedPlayerId = resolvedPlayerId,
+                        expectedPlayerCount = playerCount,
+                    )
+                ) {
+                    showStatus("Private room response is incomplete • retry the room request.")
+                    return@success
+                }
                 val session = PlayerSession(
-                    matchId = response.getString("matchId"),
-                    playerId = response.getString("playerId"),
-                    playerToken = response.getString("playerToken"),
+                    matchId = roomId,
+                    playerId = resolvedPlayerId,
+                    playerToken = roomToken,
                     modeWire = GameMode.FRIENDS.wireValue,
                 )
                 runCatching { sessionStore.save(session) }
@@ -1523,10 +1537,25 @@ class FriendsActivity : Activity() {
                 )
             },
             onSuccess = success@ { response ->
+                val roomId = response.optString("matchId").trim().uppercase(Locale.ROOT)
+                val resolvedPlayerId = response.optString("playerId").trim()
+                val roomToken = response.optString("playerToken").trim()
+                if (
+                    roomId != matchId.uppercase(Locale.ROOT) ||
+                    !isValidFriendRoomHandoff(
+                        response = response,
+                        expectedMatchId = roomId,
+                        expectedPlayerId = resolvedPlayerId,
+                        expectedPlayerCount = null,
+                    )
+                ) {
+                    showStatus("Private-room join response is incomplete • reopen the invite to retry.")
+                    return@success
+                }
                 val session = PlayerSession(
-                    matchId = response.getString("matchId"),
-                    playerId = response.getString("playerId"),
-                    playerToken = response.getString("playerToken"),
+                    matchId = roomId,
+                    playerId = resolvedPlayerId,
+                    playerToken = roomToken,
                     modeWire = GameMode.FRIENDS.wireValue,
                 )
                 runCatching { sessionStore.save(session) }
@@ -1571,6 +1600,31 @@ class FriendsActivity : Activity() {
                 syncFriends(announce = false)
             },
         )
+    }
+
+    private fun isValidFriendRoomHandoff(
+        response: JSONObject,
+        expectedMatchId: String,
+        expectedPlayerId: String,
+        expectedPlayerCount: Int?,
+    ): Boolean {
+        if (
+            expectedMatchId.isBlank() ||
+            expectedPlayerId.isBlank() ||
+            response.optString("playerToken").isBlank() ||
+            response.optString("matchId").trim().uppercase(Locale.ROOT) != expectedMatchId
+        ) {
+            return false
+        }
+
+        val state = runCatching { GameJson.envelope(response).state }.getOrNull()
+            ?: return false
+        return state.matchId == expectedMatchId &&
+            state.matchMode == "FRIENDS" &&
+            state.status in setOf("WAITING", "ACTIVE") &&
+            state.targetPlayerCount != null &&
+            (expectedPlayerCount == null || state.targetPlayerCount == expectedPlayerCount) &&
+            state.players.any { it.playerId == expectedPlayerId }
     }
 
     private fun openFriendRoom() {
