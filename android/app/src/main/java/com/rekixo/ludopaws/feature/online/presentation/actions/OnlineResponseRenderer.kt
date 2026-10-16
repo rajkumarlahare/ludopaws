@@ -63,34 +63,29 @@ internal fun MainActivity.applyResponse(
     val previousState = currentState
     val currentStateIsAuthoritative =
         uiStateHolder.value.currentStateSource == OnlineStateSource.AUTHORITATIVE
-    val currentRevision =
-        if (
+    val incomingBehindRealtime =
+        source == OnlineStateSource.AUTHORITATIVE &&
             currentStateIsAuthoritative &&
-            previousState?.matchId == state.matchId
-        ) {
-            maxOf(previousState.revision, lastRealtimeRevision.toLong())
-        } else {
-            previousState?.revision
-        }
+            previousState?.matchId == state.matchId &&
+            state.revision < lastRealtimeRevision.toLong()
+    if (incomingBehindRealtime) {
+        // A WebSocket event may announce a revision before the state-fetch reply
+        // arrives. Do not render the older reply; fetch again for the latest state.
+        mainHandler.removeCallbacks(realtimeRefreshRunnable)
+        mainHandler.postDelayed(realtimeRefreshRunnable, 120L)
+        return
+    }
+
     if (
         source == OnlineStateSource.AUTHORITATIVE &&
         !OnlineSnapshotRevisionPolicy.shouldApply(
             currentMatchId = previousState?.matchId,
-            currentRevision = currentRevision,
+            currentRevision = previousState?.revision,
             currentIsAuthoritative = currentStateIsAuthoritative,
             incomingMatchId = state.matchId,
             incomingRevision = state.revision,
         )
     ) {
-        // If realtime has already announced a newer revision than this HTTP
-        // reply contains, schedule one trailing snapshot fetch to catch up.
-        if (
-            previousState?.matchId == state.matchId &&
-            state.revision < lastRealtimeRevision.toLong()
-        ) {
-            mainHandler.removeCallbacks(realtimeRefreshRunnable)
-            mainHandler.postDelayed(realtimeRefreshRunnable, 120L)
-        }
         return
     }
 
