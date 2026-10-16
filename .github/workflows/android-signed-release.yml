@@ -218,7 +218,6 @@ jobs:
             # ORG_GRADLE_PROJECT_* maps the validated release config into actual Gradle project properties.
             printf 'ORG_GRADLE_PROJECT_LUDOPROOF_API_BASE_URL=%s\n' "$API_BASE"
             printf 'ORG_GRADLE_PROJECT_LUDOPROOF_BILLING_ENABLED=%s\n' "$APP_BILLING"
-            printf 'ORG_GRADLE_PROJECT_LUDOPROOF_SUBSCRIPTIONS_ENABLED=%s\n' "$APP_SUBSCRIPTIONS"
             printf 'ORG_GRADLE_PROJECT_LUDOPROOF_ADS_ENABLED=%s\n' "$APP_ADS"
             printf 'ORG_GRADLE_PROJECT_LUDOPROOF_INTERSTITIAL_ADS_ENABLED=%s\n' "$INTERSTITIAL_ADS"
             printf 'ORG_GRADLE_PROJECT_ADMOB_APP_ID=%s\n' "$APP_ID"
