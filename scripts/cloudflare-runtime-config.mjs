@@ -1,5 +1,4 @@
 const GOOGLE_WEB_CLIENT_ID = /^[0-9]+-[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$/;
-const GOOGLE_PLAY_SERVICE_ACCOUNT = /^[^@\s]+@[^@\s]+\.iam\.gserviceaccount\.com$/;
 const ADMOB_REWARDED_UNIT = /^ca-app-pub-[0-9]{16}\/[0-9]{10}$/;
 export const ACCOUNT_WEB_ORIGIN = "https://ludopaws.rekixo.com";
 
@@ -29,34 +28,13 @@ export function buildCloudflareRuntimeVars(existingVars, environment) {
 
   const billingEnabled = readBoolean("GOOGLE_PLAY_BILLING_ENABLED", environment.GOOGLE_PLAY_BILLING_ENABLED);
   const androidBillingEnabled = readBoolean("LUDOPROOF_BILLING_ENABLED", environment.LUDOPROOF_BILLING_ENABLED);
-  const subscriptionsEnabled = readBoolean("GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED", environment.GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED);
-  const androidSubscriptionsEnabled = readBoolean("LUDOPROOF_SUBSCRIPTIONS_ENABLED", environment.LUDOPROOF_SUBSCRIPTIONS_ENABLED);
   const adsEnabled = readBoolean("LUDOPROOF_ADMOB_SSV_ENABLED", environment.LUDOPROOF_ADMOB_SSV_ENABLED);
   const androidAdsEnabled = readBoolean("LUDOPROOF_ADS_ENABLED", environment.LUDOPROOF_ADS_ENABLED);
   if (billingEnabled !== androidBillingEnabled) {
     throw new Error("GOOGLE_PLAY_BILLING_ENABLED and LUDOPROOF_BILLING_ENABLED must match before deployment.");
   }
-  if (subscriptionsEnabled !== androidSubscriptionsEnabled) {
-    throw new Error("GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED and LUDOPROOF_SUBSCRIPTIONS_ENABLED must match before deployment.");
-  }
-  if (subscriptionsEnabled && !billingEnabled) {
-    throw new Error("Google Play subscriptions cannot be enabled while one-time Billing is disabled.");
-  }
   if (adsEnabled !== androidAdsEnabled) {
     throw new Error("LUDOPROOF_ADMOB_SSV_ENABLED and LUDOPROOF_ADS_ENABLED must match before deployment.");
-  }
-
-  const rtdnAudience = String(environment.GOOGLE_PLAY_RTDN_AUDIENCE ?? "").trim();
-  const rtdnEmail = String(environment.GOOGLE_PLAY_RTDN_EMAIL ?? "").trim();
-  const expectedRtdnAudience = "https://api.ludopaws.rekixo.com/api/google-play/rtdn";
-  if (rtdnAudience && rtdnAudience !== expectedRtdnAudience) {
-    throw new Error("GOOGLE_PLAY_RTDN_AUDIENCE must be the exact public RTDN HTTPS endpoint.");
-  }
-  if (rtdnEmail && !GOOGLE_PLAY_SERVICE_ACCOUNT.test(rtdnEmail)) {
-    throw new Error("GOOGLE_PLAY_RTDN_EMAIL must be the Google Cloud service-account email used for authenticated Pub/Sub push.");
-  }
-  if (subscriptionsEnabled && (!billingEnabled || rtdnAudience !== expectedRtdnAudience || !rtdnEmail)) {
-    throw new Error("Paws Plus subscriptions require Billing, GOOGLE_PLAY_RTDN_AUDIENCE, and GOOGLE_PLAY_RTDN_EMAIL.");
   }
 
   const serviceAccountEmail = String(environment.GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL ?? "").trim();
@@ -101,18 +79,12 @@ export function buildCloudflareRuntimeVars(existingVars, environment) {
     GOOGLE_SIGN_IN_WEB_CLIENT_ID: oauthClientId,
     LUDOPROOF_ACCOUNT_WEB_ORIGIN: accountOrigin,
     GOOGLE_PLAY_BILLING_ENABLED: String(billingEnabled),
-    GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED: String(subscriptionsEnabled),
     LUDOPROOF_ADMOB_SSV_ENABLED: String(adsEnabled),
     LUDOPROOF_ADMOB_REWARD_ITEM: "gems",
   };
 
   if (serviceAccountEmail) vars.GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL = serviceAccountEmail;
   else delete vars.GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL;
-  if (rtdnAudience) vars.GOOGLE_PLAY_RTDN_AUDIENCE = rtdnAudience;
-  else delete vars.GOOGLE_PLAY_RTDN_AUDIENCE;
-  if (rtdnEmail) vars.GOOGLE_PLAY_RTDN_EMAIL = rtdnEmail;
-  else delete vars.GOOGLE_PLAY_RTDN_EMAIL;
-
   if (rewardedAdUnitId) vars.LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID = rewardedAdUnitId;
   else delete vars.LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID;
 
