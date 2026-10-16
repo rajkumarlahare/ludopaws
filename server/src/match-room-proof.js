@@ -21,7 +21,13 @@ export class MatchRoom extends TeamMatchRoom {
       );
 
     if (response.ok) {
-      await this.#enqueueArchiveSync();
+      // Receipt archival is durable evidence work, not part of the dice response
+      // critical path. Keep the HTTP response path independent from archive I/O.
+      this.#enqueueArchiveSync().catch((error) => {
+        console.error("LudoPaws receipt archive enqueue failed", {
+          code: error?.code ?? "MATCH_RECEIPT_SYNC_FAILED",
+        });
+      });
     }
 
     return response;
