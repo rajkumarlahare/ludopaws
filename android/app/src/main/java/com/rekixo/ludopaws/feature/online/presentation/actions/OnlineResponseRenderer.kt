@@ -73,6 +73,20 @@ internal fun MainActivity.applyResponse(
     }
 
     val previousState = currentState
+    if (
+        source == OnlineStateSource.AUTHORITATIVE &&
+        !OnlineSnapshotRevisionPolicy.shouldApply(
+            currentMatchId = previousState?.matchId,
+            currentRevision = previousState?.revision,
+            currentIsAuthoritative =
+                uiStateHolder.value.currentStateSource == OnlineStateSource.AUTHORITATIVE,
+            incomingMatchId = state.matchId,
+            incomingRevision = state.revision,
+        )
+    ) {
+        return
+    }
+
     currentState = state
     applyOnlineGameplayPacing(previousState, state)
     LudoProofTheme.setGameplayBackground(
