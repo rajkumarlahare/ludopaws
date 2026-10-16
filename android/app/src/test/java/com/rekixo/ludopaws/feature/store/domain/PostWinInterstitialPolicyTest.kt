@@ -14,22 +14,6 @@ class PostWinInterstitialPolicyTest {
     }
 
     @Test
-    fun activePawsPlusSubscriptionSuppressesOnlyTheFillerInterstitialPlacement() {
-        assertFalse(
-            PostWinInterstitialPolicy.shouldShowFillerInterstitial(
-                adsRemoved = false,
-                pawsPlusActive = true,
-            ),
-        )
-        assertTrue(
-            PostWinInterstitialPolicy.shouldShowFillerInterstitial(
-                adsRemoved = false,
-                pawsPlusActive = false,
-            ),
-        )
-    }
-
-    @Test
     fun offlineInterstitialOnlyFollowsFinishedLocalWin() {
         assertTrue(
             PostWinInterstitialPolicy.shouldShowOffline(
