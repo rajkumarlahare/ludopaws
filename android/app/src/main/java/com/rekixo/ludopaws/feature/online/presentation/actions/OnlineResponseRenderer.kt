@@ -64,6 +64,14 @@ internal fun MainActivity.applyResponse(
     val previousState = currentState
     val currentStateIsAuthoritative =
         uiStateHolder.value.currentStateSource == OnlineStateSource.AUTHORITATIVE
+    if (
+        source == OnlineStateSource.CACHE &&
+        currentStateIsAuthoritative &&
+        previousState?.matchId == state.matchId
+    ) {
+        return
+    }
+
     val incomingBehindRealtime =
         previousState?.matchId == state.matchId &&
             state.revision < lastRealtimeRevision.toLong()
