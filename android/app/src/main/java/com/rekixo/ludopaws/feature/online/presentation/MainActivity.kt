@@ -190,6 +190,8 @@ class MainActivity : ComponentActivity() {
 
     internal var lastRealtimeRevision =
         -1
+    internal var lastAppliedAuthoritativeRevision =
+        -1L
 
     internal var lastTurnTimeoutNoticeAt = 0L
     internal var timeoutExitScheduled = false
