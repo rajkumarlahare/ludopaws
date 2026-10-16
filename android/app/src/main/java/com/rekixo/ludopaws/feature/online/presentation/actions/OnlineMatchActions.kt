@@ -297,6 +297,7 @@ internal fun MainActivity.rollVerifiedDice() {
                 revealed
             },
             reconcileOnError = true,
+            prioritizeGameplay = true,
             onComplete = { releaseOnlineGameplayRequest() },
         )
     }
@@ -363,6 +364,7 @@ internal fun MainActivity.moveToken(
                 )
             },
             reconcileOnError = true,
+            prioritizeGameplay = true,
             onComplete = { releaseOnlineGameplayRequest() },
         )
     }
