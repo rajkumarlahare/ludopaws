@@ -124,6 +124,7 @@ async function json(response) {
 async function createStartedMatch(
   playerCount,
   matchMode = "ONLINE",
+  rulesetKey = null,
 ) {
   const {
     ctx,
@@ -149,9 +150,11 @@ async function createStartedMatch(
                 ? {
                     targetPlayerCount: playerCount,
                     matchMode,
-                    rulesetKey: "TEAM_UP_V4",
+                    rulesetKey: rulesetKey ?? "TEAM_UP_V4",
                   }
-                : {}),
+                : rulesetKey != null
+                  ? { rulesetKey }
+                  : {}),
             },
           },
         ),
@@ -329,6 +332,27 @@ test(
       replay.body.replayed,
       true,
     );
+  },
+);
+
+test(
+  "classic V4 exit advances the active seat and resets the deadline",
+  async () => {
+    const { ctx, room, players } = await createStartedMatch(4, "ONLINE", "CLASSIC_V4");
+    const before = await ctx.storage.get("match-state");
+    assert.equal(before.turnDeadlineSeat, 0);
+    const oldDeadline = before.turnDeadlineAt;
+
+    const result = await forfeit(room, players[0].playerToken);
+    assert.equal(result.response.status, 200, JSON.stringify(result.body));
+    assert.equal(result.body.state.status, "ACTIVE");
+    assert.equal(result.body.state.turnSeat, 1);
+    assert.equal(result.body.state.turnDeadlineSeat, 1);
+    assert.ok(result.body.state.turnDeadlineAt > oldDeadline);
+
+    const stored = await ctx.storage.get("match-state");
+    assert.equal(stored.turnDeadlineSeat, 1);
+    assert.ok(stored.turnDeadlineAt > oldDeadline);
   },
 );
 

@@ -124,6 +124,8 @@ export class MatchRoom extends SafeMatchRoom {
     next.revision = Number(next.revision ?? 0) + 1;
     // Individual leaderboard semantics cannot represent two co-winners safely.
     next.leaderboardRecordedAt = now;
+    next.turnDeadlineAt = null;
+    next.turnDeadlineSeat = null;
 
     await this.ctx.storage.put(STATE_KEY, next);
     if (typeof this.ctx.storage.setAlarm === "function") {

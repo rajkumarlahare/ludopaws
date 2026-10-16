@@ -7,8 +7,10 @@ import {
   sha256Hex,
 } from "./crypto.js";
 import {
+  actingSeatForTurn,
   isTeamUp,
   publicState,
+  rulesetForState,
   teamIdForSeat,
 } from "./game.js";
 import {
@@ -216,6 +218,8 @@ export class MatchRoom extends BaseMatchRoom {
 
       const now =
         Date.now();
+      const previousActingSeat = actingSeatForTurn(state);
+      const hadPendingRoll = state.pendingRoll != null;
       const next =
         structuredClone(
           state,
@@ -245,6 +249,8 @@ export class MatchRoom extends BaseMatchRoom {
         next.winnerTeamId = losingTeam === "A" ? "B" : "A";
         next.finishedAt = now;
         next.leaderboardRecordedAt = now;
+        next.turnDeadlineAt = null;
+        next.turnDeadlineSeat = null;
       } else {
         player.forfeitedAt = now;
         player.forfeitReason = "PLAYER_EXIT";
@@ -255,6 +261,27 @@ export class MatchRoom extends BaseMatchRoom {
 
         clearPendingRollForSeat(next, actor.seat);
         finishOrAdvanceAfterForfeit(next, actor.seat, now);
+
+        if (next.status !== "ACTIVE") {
+          next.turnDeadlineAt = null;
+          next.turnDeadlineSeat = null;
+        } else {
+          const timeoutMs = rulesetForState(next).turnRollTimeoutMs;
+          const nextActingSeat = actingSeatForTurn(next);
+          const actingSeatChanged = nextActingSeat !== previousActingSeat;
+          const pendingRollEnded = hadPendingRoll && next.pendingRoll == null;
+          if (
+            Number.isSafeInteger(timeoutMs) &&
+            timeoutMs > 0 &&
+            (actingSeatChanged || pendingRollEnded)
+          ) {
+            next.turnDeadlineSeat = nextActingSeat;
+            next.turnDeadlineAt = now + timeoutMs;
+          } else if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) {
+            next.turnDeadlineAt = null;
+            next.turnDeadlineSeat = null;
+          }
+        }
       }
       touch(
         next,
