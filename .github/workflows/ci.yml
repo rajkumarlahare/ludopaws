@@ -6,7 +6,7 @@ on:
   pull_request:
     types: [opened, reopened, ready_for_review, synchronize]
   push:
-    branches: [main, feat/ludopaws-production-readiness]
+    branches: [main, feat/ludopaws-production-readiness, feat/gameplay-polish-futureproof]
   workflow_dispatch:
     inputs:
       run_android_instrumentation:

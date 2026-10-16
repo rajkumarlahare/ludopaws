@@ -143,46 +143,41 @@ export class MatchRoom {
   }
 
   async alarm() {
-    let state =
-      await this.ctx.storage.get(STATE_KEY);
-    if (!state) return;
+    // Serialize timer expiry with gameplay mutations. Otherwise an alarm and a
+    // near-simultaneous roll/move can both advance the match from one turn.
+    return this.#mutate(async () => {
+      let state = await this.ctx.storage.get(STATE_KEY);
+      if (!state) return;
 
-    const now = Date.now();
-    const expired =
-      await this.#expirePendingIfNeeded(
-        state,
-        now,
-      );
-    state = expired.state;
+      const now = Date.now();
+      const expired = await this.#expirePendingIfNeeded(state, now);
+      state = expired.state;
 
-    if (expired.changed) {
-      await this.#persist(state);
-      return;
-    }
+      if (expired.changed) {
+        await this.#persist(state);
+        return;
+      }
 
-    const turnExpired = this.#expireTurnIfNeeded(state, now);
-    if (turnExpired.changed) {
-      await this.#persist(turnExpired.state);
-      await this.#recordFinishedMatchIfNeeded(turnExpired.state);
-      return;
-    }
+      const turnExpired = this.#expireTurnIfNeeded(state, now);
+      if (turnExpired.changed) {
+        await this.#persist(turnExpired.state);
+        await this.#recordFinishedMatchIfNeeded(turnExpired.state);
+        return;
+      }
 
-    const expiresAt =
-      Number(state.updatedAt ?? state.createdAt ?? 0) +
-      this.#idleTtl(state);
+      const expiresAt =
+        Number(state.updatedAt ?? state.createdAt ?? 0) +
+        this.#idleTtl(state);
 
-    if (now < expiresAt) {
-      await this.#setAlarm(
-        this.#nextAlarmAt(state, expiresAt),
-      );
-      return;
-    }
+      if (now < expiresAt) {
+        await this.#setAlarm(this.#nextAlarmAt(state, expiresAt));
+        return;
+      }
 
-    if (
-      typeof this.ctx.storage.deleteAll === "function"
-    ) {
-      await this.ctx.storage.deleteAll();
-    }
+      if (typeof this.ctx.storage.deleteAll === "function") {
+        await this.ctx.storage.deleteAll();
+      }
+    });
   }
 
   async #persist(state) {
