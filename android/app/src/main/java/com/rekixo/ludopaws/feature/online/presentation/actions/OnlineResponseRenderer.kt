@@ -69,6 +69,7 @@ internal fun MainActivity.applyResponse(
             incomingMatchId = state.matchId,
             incomingSource = source,
             currentStateSource = uiStateHolder.value.currentStateSource,
+            currentStateMatchId = currentState?.matchId,
             incomingRevision = serverRevision,
             lastAppliedAuthoritativeRevision = lastAppliedAuthoritativeRevision,
         )
