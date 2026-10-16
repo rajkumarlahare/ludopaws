@@ -21,7 +21,9 @@ export class MatchRoom extends TeamMatchRoom {
       );
 
     if (response.ok) {
-      await this.#enqueueArchiveSync();
+      // Receipt archival is durable evidence work, not part of the dice response
+      // critical path. Leave it queued behind serialized mutations, without awaiting it.
+      this.#enqueueArchiveSync();
     }
 
     return response;

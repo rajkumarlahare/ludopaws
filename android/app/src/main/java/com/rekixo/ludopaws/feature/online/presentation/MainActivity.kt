@@ -372,19 +372,16 @@ class MainActivity : ComponentActivity() {
                         return@post
                     }
 
-                    if (
-                        revision >
-                        lastRealtimeRevision
-                    ) {
-                        lastRealtimeRevision =
-                            revision
-                        mainHandler.removeCallbacks(
-                            realtimeRefreshRunnable,
-                        )
-                        mainHandler.postDelayed(
-                            realtimeRefreshRunnable,
-                            120L,
-                        )
+                    if (revision > lastRealtimeRevision) {
+                        // Roll HTTP responses apply authoritative snapshots directly.
+                        // Avoid another GET if this socket revision was already applied.
+                        if (revision.toLong() <= lastAppliedAuthoritativeRevision) {
+                            lastRealtimeRevision = maxOf(lastRealtimeRevision, revision)
+                        } else {
+                            lastRealtimeRevision = revision
+                            mainHandler.removeCallbacks(realtimeRefreshRunnable)
+                            mainHandler.postDelayed(realtimeRefreshRunnable, 40L)
+                        }
                     }
                 }
             },

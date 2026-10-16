@@ -826,6 +826,7 @@ export class MatchRoom {
     }
 
     const pending = state.pendingRoll;
+    const perfStartedAt = Date.now();
     const config = buildEntroNexConfig(state.matchId, pending);
     const expected = await expectedDigests(config);
 
@@ -848,6 +849,12 @@ export class MatchRoom {
 
     validateRoundCommitment(remote, pending, expected, config);
     verifyCommitmentAttestation(remote, this.env);
+    console.info("ludopaws_dice_perf", {
+      phase: "commit",
+      matchId: state.matchId,
+      eventIndex: pending.eventIndex,
+      elapsedMs: Date.now() - perfStartedAt,
+    });
 
     let latest = await this.#requireState();
     if (
@@ -891,6 +898,7 @@ export class MatchRoom {
       "entronex:v4:client-commit:" + clientSeed,
     );
     const pending = state.pendingRoll;
+    const revealStartedAt = Date.now();
 
     if (!pending) {
       return this.#replayHistoricalReveal(
@@ -985,6 +993,12 @@ export class MatchRoom {
 
     assertLocalProofValid(proof);
     verifyProofAttestation(proof, this.env);
+    console.info("ludopaws_dice_perf", {
+      phase: "reveal_verify",
+      matchId: state.matchId,
+      eventIndex: pending.eventIndex,
+      elapsedMs: Date.now() - revealStartedAt,
+    });
 
     let latest = await this.#requireState();
     if (
