@@ -427,6 +427,7 @@ internal fun MainActivity.captureSession(
     ) {
         lastRealtimeRevision =
             -1
+        lastAppliedAuthoritativeRevision = -1L
         uiStateHolder.update {
             it.copy(
                 currentStateSource = null,
