@@ -70,6 +70,7 @@ data class MatchSnapshot(
     val winnerTeamId: String? = null,
     // Ordered player IDs from a trusted finish-order source, when available.
     val finishOrderPlayerIds: List<String> = emptyList(),
+    val revision: Long = 0L,
 )
 
 data class GameEnvelope(
@@ -157,6 +158,7 @@ object GameJson {
                 value.optString("winnerTeamId")
                     .takeIf { it == "A" || it == "B" },
             finishOrderPlayerIds = value.optJSONArray("finishOrderPlayerIds").toStringList(),
+            revision = value.optLong("revision", 0L),
         )
     }
 
