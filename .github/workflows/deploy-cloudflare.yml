@@ -30,8 +30,6 @@ jobs:
       GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL: ${{ vars.GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL }}
       GOOGLE_PLAY_BILLING_ENABLED: ${{ vars.GOOGLE_PLAY_BILLING_ENABLED }}
       LUDOPROOF_BILLING_ENABLED: ${{ vars.LUDOPROOF_BILLING_ENABLED }}
-      GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED: ${{ vars.GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED }}
-      LUDOPROOF_SUBSCRIPTIONS_ENABLED: ${{ vars.LUDOPROOF_SUBSCRIPTIONS_ENABLED }}
       GOOGLE_PLAY_RTDN_AUDIENCE: ${{ vars.GOOGLE_PLAY_RTDN_AUDIENCE }}
       GOOGLE_PLAY_RTDN_EMAIL: ${{ vars.GOOGLE_PLAY_RTDN_EMAIL }}
       LUDOPROOF_ADMOB_SSV_ENABLED: ${{ vars.LUDOPROOF_ADMOB_SSV_ENABLED }}
@@ -301,25 +299,21 @@ jobs:
           node -e '
             const fs = require("node:fs");
             const body = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
-            if (body?.ok !== true || typeof body.billingAvailable !== "boolean" || typeof body.subscriptionsAvailable !== "boolean" || typeof body.rewardedAdsAvailable !== "boolean") {
+            if (body?.ok !== true || typeof body.billingAvailable !== "boolean" || typeof body.rewardedAdsAvailable !== "boolean") {
               console.error("Branded API /api/store/status response is missing expected boolean feature flags.");
               process.exit(2);
             }
             const expectedBilling = process.env.GOOGLE_PLAY_BILLING_ENABLED === "true";
             const androidBillingEnabled = process.env.LUDOPROOF_BILLING_ENABLED === "true";
-            const expectedSubscriptions = process.env.GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED === "true";
-            const androidSubscriptionsEnabled = process.env.LUDOPROOF_SUBSCRIPTIONS_ENABLED === "true";
             const expectedRewardedAds = process.env.LUDOPROOF_ADMOB_SSV_ENABLED === "true";
             const androidRewardedAds = process.env.LUDOPROOF_ADS_ENABLED === "true";
             if (
               body.billingAvailable !== expectedBilling ||
               androidBillingEnabled !== expectedBilling ||
-              body.subscriptionsAvailable !== expectedSubscriptions ||
-              androidSubscriptionsEnabled !== expectedSubscriptions ||
               body.rewardedAdsAvailable !== expectedRewardedAds ||
               androidRewardedAds !== expectedRewardedAds
             ) {
-              console.error("Production store status does not match validated feature configuration. Android/Worker Billing, Paws Plus subscription and Rewarded Ads flags must match their explicitly configured values.");
+              console.error("Production store status does not match validated feature configuration. One-time Billing and Rewarded Ads flags must match their explicitly configured values.");
               process.exit(3);
             }
             console.log(
