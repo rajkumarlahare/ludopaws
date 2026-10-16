@@ -5,7 +5,8 @@ package com.rekixo.ludopaws
  *
  * Revisions come from the server and only order snapshots for the same match.
  * Cache state is useful for drawing a board during startup, but it must never
- * replace a live authoritative snapshot for that same match.
+ * replace a newer snapshot already seen for that same match, including after
+ * the Activity temporarily clears its source marker during lifecycle changes.
  */
 internal object OnlineSnapshotFreshnessPolicy {
     fun shouldApply(
