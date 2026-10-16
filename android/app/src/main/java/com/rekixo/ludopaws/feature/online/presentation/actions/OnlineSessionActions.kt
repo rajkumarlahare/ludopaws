@@ -88,24 +88,33 @@ internal fun MainActivity.runNetwork(
         return
     }
 
+    val gameplayMutation = onlineRollRequestInFlight || onlineMoveRequestInFlight
+    val requestExecutor = if (gameplayMutation) gameplayExecutor else executor
+
     if (!isOnline) {
-        diceView.stopRolling()
-        showStatus("Offline — this online match is read-only until internet returns.")
-        currentState?.let { updateControls(it) }
+        if (gameplayMutation) diceView.stopRolling()
+        if (showWorking) {
+            showStatus("Offline — this online match is read-only until internet returns.")
+            currentState?.let { updateControls(it) }
+        }
         onComplete()
         return
     }
-    if (executor.isShutdown) {
+    if (requestExecutor.isShutdown) {
         onComplete()
         return
     }
 
-    if (showWorking) showStatus("Working…")
-    setNetworkControls(enabled = false)
+    // Passive synchronization must not flicker/disable the live controls or replace
+    // an animation status. Only explicit actions own the global working UI.
+    if (showWorking) {
+        showStatus("Working…")
+        setNetworkControls(enabled = false)
+    }
 
     val submitted =
         runCatching {
-            executor.execute {
+            requestExecutor.execute {
                 try {
                     val response = action()
                     mainHandler.post {
@@ -114,7 +123,7 @@ internal fun MainActivity.runNetwork(
                             return@post
                         }
                         try {
-                            setNetworkControls(enabled = true)
+                            if (showWorking) setNetworkControls(enabled = true)
                             onSuccess(response)
                             updateRollButton()
                         } finally {
@@ -128,13 +137,15 @@ internal fun MainActivity.runNetwork(
                             return@post
                         }
                         try {
-                            diceView.stopRolling()
+                            if (gameplayMutation) diceView.stopRolling()
                             val sessionReset = resetInvalidSessionIfNeeded(error)
                             if (!sessionReset) {
-                                setNetworkControls(enabled = true)
-                                showStatus("Error: " + (error.message ?: error.toString()))
-                                currentState?.let { updateControls(it) }
-                                if (reconcileOnError) {
+                                if (showWorking) {
+                                    setNetworkControls(enabled = true)
+                                    showStatus("Error: " + (error.message ?: error.toString()))
+                                    currentState?.let { updateControls(it) }
+                                }
+                                if (reconcileOnError && gameplayMutation) {
                                     refreshState(silent = true)
                                 }
                             }
@@ -149,9 +160,11 @@ internal fun MainActivity.runNetwork(
 
     if (!submitted && canRenderUi()) {
         try {
-            diceView.stopRolling()
-            setNetworkControls(enabled = true)
-            showStatus("Request was cancelled because the screen is closing.")
+            if (gameplayMutation) diceView.stopRolling()
+            if (showWorking) {
+                setNetworkControls(enabled = true)
+                showStatus("Request was cancelled because the screen is closing.")
+            }
             updateRollButton()
         } finally {
             onComplete()
