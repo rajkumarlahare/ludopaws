@@ -22,8 +22,9 @@ class DiceView @JvmOverloads constructor(
             IMPORTANT_FOR_ACCESSIBILITY_YES
         contentDescription =
             "Dice. No verified outcome yet."
+        // Avoid forcing software rasterization on every rolling animation frame.
         setLayerType(
-            LAYER_TYPE_SOFTWARE,
+            LAYER_TYPE_NONE,
             null,
         )
     }
