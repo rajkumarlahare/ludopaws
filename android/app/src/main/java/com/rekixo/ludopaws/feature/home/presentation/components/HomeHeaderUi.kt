@@ -93,7 +93,7 @@ private fun HomeActivity.homeIdentityRow(): LinearLayout =
             homeCurrencyPill(),
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
-                dp(if (isCompact()) 53 else 57),
+                dp(if (isCompact()) 27 else 29),
             ),
         )
 
@@ -125,14 +125,14 @@ private fun HomeActivity.homeCurrencyPill(): LinearLayout =
         background =
             plywoodBackground(
                 context = this@homeCurrencyPill,
-                cornerRadiusDp = if (isCompact()) 26.5f else 28.5f,
+                cornerRadiusDp = if (isCompact()) 13.25f else 14.25f,
             )
         elevation = dp(5).toFloat()
         setPadding(
-            dp(6),
-            dp(5),
-            dp(5),
-            dp(5),
+            dp(3),
+            dp(2),
+            dp(2),
+            dp(2),
         )
         setOnClickListener {
             startActivity(
@@ -150,7 +150,7 @@ private fun HomeActivity.homeCurrencyPill(): LinearLayout =
                     View.IMPORTANT_FOR_ACCESSIBILITY_NO
             },
             LinearLayout.LayoutParams(
-                dp(if (isCompact()) 39 else 44),
+                dp(if (isCompact()) 20 else 22),
                 LinearLayout.LayoutParams.MATCH_PARENT,
             ),
         )
@@ -162,7 +162,7 @@ private fun HomeActivity.homeCurrencyPill(): LinearLayout =
                     GemWalletStore(this@homeCurrencyPill)
                         .balance()
                         .toString()
-                textSize = if (isCompact()) 16f else 17.5f
+                textSize = if (isCompact()) 8f else 8.75f
                 setTypeface(Typeface.DEFAULT_BOLD)
                 setTextColor(Color.WHITE)
                 gravity = Gravity.CENTER
@@ -187,15 +187,15 @@ private fun HomeActivity.homeCurrencyPill(): LinearLayout =
                 isFocusable = true
                 contentDescription = "Add currency"
                 setPadding(
-                    dp(9),
-                    dp(9),
-                    dp(9),
-                    dp(9),
+                    dp(if (isCompact()) 4 else 5),
+                    dp(if (isCompact()) 4 else 5),
+                    dp(if (isCompact()) 4 else 5),
+                    dp(if (isCompact()) 4 else 5),
                 )
                 background =
                     plywoodBackground(
                         context = this@homeCurrencyPill,
-                        cornerRadiusDp = if (isCompact()) 19.5f else 22f,
+                        cornerRadiusDp = if (isCompact()) 9.75f else 11f,
                     )
                 setOnClickListener {
                     startActivity(
@@ -207,8 +207,8 @@ private fun HomeActivity.homeCurrencyPill(): LinearLayout =
                 }
             },
             LinearLayout.LayoutParams(
-                dp(if (isCompact()) 39 else 44),
-                dp(if (isCompact()) 39 else 44),
+                dp(if (isCompact()) 20 else 22),
+                dp(if (isCompact()) 20 else 22),
             ),
         )
     }
