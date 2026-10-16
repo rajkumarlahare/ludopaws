@@ -1,6 +1,6 @@
 # Ludo Paws authored audio
 
-This folder is the source of truth for replaceable production audio. Drop real .wav or .ogg files into the matching folders below and commit them. Android Gradle mirrors these files into APK assets at build time; do not copy them manually into res/raw.
+This folder is the source of truth for replaceable production audio. Drop real WAV or OGG files into SFX/voice folders, and WAV, OGG, or MP3 files into `audio/music/`. Android Gradle mirrors these files into APK assets at build time; do not copy them manually into `res/raw`.
 
 Do not add fake, silent, or zero-byte WAVs. Empty folders use .gitkeep until an authored sound is ready.
 
@@ -8,7 +8,7 @@ Do not add fake, silent, or zero-byte WAVs. Empty folders use .gitkeep until an 
 
 Folder: `audio/music/`.
 
-Put background-music files such as `ludoproof_theme (1).wav`, `ludoproof_theme (2).wav`, and so on directly in this folder. **Keep the names exactly as they are**—the Android asset loader recognizes the original base name with a Windows duplicate suffix (` (number)`) and uses the first matching file in numeric order as the looping BGM. It falls back to the legacy `res/raw/ludoproof_theme` resource if no authored asset is present.
+Put background-music files directly in this folder. The loader supports legacy `ludoproof_theme (number).wav` / `.ogg` names and the current `Firefly-audio-Title-Ludo-Paws-Ro.mp3` theme. The Firefly track is selected ahead of legacy numbered tracks, and the app falls back to `res/raw/ludoproof_theme` only when no authored track can be opened.
 
 Important: do not leave filenames containing spaces or parentheses in `android/app/src/main/res/raw/`; Android resource filenames must be resource-safe. Move those BGM files into `audio/music/` without renaming them. Gradle packages this folder as APK assets automatically.
 

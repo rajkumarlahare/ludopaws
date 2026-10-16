@@ -299,7 +299,9 @@ function listAudioFiles(directory) {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
     const entryPath = path.join(directory, entry.name);
     if (entry.isDirectory()) return listAudioFiles(entryPath);
-    return /\.(wav|ogg)$/i.test(entry.name) ? [entryPath] : [];
+    const supportedAudioExtension =
+      directory === 'audio/music' ? /\.(wav|ogg|mp3)$/i : /\.(wav|ogg)$/i;
+    return supportedAudioExtension.test(entry.name) ? [entryPath] : [];
   });
 }
 
@@ -358,11 +360,20 @@ for (const file of authoredAudioFiles) {
     ) {
       throw new Error(`Invalid or truncated RIFF/WAVE asset: ${file}`);
     }
-  } else if (
-    bytes.length < 4 ||
-    bytes.toString('ascii', 0, 4) !== 'OggS'
-  ) {
-    throw new Error(`Invalid or truncated OGG asset: ${file}`);
+  } else if (lower.endsWith('.ogg')) {
+    if (
+      bytes.length < 4 ||
+      bytes.toString('ascii', 0, 4) !== 'OggS'
+    ) {
+      throw new Error(`Invalid or truncated OGG asset: ${file}`);
+    }
+  } else if (lower.endsWith('.mp3')) {
+    const hasId3Header = bytes.toString('ascii', 0, 3) === 'ID3';
+    const hasMpegFrameSync =
+      bytes.length >= 2 && bytes[0] === 0xff && (bytes[1] & 0xe0) === 0xe0;
+    if (!hasId3Header && !hasMpegFrameSync) {
+      throw new Error(`Invalid or truncated MP3 asset: ${file}`);
+    }
   }
 }
 

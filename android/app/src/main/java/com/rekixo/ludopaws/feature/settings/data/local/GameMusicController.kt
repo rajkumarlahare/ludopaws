@@ -209,7 +209,7 @@ object GameMusicController {
         val directory = "audio/music"
         val filenamePattern =
             Regex(
-                "^ludoproof_theme(?: \\(\\d+\\))?\\.(wav|ogg)$",
+                "^(?:ludoproof_theme(?: \\(\\d+\\))?|Firefly-audio-Title-Ludo-Paws-Ro)\\.(wav|ogg|mp3)$",
                 RegexOption.IGNORE_CASE,
             )
         return runCatching {

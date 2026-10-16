@@ -126,7 +126,7 @@ val generatedAudioAssetsDir = layout.buildDirectory.dir("generated/audio-assets"
 val syncAuthoredAudioAssets =
     tasks.register<Sync>("syncAuthoredAudioAssets") {
         from(authoredAudioDir) {
-            include("**/*.wav", "**/*.ogg")
+            include("**/*.wav", "**/*.ogg", "**/*.mp3")
         }
         into(generatedAudioAssetsDir.map { it.dir("audio") })
     }
@@ -135,7 +135,7 @@ android {
     namespace = "com.rekixo.ludopaws"
 
     androidResources {
-        noCompress += listOf("wav", "ogg")
+        noCompress += listOf("wav", "ogg", "mp3")
     }
     compileSdk = 36
 

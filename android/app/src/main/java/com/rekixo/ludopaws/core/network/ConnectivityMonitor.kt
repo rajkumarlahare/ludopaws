@@ -28,9 +28,12 @@ class ConnectivityMonitor(
 
             override fun onCapabilitiesChanged(
                 network: Network,
-                networkCapabilities: NetworkCapabilities,
+                @Suppress("UNUSED_PARAMETER") networkCapabilities: NetworkCapabilities,
             ) {
-                onChanged(hasValidatedInternet(networkCapabilities))
+                // A queued callback can describe a network that is no longer the
+                // active default. Always derive state from the current default
+                // network to prevent stale "online" events after Wi-Fi is disabled.
+                onChanged(isOnline())
             }
         }
 
