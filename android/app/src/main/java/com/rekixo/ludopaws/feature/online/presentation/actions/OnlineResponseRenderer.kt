@@ -199,26 +199,16 @@ internal fun MainActivity.applyResponse(
     updateControls(state)
     updateRollButton()
 
-    val transitionMessage =
-        OnlineTurnTransitionFeedbackPolicy.message(
-            previous = previousState,
-            current = state,
-        )
-
     if (secureSessionPersistenceFailed) {
         showStatus(
             "Match is connected, but secure resume could not be saved. Keep this screen open until the match is finished.",
         )
-    } else if (transitionMessage != null) {
-        showStatus(transitionMessage)
-    } else if (announce) {
-        showStatus(
-            if (state.status == "WAITING") {
-                "Room synced • waiting for all required players."
-            } else {
-                "State revision updated. Event index: " + state.randomEventIndex
-            },
-        )
+    } else if (state.status == "WAITING" && announce) {
+        showStatus("Room synced • waiting for all required players.")
+    } else if (state.status == "ACTIVE" || state.status == "FINISHED") {
+        // Normal gameplay transitions are presented by the board and player rails,
+        // not as a scrolling activity-style status message.
+        statusText.text = ""
     }
 
     val wireState = response.optJSONObject("state") ?: response
@@ -233,16 +223,8 @@ internal fun MainActivity.applyResponse(
         timeoutAt > lastTurnTimeoutNoticeAt
     ) {
         lastTurnTimeoutNoticeAt = timeoutAt
-        val displayName = state.players.firstOrNull {
-            it.playerId == timeoutPlayerId
-        }?.displayName ?: "Player"
-        showStatus(
-            if (timeoutCount >= 4) {
-                "${displayName} was removed after four missed dice turns."
-            } else {
-                "${displayName} did not roll in 15 seconds • warning ${timeoutCount}/3 • turn passed."
-            },
-        )
+        // Keep timeout history in the authoritative state, but do not render it
+        // as repetitive activity-log text during gameplay.
     }
 
     val wirePlayers = wireState.optJSONArray("players")
@@ -258,7 +240,6 @@ internal fun MainActivity.applyResponse(
         !timeoutExitScheduled
     ) {
         timeoutExitScheduled = true
-        showStatus("You missed four dice turns and were removed from this match.")
         mainHandler.postDelayed(
             {
                 if (canRenderUi()) {
@@ -280,6 +261,7 @@ internal fun MainActivity.applyResponse(
             1_800L,
         )
     }
+    scheduleOnlineAutoMove(state)
 }
 
 internal fun MainActivity.reconcilePendingSecret(
