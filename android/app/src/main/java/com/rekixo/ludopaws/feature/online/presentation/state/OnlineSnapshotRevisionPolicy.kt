@@ -15,6 +15,6 @@ internal object OnlineSnapshotRevisionPolicy {
     ): Boolean {
         if (!currentIsAuthoritative || currentMatchId != incomingMatchId) return true
         if (currentRevision == null) return true
-        return incomingRevision >= currentRevision
+        return incomingRevision > currentRevision
     }
 }
