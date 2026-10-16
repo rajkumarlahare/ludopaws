@@ -1,18 +1,48 @@
 package com.rekixo.ludopaws.feature.online
 
 import android.os.SystemClock
+import com.rekixo.ludopaws.LudoPawsGameplayPacingPolicy
 import com.rekixo.ludopaws.MainActivity
 import com.rekixo.ludopaws.MatchSnapshot
 import com.rekixo.ludopaws.OnlineStateSource
+import com.rekixo.ludopaws.feature.settings.data.local.GameSettingsStore
 
+/**
+ * Returns the remaining wall-clock-independent dice animation duration using
+ * the same configured minimum spin duration as the verified-result renderer.
+ */
+internal fun MainActivity.remainingOnlineDicePresentationMillis(): Long {
+    val speed = GameSettingsStore(this).snapshot().gameSpeed
+    val minimumRollDuration =
+        LudoPawsGameplayPacingPolicy.diceResultHoldMillis(speed)
+    return diceView.remainingOutcomePresentationMillis(minimumRollDuration)
+}
+
+private fun MainActivity.onlineAutoMoveWaitMillis(includePostRollBreath: Boolean): Long {
+    val now = SystemClock.uptimeMillis()
+    val actionLockRemaining =
+        (onlineGameplayActionBlockedUntilMillis - now).coerceAtLeast(0L)
+    val diceAnimationRemaining = remainingOnlineDicePresentationMillis()
+    val animationAndLock = maxOf(actionLockRemaining, diceAnimationRemaining)
+    if (!includePostRollBreath) return animationAndLock
+
+    val speed = GameSettingsStore(this).snapshot().gameSpeed
+    return animationAndLock +
+        LudoPawsGameplayPacingPolicy.postRollAutoMoveDelayMillis(speed)
+}
+
+/**
+ * Schedules an automatic move only from a fresh authoritative resolved roll.
+ * It waits for both the verified-dice animation and gameplay lock, then
+ * revalidates the exact event/destination before sending the mutation.
+ */
 internal fun MainActivity.scheduleOnlineAutoMove(snapshot: MatchSnapshot) {
-    val authoritative =
-        uiStateHolder.value.currentStateSource == OnlineStateSource.AUTHORITATIVE
     val decision = OnlineAutoMovePolicy.resolve(
         state = snapshot,
         localPlayerId = playerId,
         isOnline = isOnline,
-        hasAuthoritativeState = authoritative,
+        hasAuthoritativeState =
+            uiStateHolder.value.currentStateSource == OnlineStateSource.AUTHORITATIVE,
     )
     if (decision == null) {
         cancelScheduledOnlineAutoMove()
@@ -21,7 +51,7 @@ internal fun MainActivity.scheduleOnlineAutoMove(snapshot: MatchSnapshot) {
     if (scheduledAutoMoveEventKey == decision.eventKey) return
     if (
         lastAutoMoveAttemptEventKey == decision.eventKey &&
-        autoMoveAttemptCount >= 2
+        autoMoveAttemptCount >= MAX_AUTO_MOVE_ATTEMPTS
     ) {
         cancelScheduledOnlineAutoMove()
         return
@@ -55,11 +85,10 @@ internal fun MainActivity.scheduleOnlineAutoMove(snapshot: MatchSnapshot) {
                 return
             }
 
-            val delay = (
-                onlineGameplayActionBlockedUntilMillis - SystemClock.uptimeMillis()
-            ).coerceAtLeast(0L)
-            if (delay > 0L) {
-                mainHandler.postDelayed(this, delay)
+            // Never issue the move while a dice spin/settle frame is still visible.
+            val waitMillis = onlineAutoMoveWaitMillis(includePostRollBreath = false)
+            if (waitMillis > 0L) {
+                mainHandler.postDelayed(this, waitMillis)
                 return
             }
             if (onlineRollRequestInFlight || onlineMoveRequestInFlight) {
@@ -67,7 +96,10 @@ internal fun MainActivity.scheduleOnlineAutoMove(snapshot: MatchSnapshot) {
                 return
             }
             if (!canSubmitOnlineGameplayAction()) {
-                cancelScheduledOnlineAutoMove()
+                val retryAfterLock =
+                    (onlineGameplayActionBlockedUntilMillis - SystemClock.uptimeMillis())
+                        .coerceAtLeast(1L)
+                mainHandler.postDelayed(this, retryAfterLock)
                 return
             }
 
@@ -75,7 +107,7 @@ internal fun MainActivity.scheduleOnlineAutoMove(snapshot: MatchSnapshot) {
                 lastAutoMoveAttemptEventKey = decision.eventKey
                 autoMoveAttemptCount = 0
             }
-            if (autoMoveAttemptCount >= 2) {
+            if (autoMoveAttemptCount >= MAX_AUTO_MOVE_ATTEMPTS) {
                 cancelScheduledOnlineAutoMove()
                 return
             }
@@ -85,10 +117,10 @@ internal fun MainActivity.scheduleOnlineAutoMove(snapshot: MatchSnapshot) {
         }
     }
     scheduledAutoMoveRunnable = task
-    val delay = (
-        onlineGameplayActionBlockedUntilMillis - SystemClock.uptimeMillis()
-    ).coerceAtLeast(0L)
-    mainHandler.postDelayed(task, delay)
+    mainHandler.postDelayed(
+        task,
+        onlineAutoMoveWaitMillis(includePostRollBreath = true),
+    )
 }
 
 internal fun MainActivity.cancelScheduledOnlineAutoMove() {
@@ -96,3 +128,5 @@ internal fun MainActivity.cancelScheduledOnlineAutoMove() {
     scheduledAutoMoveRunnable = null
     scheduledAutoMoveEventKey = null
 }
+
+private const val MAX_AUTO_MOVE_ATTEMPTS = 2

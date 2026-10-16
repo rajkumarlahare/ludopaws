@@ -320,10 +320,19 @@ private fun MainActivity.scheduleSingleLegalOnlineMove(
     showStatus("Only one move is possible • showing the dice result…")
     val speed = GameSettingsStore(this).snapshot().gameSpeed
     val autoMoveDelay =
-        LudoPawsGameplayPacingPolicy.diceResultHoldMillis(speed) +
-            LudoPawsGameplayPacingPolicy.postRollAutoMoveDelayMillis(speed)
-    rollButton.postDelayed(
-        {
+        maxOf(
+            remainingOnlineDicePresentationMillis(),
+            (onlineGameplayActionBlockedUntilMillis - SystemClock.uptimeMillis())
+                .coerceAtLeast(0L),
+        ) + LudoPawsGameplayPacingPolicy.postRollAutoMoveDelayMillis(speed)
+
+    val autoMoveTask = object : Runnable {
+        override fun run() {
+            if (!canRenderUi() || !screenStarted || rollButton.tag != eventKey) {
+                if (rollButton.tag == eventKey) rollButton.tag = null
+                return
+            }
+
             val latest = currentState
             val latestPending = latest?.pendingRoll
             val stillSameMove =
@@ -340,14 +349,25 @@ private fun MainActivity.scheduleSingleLegalOnlineMove(
                             player.playerId == playerId
                         }
 
-            if (stillSameMove) {
-                moveToken(tokenIndex)
-            } else if (rollButton.tag == eventKey) {
-                rollButton.tag = null
+            if (!stillSameMove) {
+                if (rollButton.tag == eventKey) rollButton.tag = null
+                return
             }
-        },
-        autoMoveDelay,
-    )
+
+            val remainingAnimation = remainingOnlineDicePresentationMillis()
+            val remainingActionLock =
+                (onlineGameplayActionBlockedUntilMillis - SystemClock.uptimeMillis())
+                    .coerceAtLeast(0L)
+            val remainingDelay = maxOf(remainingAnimation, remainingActionLock)
+            if (remainingDelay > 0L) {
+                rollButton.postDelayed(this, remainingDelay)
+                return
+            }
+
+            moveToken(tokenIndex)
+        }
+    }
+    rollButton.postDelayed(autoMoveTask, autoMoveDelay)
 }
 
 internal fun MainActivity.updateRollButton() {

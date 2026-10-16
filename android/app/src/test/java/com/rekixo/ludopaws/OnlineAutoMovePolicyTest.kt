@@ -9,7 +9,10 @@ class OnlineAutoMovePolicyTest {
     @Test
     fun schedulesOnlyForTheAuthoritativeActingPlayerWithOneEffectiveDestination() {
         val state = snapshot(
-            localSeat = 0, tokens = listOf(8, -1, -1, -1), roll = 2, legal = setOf(0),
+            localSeat = 0,
+            tokens = listOf(8, 8, -1, -1),
+            roll = 2,
+            legal = setOf(0, 1),
         )
         val decision = OnlineAutoMovePolicy.resolve(state, "p0", true, true)
         requireNotNull(decision)
@@ -18,18 +21,44 @@ class OnlineAutoMovePolicyTest {
     }
 
     @Test
+    fun oneLegalTokenIsLeftToTheExistingSingleLegalScheduler() {
+        val state = snapshot(
+            localSeat = 0,
+            tokens = listOf(8, -1, -1, -1),
+            roll = 2,
+            legal = setOf(0),
+        )
+        assertNull(OnlineAutoMovePolicy.resolve(state, "p0", true, true))
+    }
+
+    @Test
     fun cachedOfflineOpponentAndUnsupportedRulesetCannotTriggerAutoMove() {
-        val state = snapshot(localSeat = 0, tokens = listOf(8, -1, -1, -1), roll = 2, legal = setOf(0))
+        val state = snapshot(
+            localSeat = 0,
+            tokens = listOf(8, 8, -1, -1),
+            roll = 2,
+            legal = setOf(0, 1),
+        )
         assertNull(OnlineAutoMovePolicy.resolve(state, "p0", true, false))
         assertNull(OnlineAutoMovePolicy.resolve(state, "p0", false, true))
         assertNull(OnlineAutoMovePolicy.resolve(state, "p1", true, true))
-        assertNull(OnlineAutoMovePolicy.resolve(state.copy(rulesetId = "ludoproof-standard-v2"), "p0", true, true))
+        assertNull(
+            OnlineAutoMovePolicy.resolve(
+                state.copy(rulesetId = "ludoproof-standard-v2"),
+                "p0",
+                true,
+                true,
+            ),
+        )
     }
 
     @Test
     fun multipleDistinctLegalDestinationsRequireManualSelection() {
         val state = snapshot(
-            localSeat = 0, tokens = listOf(20, 25, -1, -1), roll = 3, legal = setOf(0, 1),
+            localSeat = 0,
+            tokens = listOf(20, 25, -1, -1),
+            roll = 3,
+            legal = setOf(0, 1),
         )
         assertNull(OnlineAutoMovePolicy.resolve(state, "p0", true, true))
     }
@@ -41,9 +70,9 @@ class OnlineAutoMovePolicyTest {
             actingSeat = 2,
             mode = "TEAM_UP",
             rulesetId = "ludoproof-team-v4",
-            tokens = listOf(8, -1, -1, -1),
+            tokens = listOf(8, 8, -1, -1),
             roll = 2,
-            legal = setOf(0),
+            legal = setOf(0, 1),
         )
         assertNull(OnlineAutoMovePolicy.resolve(state, "p0", true, true))
     }
