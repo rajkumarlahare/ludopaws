@@ -59,6 +59,25 @@ internal fun MainActivity.applyResponse(
         return
     }
 
+    val serverRevision =
+        response.optJSONObject("state")
+            ?.optLong("revision", -1L)
+            ?: response.optLong("revision", -1L)
+    if (
+        !OnlineSnapshotFreshnessPolicy.shouldApply(
+            sessionMatchId = matchId,
+            incomingMatchId = state.matchId,
+            incomingSource = source,
+            currentStateSource = uiStateHolder.value.currentStateSource,
+            incomingRevision = serverRevision,
+            lastAppliedAuthoritativeRevision = lastAppliedAuthoritativeRevision,
+        )
+    ) {
+        // Skip all side effects for stale responses: no state replacement,
+        // cache write, pending-secret reconciliation, or animation replay.
+        return
+    }
+
     envelope.playerId?.let { resolvedPlayerId ->
         playerId = resolvedPlayerId
         val code = matchId
@@ -86,12 +105,14 @@ internal fun MainActivity.applyResponse(
     }
     matchId = state.matchId
 
-    val serverRevision =
-        response.optJSONObject("state")
-            ?.optInt("revision", -1)
-            ?: response.optInt("revision", -1)
-    if (serverRevision > lastRealtimeRevision) {
-        lastRealtimeRevision = serverRevision
+    if (source == OnlineStateSource.AUTHORITATIVE && serverRevision >= 0L) {
+        lastAppliedAuthoritativeRevision = maxOf(
+            lastAppliedAuthoritativeRevision,
+            serverRevision,
+        )
+    }
+    if (serverRevision > lastRealtimeRevision.toLong()) {
+        lastRealtimeRevision = serverRevision.toInt()
     }
 
     if (state.status == "FINISHED") {
