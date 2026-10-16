@@ -62,6 +62,7 @@ export class PlayerAccount {
       sql.exec("CREATE TABLE IF NOT EXISTS account_sessions (session_id TEXT PRIMARY KEY, refresh_token_hash TEXT NOT NULL, previous_refresh_hash TEXT, last_refresh_request_id TEXT, created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, revoked_at INTEGER, last_seen_at INTEGER NOT NULL)");
       sql.exec("CREATE TABLE IF NOT EXISTS wallet (account_id TEXT PRIMARY KEY, balance INTEGER NOT NULL DEFAULT 0 CHECK(balance >= 0), ads_removed INTEGER NOT NULL DEFAULT 0 CHECK(ads_removed IN (0, 1)), updated_at INTEGER NOT NULL)");
       sql.exec("CREATE TABLE IF NOT EXISTS wallet_transactions (transaction_id TEXT PRIMARY KEY, idempotency_key TEXT NOT NULL UNIQUE, payload_hash TEXT NOT NULL, kind TEXT NOT NULL, delta INTEGER NOT NULL, balance_after INTEGER NOT NULL, source_ref_hash TEXT, created_at INTEGER NOT NULL)");
+      sql.exec("DROP TABLE IF EXISTS paws_plus_subscriptions");
       sql.exec("CREATE TABLE IF NOT EXISTS owned_cosmetics (cosmetic_id TEXT PRIMARY KEY, category TEXT NOT NULL, source TEXT NOT NULL, acquired_at INTEGER NOT NULL, source_ref_hash TEXT)");
       sql.exec("CREATE TABLE IF NOT EXISTS selected_cosmetics (category TEXT PRIMARY KEY, cosmetic_id TEXT NOT NULL, updated_at INTEGER NOT NULL)");
       sql.exec("CREATE TABLE IF NOT EXISTS cosmetic_ad_progress (cosmetic_id TEXT PRIMARY KEY, progress INTEGER NOT NULL DEFAULT 0 CHECK(progress >= 0), updated_at INTEGER NOT NULL)");
