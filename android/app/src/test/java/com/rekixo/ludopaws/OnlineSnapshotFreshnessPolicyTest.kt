@@ -29,6 +29,7 @@ class OnlineSnapshotFreshnessPolicyTest {
                     incomingMatchId = MATCH_ID,
                     incomingSource = OnlineStateSource.AUTHORITATIVE,
                     currentStateSource = OnlineStateSource.AUTHORITATIVE,
+                    currentStateMatchId = MATCH_ID,
                     incomingRevision = revision,
                     lastAppliedAuthoritativeRevision = 12L,
                 ),
