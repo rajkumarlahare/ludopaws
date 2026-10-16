@@ -18,6 +18,7 @@ class FakeAccountSql {
   exec(statement, ...params) {
     const sql = String(statement).replace(/\s+/g, " ").trim();
     if (/^(CREATE TABLE|CREATE INDEX)/i.test(sql)) return { rowsWritten: 0 };
+    if (/^DROP TABLE IF EXISTS paws_plus_subscriptions$/i.test(sql)) return { rowsWritten: 0 };
 
     if (sql.startsWith("SELECT account_id FROM account_deletions WHERE account_id = ?")) {
       return this.deletedAccounts.has(params[0]) ? [{ account_id: params[0] }] : [];
