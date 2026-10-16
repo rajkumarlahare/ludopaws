@@ -186,6 +186,7 @@ internal fun MainActivity.refreshState(
                 applyResponse(
                     it,
                     announce = !silent,
+                    silentValidationFailure = silent,
                 )
             },
             showWorking = !silent,
