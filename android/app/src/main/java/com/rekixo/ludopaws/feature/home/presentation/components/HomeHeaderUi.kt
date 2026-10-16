@@ -93,7 +93,7 @@ private fun HomeActivity.homeIdentityRow(): LinearLayout =
             homeCurrencyPill(),
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
-                dp(if (isCompact()) 27 else 29),
+                dp(if (isCompact()) 53 else 57),
             ),
         )
 
@@ -125,14 +125,14 @@ private fun HomeActivity.homeCurrencyPill(): LinearLayout =
         background =
             plywoodBackground(
                 context = this@homeCurrencyPill,
-                cornerRadiusDp = if (isCompact()) 13.25f else 14.25f,
+                cornerRadiusDp = if (isCompact()) 26.5f else 28.5f,
             )
         elevation = dp(5).toFloat()
         setPadding(
-            dp(3),
-            dp(2),
-            dp(2),
-            dp(2),
+            dp(6),
+            dp(5),
+            dp(5),
+            dp(5),
         )
         setOnClickListener {
             startActivity(
@@ -150,7 +150,7 @@ private fun HomeActivity.homeCurrencyPill(): LinearLayout =
                     View.IMPORTANT_FOR_ACCESSIBILITY_NO
             },
             LinearLayout.LayoutParams(
-                dp(if (isCompact()) 20 else 22),
+                dp(if (isCompact()) 39 else 44),
                 LinearLayout.LayoutParams.MATCH_PARENT,
             ),
         )
@@ -162,7 +162,7 @@ private fun HomeActivity.homeCurrencyPill(): LinearLayout =
                     GemWalletStore(this@homeCurrencyPill)
                         .balance()
                         .toString()
-                textSize = if (isCompact()) 8f else 8.75f
+                textSize = if (isCompact()) 16f else 17.5f
                 setTypeface(Typeface.DEFAULT_BOLD)
                 setTextColor(Color.WHITE)
                 gravity = Gravity.CENTER
