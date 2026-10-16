@@ -19,10 +19,9 @@ permissions:
   contents: read
 
 concurrency:
-  # Use the PR source branch, not GitHub's synthetic refs/pull/<number>/merge ref,
-  # so successive updates to the same PR correctly supersede its previous validation run.
-  # Isolate validation by commit so a stuck emulator run cannot block a newer approved batch.
-  group: ludoproof-ci-${{ github.event.pull_request.head.ref || github.ref }}-${{ github.sha }}
+  # Keep one active validation batch per PR (or per pushed branch). A newer commit
+  # cancels stale emulator/build jobs instead of consuming more private-repo minutes.
+  group: ludopaws-ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
