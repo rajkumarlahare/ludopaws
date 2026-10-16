@@ -673,7 +673,7 @@ class MainActivity : ComponentActivity() {
         content.addView(
             matchStatusPanel,
             onlineSectionParams(
-                if (isCompactOnline()) 12 else 16,
+                if (isCompactOnline()) 4 else 6,
             ).apply {
                 leftMargin =
                     sectionSideMargin
@@ -729,7 +729,7 @@ class MainActivity : ComponentActivity() {
         content.addView(
             boardFrame,
             onlineSectionParams(
-                if (isCompactOnline()) 12 else 14,
+                if (isCompactOnline()) 4 else 6,
             ).apply {
                 leftMargin = dp(1)
                 rightMargin = dp(1)
@@ -745,7 +745,7 @@ class MainActivity : ComponentActivity() {
         content.addView(
             actionPanel,
             onlineSectionParams(
-                if (isCompactOnline()) 12 else 14,
+                if (isCompactOnline()) 2 else 4,
             ),
         )
 

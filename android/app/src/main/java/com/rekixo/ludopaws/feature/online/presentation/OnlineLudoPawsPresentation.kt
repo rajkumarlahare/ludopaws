@@ -435,8 +435,12 @@ internal object OnlineLudoPawsPresentation {
         val versionSupportsTimer =
             state.rulesetId == "ludoproof-standard-v4" ||
                 state.rulesetId == "ludoproof-team-v4"
+        val hasTrustedTimerContract =
+            state.serverTimeAtSnapshot != null &&
+                state.turnRollTimeoutMillis?.let { it > 0L } == true
         val deadline = state.turnDeadlineAt.takeIf {
             versionSupportsTimer &&
+                hasTrustedTimerContract &&
                 state.status == "ACTIVE" &&
                 state.pendingRoll == null
         }
