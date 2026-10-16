@@ -186,6 +186,7 @@ internal fun MainActivity.refreshState(
                 applyResponse(
                     it,
                     announce = !silent,
+                    silentValidationFailure = silent,
                 )
             },
             showWorking = !silent,
@@ -296,6 +297,7 @@ internal fun MainActivity.rollVerifiedDice() {
                 revealed
             },
             reconcileOnError = true,
+            prioritizeGameplay = true,
             onComplete = { releaseOnlineGameplayRequest() },
         )
     }
@@ -362,6 +364,7 @@ internal fun MainActivity.moveToken(
                 )
             },
             reconcileOnError = true,
+            prioritizeGameplay = true,
             onComplete = { releaseOnlineGameplayRequest() },
         )
     }
@@ -427,7 +430,6 @@ internal fun MainActivity.captureSession(
     ) {
         lastRealtimeRevision =
             -1
-        lastAppliedAuthoritativeRevision = -1L
         uiStateHolder.update {
             it.copy(
                 currentStateSource = null,

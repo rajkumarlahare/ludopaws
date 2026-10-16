@@ -16,6 +16,22 @@ const terms = read("../docs/terms-of-service.html");
 const privacy = read("../docs/privacy-policy.html");
 const inAppPolicy = read("../android/app/src/main/java/com/rekixo/ludopaws/feature/settings/presentation/PrivacyPolicyDialogUi.kt");
 const pagesWorkflow = read("../.github/workflows/account-deletion-pages.yml");
+const androidBillingGateway = read("../android/app/src/main/java/com/rekixo/ludopaws/feature/store/data/billing/GooglePlayBillingGateway.kt");
+const storeActivity = read("../android/app/src/main/java/com/rekixo/ludopaws/feature/store/presentation/StoreActivity.kt");
+const storeContent = read("../android/app/src/main/java/com/rekixo/ludopaws/feature/store/presentation/components/StoreContentUi.kt");
+const androidBuildConfig = read("../android/app/build.gradle.kts");
+const accountRepository = read("../android/app/src/main/java/com/rekixo/ludopaws/feature/account/data/AccountRepository.kt");
+const oneTimeBillingSetup = read("../docs/GOOGLE_PLAY_ONE_TIME_BILLING_SETUP.md");
+const billingReleaseChecklist = read("../docs/GOOGLE_PLAY_BILLING_RELEASE_CHECKLIST.md");
+const monetizationRoadmap = read("../docs/STORE_MONETIZATION_ROADMAP.md");
+const accountWorker = read("../server/src/index-account.js");
+const baseWorker = read("../server/src/index.js");
+const playerAccount = read("../server/src/player-account.js");
+const purchaseLedger = read("../server/src/store-purchase-ledger.js");
+const releaseWorkflow = read("../.github/workflows/android-signed-release.yml");
+const backendWorkflow = read("../.github/workflows/deploy-cloudflare.yml");
+const runtimeConfig = read("./cloudflare-runtime-config.mjs");
+const deployPreflight = read("./cloudflare-deploy-preflight.mjs");
 
 const constants = Object.fromEntries(
   [...android.matchAll(/const\s+val\s+([A-Z0-9_]+)\s*=\s*\n?\s*"([^"]+)"/g)]
@@ -32,7 +48,6 @@ for (const match of androidProductCatalog.matchAll(/StoreProduct\(([\s\S]*?)\n {
   const kind = block.match(/kind\s*=\s*StoreProductKind\.([A-Z_]+)/)?.[1];
   assert.ok(constant && constants[constant], "every Android store item needs a resolvable product ID");
   assert.ok(gemText && kind, "every Android store item needs a reward amount and purchase type");
-  if (kind === "SUBSCRIPTION_PAWS_PLUS") continue; // Validated separately as a SUBS product below.
   androidProducts[constants[constant]] = {
     gemAmount: amount(gemText),
     removeAds: kind === "NON_CONSUMABLE_REMOVE_ADS",
@@ -62,19 +77,45 @@ for (const [productId, product] of Object.entries(serverProducts)) {
 }
 assert.ok(pricing.includes("localized price and currency shown in the app"), "pricing page must direct users to the localized Google Play price");
 assert.ok(pricing.includes("does not take payments or offer a separate web checkout"), "pricing page must not imply web checkout");
-assert.ok(constants.PAWS_PLUS === "paws_plus", "Android must define the Paws Plus subscription product ID");
-assert.ok(constants.PAWS_PLUS_BASE_PLAN_ID === "monthly-auto", "Android must define the monthly auto-renewing base plan ID");
-assert.ok(android.includes("StoreProductKind.SUBSCRIPTION_PAWS_PLUS"), "Android must model Paws Plus separately from one-time products");
-assert.ok(server.includes("GOOGLE_PLAY_SUBSCRIPTIONS"), "server must define a separate subscription catalog");
-assert.ok(server.includes("paws_plus: Object.freeze({") && server.includes('basePlanId: "monthly-auto"'), "server subscription contract must match the monthly Paws Plus base plan");
-assert.ok(pricing.includes("<code>paws_plus</code>") && pricing.includes("<code>monthly-auto</code>"), "pricing page must identify the subscription and base plan");
-assert.ok(pricing.includes("Auto-renewing") && pricing.includes("monthly") && pricing.includes("canceled in Google Play"), "pricing page must disclose recurring billing and cancellation");
-assert.ok(terms.includes("auto-renewing monthly subscription") && terms.includes("Google Play subscription settings"), "Terms must disclose renewal and cancellation");
-assert.ok(privacy.includes("Paws Plus") && privacy.includes("expires"), "Privacy policy must disclose subscription status/expiry processing");
 assert.ok(pricing.includes("Google Play order history"), "pricing page must explain the order/refund support boundary");
 assert.ok(pricing.includes("PRICING_RELEASE_REVIEW_REQUIRED"), "pricing page must retain its manual release-review gate until live Play Console validation");
 assert.ok(terms.includes("TERMS_RELEASE_REVIEW_REQUIRED"), "Terms of Service must retain its publisher/legal review gate");
 assert.doesNotMatch(pricing, /(?:₹|Rs\.?\s*|US\$|USD\s*)\s*\d/i, "public pricing page must not hard-code a regional currency price");
+
+const retiredMonthlyPlanPattern =
+  /Paws\s*Plus|paws_plus|monthly-auto|monthly subscription|monthly plan|subscription|renewal|auto-renew|recurring billing|LUDOPROOF_SUBSCRIPTIONS_ENABLED|GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED|GOOGLE_PLAY_RTDN_AUDIENCE|GOOGLE_PLAY_RTDN_EMAIL|\/api\/google-play\/rtdn|\/api\/store\/subscriptions\/verify|ProductType\.SUBS|SUBSCRIPTION_STATE_/i;
+const retiredMonthlyPlanFiles = [
+  ["Android store catalog", android],
+  ["Android Billing gateway", androidBillingGateway],
+  ["Android Store activity", storeActivity],
+  ["Android store content", storeContent],
+  ["Android build configuration", androidBuildConfig],
+  ["Android account repository", accountRepository],
+  ["Pricing page", pricing],
+  ["Terms of Service", terms],
+  ["Privacy Policy", privacy],
+  ["In-app Privacy Policy", inAppPolicy],
+  ["One-time billing setup", oneTimeBillingSetup],
+  ["One-time billing release checklist", billingReleaseChecklist],
+  ["Monetization roadmap", monetizationRoadmap],
+  ["Account API routes", accountWorker],
+  ["Base Worker routes", baseWorker],
+  ["Purchase ledger", purchaseLedger],
+  ["Android release workflow", releaseWorkflow],
+  ["Backend release workflow", backendWorkflow],
+  ["Cloudflare runtime configuration", runtimeConfig],
+  ["Cloudflare deploy preflight", deployPreflight],
+];
+for (const [name, content] of retiredMonthlyPlanFiles) {
+  assert.doesNotMatch(content, retiredMonthlyPlanPattern, name + " must not expose or enable the retired monthly plan");
+}
+assert.doesNotMatch(
+  playerAccount.replace("DROP TABLE IF EXISTS paws_plus_subscriptions", ""),
+  retiredMonthlyPlanPattern,
+  "PlayerAccount must not implement monthly entitlements; the only legacy reference may be the one-time cleanup migration",
+);
+assert.match(playerAccount, /DROP TABLE IF EXISTS paws_plus_subscriptions/, "backend startup must remove the retired entitlement table");
+assert.doesNotMatch(playerAccount, /CREATE TABLE IF NOT EXISTS paws_plus_subscriptions/, "backend must not recreate the retired entitlement table");
 
 assert.ok(privacy.includes('href="./pricing.html">Pricing and in-app purchase policy</a>'), "online privacy policy must link to pricing policy");
 assert.ok(privacy.includes("configured reward is five Gems"), "online privacy policy must disclose the verified rewarded-ad grant");
@@ -91,4 +132,4 @@ assert.ok(pagesWorkflow.includes("TERMS_RELEASE_REVIEW_REQUIRED"), "Pages workfl
 assert.ok(pagesWorkflow.includes("fetch_public_page /terms-of-service.html"), "Pages workflow must smoke-test the published Terms of Service route");
 assert.ok(pagesWorkflow.includes("PRICING_RELEASE_REVIEW_REQUIRED"), "Pages workflow must block on the pricing review marker");
 
-console.log("Pricing and in-app purchase policy contract passed: Android, server and public disclosures match.");
+console.log("One-time purchase policy contract passed: Android, server and public disclosures match.");

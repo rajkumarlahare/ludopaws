@@ -71,8 +71,13 @@ class MainActivity : ComponentActivity() {
     }
 
     internal val api = GameApi()
-    internal val executor =
-        Executors.newSingleThreadExecutor()
+    // Keep room snapshots and background synchronization from queueing ahead of
+    // a user's roll/move. Game mutations still serialize on this dedicated lane.
+    internal val executor = Executors.newSingleThreadExecutor()
+    internal val gameplayExecutor =
+        Executors.newSingleThreadExecutor { runnable ->
+            Thread(runnable, "ludo-paws-gameplay-network").apply { isDaemon = true }
+        }
     internal val mainHandler =
         Handler(Looper.getMainLooper())
 
@@ -943,6 +948,7 @@ class MainActivity : ComponentActivity() {
         )
         realtimeClient.shutdown()
         executor.shutdownNow()
+        gameplayExecutor.shutdownNow()
         super.onDestroy()
     }
 

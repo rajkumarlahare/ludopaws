@@ -10,6 +10,7 @@ import org.json.JSONObject
 internal fun MainActivity.applyResponse(
     response: JSONObject,
     announce: Boolean = true,
+    silentValidationFailure: Boolean = false,
 ) {
     val source =
         if (
@@ -27,6 +28,7 @@ internal fun MainActivity.applyResponse(
         try {
             GameJson.envelope(response)
         } catch (error: GameSchemaException) {
+            if (silentValidationFailure) return
             diceView.stopRolling()
             currentState?.let { safeState ->
                 updateControls(safeState)

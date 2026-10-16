@@ -19,6 +19,31 @@ class GameJsonAuthoritativeSnapshotTest {
         assertNull(parsed.pendingRoll)
     }
 
+    @Test
+    fun parserRetainsAuthoritativeRevisionForStaleResponseProtection() {
+        val parsed = GameJson.envelope(
+            JSONObject().put("state", classicState(status = "ACTIVE", playerCount = 2)),
+        ).state
+
+        requireNotNull(parsed)
+        assertEquals(3L, parsed.revision)
+    }
+
+    @Test
+    fun twoPlayerFriendsRoomKeepsGreenOpponentSeat() {
+        val state = classicState(status = "ACTIVE", playerCount = 2)
+            .put("targetPlayerCount", 2)
+            .put("matchMode", "FRIENDS")
+            .put("players", players(2, team = false).apply {
+                getJSONObject(1).put("color", "GREEN")
+            })
+
+        val parsed = GameJson.envelope(JSONObject().put("state", state)).state
+
+        requireNotNull(parsed)
+        assertEquals(listOf("RED", "GREEN"), parsed.players.map { it.color })
+    }
+
     @Test(expected = GameSchemaException::class)
     fun activeSnapshotRejectsMissingTurnSeatInsteadOfDefaultingToZero() {
         val state = classicState(status = "ACTIVE", playerCount = 2)
@@ -31,6 +56,28 @@ class GameJsonAuthoritativeSnapshotTest {
     fun activeSnapshotRejectsNullTurnSeatInsteadOfDefaultingToZero() {
         val state = classicState(status = "ACTIVE", playerCount = 2)
         state.put("turnSeat", JSONObject.NULL)
+
+        GameJson.envelope(JSONObject().put("state", state))
+    }
+
+    @Test
+    fun twoPlayerOnlineSnapshotAcceptsYellowOpponentSeat() {
+        val state = classicState(status = "ACTIVE", playerCount = 2)
+            .put("targetPlayerCount", 2)
+        state.getJSONArray("players")
+            .getJSONObject(1)
+            .put("color", "YELLOW")
+
+        val parsed = GameJson.envelope(JSONObject().put("state", state)).state
+
+        requireNotNull(parsed)
+        assertEquals(listOf("RED", "YELLOW"), parsed.players.map { it.color })
+    }
+
+    @Test(expected = GameSchemaException::class)
+    fun twoPlayerOnlineSnapshotRejectsGreenOpponentSeat() {
+        val state = classicState(status = "ACTIVE", playerCount = 2)
+            .put("targetPlayerCount", 2)
 
         GameJson.envelope(JSONObject().put("state", state))
     }

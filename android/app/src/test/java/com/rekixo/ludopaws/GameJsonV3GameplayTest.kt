@@ -101,7 +101,7 @@ class GameJsonV3GameplayTest {
                         .put("playerId", "p$seat")
                         .put("displayName", "Player $seat")
                         .put("characterId", "duck")
-                        .put("color", listOf("RED", "GREEN")[seat])
+                        .put("color", listOf("RED", "YELLOW")[seat])
                         .put("seat", seat)
                         .put("tokens", JSONArray(listOf(-1, -1, -1, -1))),
                 )

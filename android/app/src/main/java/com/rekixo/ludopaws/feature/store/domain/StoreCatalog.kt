@@ -8,10 +8,6 @@ object StoreCatalog {
 
     const val REMOVE_ADS =
         "remove_ads"
-    const val PAWS_PLUS =
-        "paws_plus"
-    const val PAWS_PLUS_BASE_PLAN_ID =
-        "monthly-auto"
     const val GEMS_300 =
         "gems_300"
     const val GEMS_1500 =
@@ -24,16 +20,6 @@ object StoreCatalog {
         "gems_40000"
     const val GEMS_200000 =
         "gems_200000"
-
-    val pawsPlus = StoreProduct(
-        productId = PAWS_PLUS,
-        title = "Paws Plus · Monthly",
-        gemAmount = 0,
-        kind = StoreProductKind.SUBSCRIPTION_PAWS_PLUS,
-        fallbackPrice = "Price shown by Google Play",
-    )
-
-    val subscriptionProductIds: List<String> = listOf(PAWS_PLUS)
 
     val products =
         listOf(
@@ -134,8 +120,7 @@ object StoreCatalog {
     fun find(
         productId: String,
     ): StoreProduct? =
-        if (productId == PAWS_PLUS) pawsPlus else products.firstOrNull {
-            it.productId ==
-                productId
+        products.firstOrNull {
+            it.productId == productId
         }
 }

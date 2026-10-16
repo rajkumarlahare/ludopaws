@@ -36,6 +36,7 @@ import com.rekixo.ludopaws.core.ui.components.playSelectionPopAnimation
 import com.rekixo.ludopaws.core.ui.components.LaserStatusDotView
 import com.rekixo.ludopaws.GameMode
 import com.rekixo.ludopaws.GameModeIntent
+import com.rekixo.ludopaws.GameJson
 import com.rekixo.ludopaws.LudoProofTheme
 import com.rekixo.ludopaws.core.ui.components.AppFocusRing
 import com.rekixo.ludopaws.core.ui.art.plywoodBackground
@@ -821,6 +822,12 @@ class TeamUpActivity : Activity() {
         validatingRestoredSearch = false
         when (response.optString("status")) {
             "MATCHED" -> openMatchedGame(response)
+            "FINALIZING" -> {
+                val queued = response.optInt("queuedPlayers", 4).coerceIn(1, 4)
+                renderQueuedPlayers(queued, queuedCharacterIds(response))
+                timerText.text = "FINALIZING…"
+                showStatus("Team match reserved • reconnecting to the room…")
+            }
             "SEARCHING" -> {
                 val queued = response.optInt("queuedPlayers", 1).coerceIn(1, 4)
                 renderQueuedPlayers(queued, queuedCharacterIds(response))
@@ -858,8 +865,21 @@ class TeamUpActivity : Activity() {
         val playerId = response.optString("playerId").trim()
         val playerToken = response.optString("playerToken").trim()
         val matchMode = response.optString("matchMode")
-        if (matchMode != "TEAM_UP") {
-            showStatus("Team match validation failed. Search again.")
+        val state = runCatching { GameJson.envelope(response).state }.getOrNull()
+        val assignmentIsValid =
+            matchMode == "TEAM_UP" &&
+                state != null &&
+                state.matchId == matchId &&
+                state.matchMode == "TEAM_UP" &&
+                state.status == "ACTIVE" &&
+                state.targetPlayerCount == 4 &&
+                state.players.size == 4 &&
+                playerId.isNotBlank() &&
+                playerToken.isNotBlank()
+        if (!assignmentIsValid) {
+            // Do not discard the ticket or persist a partial session. The next
+            // matchmaking poll can replay the authoritative assignment safely.
+            showStatus("Team match reserved • waiting for a complete verified room snapshot…")
             return
         }
 
