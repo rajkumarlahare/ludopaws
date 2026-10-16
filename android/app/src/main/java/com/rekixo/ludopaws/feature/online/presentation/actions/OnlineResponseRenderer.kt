@@ -86,6 +86,15 @@ internal fun MainActivity.applyResponse(
     }
     matchId = state.matchId
 
+    // A successful matchmaking response also carries the authoritative room state.
+    // Switch from the matchmaking lobby to the actual match UI here; rendering the
+    // board alone is not enough because boardFrame starts GONE and the lobby remains visible.
+    lobbyPanel.visibility = View.GONE
+    matchStatusPanel.visibility = View.VISIBLE
+    boardFrame.visibility = View.VISIBLE
+    actionPanel.visibility = View.VISIBLE
+    resultPanel.visibility = if (state.status == "FINISHED") View.VISIBLE else View.GONE
+
     val serverRevision =
         response.optJSONObject("state")
             ?.optInt("revision", -1)
