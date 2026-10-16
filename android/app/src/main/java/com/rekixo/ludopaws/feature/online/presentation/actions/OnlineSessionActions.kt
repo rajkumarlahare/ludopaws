@@ -81,6 +81,7 @@ internal fun MainActivity.runNetwork(
     onSuccess: (JSONObject) -> Unit = { applyResponse(it) },
     showWorking: Boolean = true,
     reconcileOnError: Boolean = false,
+    prioritizeGameplay: Boolean = false,
     onComplete: () -> Unit = {},
 ) {
     if (!canRenderUi()) {
@@ -88,33 +89,49 @@ internal fun MainActivity.runNetwork(
         return
     }
 
+    // A slow reply from a room we already left must not resurrect that session
+    // or reset a newer one. Capture the active session identity per request.
+    val expectedSessionMatchId = matchId
+    val requestExecutor = if (prioritizeGameplay) gameplayExecutor else executor
+
     if (!isOnline) {
-        diceView.stopRolling()
-        showStatus("Offline — this online match is read-only until internet returns.")
-        currentState?.let { updateControls(it) }
+        if (prioritizeGameplay) diceView.stopRolling()
+        if (showWorking) {
+            currentState?.let { updateControls(it) }
+            showStatus("Offline — this online match is read-only until internet returns.")
+        }
         onComplete()
         return
     }
-    if (executor.isShutdown) {
+    if (requestExecutor.isShutdown) {
         onComplete()
         return
     }
 
-    if (showWorking) showStatus("Working…")
-    setNetworkControls(enabled = false)
+    // Passive synchronization must not flicker/disable the live controls or replace
+    // an animation status. Only explicit actions own the global working UI.
+    if (showWorking && !prioritizeGameplay) {
+        showStatus("Working…")
+        setNetworkControls(enabled = false)
+    }
 
     val submitted =
         runCatching {
-            executor.execute {
+            requestExecutor.execute {
                 try {
                     val response = action()
                     mainHandler.post {
-                        if (!canRenderUi()) {
+                        if (
+                            !canRenderUi() ||
+                            (expectedSessionMatchId != null && matchId != expectedSessionMatchId)
+                        ) {
                             onComplete()
                             return@post
                         }
                         try {
-                            setNetworkControls(enabled = true)
+                            if (showWorking && !prioritizeGameplay) {
+                                setNetworkControls(enabled = true)
+                            }
                             onSuccess(response)
                             updateRollButton()
                         } finally {
@@ -123,18 +140,23 @@ internal fun MainActivity.runNetwork(
                     }
                 } catch (error: Exception) {
                     mainHandler.post {
-                        if (!canRenderUi()) {
+                        if (
+                            !canRenderUi() ||
+                            (expectedSessionMatchId != null && matchId != expectedSessionMatchId)
+                        ) {
                             onComplete()
                             return@post
                         }
                         try {
-                            diceView.stopRolling()
+                            if (prioritizeGameplay) diceView.stopRolling()
                             val sessionReset = resetInvalidSessionIfNeeded(error)
                             if (!sessionReset) {
-                                setNetworkControls(enabled = true)
-                                showStatus("Error: " + (error.message ?: error.toString()))
-                                currentState?.let { updateControls(it) }
-                                if (reconcileOnError) {
+                                if (showWorking) {
+                                    setNetworkControls(enabled = true)
+                                    currentState?.let { updateControls(it) }
+                                    showStatus("Error: " + (error.message ?: error.toString()))
+                                }
+                                if (reconcileOnError && prioritizeGameplay) {
                                     refreshState(silent = true)
                                 }
                             }
@@ -149,9 +171,11 @@ internal fun MainActivity.runNetwork(
 
     if (!submitted && canRenderUi()) {
         try {
-            diceView.stopRolling()
-            setNetworkControls(enabled = true)
-            showStatus("Request was cancelled because the screen is closing.")
+            if (prioritizeGameplay) diceView.stopRolling()
+            if (showWorking) {
+                setNetworkControls(enabled = true)
+                showStatus("Request was cancelled because the screen is closing.")
+            }
             updateRollButton()
         } finally {
             onComplete()
