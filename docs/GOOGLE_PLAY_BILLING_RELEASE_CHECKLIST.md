@@ -1,6 +1,6 @@
 # Google Play Billing — Production Readiness and Release Checklist
 
-**Scope:** Current production implementation supports Google Play **one-time in-app products** only. This checklist does not enable deployment, change flags, or add subscription behavior. Keep the one-time `remove_ads` SKU semantics unchanged.
+**Scope:** This checklist validates Google Play **one-time in-app products** only. It does not enable deployment or change feature flags. Keep the one-time `remove_ads` SKU semantics unchanged.
 
 ## 1. Supported product IDs
 
