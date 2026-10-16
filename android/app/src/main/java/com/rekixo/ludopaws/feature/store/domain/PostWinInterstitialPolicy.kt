@@ -6,13 +6,12 @@ package com.rekixo.ludopaws.feature.store.domain
  */
 internal object PostWinInterstitialPolicy {
     /**
-     * Remove Ads suppresses only unsolicited interstitial placements.
-     * Explicit user-requested rewarded ads are handled by RewardedAdsController independently.
+     * Remove Ads suppresses unsolicited interstitial placements.
+     * Explicit user-requested rewarded ads are handled independently.
      */
     fun shouldShowFillerInterstitial(
         adsRemoved: Boolean,
-        pawsPlusActive: Boolean = false,
-    ): Boolean = !adsRemoved && !pawsPlusActive
+    ): Boolean = !adsRemoved
 
     fun shouldShowOffline(
         matchStatus: String?,
