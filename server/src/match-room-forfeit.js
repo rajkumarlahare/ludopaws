@@ -7,10 +7,13 @@ import {
   sha256Hex,
 } from "./crypto.js";
 import {
+  isTeamUp,
   publicState,
+  teamIdForSeat,
 } from "./game.js";
 import {
   fairnessSummary,
+  sealFairnessEvent,
 } from "./fairness.js";
 
 const STATE_KEY =
@@ -217,36 +220,42 @@ export class MatchRoom extends BaseMatchRoom {
         structuredClone(
           state,
         );
-      const player =
-        next.players[
-          actor.seat
-        ];
+      const player = next.players[actor.seat];
 
-      player.forfeitedAt =
-        now;
-      player.forfeitReason =
-        "PLAYER_EXIT";
-      player.tokens =
-        [-1, -1, -1, -1];
-      if (
-        Array.isArray(
-          next.consecutiveSixes,
-        )
-      ) {
-        next.consecutiveSixes[
-          actor.seat
-        ] = 0;
+      if (isTeamUp(next)) {
+        // The UI warns that an active Team Up exit forfeits the whole side.
+        // Enforce that contract in authoritative state, including the partner.
+        const losingTeam = teamIdForSeat(next, actor.seat);
+        next.players.forEach((teammate, teammateSeat) => {
+          if (teamIdForSeat(next, teammateSeat) !== losingTeam) return;
+          teammate.forfeitedAt = now;
+          teammate.forfeitReason =
+            teammateSeat === actor.seat ? "PLAYER_EXIT" : "TEAMMATE_EXIT";
+          teammate.tokens = [-1, -1, -1, -1];
+          if (Array.isArray(next.consecutiveSixes)) {
+            next.consecutiveSixes[teammateSeat] = 0;
+          }
+        });
+
+        // If a roll was in flight for any seat, close it in the fairness chain
+        // before finishing the team result; do not leave a dangling commitment.
+        closePendingRollForTeamForfeit(next, now);
+        next.status = "FINISHED";
+        next.winnerPlayerId = null;
+        next.winnerTeamId = losingTeam === "A" ? "B" : "A";
+        next.finishedAt = now;
+        next.leaderboardRecordedAt = now;
+      } else {
+        player.forfeitedAt = now;
+        player.forfeitReason = "PLAYER_EXIT";
+        player.tokens = [-1, -1, -1, -1];
+        if (Array.isArray(next.consecutiveSixes)) {
+          next.consecutiveSixes[actor.seat] = 0;
+        }
+
+        clearPendingRollForSeat(next, actor.seat);
+        finishOrAdvanceAfterForfeit(next, actor.seat, now);
       }
-
-      clearPendingRollForSeat(
-        next,
-        actor.seat,
-      );
-      finishOrAdvanceAfterForfeit(
-        next,
-        actor.seat,
-        now,
-      );
       touch(
         next,
         now,
@@ -521,6 +530,52 @@ async function authenticatedPlayer(
         seat
       ],
   };
+}
+
+function closePendingRollForTeamForfeit(state, now) {
+  const pending = state.pendingRoll;
+  if (!pending) return;
+
+  const history = Array.isArray(state.history) ? [...state.history] : [];
+  const alreadyArchived = history.some(
+    (event) => event?.eventIndex === pending.eventIndex,
+  );
+
+  if (!alreadyArchived) {
+    const eventIndex = Number(pending.eventIndex);
+    if (Number.isSafeInteger(eventIndex) && eventIndex >= 0) {
+      state.randomEventIndex = Math.max(
+        Number(state.randomEventIndex ?? 0),
+        eventIndex + 1,
+      );
+      const fairnessEvent = sealFairnessEvent(history, {
+        eventIndex,
+        eventId: pending.eventId ?? null,
+        playerId: pending.playerId,
+        color: state.players?.[pending.seat]?.color ?? null,
+        roundId: pending.roundId ?? null,
+        serverCommitment: pending.serverCommitment ?? null,
+        clientCommitment: pending.clientCommitment ?? null,
+        actorHash: pending.actorHash ?? null,
+        previousStateHash: pending.previousStateHash ?? null,
+        rulesetHash: pending.rulesetHash ?? null,
+        proofDigest: pending.proofDigest ?? null,
+        outcome: pending.outcome ?? null,
+        moveTokenIndex: null,
+        captures: 0,
+        status: "FORFEITED",
+        timeoutReason: null,
+        replacementRoundAllowed: false,
+        resolvedAt: pending.resolvedAt ?? null,
+        timedOutAt: null,
+      });
+      state.history = [...history, fairnessEvent].slice(-200);
+    } else {
+      state.history = history;
+    }
+  }
+
+  state.pendingRoll = null;
 }
 
 function clearPendingRollForSeat(

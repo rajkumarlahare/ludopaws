@@ -123,6 +123,7 @@ async function json(response) {
 
 async function createStartedMatch(
   playerCount,
+  matchMode = "ONLINE",
 ) {
   const {
     ctx,
@@ -142,10 +143,15 @@ async function createStartedMatch(
               "POST",
             body: {
               matchId,
-              displayName:
-                "Host",
-              clientRequestId:
-                crypto.randomUUID(),
+              displayName: "Host",
+              clientRequestId: crypto.randomUUID(),
+              ...(matchMode === "TEAM_UP"
+                ? {
+                    targetPlayerCount: playerCount,
+                    matchMode,
+                    rulesetKey: "TEAM_UP_V4",
+                  }
+                : {}),
             },
           },
         ),
@@ -323,6 +329,29 @@ test(
       replay.body.replayed,
       true,
     );
+  },
+);
+
+test(
+  "Team Up exit forfeits both teammates and awards the opposite team",
+  async () => {
+    const { room, players } = await createStartedMatch(4, "TEAM_UP");
+
+    const result = await forfeit(room, players[1].playerToken);
+    assert.equal(result.response.status, 200, JSON.stringify(result.body));
+    assert.equal(result.body.state.status, "FINISHED");
+    assert.equal(result.body.state.winnerTeamId, "A");
+    assert.equal(result.body.state.winnerPlayerId, null);
+    assert.equal(result.body.state.players[1].forfeited, true);
+    assert.equal(result.body.state.players[3].forfeited, true);
+    assert.equal(result.body.state.players[3].forfeitedAt, result.body.state.players[1].forfeitedAt);
+    assert.equal(result.body.state.players[0].forfeited, false);
+    assert.equal(result.body.state.players[2].forfeited, false);
+
+    const replay = await forfeit(room, players[3].playerToken);
+    assert.equal(replay.response.status, 200);
+    assert.equal(replay.body.replayed, true);
+    assert.equal(replay.body.state.winnerTeamId, "A");
   },
 );
 
