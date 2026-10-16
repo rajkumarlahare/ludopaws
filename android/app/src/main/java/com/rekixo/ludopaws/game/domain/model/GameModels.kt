@@ -235,7 +235,19 @@ object GameJson {
             val playerId = player.requireString("playerId")
             schema(playerIds.add(playerId), "duplicate playerId")
             schema(player.requireInt("seat") == index, "player seat does not match array position")
-            schema(player.requireString("color") == colors[index], "player color does not match seat")
+            // Public two-player Online matches seat the opponent in the Yellow quadrant.
+            // Other classic rooms and four-player matches use the canonical seat color order.
+            val expectedColor =
+                if (
+                    matchMode == "ONLINE" &&
+                    targetPlayerCount == 2 &&
+                    index == 1
+                ) {
+                    "YELLOW"
+                } else {
+                    colors[index]
+                }
+            schema(player.requireString("color") == expectedColor, "player color does not match seat")
             if (player.has("playerType")) {
                 schema(
                     player.requireString("playerType") in setOf("HUMAN", "BOT"),
