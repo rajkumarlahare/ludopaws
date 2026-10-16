@@ -83,7 +83,7 @@ assert.ok(terms.includes("TERMS_RELEASE_REVIEW_REQUIRED"), "Terms of Service mus
 assert.doesNotMatch(pricing, /(?:₹|Rs\.?\s*|US\$|USD\s*)\s*\d/i, "public pricing page must not hard-code a regional currency price");
 
 const retiredMonthlyPlanPattern =
-  /Paws\s*Plus|paws_plus|monthly-auto|monthly subscription|monthly plan|LUDOPROOF_SUBSCRIPTIONS_ENABLED|GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED|GOOGLE_PLAY_RTDN_AUDIENCE|GOOGLE_PLAY_RTDN_EMAIL|\/api\/google-play\/rtdn|\/api\/store\/subscriptions\/verify|ProductType\.SUBS|SUBSCRIPTION_STATE_/i;
+  /Paws\s*Plus|paws_plus|monthly-auto|monthly subscription|monthly plan|subscription|renewal|auto-renew|recurring billing|LUDOPROOF_SUBSCRIPTIONS_ENABLED|GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED|GOOGLE_PLAY_RTDN_AUDIENCE|GOOGLE_PLAY_RTDN_EMAIL|\/api\/google-play\/rtdn|\/api\/store\/subscriptions\/verify|ProductType\.SUBS|SUBSCRIPTION_STATE_/i;
 const retiredMonthlyPlanFiles = [
   ["Android store catalog", android],
   ["Android Billing gateway", androidBillingGateway],
