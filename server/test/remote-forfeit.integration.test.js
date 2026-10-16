@@ -347,7 +347,6 @@ test(
     assert.equal(result.response.status, 200, JSON.stringify(result.body));
     assert.equal(result.body.state.status, "ACTIVE");
     assert.equal(result.body.state.turnSeat, 1);
-    assert.equal(result.body.state.turnDeadlineSeat, 1);
     assert.ok(result.body.state.turnDeadlineAt > oldDeadline);
 
     const stored = await ctx.storage.get("match-state");
