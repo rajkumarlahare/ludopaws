@@ -58,7 +58,7 @@ has(receiptArchive, "const RECEIPT_RETENTION_MS = 365 * 24 * 60 * 60 * 1000;", "
 has(receiptArchive, "async alarm()", "scheduled receipt expiration handler");
 has(receiptArchive, "MATCH_RECEIPT_RETENTION_EXPIRED", "expired receipt access protection");
 has(policy, "Optional Friends voice chat", "published microphone and voice-chat disclosure");
-has(inAppPolicy, "Optional Friends voice chat", "in-app microphone and voice-chat disclosure");
+has(inAppPolicy, "Optional voice chat", "in-app microphone and voice-chat disclosure");
 has(manifest, "android.permission.RECORD_AUDIO", "declared microphone permission");
 has(voiceSession, "stun:stun.l.google.com:19302", "configured WebRTC STUN provider");
 has(voiceSession, "audioTrack?.setEnabled(micEnabled)", "microphone track behavior");
