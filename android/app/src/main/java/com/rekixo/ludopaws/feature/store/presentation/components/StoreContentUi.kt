@@ -51,17 +51,6 @@ private fun StoreActivity.gemsContent():
         orientation =
             LinearLayout.VERTICAL
 
-        addView(
-            pawsPlusCard(StoreCatalog.pawsPlus),
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            ).apply {
-                topMargin = dp(6)
-                bottomMargin = dp(8)
-            },
-        )
-
         val packs =
             StoreCatalog
                 .products
@@ -163,107 +152,6 @@ private fun StoreActivity.gemsContent():
                     dp(16)
             },
         )
-    }
-
-private fun StoreActivity.pawsPlusCard(
-    product: StoreProduct,
-): LinearLayout =
-    LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
-        setPadding(dp(14), dp(12), dp(14), dp(12))
-        background = plywoodBackground(
-            context = this@pawsPlusCard,
-            cornerRadiusDp = 15f,
-        )
-        elevation = dp(2).toFloat()
-
-        addView(
-            TextView(this@pawsPlusCard).apply {
-                text = if (pawsPlusActiveForUi) "PAWS PLUS · ACTIVE" else "PAWS PLUS · MONTHLY"
-                textSize = 15f
-                setTypeface(Typeface.DEFAULT_BOLD)
-                setTextColor(0xFFFFE6A4.toInt())
-                gravity = Gravity.CENTER
-                maxLines = 1
-            },
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            ),
-        )
-        addView(
-            TextView(this@pawsPlusCard).apply {
-                text = when {
-                    pawsPlusActiveForUi && pawsPlusAutoRenewEnabledForUi ->
-                        "Forced post-win ads are disabled. Renews monthly until canceled in Google Play; rewarded ads remain optional."
-                    pawsPlusActiveForUi ->
-                        "Forced post-win ads are disabled through the paid period. Renewal is off; rewarded ads remain optional."
-                    else ->
-                        "Monthly auto-renewing plan. Cancel in Google Play anytime. Core gameplay remains available without subscribing."
-                }
-                textSize = 11.5f
-                setTextColor(Color.WHITE)
-                gravity = Gravity.CENTER
-                setPadding(dp(4), dp(5), dp(4), dp(8))
-            },
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            ),
-        )
-        val price = liveProducts[product.productId]?.formattedPrice?.takeIf(String::isNotBlank)
-        addView(
-            Button(this@pawsPlusCard).apply {
-                text = when {
-                    pawsPlusActiveForUi -> "MANAGE SUBSCRIPTION"
-                    pawsPlusSubscriptionsConfigured && price != null ->
-                        "SUBSCRIBE · $price / month"
-                    else -> "MONTHLY PLAN NOT AVAILABLE"
-                }
-                textSize = 14f
-                setTypeface(Typeface.DEFAULT_BOLD)
-                setTextColor(Color.WHITE)
-                isEnabled = pawsPlusActiveForUi || (pawsPlusSubscriptionsConfigured && price != null)
-                background = GradientDrawable(
-                    GradientDrawable.Orientation.TOP_BOTTOM,
-                    if (pawsPlusActiveForUi) {
-                        intArrayOf(0xFF4FAF7C.toInt(), 0xFF28724D.toInt())
-                    } else {
-                        intArrayOf(0xFF477DD0.toInt(), 0xFF284C91.toInt())
-                    },
-                ).apply {
-                    cornerRadius = dp(10).toFloat()
-                }
-                setOnClickListener {
-                    if (pawsPlusActiveForUi) managePawsPlusSubscription()
-                    else requestPurchase(product.productId)
-                }
-                AppFocusRing.apply(this, cornerRadiusDp = 10f)
-            },
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(46),
-            ),
-        )
-        if ((!pawsPlusSubscriptionsConfigured || price == null) && !pawsPlusActiveForUi) {
-            addView(
-                TextView(this@pawsPlusCard).apply {
-                    text = if (!pawsPlusSubscriptionsConfigured) {
-                        "Checkout stays disabled until Play Console and server verification are configured."
-                    } else {
-                        "Google Play has not returned an eligible monthly offer yet. Checkout remains disabled."
-                    }
-                    textSize = 10f
-                    setTextColor(0xFFEED9B7.toInt())
-                    gravity = Gravity.CENTER
-                    setPadding(dp(4), dp(7), dp(4), 0)
-                },
-                LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                ),
-            )
-        }
     }
 
 private fun StoreActivity.featuredRemoveAdsCard(
