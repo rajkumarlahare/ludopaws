@@ -29,12 +29,6 @@ val ludoProofInterstitialAdsEnabled =
         .get()
         .toBooleanStrictOrNull()
         ?: false
-val ludoProofSubscriptionsEnabled =
-    providers.gradleProperty("LUDOPROOF_SUBSCRIPTIONS_ENABLED")
-        .orElse("false")
-        .get()
-        .toBooleanStrictOrNull()
-        ?: false
 val admobAppId =
     providers.gradleProperty("ADMOB_APP_ID")
         .orElse("ca-app-pub-9987799703505828~1411336271")
@@ -172,11 +166,6 @@ android {
             "boolean",
             "LUDOPROOF_INTERSTITIAL_ADS_ENABLED",
             ludoProofInterstitialAdsEnabled.toString(),
-        )
-        buildConfigField(
-            "boolean",
-            "LUDOPROOF_SUBSCRIPTIONS_ENABLED",
-            ludoProofSubscriptionsEnabled.toString(),
         )
         buildConfigField(
             "String",
