@@ -88,6 +88,9 @@ internal fun MainActivity.runNetwork(
         return
     }
 
+    // A slow reply from a room we already left must not resurrect that session
+    // or reset a newer one. Capture the active session identity per request.
+    val expectedSessionMatchId = matchId
     val gameplayMutation = onlineRollRequestInFlight || onlineMoveRequestInFlight
     val requestExecutor = if (gameplayMutation) gameplayExecutor else executor
 
@@ -118,7 +121,10 @@ internal fun MainActivity.runNetwork(
                 try {
                     val response = action()
                     mainHandler.post {
-                        if (!canRenderUi()) {
+                        if (
+                            !canRenderUi() ||
+                            (expectedSessionMatchId != null && matchId != expectedSessionMatchId)
+                        ) {
                             onComplete()
                             return@post
                         }
@@ -132,7 +138,10 @@ internal fun MainActivity.runNetwork(
                     }
                 } catch (error: Exception) {
                     mainHandler.post {
-                        if (!canRenderUi()) {
+                        if (
+                            !canRenderUi() ||
+                            (expectedSessionMatchId != null && matchId != expectedSessionMatchId)
+                        ) {
                             onComplete()
                             return@post
                         }
