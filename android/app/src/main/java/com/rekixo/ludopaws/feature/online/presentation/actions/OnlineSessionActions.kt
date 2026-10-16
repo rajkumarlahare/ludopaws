@@ -110,7 +110,7 @@ internal fun MainActivity.runNetwork(
 
     // Passive synchronization must not flicker/disable the live controls or replace
     // an animation status. Only explicit actions own the global working UI.
-    if (showWorking) {
+    if (showWorking && !prioritizeGameplay) {
         showStatus("Working…")
         setNetworkControls(enabled = false)
     }
@@ -129,7 +129,9 @@ internal fun MainActivity.runNetwork(
                             return@post
                         }
                         try {
-                            if (showWorking) setNetworkControls(enabled = true)
+                            if (showWorking && !prioritizeGameplay) {
+                                setNetworkControls(enabled = true)
+                            }
                             onSuccess(response)
                             updateRollButton()
                         } finally {
