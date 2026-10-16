@@ -255,12 +255,16 @@ class GameJsonAuthoritativeSnapshotTest {
         val state = classicState(status = "ACTIVE", playerCount = 2)
             .put("rulesetId", "ludoproof-standard-v4")
             .put("turnDeadlineAt", 1_800_000_000_000L)
+            .put("turnRollTimeoutMs", 15_000L)
+            .put("serverNow", 1_799_999_985_000L)
 
         val parsed = GameJson.envelope(JSONObject().put("state", state)).state
 
         requireNotNull(parsed)
         assertEquals("ludoproof-standard-v4", parsed.rulesetId)
         assertEquals(1_800_000_000_000L, parsed.turnDeadlineAt)
+        assertEquals(15_000L, parsed.turnRollTimeoutMillis)
+        assertEquals(1_799_999_985_000L, parsed.serverTimeAtSnapshot)
     }
 
     @Test

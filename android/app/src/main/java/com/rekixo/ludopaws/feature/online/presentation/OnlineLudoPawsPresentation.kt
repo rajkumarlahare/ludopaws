@@ -700,7 +700,7 @@ internal object OnlineLudoPawsPresentation {
                 pending.status == "RESOLVED" &&
                 (
                     previousPending?.eventIndex != pending.eventIndex ||
-                        previousPending.status != "RESOLVED"
+                        previousPending?.status != "RESOLVED"
                 )
         if (
             newlyResolvedPending &&
