@@ -13,7 +13,6 @@ class FakeAccountSql {
     this.selectedCosmetics = new Map();
     this.adProgress = new Map();
     this.walletTransactions = new Map();
-    this.subscriptions = new Map();
   }
 
   exec(statement, ...params) {
@@ -36,26 +35,6 @@ class FakeAccountSql {
     }
     if (sql.startsWith("SELECT source_ref_hash FROM wallet_transactions WHERE kind IN")) {
       return [...this.walletTransactions.values()].filter(row => ["PLAY_GEM_PURCHASE", "PLAY_REMOVE_ADS"].includes(row.kind) && row.source_ref_hash).map(row => ({ source_ref_hash: row.source_ref_hash }));
-    }
-    if (sql.startsWith("DELETE FROM paws_plus_subscriptions WHERE account_id = ?")) {
-      this.subscriptions.delete(params[0]);
-      return { rowsWritten: 1 };
-    }
-    if (sql.startsWith("SELECT purchase_token_hash FROM paws_plus_subscriptions WHERE account_id = ?")) {
-      const row = this.subscriptions.get(params[0]);
-      return row ? [{ purchase_token_hash: row.purchase_token_hash }] : [];
-    }
-    if (sql.startsWith("SELECT product_id, subscription_state, expiry_time_ms, auto_renew_enabled, updated_at FROM paws_plus_subscriptions WHERE account_id = ?")) {
-      const row = this.subscriptions.get(params[0]);
-      return row ? [structuredClone(row)] : [];
-    }
-    if (sql.startsWith("INSERT INTO paws_plus_subscriptions")) {
-      this.subscriptions.set(params[0], {
-        account_id: params[0], product_id: params[1], purchase_token_hash: params[2],
-        subscription_state: params[3], expiry_time_ms: params[4],
-        auto_renew_enabled: params[5], updated_at: params[6],
-      });
-      return { rowsWritten: 1 };
     }
     if (/^DELETE FROM account_sessions$/.test(sql)) { this.sessions.clear(); return { rowsWritten: 1 }; }
     if (/^DELETE FROM wallet_transactions$/.test(sql)) { this.walletTransactions.clear(); return { rowsWritten: 1 }; }
