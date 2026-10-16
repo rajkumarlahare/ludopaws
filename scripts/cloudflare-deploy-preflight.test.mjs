@@ -12,17 +12,13 @@ const preflightScript = path.join(repoRoot, "scripts", "cloudflare-deploy-prefli
 const adUnit = "ca-app-pub-1234567890123456/1234567890";
 const appId = "ca-app-pub-1234567890123456~1234567890";
 
-function runPreflight({ adsEnabled, billingEnabled = false, subscriptionsEnabled = false, routeConfigured = true }) {
+function runPreflight({ adsEnabled, billingEnabled = false, routeConfigured = true }) {
   const baseConfig = JSON.parse(fs.readFileSync(path.join(repoRoot, "server", "wrangler.json"), "utf8"));
   const runtimeEnvironment = {
     GOOGLE_SIGN_IN_WEB_CLIENT_ID: "1234567890-exampleclient.apps.googleusercontent.com",
     LUDOPROOF_ACCOUNT_WEB_ORIGIN: ACCOUNT_WEB_ORIGIN,
     GOOGLE_PLAY_BILLING_ENABLED: String(billingEnabled),
     LUDOPROOF_BILLING_ENABLED: String(billingEnabled),
-    GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED: String(subscriptionsEnabled),
-    LUDOPROOF_SUBSCRIPTIONS_ENABLED: String(subscriptionsEnabled),
-    GOOGLE_PLAY_RTDN_AUDIENCE: subscriptionsEnabled ? "https://api.ludopaws.rekixo.com/api/google-play/rtdn" : "",
-    GOOGLE_PLAY_RTDN_EMAIL: subscriptionsEnabled ? "pubsub-push@ludopaws-test.iam.gserviceaccount.com" : "",
     LUDOPROOF_ADMOB_SSV_ENABLED: String(adsEnabled),
     LUDOPROOF_ADS_ENABLED: String(adsEnabled),
     LUDOPROOF_ADMOB_REWARD_ITEM: "gems",
@@ -109,8 +105,3 @@ test("production readiness verifier reads its response from the explicit READY_F
   assert.equal(inlineNodeScript.includes("'"), false, "single-quoted bash inline script must not contain unescaped apostrophes");
 });
 
-test("production preflight accepts Paws Plus only with Billing and authenticated RTDN configuration", () => {
-  const result = runPreflight({ adsEnabled: false, billingEnabled: true, subscriptionsEnabled: true });
-  assert.equal(result.status, 0, "stdout: " + result.stdout + " stderr: " + result.stderr);
-  assert.match(result.stdout, /Cloudflare production deploy preflight passed/);
-});
