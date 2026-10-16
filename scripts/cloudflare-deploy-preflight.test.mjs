@@ -91,8 +91,8 @@ test("deployment workflow checks the Cloudflare private key before enabling Bill
   assert.ok(statusStep.includes('const expectedBilling = process.env.GOOGLE_PLAY_BILLING_ENABLED === "true";'));
   assert.ok(statusStep.includes("body.billingAvailable !== expectedBilling"));
   assert.ok(statusStep.includes("androidBillingEnabled !== expectedBilling"));
-  assert.ok(statusStep.includes("body.subscriptionsAvailable !== expectedSubscriptions"));
-  assert.ok(statusStep.includes("androidSubscriptionsEnabled !== expectedSubscriptions"));
+  assert.equal(statusStep.includes("body.subscriptionsAvailable !== expectedSubscriptions"), false);
+  assert.equal(statusStep.includes("androidSubscriptionsEnabled !== expectedSubscriptions"), false);
 });
 
 test("production readiness verifier reads its response from the explicit READY_FILE environment variable", () => {
