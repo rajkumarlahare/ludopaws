@@ -16,6 +16,19 @@ const terms = read("../docs/terms-of-service.html");
 const privacy = read("../docs/privacy-policy.html");
 const inAppPolicy = read("../android/app/src/main/java/com/rekixo/ludopaws/feature/settings/presentation/PrivacyPolicyDialogUi.kt");
 const pagesWorkflow = read("../.github/workflows/account-deletion-pages.yml");
+const androidBillingGateway = read("../android/app/src/main/java/com/rekixo/ludopaws/feature/store/data/billing/GooglePlayBillingGateway.kt");
+const storeActivity = read("../android/app/src/main/java/com/rekixo/ludopaws/feature/store/presentation/StoreActivity.kt");
+const accountRepository = read("../android/app/src/main/java/com/rekixo/ludopaws/feature/account/data/AccountRepository.kt");
+const oneTimeBillingSetup = read("../docs/GOOGLE_PLAY_ONE_TIME_BILLING_SETUP.md");
+const billingReleaseChecklist = read("../docs/GOOGLE_PLAY_BILLING_RELEASE_CHECKLIST.md");
+const monetizationRoadmap = read("../docs/STORE_MONETIZATION_ROADMAP.md");
+const accountWorker = read("../server/src/index-account.js");
+const playerAccount = read("../server/src/player-account.js");
+const purchaseLedger = read("../server/src/store-purchase-ledger.js");
+const releaseWorkflow = read("../.github/workflows/android-signed-release.yml");
+const backendWorkflow = read("../.github/workflows/deploy-cloudflare.yml");
+const runtimeConfig = read("./cloudflare-runtime-config.mjs");
+const deployPreflight = read("./cloudflare-deploy-preflight.mjs");
 
 const constants = Object.fromEntries(
   [...android.matchAll(/const\s+val\s+([A-Z0-9_]+)\s*=\s*\n?\s*"([^"]+)"/g)]
@@ -65,6 +78,38 @@ assert.ok(pricing.includes("Google Play order history"), "pricing page must expl
 assert.ok(pricing.includes("PRICING_RELEASE_REVIEW_REQUIRED"), "pricing page must retain its manual release-review gate until live Play Console validation");
 assert.ok(terms.includes("TERMS_RELEASE_REVIEW_REQUIRED"), "Terms of Service must retain its publisher/legal review gate");
 assert.doesNotMatch(pricing, /(?:₹|Rs\.?\s*|US\$|USD\s*)\s*\d/i, "public pricing page must not hard-code a regional currency price");
+
+const retiredMonthlyPlanPattern =
+  /Paws\s*Plus|paws_plus|monthly-auto|monthly subscription|monthly plan|LUDOPROOF_SUBSCRIPTIONS_ENABLED|GOOGLE_PLAY_SUBSCRIPTIONS_ENABLED|GOOGLE_PLAY_RTDN_AUDIENCE|GOOGLE_PLAY_RTDN_EMAIL|\/api\/google-play\/rtdn|\/api\/store\/subscriptions\/verify|ProductType\.SUBS|SUBSCRIPTION_STATE_/i;
+const retiredMonthlyPlanFiles = [
+  ["Android store catalog", android],
+  ["Android Billing gateway", androidBillingGateway],
+  ["Android Store activity", storeActivity],
+  ["Android account repository", accountRepository],
+  ["Pricing page", pricing],
+  ["Terms of Service", terms],
+  ["Privacy Policy", privacy],
+  ["In-app Privacy Policy", inAppPolicy],
+  ["One-time billing setup", oneTimeBillingSetup],
+  ["One-time billing release checklist", billingReleaseChecklist],
+  ["Monetization roadmap", monetizationRoadmap],
+  ["Account API routes", accountWorker],
+  ["Purchase ledger", purchaseLedger],
+  ["Android release workflow", releaseWorkflow],
+  ["Backend release workflow", backendWorkflow],
+  ["Cloudflare runtime configuration", runtimeConfig],
+  ["Cloudflare deploy preflight", deployPreflight],
+];
+for (const [name, content] of retiredMonthlyPlanFiles) {
+  assert.doesNotMatch(content, retiredMonthlyPlanPattern, name + " must not expose or enable the retired monthly plan");
+}
+assert.doesNotMatch(
+  playerAccount.replace("DROP TABLE IF EXISTS paws_plus_subscriptions", ""),
+  retiredMonthlyPlanPattern,
+  "PlayerAccount must not implement monthly entitlements; the only legacy reference may be the one-time cleanup migration",
+);
+assert.match(playerAccount, /DROP TABLE IF EXISTS paws_plus_subscriptions/, "backend startup must remove the retired entitlement table");
+assert.doesNotMatch(playerAccount, /CREATE TABLE IF NOT EXISTS paws_plus_subscriptions/, "backend must not recreate the retired entitlement table");
 
 assert.ok(privacy.includes('href="./pricing.html">Pricing and in-app purchase policy</a>'), "online privacy policy must link to pricing policy");
 assert.ok(privacy.includes("configured reward is five Gems"), "online privacy policy must disclose the verified rewarded-ad grant");
