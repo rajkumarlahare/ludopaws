@@ -54,7 +54,7 @@ has(policy, "365 days from match completion", "privacy policy receipt retention 
 has(policy, "AI@rekixo.com", "privacy support contact");
 has(page, "365 days after a match finishes", "deletion page receipt retention disclosure");
 has(page, "AI@rekixo.com", "deletion page support contact");
-has(receiptArchive, "const RECEIPT_RETENTION_MS = 365 * 24 * 60 * 60 * 1000;", "180-day receipt retention constant");
+has(receiptArchive, "const RECEIPT_RETENTION_MS = 365 * 24 * 60 * 60 * 1000;", "365-day receipt retention constant");
 has(receiptArchive, "async alarm()", "scheduled receipt expiration handler");
 has(receiptArchive, "MATCH_RECEIPT_RETENTION_EXPIRED", "expired receipt access protection");
 has(policy, "Optional Friends voice chat", "published microphone and voice-chat disclosure");
