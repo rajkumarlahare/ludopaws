@@ -28,18 +28,15 @@ internal fun MainActivity.applyResponse(
         try {
             GameJson.envelope(response)
         } catch (error: GameSchemaException) {
-            // Passive refreshes can overlap a live roll animation. A malformed
-            // background snapshot must never cancel that animation or replace its
-            // visible status; explicit action responses still fail visibly closed.
-            if (!silentValidationFailure) {
-                diceView.stopRolling()
-                showStatus(
-                    "Server state validation failed. Your last verified state was kept; refresh to retry.",
-                )
-            }
+            // Passive refreshes must not rerender controls or disturb a live roll.
+            if (silentValidationFailure) return
+            diceView.stopRolling()
             currentState?.let { safeState ->
                 updateControls(safeState)
             }
+            showStatus(
+                "Server state validation failed. Your last verified state was kept; refresh to retry.",
+            )
             updateRollButton()
             return
         }
@@ -63,19 +60,6 @@ internal fun MainActivity.applyResponse(
         return
     }
 
-    envelope.playerId?.let { resolvedPlayerId ->
-        playerId = resolvedPlayerId
-        val code = matchId
-        val token = playerToken
-        if (code != null && token != null) {
-            persistSessionSecurely(
-                code = code,
-                id = resolvedPlayerId,
-                token = token,
-            )
-        }
-    }
-
     val previousState = currentState
     if (
         source == OnlineStateSource.AUTHORITATIVE &&
@@ -89,6 +73,19 @@ internal fun MainActivity.applyResponse(
         )
     ) {
         return
+    }
+
+    envelope.playerId?.let { resolvedPlayerId ->
+        playerId = resolvedPlayerId
+        val code = matchId
+        val token = playerToken
+        if (code != null && token != null) {
+            persistSessionSecurely(
+                code = code,
+                id = resolvedPlayerId,
+                token = token,
+            )
+        }
     }
 
     currentState = state
