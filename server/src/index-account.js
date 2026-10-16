@@ -19,7 +19,7 @@ import {
   verifyAccessTokenForDeletionReplay,
   verifyGoogleIdToken,
 } from "./account-security.js";
-import { GOOGLE_PLAY_PRODUCTS, googlePlayBillingChecks, googlePlayBillingEnabled, googlePlaySubscriptionsEnabled, verifyAndRedeemGooglePlayPurchase, verifyAndSyncGooglePlaySubscription } from "./google-play-billing.js";
+import { GOOGLE_PLAY_PRODUCTS, googlePlayBillingChecks, googlePlayBillingEnabled, verifyAndRedeemGooglePlayPurchase } from "./google-play-billing.js";
 import { verifyAdMobSsvRequest } from "./admob-ssv.js";
 import { StoreCatalogStore } from "./store-catalog-store.js";
 import { bearerToken, httpError, readJsonObject, sha256Hex } from "./crypto.js";
@@ -102,8 +102,7 @@ async function handleAccountRequest(request, env) {
             sessionHmacConfigured,
             playBillingEnabled: googlePlayBillingEnabled(env),
             playBillingConfiguration: googlePlayBillingChecks(env),
-            playSubscriptionsEnabled: googlePlaySubscriptionsEnabled(env),
-            admobSsvEnabled: env?.LUDOPROOF_ADMOB_SSV_ENABLED === "true" &&
+                admobSsvEnabled: env?.LUDOPROOF_ADMOB_SSV_ENABLED === "true" &&
               Boolean(env?.LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID) &&
               (env?.LUDOPROOF_ADMOB_REWARD_ITEM == null || env.LUDOPROOF_ADMOB_REWARD_ITEM === "gems"),
           },
@@ -405,9 +404,6 @@ async function handleAccountRequest(request, env) {
         return response;
       }
 
-      if (url.pathname === "/api/google-play/rtdn" && request.method === "POST") {
-        return await handleGooglePlayRtdn(request, env);
-      }
 
 
       if (url.pathname === "/api/store/catalog" && request.method === "GET") {
@@ -507,9 +503,6 @@ async function handleAccountRequest(request, env) {
             Boolean(env?.LUDOPROOF_PLAYER_ACCOUNTS),
         };
         const billingReady = billingChecks.available;
-        const subscriptionsReady = googlePlaySubscriptionsEnabled(env) &&
-          Boolean(env?.LUDOPROOF_ACCOUNT_DIRECTORY) &&
-          Boolean(env?.LUDOPROOF_PLAYER_ACCOUNTS);
         const adsReady = env?.LUDOPROOF_ADMOB_SSV_ENABLED === "true" &&
           Boolean(env?.LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID) &&
           (env?.LUDOPROOF_ADMOB_REWARD_ITEM == null || env.LUDOPROOF_ADMOB_REWARD_ITEM === "gems");
@@ -517,68 +510,10 @@ async function handleAccountRequest(request, env) {
           ok: true,
           billingAvailable: billingReady,
           billingChecks,
-          subscriptionsAvailable: subscriptionsReady,
           rewardedAdsAvailable: adsReady,
         });
       }
 
-      if (url.pathname === "/api/store/subscriptions/verify" && request.method === "POST") {
-        if (!googlePlaySubscriptionsEnabled(env)) {
-          throw httpError(503, "PLAY_SUBSCRIPTIONS_NOT_ENABLED", "Google Play subscriptions are not enabled by the server");
-        }
-        await rateLimit(env, request, "store:subscriptions:verify", ACCOUNT_RATE_LIMITS.storePurchase);
-        const session = await authenticate(request, env);
-        const body = await readJson(request);
-        const productId = requireText(body.productId, "productId");
-        const purchaseToken = requireOpaqueToken(body.purchaseToken, /^.{8,2048}$/);
-        const obfuscatedAccountId = await billingAccountId(session.accountId);
-        const verified = await verifyAndSyncGooglePlaySubscription(env, {
-          productId,
-          purchaseToken,
-          accountId: obfuscatedAccountId,
-          ownerAccountId: session.accountId,
-        });
-        let grant;
-        try {
-          grant = await playerRequest(env, session.accountId, "/wallet/subscription/sync", {
-            accountId: session.accountId,
-            productId,
-            subscriptionState: verified.subscriptionState,
-            expiryTimeMs: verified.expiryTimeMs,
-            autoRenewEnabled: verified.autoRenewEnabled,
-            purchaseTokenHash: verified.purchaseTokenHash,
-          });
-        } catch (error) {
-          const deletionWonRace = ["ACCOUNT_DELETION_IN_PROGRESS", "ACCOUNT_DELETED"].includes(error?.code);
-          if (deletionWonRace) {
-            try {
-              const ledger = env.LUDOPROOF_STORE_PURCHASES.get(
-                env.LUDOPROOF_STORE_PURCHASES.idFromName(verified.subscriptionLedgerId),
-              );
-              await parseInternalResponse(await ledger.fetch(new Request("https://store-purchase-ledger/delete", {
-                method: "POST",
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify({ accountId: obfuscatedAccountId }),
-              })), "STORE_SUBSCRIPTION_CLEANUP_FAILED");
-            } catch {
-              throw httpError(503, "STORE_SUBSCRIPTION_CLEANUP_FAILED", "subscription ledger cleanup failed while account deletion was in progress");
-            }
-          }
-          throw error;
-        }
-        const wallet = grant.wallet;
-        return json(200, {
-          ok: true,
-          verified: true,
-          productId,
-          subscriptionState: verified.subscriptionState,
-          expiryTimeMs: verified.expiryTimeMs,
-          autoRenewEnabled: verified.autoRenewEnabled,
-          pawsPlusActive: wallet?.pawsPlusActive === true,
-          replay: verified.replay === true || grant.staleUpdateIgnored === true,
-          wallet,
-        });
-      }
       if (url.pathname === "/api/store/purchases/verify" && request.method === "POST") {
         if (!googlePlayBillingEnabled(env)) {
           return await baseWorker.fetch(request, env);
@@ -665,127 +600,6 @@ async function handleAccountRequest(request, env) {
       }
       return errorResponse(error);
     }
-}
-
-async function handleGooglePlayRtdn(request, env) {
-  if (!googlePlaySubscriptionsEnabled(env)) {
-    return json(503, { ok: false, error: "PLAY_SUBSCRIPTIONS_NOT_ENABLED" });
-  }
-  const authorization = String(request.headers.get("authorization") ?? "");
-  const match = /^Bearer ([A-Za-z0-9._~-]{40,8192})$/.exec(authorization);
-  if (!match) return json(401, { ok: false, error: "RTDN_AUTH_REQUIRED" });
-
-  let tokenInfoResponse;
-  try {
-    tokenInfoResponse = await fetch(
-      "https://oauth2.googleapis.com/tokeninfo?id_token=" + encodeURIComponent(match[1]),
-      { method: "GET", signal: AbortSignal.timeout(8_000) },
-    );
-  } catch {
-    return json(503, { ok: false, error: "RTDN_AUTH_UNAVAILABLE" });
-  }
-  if (!tokenInfoResponse.ok) return json(401, { ok: false, error: "RTDN_AUTH_INVALID" });
-  let tokenInfo;
-  try { tokenInfo = await tokenInfoResponse.json(); }
-  catch { return json(401, { ok: false, error: "RTDN_AUTH_INVALID" }); }
-  const nowSeconds = Math.floor(Date.now() / 1000);
-  if (
-    tokenInfo?.aud !== env.GOOGLE_PLAY_RTDN_AUDIENCE ||
-    tokenInfo?.email !== env.GOOGLE_PLAY_RTDN_EMAIL ||
-    ![true, "true"].includes(tokenInfo?.email_verified) ||
-    !Number.isFinite(Number(tokenInfo?.exp)) ||
-    Number(tokenInfo.exp) <= nowSeconds ||
-    !["accounts.google.com", "https://accounts.google.com"].includes(tokenInfo?.iss)
-  ) {
-    return json(401, { ok: false, error: "RTDN_AUTH_INVALID" });
-  }
-
-  let envelope;
-  try { envelope = await readJson(request); }
-  catch { return json(400, { ok: false, error: "RTDN_ENVELOPE_INVALID" }); }
-  const messageId = String(envelope?.message?.messageId ?? "");
-  const encodedData = envelope?.message?.data;
-  if (!/^[A-Za-z0-9_-]{1,200}$/.test(messageId) ||
-      typeof encodedData !== "string" ||
-      encodedData.length < 4 ||
-      encodedData.length > 8 * 1024) {
-    return json(400, { ok: false, error: "RTDN_ENVELOPE_INVALID" });
-  }
-
-  let notification;
-  try {
-    const bytes = Uint8Array.from(atob(encodedData.replace(/-/g, "+").replace(/_/g, "/")), (ch) => ch.charCodeAt(0));
-    notification = JSON.parse(new TextDecoder().decode(bytes));
-  } catch {
-    return json(400, { ok: false, error: "RTDN_PAYLOAD_INVALID" });
-  }
-  if (notification?.packageName !== "com.rekixo.ludopaws") {
-    return json(200, { ok: true, ignored: true, reason: "package_mismatch" });
-  }
-  const token = notification?.subscriptionNotification?.purchaseToken;
-  if (typeof token !== "string" || token.length < 8 || token.length > 2048) {
-    // Test and one-time-product notifications do not change this subscription entitlement.
-    return json(200, { ok: true, ignored: true, reason: "not_a_subscription_notification" });
-  }
-
-  const purchaseTokenHash = await sha256Hex("ludopaws:google-play-subscription:v1:" + token);
-  const ledger = env.LUDOPROOF_STORE_PURCHASES.get(
-    env.LUDOPROOF_STORE_PURCHASES.idFromName(purchaseTokenHash),
-  );
-  let prior;
-  try {
-    prior = await parseInternalResponse(
-      await ledger.fetch(new Request("https://store-purchase-ledger/subscription/status")),
-      "STORE_SUBSCRIPTION_LOOKUP_FAILED",
-    );
-  } catch {
-    return json(503, { ok: false, error: "STORE_SUBSCRIPTION_LOOKUP_FAILED" });
-  }
-  const subscription = prior?.subscription;
-  if (!subscription ||
-      subscription.purchaseTokenHash !== purchaseTokenHash ||
-      !/^[a-f0-9]{64}$/.test(String(subscription.accountId ?? "")) ||
-      !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(String(subscription.ownerAccountId ?? ""))) {
-    // A purchase that races ahead of the client-side verification is reconciled when the
-    // authenticated Android client submits its token. Acknowledge the unrelated push safely.
-    return json(200, { ok: true, ignored: true, reason: "subscription_not_registered_yet" });
-  }
-  if (Array.isArray(prior.notificationIds) && prior.notificationIds.includes(messageId)) {
-    return json(200, { ok: true, duplicate: true });
-  }
-
-  try {
-    const verified = await verifyAndSyncGooglePlaySubscription(env, {
-      productId: "paws_plus",
-      purchaseToken: token,
-      accountId: subscription.accountId,
-      ownerAccountId: subscription.ownerAccountId,
-    });
-    const grant = await playerRequest(env, subscription.ownerAccountId, "/wallet/subscription/sync", {
-      accountId: subscription.ownerAccountId,
-      productId: "paws_plus",
-      subscriptionState: verified.subscriptionState,
-      expiryTimeMs: verified.expiryTimeMs,
-      autoRenewEnabled: verified.autoRenewEnabled,
-      purchaseTokenHash: verified.purchaseTokenHash,
-    });
-    await parseInternalResponse(await ledger.fetch(new Request("https://store-purchase-ledger/subscription/notification/seen", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ messageId }),
-    })), "RTDN_DEDUPLICATION_FAILED");
-    return json(200, { ok: true, processed: true, pawsPlusActive: grant.wallet?.pawsPlusActive === true });
-  } catch (error) {
-    const status = Number.isInteger(error?.status) ? error.status : 503;
-    // Permanent invalid/removed-account events are acknowledged to avoid a poison-message loop.
-    if (status >= 400 && status < 500) {
-      if (["ACCOUNT_DELETED", "ACCOUNT_NOT_FOUND", "ACCOUNT_DELETION_IN_PROGRESS"].includes(error?.code)) {
-        return json(200, { ok: true, ignored: true, reason: "account_unavailable" });
-      }
-      return json(200, { ok: true, ignored: true, reason: "subscription_no_longer_valid" });
-    }
-    return json(503, { ok: false, error: error?.code ?? "RTDN_PROCESSING_FAILED" });
-  }
 }
 
 async function deleteAccountData(env, accountId, sessionId, {
