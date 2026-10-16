@@ -43,6 +43,7 @@ internal fun MainActivity.applyResponse(
 
     val state = envelope.state
     if (state == null) {
+        if (silentValidationFailure) return
         showStatus(response.toString(2))
         updateRollButton()
         return
