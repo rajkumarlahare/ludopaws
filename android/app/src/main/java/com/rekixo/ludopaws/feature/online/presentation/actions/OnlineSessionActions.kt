@@ -2,6 +2,7 @@ package com.rekixo.ludopaws.feature.online
 
 import android.content.Intent
 import android.util.Log
+import android.os.SystemClock
 import android.view.View
 import com.rekixo.ludopaws.*
 import org.json.JSONObject
@@ -93,6 +94,8 @@ internal fun MainActivity.runNetwork(
     // or reset a newer one. Capture the active session identity per request.
     val expectedSessionMatchId = matchId
     val requestExecutor = if (prioritizeGameplay) gameplayExecutor else executor
+    val requestStartedAtNanos = SystemClock.elapsedRealtimeNanos()
+    val traceId = if (prioritizeGameplay) "dice" else null
 
     if (!isOnline) {
         if (prioritizeGameplay) diceView.stopRolling()
@@ -120,6 +123,13 @@ internal fun MainActivity.runNetwork(
             requestExecutor.execute {
                 try {
                     val response = action()
+                    if (traceId != null) {
+                        Log.d(
+                            "LudoDicePerf",
+                            "network_complete match=$expectedSessionMatchId elapsedMs=" +
+                                ((SystemClock.elapsedRealtimeNanos() - requestStartedAtNanos) / 1_000_000L),
+                        )
+                    }
                     mainHandler.post {
                         if (
                             !canRenderUi() ||
@@ -139,6 +149,14 @@ internal fun MainActivity.runNetwork(
                         }
                     }
                 } catch (error: Exception) {
+                    if (traceId != null) {
+                        Log.w(
+                            "LudoDicePerf",
+                            "network_error match=$expectedSessionMatchId elapsedMs=" +
+                                ((SystemClock.elapsedRealtimeNanos() - requestStartedAtNanos) / 1_000_000L) +
+                                " type=" + error.javaClass.simpleName,
+                        )
+                    }
                     mainHandler.post {
                         if (
                             !canRenderUi() ||
