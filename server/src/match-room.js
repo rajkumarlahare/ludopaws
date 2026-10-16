@@ -1232,6 +1232,14 @@ export class MatchRoom {
     });
   }
 
+  /**
+   * Lifecycle uses the same idempotent terminal-result recording path when its
+   * deadline alarm performs the state transition before the base alarm runs.
+   */
+  async recordFinishedMatchForLifecycle(state) {
+    return this.#recordFinishedMatchIfNeeded(state);
+  }
+
   async #recordFinishedMatchIfNeeded(
     state,
   ) {

@@ -41,6 +41,7 @@ function stateWithResolvedMove(resolvedAt) {
     hostPlayerId: "p1",
     targetPlayerCount: 2,
     matchMode: "ONLINE",
+    rulesetKey: "CLASSIC_V4",
     players: [
       {
         playerId: "p1",
@@ -139,6 +140,23 @@ test("expired resolved roll forfeits the move and advances the turn", async () =
   assert.ok(Number.isSafeInteger(stored.history[0].moveTimedOutAt));
 });
 
+test("legacy rulesets do not inherit the V4 inactivity forfeit policy", async () => {
+  const now = Date.now();
+  const state = stateWithResolvedMove(now - TURN_ROLL_TIMEOUT_MS - 1);
+  state.pendingRoll = null;
+  state.rulesetKey = "CLASSIC_V3";
+  state.updatedAt = now - TURN_ROLL_TIMEOUT_MS - 1;
+  const { room, storage } = makeRoom(state);
+
+  await room.alarm();
+
+  const stored = await storage.get("match-state");
+  assert.equal(stored.status, "ACTIVE");
+  assert.equal(stored.turnSeat, 0);
+  assert.equal(stored.turnTimeoutNotice, undefined);
+  assert.equal(storage.alarmAt, stored.updatedAt + 7 * 24 * 60 * 60 * 1000);
+});
+
 test("an unrolled turn times out after 15 seconds, warns and advances", async () => {
   const now = Date.now();
   const state = stateWithResolvedMove(now - TURN_ROLL_TIMEOUT_MS - 1);
@@ -181,6 +199,7 @@ test("Team Up timeout advances from the scheduled seat when its finished partner
   const now = Date.now();
   const state = stateWithResolvedMove(now - TURN_ROLL_TIMEOUT_MS - 1);
   state.matchMode = "TEAM_UP";
+  state.rulesetKey = "TEAM_UP_V4";
   state.teamAssignments = ["A", "B", "A", "B"];
   state.targetPlayerCount = 4;
   state.players[0].teamId = "A";
@@ -215,6 +234,7 @@ test("four missed dice turns in Team Up award the other team", async () => {
   const now = Date.now();
   const state = stateWithResolvedMove(now - TURN_ROLL_TIMEOUT_MS - 1);
   state.matchMode = "TEAM_UP";
+  state.rulesetKey = "TEAM_UP_V4";
   state.teamAssignments = ["A", "B", "A", "B"];
   state.targetPlayerCount = 4;
   state.players[0].teamId = "A";
