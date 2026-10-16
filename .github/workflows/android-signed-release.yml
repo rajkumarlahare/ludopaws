@@ -8,6 +8,8 @@ permissions:
 
 jobs:
   signed-release:
+    # Never sign a release from an unmerged feature/PR branch.
+    if: ${{ github.ref == 'refs/heads/main' }}
     environment: production
     runs-on: ubuntu-latest
     timeout-minutes: 30
