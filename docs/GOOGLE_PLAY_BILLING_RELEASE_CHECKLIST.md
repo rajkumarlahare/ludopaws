@@ -16,12 +16,12 @@ These IDs are hard-coded in the server verifier and must match products provisio
 | `gems_40000` | One-time, consumable | 16,000 Gems |
 | `gems_200000` | One-time, consumable | 35,000 Gems |
 
-Do not infer a purchase SKU from a display label, create a different ID in Play Console, or convert `remove_ads` to a subscription. Verify that each product exists, has the correct product type, is active/available for the test region, and has a price configured. Only show prices returned by Google Play as checkout prices.
+Do not infer a purchase SKU from a display label or create a different ID in Play Console. Verify that each product exists, has the correct product type, is active/available for the test region, and has a price configured. Only show prices returned by Google Play as checkout prices.
 
 ## 2. Configure the Google Play Developer API identity
 
 1. In Google Cloud Console, select the project that owns the service account, enable **Google Play Developer API**, and create/identify the service account.
-2. In Play Console, open **Users and permissions**, invite that exact service-account email, and grant the Play Billing permissions needed to view financial data/orders and manage orders/subscriptions.
+2. In Play Console, open **Users and permissions**, invite that exact service-account email, and grant the Play Billing permissions needed to view and manage financial data/orders.
 3. Generate/download a service-account key only if one is not already available. Never commit the JSON key, private key, or credentials to Git, Android resources, Gradle properties committed to source, or chat.
 
 Official setup guide: https://developers.google.com/android-publisher/getting_started
@@ -100,4 +100,4 @@ This repository currently has a manual production Worker deployment workflow, no
 
 Do not describe Billing as production-ready merely because the flag is true or `/ready` returns 200. Release acceptance requires: matching Play Console SKUs, service-account authorization against the real Developer API, a Billing-enabled signed candidate, a successful license-tester purchase and restore, no double fulfillment, server consume/acknowledge success, passing CI, and an explicitly run successful production deployment.
 
-Subscription billing is outside this one-time purchase checklist.
+This checklist covers one-time purchases only.
