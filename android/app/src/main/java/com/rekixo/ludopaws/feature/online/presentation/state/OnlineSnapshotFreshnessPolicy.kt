@@ -13,13 +13,17 @@ internal object OnlineSnapshotFreshnessPolicy {
         incomingMatchId: String,
         incomingSource: OnlineStateSource,
         currentStateSource: OnlineStateSource?,
+        currentStateMatchId: String?,
         incomingRevision: Long,
         lastAppliedAuthoritativeRevision: Long,
     ): Boolean {
+        val sameCurrentMatch = currentStateMatchId == incomingMatchId
+
         if (incomingSource == OnlineStateSource.CACHE) {
+            // Do not roll a currently displayed match back to a cache copy.
             if (
-                currentStateSource == OnlineStateSource.AUTHORITATIVE &&
-                sessionMatchId == incomingMatchId
+                sameCurrentMatch &&
+                currentStateSource == OnlineStateSource.AUTHORITATIVE
             ) {
                 return false
             }
@@ -27,6 +31,7 @@ internal object OnlineSnapshotFreshnessPolicy {
         }
 
         if (
+            sameCurrentMatch &&
             sessionMatchId == incomingMatchId &&
             incomingRevision >= 0L &&
             lastAppliedAuthoritativeRevision >= 0L &&
