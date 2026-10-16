@@ -261,9 +261,9 @@ internal fun MainActivity.rollVerifiedDice() {
 
         onlineRollRequestInFlight = true
         val rollEventIndex = state.pendingRoll?.eventIndex ?: state.randomEventIndex
+        diceView.startRolling()
         OnlineLudoPawsPresentation.noteLocalRollStarted(this, code, rollEventIndex)
         GameSoundFeedback.roll(this, rollEventIndex)
-        diceView.startRolling()
         verificationText.text =
             if (decision.kind == OnlineRollActionKind.NEW_ROLL) {
                 "Verifying committed EntroNex roll…"
