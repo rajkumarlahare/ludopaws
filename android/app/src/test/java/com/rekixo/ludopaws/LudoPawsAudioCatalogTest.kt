@@ -82,6 +82,16 @@ class LudoPawsAudioCatalogTest {
     }
 
     @Test
+    fun sharedOnlineEventIndexSelectsTheSameStableTakeForEveryPeer() {
+        val family = LudoPawsAudioCatalog.Sfx.DICE_ROLL
+        assertEquals(listOf(family[0]), LudoPawsAudioCatalog.takeForEvent(family, 0))
+        assertEquals(listOf(family[1]), LudoPawsAudioCatalog.takeForEvent(family, 1))
+        assertEquals(listOf(family[2]), LudoPawsAudioCatalog.takeForEvent(family, 2))
+        assertEquals(listOf(family[0]), LudoPawsAudioCatalog.takeForEvent(family, 3))
+        assertEquals(listOf(family[2]), LudoPawsAudioCatalog.takeForEvent(family, -1))
+    }
+
+    @Test
     fun allCatalogPathsUseSupportedUncompressedAudioFormats() {
         val families =
             listOf(

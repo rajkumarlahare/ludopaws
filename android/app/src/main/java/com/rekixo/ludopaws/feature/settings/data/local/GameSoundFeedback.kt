@@ -174,25 +174,29 @@ object GameSoundFeedback {
         characterId: String? = null,
     ) = moveStep(context, characterId)
 
-    fun roll(context: Context) =
+    fun roll(context: Context, eventIndex: Int? = null) =
         play(
             context = context,
             names = listOf("lp_sfx_dice_roll"),
             fallback = LudoPawsProceduralAudio.Sfx.DICE_ROLL,
             volume = .50f,
             priority = PRIORITY_ROLL,
-            assetPaths = LudoPawsAudioCatalog.Sfx.DICE_ROLL,
+            assetPaths = eventIndex?.let {
+                LudoPawsAudioCatalog.takeForEvent(LudoPawsAudioCatalog.Sfx.DICE_ROLL, it)
+            } ?: LudoPawsAudioCatalog.Sfx.DICE_ROLL,
         )
 
     /** Short landing tick when the verified dice face is revealed. */
-    fun diceSettle(context: Context) =
+    fun diceSettle(context: Context, eventIndex: Int? = null) =
         play(
             context = context,
             names = listOf("lp_sfx_dice_settle"),
             fallback = LudoPawsProceduralAudio.Sfx.DICE_SETTLE,
             volume = .32f,
             priority = PRIORITY_HIGH,
-            assetPaths = LudoPawsAudioCatalog.Sfx.DICE_SETTLE,
+            assetPaths = eventIndex?.let {
+                LudoPawsAudioCatalog.takeForEvent(LudoPawsAudioCatalog.Sfx.DICE_SETTLE, it)
+            } ?: LudoPawsAudioCatalog.Sfx.DICE_SETTLE,
         )
 
     fun six(context: Context) =

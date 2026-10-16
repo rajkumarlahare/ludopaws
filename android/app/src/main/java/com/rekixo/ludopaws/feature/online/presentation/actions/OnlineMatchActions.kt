@@ -72,7 +72,7 @@ internal fun MainActivity.createMatch() {
                     displayName,
                 clientRequestId =
                     requestId,
-                rulesetKey = "CLASSIC_V4",
+                rulesetKey = "CLASSIC_V3",
             )
         },
         onSuccess = {
@@ -260,7 +260,9 @@ internal fun MainActivity.rollVerifiedDice() {
                 }
 
         onlineRollRequestInFlight = true
-        GameSoundFeedback.roll(this)
+        val rollEventIndex = state.pendingRoll?.eventIndex ?: state.randomEventIndex
+        OnlineLudoPawsPresentation.noteLocalRollStarted(this, code, rollEventIndex)
+        GameSoundFeedback.roll(this, rollEventIndex)
         diceView.startRolling()
         verificationText.text =
             if (decision.kind == OnlineRollActionKind.NEW_ROLL) {
