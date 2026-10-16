@@ -252,6 +252,10 @@ export function publicState(state) {
     turnDeadlineAt: Number.isSafeInteger(state.turnDeadlineAt)
       ? state.turnDeadlineAt
       : null,
+    turnRollTimeoutMs: Number.isSafeInteger(rulesetForState(state).turnRollTimeoutMs)
+      ? rulesetForState(state).turnRollTimeoutMs
+      : null,
+    serverNow: Date.now(),
     ...(isV3State(state)
       ? { openingRollConsumed: openingRollState(state) }
       : {}),

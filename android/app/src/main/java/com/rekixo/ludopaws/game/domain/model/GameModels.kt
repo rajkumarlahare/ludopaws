@@ -72,6 +72,8 @@ data class MatchSnapshot(
     val finishOrderPlayerIds: List<String> = emptyList(),
     val revision: Long = 0L,
     val turnDeadlineAt: Long? = null,
+    val turnRollTimeoutMillis: Long? = null,
+    val serverTimeAtSnapshot: Long? = null,
 )
 
 data class GameEnvelope(
@@ -165,6 +167,18 @@ object GameJson {
             turnDeadlineAt =
                 if (value.has("turnDeadlineAt") && !value.isNull("turnDeadlineAt")) {
                     value.optLong("turnDeadlineAt").takeIf { it > 0L }
+                } else {
+                    null
+                },
+            turnRollTimeoutMillis =
+                if (value.has("turnRollTimeoutMs") && !value.isNull("turnRollTimeoutMs")) {
+                    value.optLong("turnRollTimeoutMs").takeIf { it > 0L }
+                } else {
+                    null
+                },
+            serverTimeAtSnapshot =
+                if (value.has("serverNow") && !value.isNull("serverNow")) {
+                    value.optLong("serverNow").takeIf { it > 0L }
                 } else {
                     null
                 },

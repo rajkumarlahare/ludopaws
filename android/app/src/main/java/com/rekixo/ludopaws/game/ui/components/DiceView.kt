@@ -107,6 +107,7 @@ class DiceView @JvmOverloads constructor(
 
     private var turnDeadlineEpochMillis: Long? = null
     private var turnDeadlineElapsedRealtimeMillis: Long? = null
+    private var turnCountdownDurationMillis = DiceTurnCountdownPolicy.TURN_DURATION_MILLIS
 
     private var diceStyleId =
         "dice_classic"
@@ -201,13 +202,25 @@ class DiceView @JvmOverloads constructor(
      * Binds countdown to the server's absolute epoch-millisecond deadline.
      * Repeated snapshots with the same deadline do not restart its progress.
      */
-    fun setTurnDeadlineAt(deadlineEpochMillis: Long?) {
-        if (turnDeadlineEpochMillis == deadlineEpochMillis) return
+    fun setTurnDeadlineAt(
+        deadlineEpochMillis: Long?,
+        serverNowEpochMillis: Long? = null,
+        timeoutDurationMillis: Long = DiceTurnCountdownPolicy.TURN_DURATION_MILLIS,
+    ) {
+        val safeDuration = timeoutDurationMillis.takeIf { it > 0L }
+            ?: DiceTurnCountdownPolicy.TURN_DURATION_MILLIS
+        if (
+            turnDeadlineEpochMillis == deadlineEpochMillis &&
+            turnCountdownDurationMillis == safeDuration
+        ) return
         turnDeadlineEpochMillis = deadlineEpochMillis
+        turnCountdownDurationMillis = safeDuration
         turnDeadlineElapsedRealtimeMillis =
             deadlineEpochMillis?.let { deadline ->
-                SystemClock.elapsedRealtime() +
-                    (deadline - System.currentTimeMillis()).coerceAtLeast(0L)
+                val remaining = serverNowEpochMillis?.let { serverNow ->
+                    deadline - serverNow
+                } ?: (deadline - System.currentTimeMillis())
+                SystemClock.elapsedRealtime() + remaining.coerceAtLeast(0L)
             }
         if (turnCountdownActive()) postOnAnimation(animationTicker)
         else if (!rolling && !settling && !attentionPulsing) removeCallbacks(animationTicker)
@@ -655,6 +668,7 @@ class DiceView @JvmOverloads constructor(
         val fraction = DiceTurnCountdownPolicy.remainingFraction(
             deadlineElapsedRealtimeMillis = deadline,
             nowElapsedRealtimeMillis = SystemClock.elapsedRealtime(),
+            timeoutDurationMillis = turnCountdownDurationMillis,
         ) ?: return
 
         val radius = (size * .17f - dp(2.2f)).coerceAtLeast(0f)

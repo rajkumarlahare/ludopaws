@@ -87,6 +87,22 @@ internal object OnlineLudoPawsPresentation {
         )
     }
 
+    /**
+     * Marks the input-time sound so the eventual authoritative snapshot cannot
+     * replay it on the same device.
+     */
+    fun noteLocalRollStarted(
+        activity: MainActivity,
+        matchId: String,
+        eventIndex: Int,
+    ) {
+        val host = host(activity) ?: return
+        host.feedbackLedger.once(
+            matchId = matchId,
+            key = "ROLL_START:${eventIndex}",
+        )
+    }
+
     fun clear(activity: MainActivity) {
         val host = host(activity) ?: return
         host.feedbackLedger.clear()
@@ -424,7 +440,12 @@ internal object OnlineLudoPawsPresentation {
                 state.status == "ACTIVE" &&
                 state.pendingRoll == null
         }
-        activity.diceView.setTurnDeadlineAt(deadline)
+        activity.diceView.setTurnDeadlineAt(
+            deadlineEpochMillis = deadline,
+            serverNowEpochMillis = state.serverTimeAtSnapshot,
+            timeoutDurationMillis = state.turnRollTimeoutMillis
+                ?: DiceTurnCountdownPolicy.TURN_DURATION_MILLIS,
+        )
     }
 
     private fun addPlayerSlot(
@@ -658,18 +679,72 @@ internal object OnlineLudoPawsPresentation {
 
         val pending = current.pendingRoll
         val previousPending = previous.pendingRoll
-        if (
+        val newRollEvent =
             pending != null &&
-            (
-                previousPending == null ||
-                    previousPending.eventIndex != pending.eventIndex
-                ) &&
+                previousPending?.eventIndex != pending.eventIndex
+
+        // All clients derive the same take from the authoritative event index.
+        // The local device marks its input-time sound to avoid playing it twice.
+        if (
+            newRollEvent &&
             host.feedbackLedger.once(
                 matchId = current.matchId,
-                key = "ROLL:${pending.eventIndex}",
+                key = "ROLL_START:${pending!!.eventIndex}",
             )
         ) {
-            GameSoundFeedback.diceSettle(activity)
+            GameSoundFeedback.roll(activity, pending!!.eventIndex)
+        }
+
+        val newlyResolvedPending =
+            pending != null &&
+                pending.status == "RESOLVED" &&
+                (
+                    previousPending?.eventIndex != pending.eventIndex ||
+                        previousPending.status != "RESOLVED"
+                )
+        if (
+            newlyResolvedPending &&
+            host.feedbackLedger.once(
+                matchId = current.matchId,
+                key = "ROLL_SETTLE:${pending!!.eventIndex}",
+            )
+        ) {
+            val eventIndex = pending!!.eventIndex
+            activity.mainHandler.postDelayed(
+                {
+                    if (activity.canRenderUi()) GameSoundFeedback.diceSettle(activity, eventIndex)
+                },
+                if (newRollEvent) 320L else 0L,
+            )
+        } else if (
+            pending == null &&
+            current.history.lastOrNull()?.let { latest ->
+                latest.eventIndex != previous.history.lastOrNull()?.eventIndex &&
+                    latest.moveTokenIndex == null &&
+                    latest.status != "TIMED_OUT" &&
+                    ((latest.effectiveOutcome ?: latest.outcome)?.let { it in 1..6 } == true) &&
+                    !latest.proofDigest.isNullOrBlank()
+            } == true
+        ) {
+            // No legal destination can clear the pending roll immediately; this
+            // history-only path still delivers the shared roll/settle pair.
+            val latest = requireNotNull(current.history.lastOrNull())
+            if (
+                host.feedbackLedger.once(
+                    matchId = current.matchId,
+                    key = "ROLL_START:${latest.eventIndex}",
+                )
+            ) {
+                GameSoundFeedback.roll(activity, latest.eventIndex)
+            }
+            if (
+                host.feedbackLedger.once(
+                    matchId = current.matchId,
+                    key = "ROLL_SETTLE:${latest.eventIndex}",
+                )
+            ) {
+                GameSoundFeedback.diceSettle(activity, latest.eventIndex)
+            }
         }
 
         val reactions =

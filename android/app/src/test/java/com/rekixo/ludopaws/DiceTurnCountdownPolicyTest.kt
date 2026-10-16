@@ -23,6 +23,19 @@ class DiceTurnCountdownPolicyTest {
     }
 
     @Test
+    fun rulesetSuppliedDurationControlsTheCountdown() {
+        assertEquals(
+            0.25f,
+            DiceTurnCountdownPolicy.remainingFraction(
+                deadlineElapsedRealtimeMillis = 20_000L,
+                nowElapsedRealtimeMillis = 15_000L,
+                timeoutDurationMillis = 20_000L,
+            )!!,
+            0.0001f,
+        )
+    }
+
+    @Test
     fun missingDeadlineDoesNotShowCountdown() {
         assertNull(DiceTurnCountdownPolicy.remainingFraction(null, 0L))
     }
