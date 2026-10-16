@@ -19,13 +19,13 @@ class OnlineSnapshotRevisionPolicyTest {
     }
 
     @Test
-    fun newerAndEqualAuthoritativeRevisionsAreAccepted() {
+    fun newerRevisionIsAcceptedButDuplicateIsIgnored() {
         assertTrue(
             OnlineSnapshotRevisionPolicy.shouldApply(
                 "LPABCDEFGH", 12L, true, "LPABCDEFGH", 13L,
             ),
         )
-        assertTrue(
+        assertFalse(
             OnlineSnapshotRevisionPolicy.shouldApply(
                 "LPABCDEFGH", 12L, true, "LPABCDEFGH", 12L,
             ),
