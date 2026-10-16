@@ -395,9 +395,10 @@ test(
     assert.equal(final.pendingRoll, null);
     assert.equal(final.history.length, 1);
     assert.equal(final.randomEventIndex, 1);
-    assert.equal(final.players[1].forfeited, undefined);
     assert.equal(Number.isSafeInteger(final.players[1].forfeitedAt), true);
     assert.equal(Number.isSafeInteger(final.players[3].forfeitedAt), true);
+    assert.deepEqual(final.players[1].tokens, [-1, -1, -1, -1]);
+    assert.deepEqual(final.players[3].tokens, [-1, -1, -1, -1]);
   },
 );
 

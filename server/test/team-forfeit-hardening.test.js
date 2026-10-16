@@ -166,9 +166,9 @@ test("Team Up forfeit waits for the shared mutation queue", async () => {
   const afterRelease = await storage.get("match-state");
   assert.equal(afterRelease.status, "FINISHED");
   assert.equal(afterRelease.winnerTeamId, "A");
-  assert.equal(afterRelease.players[1].forfeited, true);
-  assert.equal(afterRelease.players[3].forfeited, true);
-  assert.equal(afterRelease.players[0].forfeited, false);
+  assert.equal(Number.isSafeInteger(afterRelease.players[1].forfeitedAt), true);
+  assert.equal(Number.isSafeInteger(afterRelease.players[3].forfeitedAt), true);
+  assert.equal(Number.isSafeInteger(afterRelease.players[0].forfeitedAt), false);
 });
 
 test("Team Up forfeit always clears another player's pending roll", async () => {
@@ -185,6 +185,8 @@ test("Team Up forfeit always clears another player's pending roll", async () => 
   assert.equal(body.winnerTeamId, "A");
   assert.equal(body.state.players[1].forfeited, true);
   assert.equal(body.state.players[3].forfeited, true);
+  assert.equal(Number.isSafeInteger(body.state.players[1].forfeitedAt), true);
+  assert.equal(Number.isSafeInteger(body.state.players[3].forfeitedAt), true);
 
   const stored = await storage.get("match-state");
   assert.equal(stored.pendingRoll, null);
