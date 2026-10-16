@@ -30,7 +30,7 @@ const ASSIGNMENT_TTL_MS = 10 * 60 * 1000;
 const PROFILE_ASSERTION_TTL_MS = 15 * 60 * 1000;
 const TARGET_PLAYER_COUNT = 4;
 const DEFAULT_RULESET_KEY = "TEAM_UP_V1";
-const TEAM_RULESET_KEYS = ["TEAM_UP_V1", "TEAM_UP_V2", "TEAM_UP_V3"];
+const TEAM_RULESET_KEYS = ["TEAM_UP_V1", "TEAM_UP_V2", "TEAM_UP_V3", "TEAM_UP_V4"];
 
 export class TeamMatchmakerQueue {
   constructor(ctx, env) {

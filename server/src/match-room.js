@@ -15,6 +15,7 @@ import {
   attachRoundCommitment,
   authoritativeStateForRandomness,
   forfeitTimedOutRoll,
+  forfeitTimedOutTurn,
   newMatch,
   publicState,
   registerResolvedRoll,
@@ -49,8 +50,10 @@ import {
   LEGACY_TEAM_RULESET_KEY,
   RULESET_KEY,
   RULESET_V3_KEY,
+  RULESET_V4_KEY,
   TEAM_RULESET_KEY,
   TEAM_RULESET_V3_KEY,
+  TEAM_RULESET_V4_KEY,
   rulesetKeyForState,
 } from "./rulesets.js";
 
@@ -157,6 +160,13 @@ export class MatchRoom {
       return;
     }
 
+    const turnExpired = this.#expireTurnIfNeeded(state, now);
+    if (turnExpired.changed) {
+      await this.#persist(turnExpired.state);
+      await this.#recordFinishedMatchIfNeeded(turnExpired.state);
+      return;
+    }
+
     const expiresAt =
       Number(state.updatedAt ?? state.createdAt ?? 0) +
       this.#idleTtl(state);
@@ -245,11 +255,15 @@ export class MatchRoom {
   }
 
   #nextAlarmAt(state, idleExpiresAt) {
-    const deadline =
-      state.pendingRoll?.revealDeadlineAt;
-    return Number.isSafeInteger(deadline)
-      ? Math.min(idleExpiresAt, deadline)
-      : idleExpiresAt;
+    const deadlines = [idleExpiresAt];
+    const revealDeadline = state.pendingRoll?.revealDeadlineAt;
+    if (Number.isSafeInteger(revealDeadline)) deadlines.push(revealDeadline);
+    const turnDeadline =
+      state.status === "ACTIVE" && state.pendingRoll == null
+        ? state.turnDeadlineAt
+        : null;
+    if (Number.isSafeInteger(turnDeadline)) deadlines.push(turnDeadline);
+    return Math.min(...deadlines);
   }
 
   #idleTtl(state) {
@@ -302,8 +316,8 @@ export class MatchRoom {
     if (requestedRulesetKey != null) {
       const acceptedRulesets =
         matchMode === "TEAM_UP"
-          ? [LEGACY_TEAM_RULESET_KEY, TEAM_RULESET_KEY, TEAM_RULESET_V3_KEY]
-          : [LEGACY_RULESET_KEY, RULESET_KEY, RULESET_V3_KEY];
+          ? [LEGACY_TEAM_RULESET_KEY, TEAM_RULESET_KEY, TEAM_RULESET_V3_KEY, TEAM_RULESET_V4_KEY]
+          : [LEGACY_RULESET_KEY, RULESET_KEY, RULESET_V3_KEY, RULESET_V4_KEY];
       if (!acceptedRulesets.includes(requestedRulesetKey)) {
         throw httpError(
           400,
@@ -2174,6 +2188,19 @@ export class MatchRoom {
       await this.#persist(state);
     }
     return state;
+  }
+
+  #expireTurnIfNeeded(state, now) {
+    if (
+      state.status !== "ACTIVE" ||
+      state.pendingRoll != null ||
+      !Number.isSafeInteger(state.turnDeadlineAt) ||
+      now < state.turnDeadlineAt
+    ) {
+      return { state, changed: false };
+    }
+    const result = forfeitTimedOutTurn(state, { now });
+    return { state: result.state, changed: true };
   }
 
   async #expirePendingIfNeeded(

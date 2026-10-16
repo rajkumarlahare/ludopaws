@@ -2,6 +2,7 @@ import {
   DEFAULT_CHARACTER_ID,
   publicCharacterId,
 } from "./ludo-paws-characters.js";
+import { rulesetForKey } from "./rulesets.js";
 
 export const COLORS = ["RED", "GREEN", "YELLOW", "BLUE"];
 
@@ -117,6 +118,8 @@ export function newMatch({
     pendingRoll: null,
     turnTimeoutCounts: {},
     turnTimeoutNotice: null,
+    turnDeadlineAt: null,
+    turnDeadlineSeat: null,
     winnerPlayerId: null,
     finishedAt: null,
   };
@@ -366,6 +369,82 @@ export function forfeitTimedOutRoll(state, {
       replacementRoundAllowed: false,
     },
   };
+}
+
+/**
+ * Expires an unrolled turn for a ruleset that opted into the v4 deadline.
+ * Only the Durable Object alarm path calls this function.
+ */
+export function forfeitTimedOutTurn(state, { now }) {
+  requireStatus(state, "ACTIVE");
+  if (state.pendingRoll != null) {
+    throw gameError("ROLL_ALREADY_PENDING", "a roll is already in progress");
+  }
+  const ruleset =
+    state.rulesetKey == null ? null : rulesetForKey(state.rulesetKey);
+  if (
+    !Number.isSafeInteger(ruleset?.turnRollTimeoutMs) ||
+    !Number.isSafeInteger(ruleset?.maxMissedRollsBeforeForfeit)
+  ) {
+    throw gameError("TURN_TIMEOUT_DISABLED", "this ruleset has no turn-roll deadline");
+  }
+  if (!Number.isSafeInteger(state.turnDeadlineAt) || now < state.turnDeadlineAt) {
+    throw gameError("TURN_NOT_TIMED_OUT", "turn deadline has not elapsed");
+  }
+  const seat = actingSeatForTurn(state);
+  if (!Number.isInteger(seat) || seat < 0 || seat >= state.players.length) {
+    throw gameError("INVALID_SEAT", "active turn seat is invalid");
+  }
+  if (state.turnDeadlineSeat !== seat) {
+    throw gameError("TURN_DEADLINE_STALE", "deadline does not match the active player");
+  }
+
+  const next = clone(state);
+  const player = next.players[seat];
+  const count = Math.max(0, Number(next.turnTimeoutCounts?.[player.playerId]) || 0) + 1;
+  next.turnTimeoutCounts = { ...(next.turnTimeoutCounts ?? {}), [player.playerId]: count };
+  next.turnTimeoutNotice = { playerId: player.playerId, count, at: now };
+
+  let forfeited = false;
+  if (count >= ruleset.maxMissedRollsBeforeForfeit) {
+    forfeited = true;
+    player.forfeitedAt = now;
+    player.forfeitReason = "TURN_TIMEOUT";
+    player.tokens = [-1, -1, -1, -1];
+    if (Array.isArray(next.consecutiveSixes)) next.consecutiveSixes[seat] = 0;
+
+    if (isTeamUp(next)) {
+      const losingTeam = teamIdForSeat(next, seat);
+      next.status = "FINISHED";
+      next.winnerPlayerId = null;
+      next.winnerTeamId = losingTeam === "A" ? "B" : "A";
+      next.finishedAt = now;
+      next.leaderboardRecordedAt = now;
+      next.pendingRoll = null;
+    } else {
+      const activeSeats = next.players
+        .map((candidate, index) => ({ candidate, index }))
+        .filter(({ candidate }) => !Number.isSafeInteger(candidate.forfeitedAt));
+      if (activeSeats.length <= 1) {
+        const winner = activeSeats[0] ?? null;
+        next.status = "FINISHED";
+        next.winnerPlayerId = winner?.candidate.playerId ?? null;
+        next.winnerTeamId = null;
+        next.turnSeat = winner?.index ?? seat;
+        next.finishedAt = now;
+        next.pendingRoll = null;
+      } else {
+        advanceTurn(next);
+      }
+    }
+  } else {
+    advanceTurn(next);
+  }
+
+  next.turnDeadlineAt = null;
+  next.turnDeadlineSeat = null;
+  touch(next, now);
+  return { state: next, playerId: player.playerId, count, forfeited };
 }
 
 const LAST_RELATIVE_TRACK_POSITION = 50;
@@ -651,6 +730,25 @@ function captureOpponents(state, movingSeat, destination) {
   if (RULESET.safeGlobalCells.includes(cell)) return 0;
 
   const movingTeam = teamIdForSeat(state, movingSeat);
+  const activeRuleset =
+    state.rulesetKey == null ? null : rulesetForKey(state.rulesetKey);
+  if (
+    isTeamUp(state) &&
+    activeRuleset?.teamStackProtection ===
+      "SAFE_WHEN_TEAM_HAS_AT_LEAST_TWO_TOKENS_ON_CELL"
+  ) {
+    const opposingTeamTokensOnCell = state.players.reduce(
+      (total, opponent, seat) => {
+        if (teamIdForSeat(state, seat) === movingTeam) return total;
+        return total + opponent.tokens.filter(
+          (position) => globalCellFor(opponent.color, position) === cell,
+        ).length;
+      },
+      0,
+    );
+    if (opposingTeamTokensOnCell >= 2) return 0;
+  }
+
   let captures = 0;
   state.players.forEach((opponent, seat) => {
     if (seat === movingSeat) return;
@@ -717,6 +815,28 @@ function requireStatus(state, expected) {
 function touch(state, now) {
   state.updatedAt = now;
   state.revision += 1;
+
+  const activeRuleset =
+    state.rulesetKey == null ? null : rulesetForKey(state.rulesetKey);
+  const timeoutMs = activeRuleset?.turnRollTimeoutMs;
+  if (
+    state.status === "ACTIVE" &&
+    state.pendingRoll == null &&
+    Number.isSafeInteger(timeoutMs) &&
+    timeoutMs > 0
+  ) {
+    const actingSeat = actingSeatForTurn(state);
+    if (
+      state.turnDeadlineSeat !== actingSeat ||
+      !Number.isSafeInteger(state.turnDeadlineAt)
+    ) {
+      state.turnDeadlineSeat = actingSeat;
+      state.turnDeadlineAt = now + timeoutMs;
+    }
+  } else {
+    state.turnDeadlineAt = null;
+    state.turnDeadlineSeat = null;
+  }
 }
 
 function clone(value) {
