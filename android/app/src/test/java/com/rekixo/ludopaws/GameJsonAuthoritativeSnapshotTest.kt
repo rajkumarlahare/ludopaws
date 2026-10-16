@@ -35,6 +35,28 @@ class GameJsonAuthoritativeSnapshotTest {
         GameJson.envelope(JSONObject().put("state", state))
     }
 
+    @Test
+    fun twoPlayerOnlineSnapshotAcceptsYellowOpponentSeat() {
+        val state = classicState(status = "ACTIVE", playerCount = 2)
+            .put("targetPlayerCount", 2)
+        state.getJSONArray("players")
+            .getJSONObject(1)
+            .put("color", "YELLOW")
+
+        val parsed = GameJson.envelope(JSONObject().put("state", state)).state
+
+        requireNotNull(parsed)
+        assertEquals(listOf("RED", "YELLOW"), parsed.players.map { it.color })
+    }
+
+    @Test(expected = GameSchemaException::class)
+    fun twoPlayerOnlineSnapshotRejectsGreenOpponentSeat() {
+        val state = classicState(status = "ACTIVE", playerCount = 2)
+            .put("targetPlayerCount", 2)
+
+        GameJson.envelope(JSONObject().put("state", state))
+    }
+
     @Test(expected = GameSchemaException::class)
     fun snapshotRejectsMalformedTokenCount() {
         val state = classicState(status = "ACTIVE", playerCount = 2)
