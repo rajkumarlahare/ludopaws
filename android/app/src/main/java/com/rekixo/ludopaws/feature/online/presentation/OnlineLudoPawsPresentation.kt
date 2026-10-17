@@ -498,6 +498,9 @@ internal object OnlineLudoPawsPresentation {
                     player.playerId == activePlayer?.playerId
             val localPlayer = player.playerId == activity.playerId
             val playerWidth = dp(activity, 112)
+            val reserveProfileFooter =
+                quickChatEnabled &&
+                    state.status == "ACTIVE"
             val activeDiceControl =
                 if (active) {
                     activeOnlineDiceControl(
@@ -506,7 +509,12 @@ internal object OnlineLudoPawsPresentation {
                         enabled = localPlayer &&
                             activity.canSubmitOnlineGameplayAction() &&
                             activity.onlineRollActionDecision(state).enabled,
-                    )
+                    ).apply {
+                        // Keep the dice visually aligned with the profile card, not its chat footer.
+                        if (reserveProfileFooter) {
+                            translationY = -dp(activity, 10).toFloat()
+                        }
+                    }
                 } else {
                     null
                 }
@@ -590,16 +598,32 @@ internal object OnlineLudoPawsPresentation {
                             LinearLayout.LayoutParams.WRAP_CONTENT,
                         ),
                     )
-                    addView(
-                        quickChatButton,
-                        LinearLayout.LayoutParams(
-                            dp(activity, 36),
-                            dp(activity, 36),
-                        ).apply {
-                            gravity = Gravity.CENTER_HORIZONTAL
-                            topMargin = dp(activity, 1)
-                        },
-                    )
+                    if (reserveProfileFooter) {
+                        // Reserve an identical footer for every player so cards never jump
+                        // when the local quick-chat control appears or disappears.
+                        val chatSlot =
+                            FrameLayout(activity).apply {
+                                clipChildren = false
+                                clipToPadding = false
+                                addView(
+                                    quickChatButton,
+                                    FrameLayout.LayoutParams(
+                                        dp(activity, 36),
+                                        dp(activity, 36),
+                                        Gravity.TOP or Gravity.CENTER_HORIZONTAL,
+                                    ),
+                                )
+                            }
+                        addView(
+                            chatSlot,
+                            LinearLayout.LayoutParams(
+                                playerWidth,
+                                dp(activity, 37),
+                            ).apply {
+                                topMargin = dp(activity, 1)
+                            },
+                        )
+                    }
                 }
             slotHost.addView(
                 profileColumn,
