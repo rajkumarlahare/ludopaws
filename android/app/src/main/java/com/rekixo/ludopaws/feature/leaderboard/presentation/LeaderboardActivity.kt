@@ -1,5 +1,6 @@
 package com.rekixo.ludopaws.feature.leaderboard.presentation
 
+import com.rekixo.ludopaws.feature.safety.AgeSafetyUi
 import android.app.Activity
 import android.graphics.Color
 import android.graphics.Typeface
@@ -83,6 +84,7 @@ class LeaderboardActivity :
         super.onCreate(
             savedInstanceState,
         )
+        if (!AgeSafetyUi.requireAdultOnlineAccess(this)) return
         LudoProofTheme
             .configureWindow(
                 this,

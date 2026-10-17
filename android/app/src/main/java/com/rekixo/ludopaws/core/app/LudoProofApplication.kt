@@ -31,7 +31,6 @@ class LudoProofApplication :
 
     override fun onCreate() {
         super.onCreate()
-        PlayGamesSdk.initialize(this)
         // Prime the process-local cosmetic mirror before any remote create/join
         // request can be sent. Character selection remains presentation-only.
         CharacterSelectionStore(this).load()
@@ -82,7 +81,11 @@ class LudoProofApplication :
      * Invoked only after neutral age-range selection. Age itself is never sent to the API.
      */
     fun onAgeRangeSelected() {
-        if (!AgeSafetyPolicy.hasSelectedAgeRange(this)) return
+        if (!AgeSafetyPolicy.canUseOnlineFeatures(this)) {
+            refreshSocialPresence()
+            return
+        }
+        PlayGamesSdk.initialize(this)
         synchronized(this) {
             if (accountBootstrapStarted) return
             accountBootstrapStarted = true

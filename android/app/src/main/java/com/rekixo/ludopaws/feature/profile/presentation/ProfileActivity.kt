@@ -1,5 +1,7 @@
 package com.rekixo.ludopaws.feature.profile.presentation
 
+import com.rekixo.ludopaws.feature.safety.AgeSafetyPolicy
+import com.rekixo.ludopaws.feature.safety.AgeSafetyUi
 import android.app.Activity
 import android.app.AlertDialog
 import android.graphics.Typeface
@@ -85,6 +87,7 @@ class ProfileActivity : Activity() {
         super.onCreate(
             savedInstanceState,
         )
+        if (!AgeSafetyUi.requireAdultOnlineAccess(this)) return
         LudoProofTheme
             .configureWindow(
                 this,
@@ -95,6 +98,7 @@ class ProfileActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        if (!AgeSafetyPolicy.canUseOnlineFeatures(this)) { finish(); return }
         refreshPlayGamesSignIn()
         refreshAccountStatus()
     }

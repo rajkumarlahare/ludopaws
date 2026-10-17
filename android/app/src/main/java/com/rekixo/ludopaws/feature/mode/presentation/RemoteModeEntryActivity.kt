@@ -1,5 +1,6 @@
 package com.rekixo.ludopaws.feature.mode.presentation
 
+import com.rekixo.ludopaws.feature.safety.AgeSafetyUi
 import android.app.Activity
 import android.os.Bundle
 import android.view.Gravity
@@ -37,6 +38,7 @@ class RemoteModeEntryActivity : Activity() {
         super.onCreate(
             savedInstanceState,
         )
+        if (!AgeSafetyUi.requireAdultOnlineAccess(this)) return
         LudoProofTheme.configureWindow(
             this,
         )

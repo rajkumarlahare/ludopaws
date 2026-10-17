@@ -1,5 +1,7 @@
 package com.rekixo.ludopaws.feature.team.presentation
 
+import com.rekixo.ludopaws.feature.safety.AgeSafetyPolicy
+import com.rekixo.ludopaws.feature.safety.AgeSafetyUi
 import android.app.Activity
 import android.content.Intent
 import android.graphics.Canvas
@@ -103,6 +105,7 @@ class TeamUpActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (!AgeSafetyUi.requireAdultOnlineAccess(this)) return
         LudoProofTheme.configureWindow(this)
         selectedCharacterId = CharacterSelectionStore(this).load().characterId
         // A persisted ticket from a prior Team Up page session must not silently
@@ -122,6 +125,7 @@ class TeamUpActivity : Activity() {
 
     override fun onStart() {
         super.onStart()
+        if (!AgeSafetyPolicy.canUseOnlineFeatures(this)) { finish(); return }
         stopped = false
         handler.removeCallbacks(pollRunnable)
         handler.post(pollRunnable)

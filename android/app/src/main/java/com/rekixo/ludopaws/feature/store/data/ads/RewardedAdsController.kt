@@ -1,5 +1,6 @@
 package com.rekixo.ludopaws.feature.store.data.ads
 
+import com.rekixo.ludopaws.feature.safety.AgeSafetyPolicy
 import android.app.Activity
 import android.util.Log
 import com.google.android.gms.ads.AdError
@@ -30,6 +31,7 @@ internal class RewardedAdsController(
     private var closed = false
 
     fun prepare() {
+        if (!AgeSafetyPolicy.canUseOnlineFeatures(activity)) return
         if (!enabled || closed || rewardedAd != null || adLoading) return
         if (activity.isFinishing || activity.isDestroyed) return
         Log.d(TAG, "Preparing rewarded ad; sdkInitialized=$sdkInitialized, consentCanRequestAds=${consentInformation.canRequestAds()}")
@@ -66,6 +68,10 @@ internal class RewardedAdsController(
         customData: String,
         onRewardEarned: () -> Unit,
     ): Boolean {
+        if (!AgeSafetyPolicy.canUseOnlineFeatures(activity)) {
+            onMessage("Ads are unavailable for this age range. Offline play remains available.")
+            return false
+        }
         if (!enabled || closed) {
             onMessage("Rewarded ads are temporarily unavailable. Please try again shortly.")
             return false
@@ -125,7 +131,7 @@ internal class RewardedAdsController(
     }
 
     fun showPrivacyOptions() {
-        if (!enabled || closed) return
+        if (!enabled || closed || !AgeSafetyPolicy.canUseOnlineFeatures(activity)) return
         UserMessagingPlatform.showPrivacyOptionsForm(activity) { error ->
             if (error != null) {
                 Log.e(TAG, "Ad privacy options form failed: ${error.message}")
@@ -144,7 +150,7 @@ internal class RewardedAdsController(
     }
 
     private fun initializeAdsIfAllowed() {
-        if (closed || !consentInformation.canRequestAds()) return
+        if (closed || !AgeSafetyPolicy.canUseOnlineFeatures(activity) || !consentInformation.canRequestAds()) return
         FamilyAdRequestPolicy.configure(activity)
         if (sdkInitialized) {
             loadRewardedAd()
@@ -166,6 +172,7 @@ internal class RewardedAdsController(
     private fun loadRewardedAd() {
         if (
             closed ||
+            !AgeSafetyPolicy.canUseOnlineFeatures(activity) ||
             !enabled ||
             !consentInformation.canRequestAds() ||
             !sdkInitialized ||

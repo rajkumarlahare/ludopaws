@@ -114,9 +114,8 @@ class FriendsActivity : Activity() {
             finish()
             return
         }
-        if (!AgeSafetyPolicy.canUseSocialFeatures(this)) {
+        if (!AgeSafetyUi.requireAdultOnlineAccess(this)) {
             accessBlocked = true
-            AgeSafetyUi.showSocialFeaturesRestricted(this) { finish() }
             return
         }
         credential = identityStore.load()
@@ -126,7 +125,10 @@ class FriendsActivity : Activity() {
 
     override fun onStart() {
         super.onStart()
-        if (accessBlocked) return
+        if (accessBlocked || !AgeSafetyPolicy.canUseOnlineFeatures(this)) {
+            finish()
+            return
+        }
         connectivityMonitor.start()
         mainHandler.removeCallbacks(refreshRunnable)
         mainHandler.post(refreshRunnable)

@@ -304,8 +304,10 @@ class HomeActivity : Activity() {
      */
     private fun startAgeGatedHomeServices() {
         if (!AgeSafetyPolicy.hasSelectedAgeRange(this)) return
-        retryPendingRemoteForfeits(this)
         connectivityMonitor.start()
+        if (AgeSafetyPolicy.canUseOnlineFeatures(this)) {
+            retryPendingRemoteForfeits(this)
+        }
     }
 
     override fun onStop() {

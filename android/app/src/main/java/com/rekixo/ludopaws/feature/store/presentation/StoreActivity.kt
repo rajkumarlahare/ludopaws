@@ -1,5 +1,7 @@
 package com.rekixo.ludopaws.feature.store.presentation
 
+import com.rekixo.ludopaws.feature.safety.AgeSafetyPolicy
+import com.rekixo.ludopaws.feature.safety.AgeSafetyUi
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
@@ -123,6 +125,7 @@ class StoreActivity :
         super.onCreate(
             savedInstanceState,
         )
+        if (!AgeSafetyUi.requireAdultOnlineAccess(this)) return
         LudoProofTheme
             .configureWindow(
                 this,
@@ -139,6 +142,7 @@ class StoreActivity :
 
     override fun onStart() {
         super.onStart()
+        if (!AgeSafetyPolicy.canUseOnlineFeatures(this)) { finish(); return }
         billingAvailable = false
         billingProductCatalogLoaded = false
 

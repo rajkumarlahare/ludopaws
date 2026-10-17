@@ -1,5 +1,6 @@
 package com.rekixo.ludopaws.feature.store.data.ads
 
+import com.rekixo.ludopaws.feature.safety.AgeSafetyPolicy
 import android.app.Activity
 import android.util.Log
 import com.google.android.gms.ads.AdError
@@ -33,6 +34,7 @@ internal class PostWinInterstitialAdController(
     private var interstitialAd: InterstitialAd? = null
 
     fun prepare() {
+        if (!AgeSafetyPolicy.canUseOnlineFeatures(activity)) return
         if (!enabled || closed || interstitialAd != null || adLoading ||
             consentUpdateInProgress || showing
         ) {
@@ -76,7 +78,7 @@ internal class PostWinInterstitialAdController(
         onAdDismissed: () -> Unit,
         onFailedToShow: () -> Unit,
     ): Boolean {
-        if (!enabled || closed || showConsumed || showing) return false
+        if (!enabled || closed || !AgeSafetyPolicy.canUseOnlineFeatures(activity) || showConsumed || showing) return false
         val ad = interstitialAd ?: return false
 
         interstitialAd = null
@@ -122,7 +124,7 @@ internal class PostWinInterstitialAdController(
     }
 
     private fun initializeAdsIfAllowed() {
-        if (closed || !consentInformation.canRequestAds()) return
+        if (closed || !AgeSafetyPolicy.canUseOnlineFeatures(activity) || !consentInformation.canRequestAds()) return
         FamilyAdRequestPolicy.configure(activity)
         if (sdkInitialized) {
             loadInterstitial()
@@ -140,7 +142,7 @@ internal class PostWinInterstitialAdController(
     }
 
     private fun loadInterstitial() {
-        if (closed || !consentInformation.canRequestAds() || adLoading ||
+        if (closed || !AgeSafetyPolicy.canUseOnlineFeatures(activity) || !consentInformation.canRequestAds() || adLoading ||
             interstitialAd != null || showing
         ) {
             return

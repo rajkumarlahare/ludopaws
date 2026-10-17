@@ -521,10 +521,7 @@ class MainActivity : ComponentActivity() {
             finish()
             return
         }
-        if (gameMode == GameMode.FRIENDS && !AgeSafetyPolicy.canUseSocialFeatures(this)) {
-            AgeSafetyUi.showSocialFeaturesRestricted(this) { finish() }
-            return
-        }
+        if (!AgeSafetyUi.requireAdultOnlineAccess(this)) return
         onBackPressedDispatcher.addCallback(
             this,
             object : OnBackPressedCallback(true) {
@@ -900,6 +897,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        if (!AgeSafetyPolicy.canUseOnlineFeatures(this)) {
+            finish()
+            return
+        }
         screenStarted = true
         connectivityMonitor.start()
         scheduleOnlineGameplayUnlock()
