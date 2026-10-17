@@ -109,6 +109,19 @@ class DiceView @JvmOverloads constructor(
     private var turnDeadlineElapsedRealtimeMillis: Long? = null
     private var turnCountdownDurationMillis = DiceTurnCountdownPolicy.TURN_DURATION_MILLIS
 
+    // Reuse all geometry used by the 15-second countdown stroke. Creating Paths
+    // and PathMeasures on every frame causes avoidable allocation/GC pressure.
+    private val shadowRect = RectF()
+    private val faceRect = RectF()
+    private val turnTimerPath = Path()
+    private val turnTimerProgressPath = Path()
+    private val turnTimerPathMeasure = PathMeasure()
+    private val turnTimerPathBounds = RectF()
+    private var turnTimerPathSize = Float.NaN
+    private var turnTimerPathRadius = Float.NaN
+    private var turnTimerPathLength = 0f
+    private var animationTickerScheduled = false
+
     private var diceStyleId =
         "dice_classic"
     private var previewStyleId: String? = null
@@ -132,6 +145,9 @@ class DiceView @JvmOverloads constructor(
     private val animationTicker =
         object : Runnable {
             override fun run() {
+                // A delivered frame frees the gate before deciding whether another
+                // frame is needed. Timer and attention updates share one VSYNC tick.
+                animationTickerScheduled = false
                 val now = SystemClock.uptimeMillis()
                 when {
                     rolling -> {
@@ -181,7 +197,7 @@ class DiceView @JvmOverloads constructor(
                 // Keep scheduling its frames while enabled, just like rolling and
                 // settling, and let every phase share this single ticker.
                 if (rolling || settling || attentionPulsing || turnCountdownActive()) {
-                    postOnAnimation(this)
+                    scheduleAnimationTicker()
                 }
             }
         }
@@ -222,8 +238,8 @@ class DiceView @JvmOverloads constructor(
                 } ?: (deadline - System.currentTimeMillis())
                 SystemClock.elapsedRealtime() + remaining.coerceAtLeast(0L)
             }
-        if (turnCountdownActive()) postOnAnimation(animationTicker)
-        else if (!rolling && !settling && !attentionPulsing) removeCallbacks(animationTicker)
+        if (turnCountdownActive()) scheduleAnimationTicker()
+        else if (!rolling && !settling && !attentionPulsing) cancelAnimationTicker()
         invalidate()
     }
 
@@ -231,6 +247,21 @@ class DiceView @JvmOverloads constructor(
         turnDeadlineElapsedRealtimeMillis?.let {
             SystemClock.elapsedRealtime() < it
         } == true
+
+    /**
+     * All countdown, attention and roll phases share one pending VSYNC callback.
+     * Duplicate posts while a match activates can cause redundant frame work.
+     */
+    private fun scheduleAnimationTicker() {
+        if (animationTickerScheduled) return
+        animationTickerScheduled = true
+        postOnAnimation(animationTicker)
+    }
+
+    private fun cancelAnimationTicker() {
+        removeCallbacks(animationTicker)
+        animationTickerScheduled = false
+    }
 
     fun setAttentionEnabled(enabled: Boolean) {
         val shouldPulse =
@@ -244,14 +275,14 @@ class DiceView @JvmOverloads constructor(
         attentionPulsing = shouldPulse
         if (shouldPulse) {
             attentionPhaseStartedAtMillis = SystemClock.uptimeMillis()
-            postOnAnimation(animationTicker)
+            scheduleAnimationTicker()
         } else {
             if (!turnCountdownActive() && !rolling && !settling) {
-                removeCallbacks(animationTicker)
+                cancelAnimationTicker()
             }
             resetTransform()
             invalidate()
-            if (turnCountdownActive()) postOnAnimation(animationTicker)
+            if (turnCountdownActive()) scheduleAnimationTicker()
         }
     }
 
@@ -259,14 +290,14 @@ class DiceView @JvmOverloads constructor(
         if (rolling) return
         cancelDeferredSettle()
         attentionPulsing = false
-        removeCallbacks(animationTicker)
+        cancelAnimationTicker()
         rolling = true
         settling = false
         rollStartedAtMillis =
             SystemClock.uptimeMillis()
         contentDescription =
             "Dice verification in progress."
-        postOnAnimation(animationTicker)
+        scheduleAnimationTicker()
     }
 
     fun showOutcome(
@@ -285,13 +316,14 @@ class DiceView @JvmOverloads constructor(
         if (!animate) {
             rolling = false
             settling = false
-            removeCallbacks(animationTicker)
+            cancelAnimationTicker()
             targetOutcome = outcome
             face = outcome
             contentDescription = "Dice outcome $outcome."
             if (eventKey != null) lastPresentedOutcomeEventKey = eventKey
             resetTransform()
             invalidate()
+            if (turnCountdownActive()) scheduleAnimationTicker()
             return
         }
 
@@ -348,7 +380,7 @@ class DiceView @JvmOverloads constructor(
     private fun beginSettle(outcome: Int) {
         val wasRolling = rolling
         rolling = false
-        removeCallbacks(animationTicker)
+        cancelAnimationTicker()
         targetOutcome = outcome
         face = outcome
         contentDescription = "Dice outcome $outcome."
@@ -360,7 +392,7 @@ class DiceView @JvmOverloads constructor(
             }
         settling = true
         settleStartedAtMillis = SystemClock.uptimeMillis()
-        postOnAnimation(animationTicker)
+        scheduleAnimationTicker()
     }
 
     private fun cancelDeferredSettle() {
@@ -373,17 +405,18 @@ class DiceView @JvmOverloads constructor(
         rolling = false
         settling = false
         attentionPulsing = false
-        removeCallbacks(animationTicker)
+        cancelAnimationTicker()
         resetTransform()
         contentDescription =
             "Dice verification stopped."
         invalidate()
+        if (turnCountdownActive()) scheduleAnimationTicker()
     }
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         reloadStyle()
-        if (turnCountdownActive()) postOnAnimation(animationTicker)
+        if (turnCountdownActive()) scheduleAnimationTicker()
     }
 
     fun reloadStyle() {
@@ -410,7 +443,7 @@ class DiceView @JvmOverloads constructor(
         rolling = false
         settling = false
         attentionPulsing = false
-        removeCallbacks(animationTicker)
+        cancelAnimationTicker()
         resetTransform()
         super.onDetachedFromWindow()
     }
@@ -469,13 +502,13 @@ class DiceView @JvmOverloads constructor(
             center,
         )
 
-        val shadow =
-            RectF(
-                size * .09f,
-                size * .11f,
-                size * .91f,
-                size * .92f,
-            )
+        shadowRect.set(
+            size * .09f,
+            size * .11f,
+            size * .91f,
+            size * .92f,
+        )
+        val shadow = shadowRect
         facePaint.shader = null
         facePaint.color =
             0x33000000
@@ -494,13 +527,13 @@ class DiceView @JvmOverloads constructor(
 
         val inset =
             size * .07f
-        val rect =
-            RectF(
-                inset,
-                inset,
-                size - inset,
-                size - inset,
-            )
+        faceRect.set(
+            inset,
+            inset,
+            size - inset,
+            size - inset,
+        )
+        val rect = faceRect
         val palette =
             dicePalette()
 
@@ -672,23 +705,46 @@ class DiceView @JvmOverloads constructor(
         ) ?: return
 
         val radius = (size * .17f - dp(2.2f)).coerceAtLeast(0f)
-        val path = Path().apply {
-            addRoundRect(rect, radius, radius, Path.Direction.CW)
+        // Geometry depends only on the dice bounds. Build the outline once per
+        // size/radius and reuse it for each timer frame.
+        if (
+            turnTimerPathSize != size ||
+            turnTimerPathRadius != radius ||
+            turnTimerPathBounds != rect
+        ) {
+            turnTimerPathBounds.set(rect)
+            turnTimerPath.reset()
+            turnTimerPath.addRoundRect(
+                turnTimerPathBounds,
+                radius,
+                radius,
+                Path.Direction.CW,
+            )
+            turnTimerPathMeasure.setPath(turnTimerPath, false)
+            turnTimerPathLength = turnTimerPathMeasure.length
+            turnTimerPathSize = size
+            turnTimerPathRadius = radius
         }
-        val measure = PathMeasure(path, false)
-        val length = measure.length
+        val length = turnTimerPathLength
         if (length <= 0f) return
 
         turnTimerTrackPaint.color = teamColor
         turnTimerProgressPaint.color = teamColor
         turnTimerTrackPaint.alpha = 62
         turnTimerProgressPaint.alpha = if (fraction <= 0f) 0 else 255
-        canvas.drawPath(path, turnTimerTrackPaint)
+        canvas.drawPath(turnTimerPath, turnTimerTrackPaint)
 
         if (fraction > 0f) {
-            val progressPath = Path()
-            measure.getSegment(0f, length * fraction.coerceIn(0f, 1f), progressPath, true)
-            canvas.drawPath(progressPath, turnTimerProgressPaint)
+            // getSegment appends to its destination; rewind the cached path rather
+            // than allocating a new Path every time onDraw runs.
+            turnTimerProgressPath.rewind()
+            turnTimerPathMeasure.getSegment(
+                0f,
+                length * fraction.coerceIn(0f, 1f),
+                turnTimerProgressPath,
+                true,
+            )
+            canvas.drawPath(turnTimerProgressPath, turnTimerProgressPaint)
         }
     }
 
