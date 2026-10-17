@@ -765,7 +765,7 @@ export class MatchRoom {
   }
 
   async #fastRoll(request, body) {
-    const clientSeed = requireDigest(body?.clientSeed, "clientSeed");
+    const clientSeed = requireDigest(body?.clientSeed, "clientSeed").toLowerCase();
     const clientCommitment = requireDigest(body?.clientCommitment, "clientCommitment").toLowerCase();
     const expectedCommitment = await sha256Hex(
       "entronex:v4:client-commit:" + clientSeed,
@@ -895,7 +895,7 @@ export class MatchRoom {
       eventIndex,
       eventId: `roll:${eventIndex}`,
       playerId: player.playerId,
-      color: state.players[state.pendingRoll?.seat ?? player.seat]?.color ?? player.color,
+      color: player.color,
       roundId: receipt.roundId,
       serverCommitment: receipt.serverCommitment,
       clientCommitment,
