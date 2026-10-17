@@ -49,18 +49,6 @@ class AgeSafetyPolicyTest {
     }
 
     @Test
-    fun dateOfBirthAgeMappingUsesTheSixPlayConsoleBands() {
-        assertEquals(AgeRange.FIVE_AND_UNDER, AgeRange.fromAge(5))
-        assertEquals(AgeRange.SIX_TO_EIGHT, AgeRange.fromAge(6))
-        assertEquals(AgeRange.NINE_TO_TWELVE, AgeRange.fromAge(9))
-        assertEquals(AgeRange.THIRTEEN_TO_FIFTEEN, AgeRange.fromAge(13))
-        assertEquals(AgeRange.SIXTEEN_TO_SEVENTEEN, AgeRange.fromAge(16))
-        assertEquals(AgeRange.EIGHTEEN_AND_OVER, AgeRange.fromAge(18))
-        assertEquals(null, AgeRange.fromAge(-1))
-        assertEquals(null, AgeRange.fromAge(121))
-    }
-
-    @Test
     fun onlyAdultBandCanUseOnlineFeatures() {
         AgeRange.values().filter { it.isUnder18 }.forEach { range ->
             assertFalse(AgeSafetyPolicy.canUseOnlineFeaturesForAge(range))

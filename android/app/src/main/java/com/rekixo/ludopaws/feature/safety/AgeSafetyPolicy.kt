@@ -34,7 +34,6 @@ internal enum class AgeRange(
 internal object AgeSafetyPolicy {
     private const val PREFS = "ludo_paws_age_safety"
     private const val AGE_RANGE_KEY = "age_range_v1"
-    private const val ADULT_DOB_VERIFIED_KEY = "adult_dob_verified_v1"
 
     fun selectedAgeRange(context: Context): AgeRange? {
         val value = preferences(context).getString(AGE_RANGE_KEY, null) ?: return null
@@ -43,20 +42,9 @@ internal object AgeSafetyPolicy {
 
     fun hasSelectedAgeRange(context: Context): Boolean = selectedAgeRange(context) != null
 
-    fun setSelectedAgeRange(
-        context: Context,
-        range: AgeRange,
-        adultDobVerified: Boolean = false,
-    ) {
-        preferences(context).edit()
-            .putString(AGE_RANGE_KEY, range.name)
-            .putBoolean(ADULT_DOB_VERIFIED_KEY, range == AgeRange.EIGHTEEN_AND_OVER && adultDobVerified)
-            .apply()
+    fun setSelectedAgeRange(context: Context, range: AgeRange) {
+        preferences(context).edit().putString(AGE_RANGE_KEY, range.name).apply()
     }
-
-    fun isAdultDobVerified(context: Context): Boolean =
-        selectedAgeRange(context) == AgeRange.EIGHTEEN_AND_OVER &&
-            preferences(context).getBoolean(ADULT_DOB_VERIFIED_KEY, false)
 
     fun shouldTreatAsChildForAds(range: AgeRange?): Boolean =
         range == null || range.isUnder13
@@ -71,10 +59,10 @@ internal object AgeSafetyPolicy {
         range != null && !range.isUnder18
 
     fun canUseOnlineFeatures(context: Context): Boolean =
-        canUseOnlineFeaturesForAge(selectedAgeRange(context)) && isAdultDobVerified(context)
+        canUseOnlineFeaturesForAge(selectedAgeRange(context))
 
     fun canUseSocialFeatures(context: Context): Boolean =
-        canUseOnlineFeatures(context)
+        canUseSocialFeaturesForAge(selectedAgeRange(context))
 
     private fun preferences(context: Context) =
         context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

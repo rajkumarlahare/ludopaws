@@ -1,15 +1,7 @@
 package com.rekixo.ludopaws.feature.safety
 
-import java.util.Locale
-import java.util.Date
-import java.util.Calendar
-import java.text.SimpleDateFormat
-import java.text.ParsePosition
 import com.rekixo.ludopaws.HomeActivity
 import android.widget.Toast
-import android.widget.EditText
-import android.text.InputType
-import android.text.InputFilter
 import android.content.Intent
 import android.app.Activity
 import android.app.AlertDialog
@@ -32,29 +24,9 @@ internal object AgeSafetyUi {
      * Neutral, full-window age screen: every band has equal visual weight and none is
      * preselected. Choice is saved locally before account bootstrap or ad requests.
      */
-    fun showAgeRangeIfNeeded(
-        activity: Activity,
-        onSelected: () -> Unit,
-        forceChooseRange: Boolean = false,
-    ) {
-        val saved = AgeSafetyPolicy.selectedAgeRange(activity)
-        if (saved != null && !forceChooseRange) {
-            if (saved == AgeRange.EIGHTEEN_AND_OVER && !AgeSafetyPolicy.isAdultDobVerified(activity)) {
-                showAdultAgeVerification(
-                    activity = activity,
-                    onVerified = { verifiedRange ->
-                        AgeSafetyPolicy.setSelectedAgeRange(
-                            activity,
-                            verifiedRange,
-                            adultDobVerified = verifiedRange == AgeRange.EIGHTEEN_AND_OVER,
-                        )
-                        if (verifiedRange.isUnder18) showUnder18Notice(activity, onSelected) else onSelected()
-                    },
-                    onBack = { showAgeRangeIfNeeded(activity, onSelected, forceChooseRange = true) },
-                )
-            } else {
-                onSelected()
-            }
+    fun showAgeRangeIfNeeded(activity: Activity, onSelected: () -> Unit) {
+        if (AgeSafetyPolicy.hasSelectedAgeRange(activity)) {
+            onSelected()
             return
         }
         if (activity.isFinishing || activity.isDestroyed) return
@@ -81,7 +53,7 @@ internal object AgeSafetyUi {
         )
         content.addView(
             TextView(activity).apply {
-                text = "Select the age range of the person who will play on this device. This choice stays on this device and is used to apply age-appropriate advertising and social-feature settings."
+                text = "Select the age range of the person who will play on this device. Your choice stays on this device and helps apply age-appropriate settings."
                 textSize = 15f
                 setTextColor(Color.rgb(68, 78, 91))
                 gravity = Gravity.CENTER
@@ -111,23 +83,12 @@ internal object AgeSafetyUi {
             isEnabled = false
             setOnClickListener {
                 val selected = options[group.checkedRadioButtonId] ?: return@setOnClickListener
+                AgeSafetyPolicy.setSelectedAgeRange(activity, selected)
                 dialog.dismiss()
-                if (selected == AgeRange.EIGHTEEN_AND_OVER) {
-                    showAdultAgeVerification(
-                        activity = activity,
-                        onVerified = { verifiedRange ->
-                            AgeSafetyPolicy.setSelectedAgeRange(
-                                activity,
-                                verifiedRange,
-                                adultDobVerified = verifiedRange == AgeRange.EIGHTEEN_AND_OVER,
-                            )
-                            if (verifiedRange.isUnder18) showUnder18Notice(activity, onSelected) else onSelected()
-                        },
-                        onBack = { showAgeRangeIfNeeded(activity, onSelected, forceChooseRange = true) },
-                    )
+                if (selected.isUnder18) {
+                    showUnder18Notice(activity, selected, onSelected)
                 } else {
-                    AgeSafetyPolicy.setSelectedAgeRange(activity, selected)
-                    showUnder18Notice(activity, onSelected)
+                    onSelected()
                 }
             }
         }
@@ -174,77 +135,20 @@ internal object AgeSafetyUi {
         return false
     }
 
-    private fun showUnder18Notice(activity: Activity, onContinue: () -> Unit) {
+    private fun showUnder18Notice(
+        activity: Activity,
+        range: AgeRange,
+        onContinue: () -> Unit,
+    ) {
         if (activity.isFinishing || activity.isDestroyed) return
         AlertDialog.Builder(activity)
             .setTitle("Offline play")
             .setMessage(
-                "For users under 18, this version keeps online accounts and multiplayer, Friends invitations, private messaging, voice chat, Quick Chat, leaderboards, in-app purchases and advertising turned off. Offline Computer and Pass & Play modes remain available. Never share your name, contact details, school or location with strangers online.",
+                "This device is set to \${range.label}. Online accounts and multiplayer, Friends invitations, private messaging, voice chat, Quick Chat, leaderboards, in-app purchases and advertising are unavailable in this age mode. Computer and Pass & Play modes remain available offline. Never share your name, contact details, school or location with strangers online.",
             )
             .setCancelable(false)
             .setPositiveButton("Continue") { _, _ -> onContinue() }
             .show()
-    }
-
-    private fun showAdultAgeVerification(
-        activity: Activity,
-        onVerified: (AgeRange) -> Unit,
-        onBack: () -> Unit,
-    ) {
-        if (activity.isFinishing || activity.isDestroyed) return
-        val birthDate = EditText(activity).apply {
-            hint = "DD/MM/YYYY"
-            inputType = InputType.TYPE_CLASS_DATETIME or InputType.TYPE_DATETIME_VARIATION_DATE
-            filters = arrayOf(InputFilter.LengthFilter(10))
-            setSingleLine(true)
-            isSaveEnabled = false
-            contentDescription = "Date of birth, day/month/year"
-        }
-        val dialog = AlertDialog.Builder(activity)
-            .setTitle("Confirm age 18+")
-            .setMessage(
-                "Enter your actual date of birth to enable online play, accounts, Friends features, leaderboards, purchases and advertising. The date is checked on this device only; the full date is not saved or sent to our servers. Only the resulting age range is stored on this device.",
-            )
-            .setView(birthDate)
-            .setPositiveButton("Confirm", null)
-            .setNegativeButton("Back to age groups", null)
-            .create()
-        dialog.setCancelable(false)
-        dialog.setOnShowListener {
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val age = ageFromBirthDate(birthDate.text.toString().trim())
-                val range = age?.let { AgeRange.fromAge(it) }
-                if (range == null) {
-                    birthDate.error = "Enter a valid past date as DD/MM/YYYY."
-                    return@setOnClickListener
-                }
-                dialog.dismiss()
-                onVerified(range)
-            }
-            dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener {
-                dialog.dismiss()
-                onBack()
-            }
-        }
-        dialog.show()
-    }
-
-    private fun ageFromBirthDate(value: String): Int? {
-        if (!Regex("^\\d{2}/\\d{2}/\\d{4}$").matches(value)) return null
-        val format = SimpleDateFormat("dd/MM/yyyy", Locale.US).apply { isLenient = false }
-        val position = ParsePosition(0)
-        val parsed: Date = format.parse(value, position) ?: return null
-        if (position.index != value.length || format.format(parsed) != value) return null
-        val today = Calendar.getInstance()
-        val birthday = Calendar.getInstance().apply { time = parsed }
-        if (birthday.after(today)) return null
-        var age = today.get(Calendar.YEAR) - birthday.get(Calendar.YEAR)
-        val birthdayNotReached =
-            today.get(Calendar.MONTH) < birthday.get(Calendar.MONTH) ||
-                (today.get(Calendar.MONTH) == birthday.get(Calendar.MONTH) &&
-                    today.get(Calendar.DAY_OF_MONTH) < birthday.get(Calendar.DAY_OF_MONTH))
-        if (birthdayNotReached) age--
-        return age.takeIf { it in 0..120 }
     }
 
     fun showSocialFeaturesRestricted(context: Context, onClose: () -> Unit = {}) {
