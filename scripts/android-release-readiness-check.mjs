@@ -94,14 +94,14 @@ for (const relativePath of androidSourceFiles) {
 requirePattern(
   "android/app/build.gradle.kts",
   appBuild,
-  /versionCode\s*=\s*2\b/,
-  "RC2 must use monotonically increasing versionCode 2.",
+  /versionCode\s*=\s*3\b/,
+  "RC3 must use monotonically increasing versionCode 2.",
 );
 requirePattern(
   "android/app/build.gradle.kts",
   appBuild,
-  /versionName\s*=\s*"1\.0\.0-rc2"/,
-  "RC2 must expose versionName 1.0.0-rc2.",
+  /versionName\s*=\s*"1\.0\.0-rc3"/,
+  "RC3 must expose versionName 1.0.0-rc3.",
 );
 
 for (const variable of [
@@ -351,11 +351,11 @@ requireText(
 );
 
 if (failures.length > 0) {
-  console.error("Android RC2 release-readiness gate failed:");
+  console.error("Android RC3 release-readiness gate failed:");
   for (const failure of failures) console.error(`- ${failure}`);
   process.exit(1);
 }
 
 console.log(
-  "Android RC2 release-readiness gate passed: version monotonicity, fail-closed secure signing, V1/V2 dual-read coverage, and explicit Ruleset V2 contract are intact.",
+  "Android RC3 release-readiness gate passed: version monotonicity, fail-closed secure signing, V1/V2 dual-read coverage, and explicit Ruleset V2 contract are intact.",
 );

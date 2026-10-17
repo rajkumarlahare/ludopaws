@@ -11,6 +11,8 @@ import com.rekixo.ludopaws.core.ui.components.AppFocusRing
 import com.rekixo.ludopaws.DiceView
 import com.rekixo.ludopaws.LudoBoardView
 import com.rekixo.ludopaws.feature.profile.data.local.ProfileStore
+import com.rekixo.ludopaws.feature.safety.AgeSafetyPolicy
+import com.rekixo.ludopaws.feature.safety.AgeSafetyUi
 import com.rekixo.ludopaws.feature.profile.domain.ProfileProgression
 import com.rekixo.ludopaws.feature.settings.data.local.GameMusicController
 import com.rekixo.ludopaws.feature.settings.data.local.GameSettingsStore
@@ -490,6 +492,21 @@ internal fun showSettingsDialog(
                 control = diceField,
             ),
         )
+
+        if (AgeSafetyPolicy.selectedAgeRange(context)?.isUnder18 == true) {
+            panel.addView(settingsDivider(context))
+            val familySafetyField = settingsDropdownField(context, "SOCIAL FEATURES OFF")
+            familySafetyField.setOnClickListener {
+                AgeSafetyUi.showFamilySafetyInfo(context)
+            }
+            panel.addView(
+                settingsCompactRow(
+                    context = context,
+                    label = "Family safety",
+                    control = familySafetyField,
+                ),
+            )
+        }
 
         panel.addView(
             settingsPrivacyLink(

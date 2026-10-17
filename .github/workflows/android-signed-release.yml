@@ -73,7 +73,7 @@ jobs:
           test -s "$KEYSTORE"
           echo "LUDOPROOF_RELEASE_STORE_FILE=$KEYSTORE" >> "$GITHUB_ENV"
 
-      - name: RC2 release-readiness gate
+      - name: RC3 release-readiness gate
         run: node scripts/android-release-readiness-check.mjs
 
       - name: Validate release OAuth, feature flags and production API
@@ -256,7 +256,7 @@ jobs:
       - name: Upload signed release evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: ludoproof-android-1.0.0-rc2-signed
+          name: ludoproof-android-1.0.0-rc3-signed
           path: |
             android/app/build/outputs/apk/release/app-release.apk
             android/app/build/outputs/bundle/release/app-release.aab

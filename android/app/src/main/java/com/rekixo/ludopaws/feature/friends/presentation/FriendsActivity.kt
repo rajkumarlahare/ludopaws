@@ -42,6 +42,8 @@ import com.rekixo.ludopaws.SecureSessionStore
 import com.rekixo.ludopaws.feature.friends.data.local.FriendCredential
 import com.rekixo.ludopaws.feature.friends.data.local.FriendIdentityStore
 import com.rekixo.ludopaws.feature.profile.data.local.ProfileStore
+import com.rekixo.ludopaws.feature.safety.AgeSafetyPolicy
+import com.rekixo.ludopaws.feature.safety.AgeSafetyUi
 import com.rekixo.ludopaws.ui.game.addGameTopActions
 import org.json.JSONArray
 import org.json.JSONObject
@@ -50,6 +52,7 @@ import java.util.UUID
 import java.util.concurrent.Executors
 
 class FriendsActivity : Activity() {
+    private var accessBlocked = false
     private val api by lazy { GameApi() }
     private val executor = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -102,6 +105,20 @@ class FriendsActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         LudoProofTheme.configureWindow(this)
+        if (!AgeSafetyPolicy.hasSelectedAgeRange(this)) {
+            accessBlocked = true
+            startActivity(
+                Intent(this, com.rekixo.ludopaws.HomeActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            )
+            finish()
+            return
+        }
+        if (!AgeSafetyPolicy.canUseSocialFeatures(this)) {
+            accessBlocked = true
+            AgeSafetyUi.showSocialFeaturesRestricted(this) { finish() }
+            return
+        }
         credential = identityStore.load()
         buildUi()
         renderAll()
@@ -109,12 +126,17 @@ class FriendsActivity : Activity() {
 
     override fun onStart() {
         super.onStart()
+        if (accessBlocked) return
         connectivityMonitor.start()
         mainHandler.removeCallbacks(refreshRunnable)
         mainHandler.post(refreshRunnable)
     }
 
     override fun onStop() {
+        if (accessBlocked) {
+            super.onStop()
+            return
+        }
         connectivityMonitor.stop()
         mainHandler.removeCallbacks(refreshRunnable)
         super.onStop()

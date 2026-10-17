@@ -25,6 +25,8 @@ import com.rekixo.ludopaws.ui.game.addGameTopActions
 import com.rekixo.ludopaws.core.ui.art.plywoodBackground
 import com.rekixo.ludopaws.ui.online.*
 import com.rekixo.ludopaws.feature.online.*
+import com.rekixo.ludopaws.feature.safety.AgeSafetyPolicy
+import com.rekixo.ludopaws.feature.safety.AgeSafetyUi
 import com.rekixo.ludopaws.feature.settings.data.local.GameSoundFeedback
 import com.rekixo.ludopaws.feature.online.FriendsVoiceChatSession
 import com.rekixo.ludopaws.feature.store.data.ads.PostWinInterstitialAdController
@@ -511,6 +513,18 @@ class MainActivity : ComponentActivity() {
         super.onCreate(
             savedInstanceState,
         )
+        if (!AgeSafetyPolicy.hasSelectedAgeRange(this)) {
+            startActivity(
+                Intent(this, HomeActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            )
+            finish()
+            return
+        }
+        if (gameMode == GameMode.FRIENDS && !AgeSafetyPolicy.canUseSocialFeatures(this)) {
+            AgeSafetyUi.showSocialFeaturesRestricted(this) { finish() }
+            return
+        }
         onBackPressedDispatcher.addCallback(
             this,
             object : OnBackPressedCallback(true) {
@@ -963,6 +977,10 @@ class MainActivity : ComponentActivity() {
     }
 
     internal fun toggleFriendsVoice() {
+        if (!AgeSafetyPolicy.canUseSocialFeatures(this)) {
+            stopFriendsVoice("Friends voice chat is unavailable for this age range.")
+            return
+        }
         val state = currentState
         if (gameMode != GameMode.FRIENDS || state?.status != "ACTIVE") {
             showStatus("Voice chat is available during an active Friends match.")

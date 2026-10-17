@@ -22,6 +22,7 @@ import com.rekixo.ludopaws.feature.characters.domain.reaction.LudoPawsReactionEn
 import com.rekixo.ludopaws.feature.online.domain.OnlineLudoPawsCharacterPolicy
 import com.rekixo.ludopaws.feature.settings.data.local.GameSettingsStore
 import com.rekixo.ludopaws.feature.settings.data.local.GameSoundFeedback
+import com.rekixo.ludopaws.feature.safety.AgeSafetyPolicy
 import com.rekixo.ludopaws.feature.settings.data.local.LudoPawsHaptics
 import com.rekixo.ludopaws.ui.online.button
 import com.rekixo.ludopaws.ui.quickchat.QuickChatButtonView
@@ -202,6 +203,7 @@ internal object OnlineLudoPawsPresentation {
         displayName: String,
         emoji: String,
     ) {
+        if (!AgeSafetyPolicy.canUseSocialFeatures(activity)) return
         if (senderPlayerId == activity.playerId) return
         if (emoji !in com.rekixo.ludopaws.ui.quickchat.QuickChatEmojiCatalog.EMOJIS) return
         if (!GameSettingsStore(activity).snapshot().quickChatEnabled) return
@@ -334,7 +336,8 @@ internal object OnlineLudoPawsPresentation {
 
     fun refreshVoiceControls(activity: MainActivity, state: MatchSnapshot) {
         val host = host(activity) ?: return
-        val visible = activity.gameMode == GameMode.FRIENDS &&
+        val visible = AgeSafetyPolicy.canUseSocialFeatures(activity) &&
+            activity.gameMode == GameMode.FRIENDS &&
             state.matchMode == "FRIENDS" &&
             state.status == "ACTIVE"
         host.voiceControls.visibility = if (visible) View.VISIBLE else View.GONE
@@ -368,7 +371,7 @@ internal object OnlineLudoPawsPresentation {
             perspectiveColor
                 ?: state.players.firstOrNull()?.color
                 ?: "BLUE"
-        val quickChatEnabled = GameSettingsStore(activity).snapshot().quickChatEnabled
+        val quickChatEnabled = AgeSafetyPolicy.canUseSocialFeatures(activity) && GameSettingsStore(activity).snapshot().quickChatEnabled
         val bindingKey = buildString {
             append(state.matchId).append('|')
             append(state.matchMode).append('|')
@@ -705,7 +708,7 @@ internal object OnlineLudoPawsPresentation {
                     player.playerId == activePlayer?.playerId
             val localPlayer = player.playerId == activity.playerId
             val playerWidth = dp(activity, 112)
-            val quickChatEnabled = GameSettingsStore(activity).snapshot().quickChatEnabled
+            val quickChatEnabled = AgeSafetyPolicy.canUseSocialFeatures(activity) && GameSettingsStore(activity).snapshot().quickChatEnabled
             val reserveProfileFooter =
                 quickChatEnabled &&
                     state.status == "ACTIVE"
@@ -760,6 +763,7 @@ internal object OnlineLudoPawsPresentation {
                     setOnClickListener {
                         if (
                             !localPlayer ||
+                            !AgeSafetyPolicy.canUseSocialFeatures(activity) ||
                             GameSettingsStore(activity).snapshot().quickChatEnabled.not()
                         ) {
                             return@setOnClickListener

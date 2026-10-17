@@ -3,7 +3,6 @@ package com.rekixo.ludopaws.feature.store.data.ads
 import android.app.Activity
 import android.util.Log
 import com.google.android.gms.ads.AdError
-import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.FullScreenContentCallback
 import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.MobileAds
@@ -11,7 +10,6 @@ import com.google.android.gms.ads.rewarded.RewardedAd
 import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
 import com.google.android.gms.ads.rewarded.ServerSideVerificationOptions
 import com.google.android.ump.ConsentInformation
-import com.google.android.ump.ConsentRequestParameters
 import com.google.android.ump.UserMessagingPlatform
 
 internal class RewardedAdsController(
@@ -44,7 +42,7 @@ internal class RewardedAdsController(
         consentUpdateInProgress = true
         consentInformation.requestConsentInfoUpdate(
             activity,
-            ConsentRequestParameters.Builder().build(),
+            FamilyAdRequestPolicy.consentRequestParameters(activity),
             {
                 UserMessagingPlatform.loadAndShowConsentFormIfRequired(activity) { error ->
                     consentUpdateInProgress = false
@@ -147,6 +145,7 @@ internal class RewardedAdsController(
 
     private fun initializeAdsIfAllowed() {
         if (closed || !consentInformation.canRequestAds()) return
+        FamilyAdRequestPolicy.configure(activity)
         if (sdkInitialized) {
             loadRewardedAd()
             return
@@ -180,7 +179,7 @@ internal class RewardedAdsController(
         RewardedAd.load(
             activity,
             adUnitId,
-            AdRequest.Builder().build(),
+            FamilyAdRequestPolicy.createAdRequest(activity),
             object : RewardedAdLoadCallback() {
                 override fun onAdLoaded(ad: RewardedAd) {
                     adLoading = false

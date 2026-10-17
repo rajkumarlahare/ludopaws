@@ -10,6 +10,9 @@ import com.rekixo.ludopaws.feature.account.data.AccountRepository
 import java.util.concurrent.Executors
 import com.rekixo.ludopaws.feature.friends.data.FriendPresenceController
 import com.rekixo.ludopaws.feature.settings.data.local.GameMusicController
+import com.rekixo.ludopaws.feature.safety.AgeSafetyPolicy
+import android.os.Handler
+import android.os.Looper
 
 class LudoProofApplication :
     Application(),
@@ -22,6 +25,8 @@ class LudoProofApplication :
     }
     private var resumedActivities = 0
     @Volatile
+    private var accountBootstrapStarted = false
+    @Volatile
     private var friendPresencePausedForAccountSwitch = false
 
     override fun onCreate() {
@@ -32,11 +37,7 @@ class LudoProofApplication :
         CharacterSelectionStore(this).load()
         friendPresence =
             FriendPresenceController(this)
-        // Create/restore the guest session off the UI thread. If the network is
-        // unavailable, gameplay remains usable; monetized store actions fail closed.
-        accountBootstrapExecutor.execute {
-            runCatching { accountRepository.ensureGuestSession() }
-        }
+        // Guest-account creation is deferred until the neutral age-range screen is completed.
         registerActivityLifecycleCallbacks(this)
     }
 
@@ -53,6 +54,8 @@ class LudoProofApplication :
         if (resumedActivities == 1) {
             if (
                 !friendPresencePausedForAccountSwitch &&
+                AgeSafetyPolicy.hasSelectedAgeRange(this) &&
+                AgeSafetyPolicy.canUseSocialFeatures(this) &&
                 accountRepository.canStartFriendPresence()
             ) {
                 friendPresence.start()
@@ -75,6 +78,40 @@ class LudoProofApplication :
         }
     }
 
+    /**
+     * Invoked only after neutral age-range selection. Age itself is never sent to the API.
+     */
+    fun onAgeRangeSelected() {
+        if (!AgeSafetyPolicy.hasSelectedAgeRange(this)) return
+        synchronized(this) {
+            if (accountBootstrapStarted) return
+            accountBootstrapStarted = true
+        }
+        accountBootstrapExecutor.execute {
+            val succeeded = runCatching { accountRepository.ensureGuestSession() }.isSuccess
+            if (!succeeded) {
+                synchronized(this) { accountBootstrapStarted = false }
+            }
+            if (succeeded) {
+                Handler(Looper.getMainLooper()).post { refreshSocialPresence() }
+            }
+        }
+    }
+
+    fun refreshSocialPresence() {
+        if (
+            resumedActivities > 0 &&
+            !friendPresencePausedForAccountSwitch &&
+            AgeSafetyPolicy.hasSelectedAgeRange(this) &&
+            AgeSafetyPolicy.canUseSocialFeatures(this) &&
+            accountRepository.canStartFriendPresence()
+        ) {
+            friendPresence.start()
+        } else {
+            friendPresence.stop()
+        }
+    }
+
     fun pauseFriendPresenceForAccountSwitch() {
         friendPresencePausedForAccountSwitch = true
         friendPresence.stop()
@@ -82,9 +119,7 @@ class LudoProofApplication :
 
     fun resumeFriendPresenceAfterAccountSwitch() {
         friendPresencePausedForAccountSwitch = false
-        if (resumedActivities > 0 && !accountRepository.requiresIdentityRecovery()) {
-            friendPresence.start()
-        }
+        refreshSocialPresence()
     }
 
     override fun onActivityCreated(

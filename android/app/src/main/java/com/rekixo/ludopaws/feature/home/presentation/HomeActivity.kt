@@ -12,6 +12,8 @@ import com.rekixo.ludopaws.feature.profile.data.local.ProfileStore
 import com.rekixo.ludopaws.feature.profile.domain.model.ProfileGameMode
 import com.rekixo.ludopaws.feature.profile.domain.model.ProfileMatchSource
 import com.rekixo.ludopaws.feature.online.retryPendingRemoteForfeits
+import com.rekixo.ludopaws.feature.safety.AgeSafetyPolicy
+import com.rekixo.ludopaws.feature.safety.AgeSafetyUi
 import com.rekixo.ludopaws.ui.home.*
 
 class HomeActivity : Activity() {
@@ -224,6 +226,17 @@ class HomeActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        if (!AgeSafetyPolicy.hasSelectedAgeRange(this)) {
+            AgeSafetyUi.showAgeRangeIfNeeded(this) {
+                continueHomeAfterAgeSelection()
+            }
+            return
+        }
+        continueHomeAfterAgeSelection()
+    }
+
+    private fun continueHomeAfterAgeSelection() {
+        (application as? LudoProofApplication)?.onAgeRangeSelected()
 
         recordAbandonedRemoteLossIfNeeded()
 
