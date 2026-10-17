@@ -3,6 +3,7 @@ import {
   entronexFetch,
   hasEntroNexServiceBinding,
 } from "./entronex-transport.js";
+import { checkFastMatchRateLimit } from "./match-rate-limit.js";
 import {
   deterministicMatchId,
   hasSessionKey,
@@ -390,7 +391,7 @@ export default {
       if (url.pathname === "/api/matches") {
         requireMethod(request, "POST");
         const body = await readJsonRequest(request);
-        await enforceRateLimit(
+        await enforceGameplayRateLimit(
           env,
           request,
           "create",
@@ -562,7 +563,7 @@ export default {
             )
             ? "state"
             : "mutation";
-      await enforceRateLimit(
+      await enforceGameplayRateLimit(
         env,
         request,
         policyKey + ":" + matchId,
@@ -593,6 +594,43 @@ export default {
     }
   },
 };
+
+// Match gameplay endpoints use edge rate-limit bindings on the hot path. Unlike
+// ApiGate, these bindings do not require a serialized Durable Object fetch for every
+// roll, move, or state/event request. If a binding is missing or unhealthy, retain
+// the existing durable-object gate as a conservative fallback.
+async function enforceGameplayRateLimit(
+  env,
+  request,
+  scope,
+  limit,
+) {
+  const policyKey = scope.split(":", 1)[0];
+  const clientIp =
+    request.headers.get("cf-connecting-ip") ?? "unknown";
+  const rateKey = await sha256Hex(
+    "ludoproof:api-rate:v1:" + scope + ":" + clientIp,
+  );
+
+  const fastAllowed = await checkFastMatchRateLimit(
+    env,
+    policyKey,
+    rateKey,
+  );
+  if (fastAllowed === true) return;
+  if (fastAllowed === false) {
+    const error = httpError(
+      429,
+      "RATE_LIMITED",
+      "too many requests",
+    );
+    // Native rate-limit bindings do not expose the exact reset time.
+    error.retryAfter = "60";
+    throw error;
+  }
+
+  await enforceRateLimit(env, request, scope, limit);
+}
 
 async function enforceRateLimit(
   env,
