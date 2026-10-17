@@ -92,11 +92,17 @@ internal object AgeSafetyUi {
                     birthDate.error = "Enter a valid past date as DD/MM/YYYY."
                     return@setOnClickListener
                 }
-                AgeSafetyPolicy.setSelectedAgeRange(activity, selected)
                 dialog.dismiss()
                 if (selected.isUnder18) {
-                    showUnder18Notice(activity, selected, onSelected)
+                    // Do not persist a child/teen age band until the required safety notice
+                    // has been acknowledged. If the app is interrupted, the neutral age gate
+                    // must appear again instead of silently treating the notice as completed.
+                    showUnder18Notice(activity, selected) {
+                        AgeSafetyPolicy.setSelectedAgeRange(activity, selected)
+                        onSelected()
+                    }
                 } else {
+                    AgeSafetyPolicy.setSelectedAgeRange(activity, selected)
                     onSelected()
                 }
             }
