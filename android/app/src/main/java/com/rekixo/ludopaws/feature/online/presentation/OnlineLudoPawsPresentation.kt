@@ -446,10 +446,9 @@ internal object OnlineLudoPawsPresentation {
         activity.actionPanel.clipChildren = false
         activity.actionPanel.clipToPadding = false
 
-        // Do not derive a new translation from getLocationOnScreen() after a
-        // previous translation has already been applied. Measure each view in its
-        // parent and convert the desired screen edge to the parent's coordinate
-        // system so repeated runs cannot compound a prior shift.
+        // Each run starts from the current base bounds (screen location with the
+        // previously applied translation removed) and assigns a fresh absolute
+        // translation. This prevents drift across repeated renders and relayouts.
         board.post {
             if (board.width <= 0 || board.height <= 0 ||
                 host.topRail.height <= 0 || host.bottomRail.height <= 0
@@ -463,12 +462,14 @@ internal object OnlineLudoPawsPresentation {
             host.bottomRail.getLocationOnScreen(bottomRailLocation)
 
             val gap = dp(activity, 8)
+            val topRailBaseTop = topRailLocation[1] - host.topRail.translationY.toInt()
+            val bottomRailBaseTop = bottomRailLocation[1] - host.bottomRail.translationY.toInt()
             val translation = OnlineBoardRailAlignmentPolicy.calculate(
                 boardTopOnScreen = boardLocation[1],
                 boardHeight = board.height,
-                topRailTopOnScreen = topRailLocation[1] - host.topRail.translationY.toInt(),
+                topRailTopOnScreen = topRailBaseTop,
                 topRailHeight = host.topRail.height,
-                bottomRailTopOnScreen = bottomRailLocation[1] - host.bottomRail.translationY.toInt(),
+                bottomRailTopOnScreen = bottomRailBaseTop,
                 gapPx = gap,
             )
 
