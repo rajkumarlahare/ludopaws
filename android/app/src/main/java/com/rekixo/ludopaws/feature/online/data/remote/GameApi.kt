@@ -4,12 +4,10 @@ import com.rekixo.ludopaws.feature.characters.data.local.LudoPawsCharacterRuntim
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
-import okhttp3.ConnectionPool
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.MediaType.Companion.toMediaType
-import java.util.concurrent.TimeUnit
 
 class GameApi(
     baseUrl: String = BuildConfig.LUDOPROOF_API_BASE_URL,
@@ -349,7 +347,7 @@ class GameApi(
         }
 
         val request = requestBuilder.method(method, requestBody).build()
-        SHARED_HTTP_CLIENT.newCall(request).execute().use { response ->
+        LudoPawsHttpClients.shared.newCall(request).execute().use { response ->
             val status = response.code
             val text = response.body
                 ?.byteStream()
@@ -388,17 +386,7 @@ class GameApi(
     private companion object {
         const val MAX_RESPONSE_BYTES = 512 * 1024
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
-        private val SHARED_HTTP_CLIENT: OkHttpClient by lazy {
-            OkHttpClient.Builder()
-                .connectionPool(ConnectionPool(8, 5, TimeUnit.MINUTES))
-                .connectTimeout(10, TimeUnit.SECONDS)
-                .readTimeout(25, TimeUnit.SECONDS)
-                .callTimeout(30, TimeUnit.SECONDS)
-                .retryOnConnectionFailure(true)
-                .followRedirects(false)
-                .followSslRedirects(false)
-                .build()
-        }
+
     }
 }
 
