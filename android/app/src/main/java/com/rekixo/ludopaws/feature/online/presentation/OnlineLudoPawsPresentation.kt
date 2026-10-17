@@ -446,34 +446,34 @@ internal object OnlineLudoPawsPresentation {
         activity.actionPanel.clipChildren = false
         activity.actionPanel.clipToPadding = false
 
+        // Do not derive a new translation from getLocationOnScreen() after a
+        // previous translation has already been applied. Measure each view in its
+        // parent and convert the desired screen edge to the parent's coordinate
+        // system so repeated runs cannot compound a prior shift.
         board.post {
-            if (board.width <= 0 || board.height <= 0) return@post
+            if (board.width <= 0 || board.height <= 0 ||
+                host.topRail.height <= 0 || host.bottomRail.height <= 0
+            ) return@post
+
             val boardLocation = IntArray(2)
-            board.getLocationOnScreen(boardLocation)
             val topRailLocation = IntArray(2)
             val bottomRailLocation = IntArray(2)
+            board.getLocationOnScreen(boardLocation)
             host.topRail.getLocationOnScreen(topRailLocation)
             host.bottomRail.getLocationOnScreen(bottomRailLocation)
+
             val gap = dp(activity, 8)
             val translation = OnlineBoardRailAlignmentPolicy.calculate(
                 boardTopOnScreen = boardLocation[1],
                 boardHeight = board.height,
-                topRailTopOnScreen = topRailLocation[1],
+                topRailTopOnScreen = topRailLocation[1] - host.topRail.translationY.toInt(),
                 topRailHeight = host.topRail.height,
-                bottomRailTopOnScreen = bottomRailLocation[1],
+                bottomRailTopOnScreen = bottomRailLocation[1] - host.bottomRail.translationY.toInt(),
                 gapPx = gap,
             )
 
-            // Absolute assignments make repeated calls idempotent. Adding deltas
-            // to the existing translations can drift when layout callbacks fire again.
-            host.topRail.post {
-                if (host.topRail.height <= 0) return@post
-                host.topRail.translationY = translation.top
-            }
-            host.bottomRail.post {
-                if (host.bottomRail.height <= 0) return@post
-                host.bottomRail.translationY = translation.bottom
-            }
+            host.topRail.translationY = translation.top
+            host.bottomRail.translationY = translation.bottom
         }
     }
 
