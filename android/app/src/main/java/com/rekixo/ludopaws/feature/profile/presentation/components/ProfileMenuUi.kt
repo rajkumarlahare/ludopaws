@@ -23,12 +23,15 @@ import com.rekixo.ludopaws.core.ui.art.recessedPlywoodBackground
 import com.rekixo.ludopaws.core.ui.art.transparentDarkBlueStrokeBackground
 import com.rekixo.ludopaws.core.ui.components.AppFocusRing
 import com.rekixo.ludopaws.feature.profile.presentation.ProfileActivity
+import com.rekixo.ludopaws.feature.safety.AgeSafetyPolicy
 import com.rekixo.ludopaws.ui.dialogs.showPrivacyPolicyDialog
 
 /** Plywood dropdown for account actions and legal pages on the Profile screen. */
 internal fun ProfileActivity.showProfileMenu(anchor: View) {
+    val onlineFeaturesAllowed = AgeSafetyPolicy.canUseOnlineFeatures(this)
     val guestCodeAvailable =
-        !accountGoogleLinked &&
+        onlineFeaturesAllowed &&
+            !accountGoogleLinked &&
             accountRepository.currentSession()?.guestRecoveryEligible == true
 
     lateinit var popup: PopupWindow
@@ -191,10 +194,12 @@ internal fun ProfileActivity.showProfileMenu(anchor: View) {
     }
 
     addSection("ACCOUNT & DATA")
-    addItem(
-        "Save / Restore Account",
-        if (accountGoogleLinked) "Manage or restore your Google-linked account" else "Link this Guest account or restore a saved account",
-    ) { openAccountActions() }
+    if (onlineFeaturesAllowed) {
+        addItem(
+            "Save / Restore Account",
+            if (accountGoogleLinked) "Manage or restore your Google-linked account" else "Link this Guest account or restore a saved account",
+        ) { openAccountActions() }
+    }
     addItem(
         "Delete account and data",
         "Permanently delete this Ludo Paws account",

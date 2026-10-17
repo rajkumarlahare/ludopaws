@@ -78,27 +78,53 @@ class ProfileActivity : Activity() {
     private var accountSwitchFromId: String? = null
     private var friendPresencePausedForAccountSwitch = false
     private var accountIdentityRecoveryPending = false
+    private var profileReady = false
+    private var ageSelectionPending = false
     internal val isAccountSignInConfigured: Boolean
         get() = BuildConfig.GOOGLE_SIGN_IN_WEB_CLIENT_ID.isNotBlank()
 
     override fun onCreate(
         savedInstanceState: Bundle?,
     ) {
-        super.onCreate(
-            savedInstanceState,
-        )
-        if (!AgeSafetyUi.requireAdultOnlineAccess(this)) return
-        LudoProofTheme
-            .configureWindow(
-                this,
-            )
+        super.onCreate(savedInstanceState)
+        LudoProofTheme.configureWindow(this)
         playGamesStatus = getString(R.string.profile_play_games_sign_in_prompt)
+
+        if (!AgeSafetyPolicy.hasSelectedAgeRange(this)) {
+            ageSelectionPending = true
+            AgeSafetyUi.showAgeRangeIfNeeded(this) {
+                ageSelectionPending = false
+                (application as? LudoProofApplication)?.onAgeRangeSelected()
+                initializeProfileScreen()
+                refreshProfileServicesForAge()
+            }
+            return
+        }
+        initializeProfileScreen()
+    }
+
+    private fun initializeProfileScreen() {
+        profileReady = true
         renderProfile()
     }
 
     override fun onResume() {
         super.onResume()
-        if (!AgeSafetyPolicy.canUseOnlineFeatures(this)) { finish(); return }
+        if (!profileReady || ageSelectionPending) return
+        refreshProfileServicesForAge()
+    }
+
+    private fun refreshProfileServicesForAge() {
+        if (!AgeSafetyPolicy.canUseOnlineFeatures(this)) {
+            playGamesAuthenticated = false
+            playGamesSignInInProgress = false
+            playGamesDisplayName = null
+            playGamesStatus = "Google Play Games sign-in is unavailable in this age mode."
+            accountGoogleLinked = false
+            accountStatus = "Online account features are unavailable in this age mode."
+            renderProfile()
+            return
+        }
         refreshPlayGamesSignIn()
         refreshAccountStatus()
     }
@@ -248,6 +274,10 @@ class ProfileActivity : Activity() {
     }
 
     internal fun openAccountActions() {
+        if (!AgeSafetyPolicy.canUseOnlineFeatures(this)) {
+            AgeSafetyUi.showFamilySafetyInfo(this)
+            return
+        }
         if (accountAuthInProgress) return
         AlertDialog.Builder(this)
             .setTitle("Ludo Paws Account")
@@ -270,6 +300,10 @@ class ProfileActivity : Activity() {
     }
 
     internal fun showGuestDeletionCode(rotateExisting: Boolean = false) {
+        if (!AgeSafetyPolicy.canUseOnlineFeatures(this)) {
+            AgeSafetyUi.showFamilySafetyInfo(this)
+            return
+        }
         if (accountAuthInProgress) return
         accountAuthInProgress = true
         accountStatus = "Preparing guest deletion code…"
@@ -394,6 +428,10 @@ class ProfileActivity : Activity() {
     }
 
     private fun confirmAccountRestore() {
+        if (!AgeSafetyPolicy.canUseOnlineFeatures(this)) {
+            AgeSafetyUi.showFamilySafetyInfo(this)
+            return
+        }
         AlertDialog.Builder(this)
             .setTitle("Restore another account?")
             .setMessage(
@@ -407,7 +445,7 @@ class ProfileActivity : Activity() {
     }
 
     private fun refreshAccountStatus() {
-        if (accountAuthInProgress) return
+        if (!AgeSafetyPolicy.canUseOnlineFeatures(this) || accountAuthInProgress) return
         accountAuthExecutor.execute {
             try {
                 val session = accountRepository.ensureGuestSession()
@@ -435,6 +473,10 @@ class ProfileActivity : Activity() {
     }
 
     private fun startGoogleAccountFlow(linkCurrentAccount: Boolean) {
+        if (!AgeSafetyPolicy.canUseOnlineFeatures(this)) {
+            AgeSafetyUi.showFamilySafetyInfo(this)
+            return
+        }
         if (accountAuthInProgress) return
         if (!isAccountSignInConfigured) {
             AlertDialog.Builder(this)
@@ -649,6 +691,10 @@ class ProfileActivity : Activity() {
     }
 
     internal fun beginPlayGamesSignIn() {
+        if (!AgeSafetyPolicy.canUseOnlineFeatures(this)) {
+            AgeSafetyUi.showFamilySafetyInfo(this)
+            return
+        }
         if (!isPlayGamesConfigured) {
             playGamesStatus = getString(R.string.profile_play_games_setup_button_message)
             AlertDialog.Builder(this)
@@ -715,6 +761,7 @@ class ProfileActivity : Activity() {
     }
 
     private fun refreshPlayGamesSignIn() {
+        if (!AgeSafetyPolicy.canUseOnlineFeatures(this)) return
         if (!isPlayGamesConfigured) {
             playGamesAuthenticated = false
             playGamesDisplayName = null

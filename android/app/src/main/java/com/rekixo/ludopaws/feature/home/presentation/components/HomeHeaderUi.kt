@@ -17,6 +17,8 @@ import com.rekixo.ludopaws.feature.leaderboard.presentation.LeaderboardActivity
 import com.rekixo.ludopaws.feature.profile.data.local.ProfileStore
 import com.rekixo.ludopaws.feature.profile.presentation.ProfileActivity
 import com.rekixo.ludopaws.feature.profile.presentation.BadgesActivity
+import com.rekixo.ludopaws.feature.safety.AgeSafetyPolicy
+import com.rekixo.ludopaws.feature.safety.AgeSafetyUi
 import com.rekixo.ludopaws.feature.store.data.local.GemWalletStore
 import com.rekixo.ludopaws.feature.store.domain.StoreCatalog
 import com.rekixo.ludopaws.feature.store.presentation.StoreActivity
@@ -135,12 +137,7 @@ private fun HomeActivity.homeCurrencyPill(): LinearLayout =
             0,
         )
         setOnClickListener {
-            startActivity(
-                Intent(
-                    this@homeCurrencyPill,
-                    StoreActivity::class.java,
-                ),
-            )
+            openStoreOrShowFamilySafety(Intent(this@homeCurrencyPill, StoreActivity::class.java))
         }
 
         addView(
@@ -194,12 +191,7 @@ private fun HomeActivity.homeCurrencyPill(): LinearLayout =
                         cornerRadiusDp = if (isCompact()) 13f else 15f,
                     )
                 setOnClickListener {
-                    startActivity(
-                        Intent(
-                            this@homeCurrencyPill,
-                            StoreActivity::class.java,
-                        ),
-                    )
+                    openStoreOrShowFamilySafety(Intent(this@homeCurrencyPill, StoreActivity::class.java))
                 }
             },
             LinearLayout.LayoutParams(
@@ -373,20 +365,14 @@ private fun HomeActivity.homeShortcut(
             setOnClickListener {
                 when (item.iconKind) {
                     HomeIconKind.SHOP ->
-                        startActivity(
-                            Intent(
-                                this@homeShortcut,
-                                StoreActivity::class.java,
-                            ),
-                        )
+                        openStoreOrShowFamilySafety(Intent(this@homeShortcut, StoreActivity::class.java))
 
                     HomeIconKind.LEADERBOARD ->
-                        startActivity(
-                            Intent(
-                                this@homeShortcut,
-                                LeaderboardActivity::class.java,
-                            ),
-                        )
+                        if (AgeSafetyPolicy.canUseOnlineFeatures(this@homeShortcut)) {
+                            startActivity(Intent(this@homeShortcut, LeaderboardActivity::class.java))
+                        } else {
+                            AgeSafetyUi.showFamilySafetyInfo(this@homeShortcut)
+                        }
 
                     HomeIconKind.BADGE ->
                         startActivity(
@@ -397,11 +383,8 @@ private fun HomeActivity.homeShortcut(
                         )
 
                     HomeIconKind.AD_BLOCKER ->
-                        startActivity(
-                            Intent(
-                                this@homeShortcut,
-                                StoreActivity::class.java,
-                            ).putExtra(
+                        openStoreOrShowFamilySafety(
+                            Intent(this@homeShortcut, StoreActivity::class.java).putExtra(
                                 StoreActivity.EXTRA_PURCHASE_PRODUCT_ID,
                                 StoreCatalog.REMOVE_ADS,
                             ),
@@ -484,3 +467,11 @@ private data class HeaderShortcut(
     val iconKind: HomeIconKind,
     val enabled: Boolean = false,
 )
+
+private fun HomeActivity.openStoreOrShowFamilySafety(intent: Intent) {
+    if (!AgeSafetyPolicy.canUseOnlineFeatures(this)) {
+        AgeSafetyUi.showFamilySafetyInfo(this)
+        return
+    }
+    startActivity(intent)
+}

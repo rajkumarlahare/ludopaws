@@ -23,6 +23,8 @@ import com.rekixo.ludopaws.core.ui.components.appIconActionButton
 import com.rekixo.ludopaws.core.ui.icons.AppIconName
 import com.rekixo.ludopaws.feature.characters.data.local.CharacterSelectionStore
 import com.rekixo.ludopaws.feature.profile.domain.ProfileProgression
+import com.rekixo.ludopaws.feature.safety.AgeSafetyPolicy
+import com.rekixo.ludopaws.feature.safety.AgeSafetyUi
 import com.rekixo.ludopaws.feature.characters.domain.catalog.LudoPawsCharacterCatalog
 import com.rekixo.ludopaws.feature.profile.domain.model.ProfileSnapshot
 import com.rekixo.ludopaws.feature.profile.presentation.ProfileActivity
@@ -141,10 +143,14 @@ internal fun ProfileActivity.profileIdentityPanel(profile: ProfileSnapshot): Lin
                 isClickable = true
                 isFocusable = true
                 setOnClickListener {
-                    startActivity(
-                        Intent(this@profileIdentityPanel, StoreActivity::class.java)
-                            .putExtra(StoreActivity.EXTRA_INITIAL_TAB, StoreTab.PAWS.name),
-                    )
+                    if (!AgeSafetyPolicy.canUseOnlineFeatures(this@profileIdentityPanel)) {
+                        AgeSafetyUi.showFamilySafetyInfo(this@profileIdentityPanel)
+                    } else {
+                        startActivity(
+                            Intent(this@profileIdentityPanel, StoreActivity::class.java)
+                                .putExtra(StoreActivity.EXTRA_INITIAL_TAB, StoreTab.PAWS.name),
+                        )
+                    }
                 }
 
                 // Keep the label first, with the pen immediately to its right.
@@ -241,7 +247,20 @@ internal fun ProfileActivity.profileIdentityPanel(profile: ProfileSnapshot): Lin
                 dp(38),
             ),
         )
-        details.addView(signInRow)
+        if (AgeSafetyPolicy.canUseOnlineFeatures(this@profileIdentityPanel)) {
+            details.addView(signInRow)
+        } else {
+            details.addView(
+                TextView(this@profileIdentityPanel).apply {
+                    text = "OFFLINE PROFILE"
+                    textSize = 10.5f
+                    setTypeface(Typeface.DEFAULT_BOLD)
+                    setTextColor(0xFFFFD34E.toInt())
+                    gravity = Gravity.END or Gravity.CENTER_VERTICAL
+                    contentDescription = "Online profile features are unavailable in this age mode"
+                },
+            )
+        }
 
         val profileScreenWidthDp = resources.displayMetrics.widthPixels / resources.displayMetrics.density
         val pageHorizontalPaddingDp =
