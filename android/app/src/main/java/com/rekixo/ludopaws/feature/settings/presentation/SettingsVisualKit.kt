@@ -108,10 +108,10 @@ private fun settingsHeader(
                 settingsDp(context, 40),
                 Gravity.END or Gravity.TOP,
             ).apply {
-                // settingsCompactPanel has 8dp inset; offset the 40dp touch
-                // target so the red mark's center lands on the rounded rim.
-                rightMargin = -settingsDp(context, 20)
-                topMargin = -settingsDp(context, 20)
+                // Keep the entire 40dp target inside the dialog like Leave Match;
+                // negative margins put the cross outside the plywood panel.
+                rightMargin = 0
+                topMargin = 0
             },
         )
     }

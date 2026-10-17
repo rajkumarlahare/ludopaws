@@ -37,10 +37,25 @@ class CosmeticInventoryStore(
         return prefs.getString(StorePreferences.KEY_WALLET_ACCOUNT_ID, null) == accountId
     }
 
+    /**
+     * Returns the owned inventory for the current account in one read.
+     * Settings uses this to populate Boards and Dice without reloading account
+     * credentials and the owned set once per catalog item.
+     */
+    fun ownedCosmeticIds(): Set<String> =
+        if (!hasCurrentAccountSnapshot()) {
+            emptySet()
+        } else {
+            prefs.getStringSet(
+                StorePreferences.KEY_OWNED_COSMETICS,
+                emptySet(),
+            )?.toSet() ?: emptySet()
+        }
+
     fun isOwned(
         cosmeticId: String,
     ): Boolean =
-        hasCurrentAccountSnapshot() && cosmeticId in ownedIds()
+        cosmeticId in ownedCosmeticIds()
 
     fun selectedId(
         category: CosmeticCategory,
