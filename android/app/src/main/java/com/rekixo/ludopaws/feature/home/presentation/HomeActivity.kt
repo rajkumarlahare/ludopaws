@@ -237,6 +237,7 @@ class HomeActivity : Activity() {
 
     private fun continueHomeAfterAgeSelection() {
         (application as? LudoProofApplication)?.onAgeRangeSelected()
+        startAgeGatedHomeServices()
 
         recordAbandonedRemoteLossIfNeeded()
 
@@ -294,6 +295,15 @@ class HomeActivity : Activity() {
 
     override fun onStart() {
         super.onStart()
+        if (!AgeSafetyPolicy.hasSelectedAgeRange(this)) return
+        startAgeGatedHomeServices()
+    }
+
+    /**
+     * Network-backed background work remains dormant until the local age screen is complete.
+     */
+    private fun startAgeGatedHomeServices() {
+        if (!AgeSafetyPolicy.hasSelectedAgeRange(this)) return
         retryPendingRemoteForfeits(this)
         connectivityMonitor.start()
     }
