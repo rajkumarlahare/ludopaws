@@ -111,10 +111,10 @@ object OfflineFairnessChain {
     private fun digest(
         material: OfflineFairnessMaterial,
     ): String =
-        EntroNexV4Local
+        NativeDiceEngine
             .sha256Hex(
                 DOMAIN +
-                    EntroNexV4Local
+                    NativeDiceEngine
                         .jcs(
                             mapOf(
                                 "protocol" to
