@@ -23,7 +23,7 @@ function rateGate(counter) {
   };
 }
 
-test("POST /api/matches/:id/roll bundles commit and reveal into one rate-limited request", async () => {
+test("POST /api/matches/:id/roll resolves through one fast-dice room request", async () => {
   const observed = [];
   const limiter = { calls: 0 };
   const env = {
@@ -39,11 +39,13 @@ test("POST /api/matches/:id/roll bundles commit and reveal into one rate-limited
             const url = new URL(request.url);
             const body = request.method === "POST" ? await request.json() : null;
             observed.push({ path: url.pathname, authorization: request.headers.get("authorization"), body });
-            if (url.pathname === "/roll/commit") {
-              return Response.json({ ok: true, round: { roundId: "test-round" } }, { status: 201 });
-            }
-            if (url.pathname === "/roll/reveal") {
-              return Response.json({ ok: true, outcome: 4, state: { pendingRoll: { status: "RESOLVED" } } });
+            if (url.pathname === "/roll/fast") {
+              return Response.json({
+                ok: true,
+                outcome: 4,
+                proof: { protocol: "ludopaws-server-csprng-v1" },
+                state: { pendingRoll: { status: "RESOLVED" } },
+              });
             }
             return Response.json({ error: "unexpected path" }, { status: 404 });
           },
@@ -72,9 +74,8 @@ test("POST /api/matches/:id/roll bundles commit and reveal into one rate-limited
   assert.equal(response.status, 200);
   assert.equal((await response.json()).outcome, 4);
   assert.equal(limiter.calls, 1);
-  assert.deepEqual(observed.map((entry) => entry.path), ["/roll/commit", "/roll/reveal"]);
-  assert.deepEqual(observed[0].body, { clientCommitment });
-  assert.deepEqual(observed[1].body, { clientSeed });
+  assert.deepEqual(observed.map((entry) => entry.path), ["/roll/fast"]);
+  assert.deepEqual(observed[0].body, { clientSeed, clientCommitment });
   assert.ok(observed.every((entry) => entry.authorization === "Bearer test-player-token"));
 });
 
