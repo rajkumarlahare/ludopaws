@@ -457,7 +457,7 @@ internal object OnlineLudoPawsPresentation {
                 val railLocation = IntArray(2)
                 host.topRail.getLocationOnScreen(railLocation)
                 val targetBottom = boardLocation[1] - gap
-                host.topRail.translationY =
+                host.topRail.translationY +=
                     (targetBottom - (railLocation[1] + host.topRail.height)).toFloat()
             }
             host.bottomRail.post {
@@ -465,7 +465,7 @@ internal object OnlineLudoPawsPresentation {
                 val railLocation = IntArray(2)
                 host.bottomRail.getLocationOnScreen(railLocation)
                 val targetTop = boardLocation[1] + board.height + gap
-                host.bottomRail.translationY = (targetTop - railLocation[1]).toFloat()
+                host.bottomRail.translationY += (targetTop - railLocation[1]).toFloat()
             }
         }
     }
