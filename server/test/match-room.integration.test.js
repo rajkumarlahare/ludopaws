@@ -2248,7 +2248,7 @@ test("Quick Chat rejects messages without a server-authenticated player tag", as
 
 
 test(
-  "server bot takes a real verified turn through commit, reveal, and legal move handlers",
+  "server bot takes a fast CSPRNG turn and applies a legal move",
   { concurrency: false },
   async (t) => {
     const ctx = makeContext();
@@ -2297,10 +2297,6 @@ test(
     scheduled.botTurn.inProgress = false;
     await ctx.storage.put("match-state", scheduled);
 
-    const mock = installEntroNexMock(t, {
-      outcomes: [6],
-      clientSeeds: [scheduled.botTurn.clientSeed],
-    });
     await room.alarm();
 
     const rollShown = await ctx.storage.get("match-state");
@@ -2309,8 +2305,7 @@ test(
     assert.ok(rollShown.players[1].tokens.every((position) => position === -1));
     assert.equal(rollShown.botTurn?.inProgress, false);
     assert.ok(rollShown.botTurn?.runAt > Date.now());
-    assert.equal(mock.createCalls(), 1);
-    assert.equal(mock.resolveCalls(), 1);
+    assert.equal(rollShown.history.at(-1)?.randomnessSource, "ludopaws-server-csprng-v1");
 
     // Simulate the result-hold window elapsing before the bot selects its paw.
     rollShown.botTurn.runAt = Date.now() - 1;
@@ -2325,8 +2320,7 @@ test(
     assert.ok(after.history.some(
       (event) => event.playerId === after.players[1].playerId && event.moveTokenIndex != null,
     ));
-    assert.equal(mock.createCalls(), 1);
-    assert.equal(mock.resolveCalls(), 1);
+    assert.ok(after.history.some((event) => event.randomnessSource === "ludopaws-server-csprng-v1"));
     assert.equal(after.botTurn?.eventIndex, 1);
     assert.equal(after.botTurn?.inProgress, false);
   },
