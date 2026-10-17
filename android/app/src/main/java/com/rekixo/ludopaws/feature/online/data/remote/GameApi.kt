@@ -4,8 +4,12 @@ import com.rekixo.ludopaws.feature.characters.data.local.LudoPawsCharacterRuntim
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
-import java.net.HttpURLConnection
-import java.net.URL
+import okhttp3.ConnectionPool
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.MediaType.Companion.toMediaType
+import java.util.concurrent.TimeUnit
 
 class GameApi(
     baseUrl: String = BuildConfig.LUDOPROOF_API_BASE_URL,
@@ -255,6 +259,21 @@ class GameApi(
             body = JSONObject(),
         )
 
+    fun roll(
+        matchId: String,
+        playerToken: String,
+        clientSeed: String,
+        clientCommitment: String,
+    ): JSONObject =
+        request(
+            method = "POST",
+            path = "/api/matches/${matchId.uppercase()}/roll",
+            playerToken = playerToken,
+            body = JSONObject()
+                .put("clientSeed", clientSeed)
+                .put("clientCommitment", clientCommitment),
+        )
+
     fun commitRoll(matchId: String, playerToken: String, clientCommitment: String): JSONObject =
         request(
             method = "POST",
@@ -299,36 +318,43 @@ class GameApi(
         require(baseUrl.startsWith("https://")) {
             "LudoProof API must use HTTPS"
         }
-        val connection = URL(baseUrl + path).openConnection() as HttpURLConnection
-        try {
-            connection.requestMethod = method
-            connection.connectTimeout = 10_000
-            connection.readTimeout = 25_000
-            connection.instanceFollowRedirects = false
-            connection.setRequestProperty("Accept", "application/json")
-            connection.setRequestProperty(
+        val requestBuilder = Request.Builder()
+            .url(baseUrl + path)
+            .header("Accept", "application/json")
+            .header(
                 "User-Agent",
                 "LudoProof-Android/" + BuildConfig.VERSION_NAME,
             )
-            val bearerToken = playerToken ?: friendToken ?: profileToken
-            if (bearerToken != null) {
-                connection.setRequestProperty("Authorization", "Bearer $bearerToken")
-            }
-            if (roomPlayerToken != null) {
-                connection.setRequestProperty("X-LudoProof-Room-Token", roomPlayerToken)
-            }
-            if (friendJoinToken != null) {
-                connection.setRequestProperty("X-LudoProof-Friend-Join-Token", friendJoinToken)
-            }
-            if (body != null) {
-                val bytes = body.toString().toByteArray(Charsets.UTF_8)
-                connection.doOutput = true
-                connection.setRequestProperty("Content-Type", "application/json")
-                connection.outputStream.use { it.write(bytes) }
-            }
-            val status = connection.responseCode
-            val stream = if (status in 200..299) connection.inputStream else connection.errorStream
-            val text = stream?.use { readUtf8Limited(it, MAX_RESPONSE_BYTES) }.orEmpty()
+
+        val bearerToken = playerToken ?: friendToken ?: profileToken
+        if (bearerToken != null) {
+            requestBuilder.header("Authorization", "Bearer $bearerToken")
+        }
+        if (roomPlayerToken != null) {
+            requestBuilder.header("X-LudoProof-Room-Token", roomPlayerToken)
+        }
+        if (friendJoinToken != null) {
+            requestBuilder.header("X-LudoProof-Friend-Join-Token", friendJoinToken)
+        }
+
+        val requestBody = when {
+            body != null -> body.toString().toByteArray(Charsets.UTF_8)
+                .toRequestBody(JSON_MEDIA_TYPE)
+            method != "GET" && method != "HEAD" ->
+                ByteArray(0).toRequestBody(JSON_MEDIA_TYPE)
+            else -> null
+        }
+        if (body != null || requestBody != null) {
+            requestBuilder.header("Content-Type", "application/json")
+        }
+
+        val request = requestBuilder.method(method, requestBody).build()
+        SHARED_HTTP_CLIENT.newCall(request).execute().use { response ->
+            val status = response.code
+            val text = response.body
+                ?.byteStream()
+                ?.use { readUtf8Limited(it, MAX_RESPONSE_BYTES) }
+                .orEmpty()
             val json = if (text.isBlank()) JSONObject() else JSONObject(text)
             if (status !in 200..299) {
                 throw GameApiException(
@@ -337,8 +363,6 @@ class GameApi(
                 )
             }
             return json
-        } finally {
-            connection.disconnect()
         }
     }
 
@@ -363,6 +387,18 @@ class GameApi(
 
     private companion object {
         const val MAX_RESPONSE_BYTES = 512 * 1024
+        private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
+        private val SHARED_HTTP_CLIENT: OkHttpClient by lazy {
+            OkHttpClient.Builder()
+                .connectionPool(ConnectionPool(8, 5, TimeUnit.MINUTES))
+                .connectTimeout(10, TimeUnit.SECONDS)
+                .readTimeout(25, TimeUnit.SECONDS)
+                .callTimeout(30, TimeUnit.SECONDS)
+                .retryOnConnectionFailure(true)
+                .followRedirects(false)
+                .followSslRedirects(false)
+                .build()
+        }
     }
 }
 
