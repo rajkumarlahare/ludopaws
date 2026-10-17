@@ -9,12 +9,14 @@ import {
 } from "./entronex-transport.js";
 import {
   ROLL_REVEAL_TIMEOUT_MS,
+  actingSeatForTurn,
   addPlayer,
   applyMove,
   attachHostAuth,
   attachRoundCommitment,
   authoritativeStateForRandomness,
   forfeitTimedOutRoll,
+  forfeitTimedOutTurn,
   newMatch,
   publicState,
   registerResolvedRoll,
@@ -49,8 +51,10 @@ import {
   LEGACY_TEAM_RULESET_KEY,
   RULESET_KEY,
   RULESET_V3_KEY,
+  RULESET_V4_KEY,
   TEAM_RULESET_KEY,
   TEAM_RULESET_V3_KEY,
+  TEAM_RULESET_V4_KEY,
   rulesetKeyForState,
 } from "./rulesets.js";
 
@@ -140,39 +144,41 @@ export class MatchRoom {
   }
 
   async alarm() {
-    let state =
-      await this.ctx.storage.get(STATE_KEY);
-    if (!state) return;
+    // Serialize timer expiry with gameplay mutations. Otherwise an alarm and a
+    // near-simultaneous roll/move can both advance the match from one turn.
+    return this.#mutate(async () => {
+      let state = await this.ctx.storage.get(STATE_KEY);
+      if (!state) return;
 
-    const now = Date.now();
-    const expired =
-      await this.#expirePendingIfNeeded(
-        state,
-        now,
-      );
-    state = expired.state;
+      const now = Date.now();
+      const expired = await this.#expirePendingIfNeeded(state, now);
+      state = expired.state;
 
-    if (expired.changed) {
-      await this.#persist(state);
-      return;
-    }
+      if (expired.changed) {
+        await this.#persist(state);
+        return;
+      }
 
-    const expiresAt =
-      Number(state.updatedAt ?? state.createdAt ?? 0) +
-      this.#idleTtl(state);
+      const turnExpired = this.#expireTurnIfNeeded(state, now);
+      if (turnExpired.changed) {
+        await this.#persist(turnExpired.state);
+        await this.#recordFinishedMatchIfNeeded(turnExpired.state);
+        return;
+      }
 
-    if (now < expiresAt) {
-      await this.#setAlarm(
-        this.#nextAlarmAt(state, expiresAt),
-      );
-      return;
-    }
+      const expiresAt =
+        Number(state.updatedAt ?? state.createdAt ?? 0) +
+        this.#idleTtl(state);
 
-    if (
-      typeof this.ctx.storage.deleteAll === "function"
-    ) {
-      await this.ctx.storage.deleteAll();
-    }
+      if (now < expiresAt) {
+        await this.#setAlarm(this.#nextAlarmAt(state, expiresAt));
+        return;
+      }
+
+      if (typeof this.ctx.storage.deleteAll === "function") {
+        await this.ctx.storage.deleteAll();
+      }
+    });
   }
 
   async #persist(state) {
@@ -245,11 +251,15 @@ export class MatchRoom {
   }
 
   #nextAlarmAt(state, idleExpiresAt) {
-    const deadline =
-      state.pendingRoll?.revealDeadlineAt;
-    return Number.isSafeInteger(deadline)
-      ? Math.min(idleExpiresAt, deadline)
-      : idleExpiresAt;
+    const deadlines = [idleExpiresAt];
+    const revealDeadline = state.pendingRoll?.revealDeadlineAt;
+    if (Number.isSafeInteger(revealDeadline)) deadlines.push(revealDeadline);
+    const turnDeadline =
+      state.status === "ACTIVE" && state.pendingRoll == null
+        ? state.turnDeadlineAt
+        : null;
+    if (Number.isSafeInteger(turnDeadline)) deadlines.push(turnDeadline);
+    return Math.min(...deadlines);
   }
 
   #idleTtl(state) {
@@ -302,8 +312,8 @@ export class MatchRoom {
     if (requestedRulesetKey != null) {
       const acceptedRulesets =
         matchMode === "TEAM_UP"
-          ? [LEGACY_TEAM_RULESET_KEY, TEAM_RULESET_KEY, TEAM_RULESET_V3_KEY]
-          : [LEGACY_RULESET_KEY, RULESET_KEY, RULESET_V3_KEY];
+          ? [LEGACY_TEAM_RULESET_KEY, TEAM_RULESET_KEY, TEAM_RULESET_V3_KEY, TEAM_RULESET_V4_KEY]
+          : [LEGACY_RULESET_KEY, RULESET_KEY, RULESET_V3_KEY, RULESET_V4_KEY];
       if (!acceptedRulesets.includes(requestedRulesetKey)) {
         throw httpError(
           400,
@@ -1220,6 +1230,14 @@ export class MatchRoom {
           state,
         ),
     });
+  }
+
+  /**
+   * Lifecycle uses the same idempotent terminal-result recording path when its
+   * deadline alarm performs the state transition before the base alarm runs.
+   */
+  async recordFinishedMatchForLifecycle(state) {
+    return this.#recordFinishedMatchIfNeeded(state);
   }
 
   async #recordFinishedMatchIfNeeded(
@@ -2173,7 +2191,54 @@ export class MatchRoom {
     if (expired.changed) {
       await this.#persist(state);
     }
+
+    // Apply the same deadline contract before a gameplay action is validated,
+    // not just when the scheduled alarm happens to win the race.
+    const turnExpired = this.#expireTurnIfNeeded(state, Date.now());
+    if (turnExpired.changed) {
+      state = turnExpired.state;
+      await this.#persist(state);
+      await this.#recordFinishedMatchIfNeeded(state);
+    }
     return state;
+  }
+
+  #expireTurnIfNeeded(state, now) {
+    if (state.status !== "ACTIVE" || state.pendingRoll != null) {
+      return { state, changed: false };
+    }
+
+    const ruleset = rulesetForState(state);
+    const timeoutMs = ruleset.turnRollTimeoutMs;
+    if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) {
+      return { state, changed: false };
+    }
+
+    // Safely initialize V4 matches restored from an older persisted schema.
+    // Use actingSeatForTurn, because a Team Up turn can be handed to a partner.
+    if (!Number.isSafeInteger(state.turnDeadlineAt)) {
+      const next = structuredClone(state);
+      const actingSeat = actingSeatForTurn(next);
+      if (
+        !Number.isInteger(actingSeat) ||
+        actingSeat < 0 ||
+        actingSeat >= next.players.length
+      ) {
+        return { state, changed: false };
+      }
+      next.turnDeadlineSeat = actingSeat;
+      next.turnDeadlineAt = now + timeoutMs;
+      next.updatedAt = now;
+      next.revision = (Number.isSafeInteger(next.revision) ? next.revision : 0) + 1;
+      return { state: next, changed: true };
+    }
+
+    if (now < state.turnDeadlineAt) {
+      return { state, changed: false };
+    }
+
+    const result = forfeitTimedOutTurn(state, { now });
+    return { state: result.state, changed: true };
   }
 
   async #expirePendingIfNeeded(

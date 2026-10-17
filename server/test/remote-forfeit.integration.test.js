@@ -123,6 +123,8 @@ async function json(response) {
 
 async function createStartedMatch(
   playerCount,
+  matchMode = "ONLINE",
+  rulesetKey = null,
 ) {
   const {
     ctx,
@@ -142,10 +144,17 @@ async function createStartedMatch(
               "POST",
             body: {
               matchId,
-              displayName:
-                "Host",
-              clientRequestId:
-                crypto.randomUUID(),
+              displayName: "Host",
+              clientRequestId: crypto.randomUUID(),
+              ...(matchMode === "TEAM_UP"
+                ? {
+                    targetPlayerCount: playerCount,
+                    matchMode,
+                    rulesetKey: rulesetKey ?? "TEAM_UP_V4",
+                  }
+                : rulesetKey != null
+                  ? { rulesetKey }
+                  : {}),
             },
           },
         ),
@@ -323,6 +332,96 @@ test(
       replay.body.replayed,
       true,
     );
+  },
+);
+
+test(
+  "classic V4 exit advances the active seat and resets the deadline",
+  async () => {
+    const { ctx, room, players } = await createStartedMatch(4, "ONLINE", "CLASSIC_V4");
+    const before = await ctx.storage.get("match-state");
+    assert.equal(before.turnDeadlineSeat, 0);
+    const oldDeadline = before.turnDeadlineAt;
+
+    const result = await forfeit(room, players[0].playerToken);
+    assert.equal(result.response.status, 200, JSON.stringify(result.body));
+    assert.equal(result.body.state.status, "ACTIVE");
+    assert.equal(result.body.state.turnSeat, 1);
+    assert.ok(result.body.state.turnDeadlineAt > oldDeadline);
+
+    const stored = await ctx.storage.get("match-state");
+    assert.equal(stored.turnDeadlineSeat, 1);
+    assert.ok(stored.turnDeadlineAt > oldDeadline);
+  },
+);
+
+test(
+  "Team Up exit forfeits both teammates and awards the opposite team",
+  async () => {
+    const { room, players } = await createStartedMatch(4, "TEAM_UP");
+
+    const result = await forfeit(room, players[1].playerToken);
+    assert.equal(result.response.status, 200, JSON.stringify(result.body));
+    assert.equal(result.body.state.status, "FINISHED");
+    assert.equal(result.body.state.winnerTeamId, "A");
+    assert.equal(result.body.state.winnerPlayerId, null);
+    assert.equal(result.body.state.players[1].forfeited, true);
+    assert.equal(result.body.state.players[3].forfeited, true);
+    assert.equal(result.body.state.players[3].forfeitedAt, result.body.state.players[1].forfeitedAt);
+    assert.equal(result.body.state.players[0].forfeited, false);
+    assert.equal(result.body.state.players[2].forfeited, false);
+
+    const replay = await forfeit(room, players[3].playerToken);
+    assert.equal(replay.response.status, 200);
+    assert.equal(replay.body.replayed, true);
+    assert.equal(replay.body.state.winnerTeamId, "A");
+  },
+);
+
+test(
+  "Team Up exit closes a pending roll even when another seat owns it",
+  async () => {
+    const { ctx, room, players } = await createStartedMatch(4, "TEAM_UP");
+    const stored = await ctx.storage.get("match-state");
+    stored.randomEventIndex = 1;
+    stored.pendingRoll = {
+      status: "COMMITTED",
+      seat: 0,
+      scheduledSeat: 0,
+      playerId: players[0].playerId,
+      clientCommitment: "a".repeat(64),
+      serverCommitment: "b".repeat(64),
+      actorHash: "c".repeat(64),
+      previousStateHash: "d".repeat(64),
+      rulesetHash: "e".repeat(64),
+      proofDigest: null,
+      outcome: null,
+      legalTokenIndexes: null,
+      eventIndex: 0,
+      eventId: "roll:0",
+      roundId: "round-pending-team-exit",
+      revealDeadlineAt: Date.now() + 120_000,
+    };
+    await ctx.storage.put("match-state", stored);
+
+    const result = await forfeit(room, players[1].playerToken);
+    assert.equal(result.response.status, 200, JSON.stringify(result.body));
+    assert.equal(result.body.state.status, "FINISHED");
+    assert.equal(result.body.state.pendingRoll, null);
+    assert.equal(result.body.state.winnerTeamId, "A");
+    assert.equal(result.body.state.history.length, 1);
+    assert.equal(result.body.state.history[0].eventIndex, 0);
+    assert.equal(result.body.state.history[0].status, "FORFEITED");
+    assert.equal(result.body.state.randomEventIndex, 1);
+
+    const final = await ctx.storage.get("match-state");
+    assert.equal(final.pendingRoll, null);
+    assert.equal(final.history.length, 1);
+    assert.equal(final.randomEventIndex, 1);
+    assert.equal(Number.isSafeInteger(final.players[1].forfeitedAt), true);
+    assert.equal(Number.isSafeInteger(final.players[3].forfeitedAt), true);
+    assert.deepEqual(final.players[1].tokens, [-1, -1, -1, -1]);
+    assert.deepEqual(final.players[3].tokens, [-1, -1, -1, -1]);
   },
 );
 

@@ -185,6 +185,7 @@ class MainActivity : ComponentActivity() {
         "Voice is off"
 
     private var friendsVoiceSession: FriendsVoiceChatSession? = null
+    internal var remoteExitConfirmationDialog: android.app.Dialog? = null
     private var postWinInterstitialAd: PostWinInterstitialAdController? = null
     private var postWinInterstitialExitGate: PostWinInterstitialExitGate? = null
     private var postWinInterstitialShownForMatchId: String? = null
@@ -206,6 +207,10 @@ class MainActivity : ComponentActivity() {
     internal var onlineRollRequestInFlight = false
     internal var onlineMoveRequestInFlight = false
     internal var onlineMovePreviewStartedAtMillis: Long? = null
+    internal var scheduledAutoMoveEventKey: String? = null
+    internal var scheduledAutoMoveRunnable: Runnable? = null
+    internal var lastAutoMoveAttemptEventKey: String? = null
+    internal var autoMoveAttemptCount: Int = 0
 
     internal fun canSubmitOnlineGameplayAction(): Boolean =
         SystemClock.uptimeMillis() >= onlineGameplayActionBlockedUntilMillis &&
@@ -223,6 +228,7 @@ class MainActivity : ComponentActivity() {
         currentState?.let { state ->
             updateRollButton()
             OnlineLudoPawsPresentation.refreshActionControls(this, state)
+            scheduleOnlineAutoMove(state)
         }
     }
 
@@ -667,7 +673,7 @@ class MainActivity : ComponentActivity() {
         content.addView(
             matchStatusPanel,
             onlineSectionParams(
-                if (isCompactOnline()) 12 else 16,
+                if (isCompactOnline()) 4 else 6,
             ).apply {
                 leftMargin =
                     sectionSideMargin
@@ -723,7 +729,7 @@ class MainActivity : ComponentActivity() {
         content.addView(
             boardFrame,
             onlineSectionParams(
-                if (isCompactOnline()) 12 else 14,
+                if (isCompactOnline()) 4 else 6,
             ).apply {
                 leftMargin = dp(1)
                 rightMargin = dp(1)
@@ -739,7 +745,7 @@ class MainActivity : ComponentActivity() {
         content.addView(
             actionPanel,
             onlineSectionParams(
-                if (isCompactOnline()) 12 else 14,
+                if (isCompactOnline()) 2 else 4,
             ),
         )
 
@@ -881,6 +887,7 @@ class MainActivity : ComponentActivity() {
         screenStarted = true
         connectivityMonitor.start()
         scheduleOnlineGameplayUnlock()
+        currentState?.let(::scheduleOnlineAutoMove)
         mainHandler.removeCallbacks(
             statePollRunnable,
         )
@@ -906,6 +913,7 @@ class MainActivity : ComponentActivity() {
     override fun onStop() {
         stopFriendsVoice("Voice paused when you left the match.")
         screenStarted = false
+        cancelScheduledOnlineAutoMove()
         mainHandler.removeCallbacks(onlineGameplayUnlockRunnable)
         uiStateHolder.update {
             it.copy(
@@ -936,6 +944,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         stopFriendsVoice("Voice is off")
+        cancelScheduledOnlineAutoMove()
+        remoteExitConfirmationDialog?.dismiss()
+        remoteExitConfirmationDialog = null
         postWinInterstitialExitGate?.close()
         postWinInterstitialExitGate = null
         postWinInterstitialAd?.close()

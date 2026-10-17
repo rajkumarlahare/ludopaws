@@ -98,19 +98,23 @@ export class MatchRoom extends SafeMatchRoom {
     const now = Date.now();
     const next = structuredClone(state);
     const actor = next.players[seat];
-    actor.forfeitedAt = now;
-    actor.forfeitReason = "PLAYER_EXIT";
-    actor.tokens = [-1, -1, -1, -1];
-    if (Array.isArray(next.consecutiveSixes)) {
-      next.consecutiveSixes[seat] = 0;
-    }
+    const losingTeam = teamIdForSeat(next, seat);
+    next.players.forEach((teammate, teammateSeat) => {
+      if (teamIdForSeat(next, teammateSeat) !== losingTeam) return;
+      teammate.forfeitedAt = now;
+      teammate.forfeitReason =
+        teammateSeat === seat ? "PLAYER_EXIT" : "TEAMMATE_EXIT";
+      teammate.tokens = [-1, -1, -1, -1];
+      if (Array.isArray(next.consecutiveSixes)) {
+        next.consecutiveSixes[teammateSeat] = 0;
+      }
+    });
 
     // A terminal match must never expose a pending roll. If the team forfeit
     // interrupts an unresolved cryptographic round, close that event in the
     // fairness chain so the receipt event count stays complete and auditable.
     closePendingRollForTeamForfeit(next, now);
 
-    const losingTeam = teamIdForSeat(next, seat);
     const winnerTeamId = losingTeam === "A" ? "B" : "A";
     next.status = "FINISHED";
     next.winnerPlayerId = null;
@@ -120,6 +124,8 @@ export class MatchRoom extends SafeMatchRoom {
     next.revision = Number(next.revision ?? 0) + 1;
     // Individual leaderboard semantics cannot represent two co-winners safely.
     next.leaderboardRecordedAt = now;
+    next.turnDeadlineAt = null;
+    next.turnDeadlineSeat = null;
 
     await this.ctx.storage.put(STATE_KEY, next);
     if (typeof this.ctx.storage.setAlarm === "function") {

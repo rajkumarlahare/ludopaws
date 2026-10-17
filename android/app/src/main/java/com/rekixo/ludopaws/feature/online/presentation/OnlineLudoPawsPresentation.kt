@@ -8,6 +8,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.rekixo.ludopaws.LudoPawsPlayerCardView
+import com.rekixo.ludopaws.DiceTurnCountdownPolicy
 import com.rekixo.ludopaws.LudoPawsReactiveBoardView
 import com.rekixo.ludopaws.MainActivity
 import com.rekixo.ludopaws.GameMode
@@ -84,6 +85,22 @@ internal object OnlineLudoPawsPresentation {
             previous = previous,
             current = current,
             characterIdsBySeat = characterIdsBySeat,
+        )
+    }
+
+    /**
+     * Marks the input-time sound so the eventual authoritative snapshot cannot
+     * replay it on the same device.
+     */
+    fun noteLocalRollStarted(
+        activity: MainActivity,
+        matchId: String,
+        eventIndex: Int,
+    ) {
+        val host = host(activity) ?: return
+        host.feedbackLedger.once(
+            matchId = matchId,
+            key = "ROLL_START:${eventIndex}",
         )
     }
 
@@ -204,7 +221,7 @@ internal object OnlineLudoPawsPresentation {
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
             ).apply {
-                topMargin = dp(activity, 4)
+                topMargin = dp(activity, 2)
             },
         )
 
@@ -216,7 +233,7 @@ internal object OnlineLudoPawsPresentation {
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
             ).apply {
-                bottomMargin = dp(activity, 4)
+                bottomMargin = dp(activity, 2)
             },
         )
 
@@ -356,6 +373,7 @@ internal object OnlineLudoPawsPresentation {
                 control.isFocusable = enabled
                 activity.diceView.setAttentionEnabled(enabled)
             }
+            bindTurnCountdown(activity, state)
             return
         }
 
@@ -410,6 +428,28 @@ internal object OnlineLudoPawsPresentation {
             activePlayer = activePlayer,
             preferredBottomLeftColor = preferredBottomLeftColor,
             characterIdsBySeat = characterIdsBySeat,
+        )
+        bindTurnCountdown(activity, state)
+    }
+
+    private fun bindTurnCountdown(activity: MainActivity, state: MatchSnapshot) {
+        val versionSupportsTimer =
+            state.rulesetId == "ludoproof-standard-v4" ||
+                state.rulesetId == "ludoproof-team-v4"
+        val hasTrustedTimerContract =
+            state.serverTimeAtSnapshot != null &&
+                state.turnRollTimeoutMillis?.let { it > 0L } == true
+        val deadline = state.turnDeadlineAt.takeIf {
+            versionSupportsTimer &&
+                hasTrustedTimerContract &&
+                state.status == "ACTIVE" &&
+                state.pendingRoll == null
+        }
+        activity.diceView.setTurnDeadlineAt(
+            deadlineEpochMillis = deadline,
+            serverNowEpochMillis = state.serverTimeAtSnapshot,
+            timeoutDurationMillis = state.turnRollTimeoutMillis
+                ?: DiceTurnCountdownPolicy.TURN_DURATION_MILLIS,
         )
     }
 
@@ -644,18 +684,72 @@ internal object OnlineLudoPawsPresentation {
 
         val pending = current.pendingRoll
         val previousPending = previous.pendingRoll
-        if (
+        val newRollEvent =
             pending != null &&
-            (
-                previousPending == null ||
-                    previousPending.eventIndex != pending.eventIndex
-                ) &&
+                previousPending?.eventIndex != pending.eventIndex
+
+        // All clients derive the same take from the authoritative event index.
+        // The local device marks its input-time sound to avoid playing it twice.
+        if (
+            newRollEvent &&
             host.feedbackLedger.once(
                 matchId = current.matchId,
-                key = "ROLL:${pending.eventIndex}",
+                key = "ROLL_START:${pending!!.eventIndex}",
             )
         ) {
-            GameSoundFeedback.diceSettle(activity)
+            GameSoundFeedback.roll(activity, pending!!.eventIndex)
+        }
+
+        val newlyResolvedPending =
+            pending != null &&
+                pending.status == "RESOLVED" &&
+                (
+                    previousPending?.eventIndex != pending.eventIndex ||
+                        previousPending?.status != "RESOLVED"
+                )
+        if (
+            newlyResolvedPending &&
+            host.feedbackLedger.once(
+                matchId = current.matchId,
+                key = "ROLL_SETTLE:${pending!!.eventIndex}",
+            )
+        ) {
+            val eventIndex = pending!!.eventIndex
+            activity.mainHandler.postDelayed(
+                {
+                    if (activity.canRenderUi()) GameSoundFeedback.diceSettle(activity, eventIndex)
+                },
+                if (newRollEvent) 320L else 0L,
+            )
+        } else if (
+            pending == null &&
+            current.history.lastOrNull()?.let { latest ->
+                latest.eventIndex != previous.history.lastOrNull()?.eventIndex &&
+                    latest.moveTokenIndex == null &&
+                    latest.status != "TIMED_OUT" &&
+                    ((latest.effectiveOutcome ?: latest.outcome)?.let { it in 1..6 } == true) &&
+                    !latest.proofDigest.isNullOrBlank()
+            } == true
+        ) {
+            // No legal destination can clear the pending roll immediately; this
+            // history-only path still delivers the shared roll/settle pair.
+            val latest = requireNotNull(current.history.lastOrNull())
+            if (
+                host.feedbackLedger.once(
+                    matchId = current.matchId,
+                    key = "ROLL_START:${latest.eventIndex}",
+                )
+            ) {
+                GameSoundFeedback.roll(activity, latest.eventIndex)
+            }
+            if (
+                host.feedbackLedger.once(
+                    matchId = current.matchId,
+                    key = "ROLL_SETTLE:${latest.eventIndex}",
+                )
+            ) {
+                GameSoundFeedback.diceSettle(activity, latest.eventIndex)
+            }
         }
 
         val reactions =

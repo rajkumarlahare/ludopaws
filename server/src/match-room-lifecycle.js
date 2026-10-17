@@ -3,8 +3,10 @@ import {
 } from "./match-room-social.js";
 import {
   actingSeatForTurn,
+  forfeitTimedOutTurn,
   isTeamUp,
-} from "./game-v1-core.js";
+  rulesetForState,
+} from "./game.js";
 
 const STATE_KEY = "match-state";
 const ACTIVE_IDLE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -70,71 +72,52 @@ export class MatchRoom extends SocialMatchRoom {
       return false;
     }
 
-    const turnStartedAt = Number(state.updatedAt ?? state.createdAt ?? 0);
-    const deadline = turnStartedAt + TURN_ROLL_TIMEOUT_MS;
+    // Inactivity handling is opt-in per ruleset. Existing matches retain their
+    // original turn contract; V4 uses the deadline persisted by the game core.
+    const timeoutMs = rulesetForState(state).turnRollTimeoutMs;
+    if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) {
+      return false;
+    }
+
     const now = Date.now();
-    if (!Number.isSafeInteger(turnStartedAt) || now < deadline) return false;
-
-    const seat = isTeamUp(state) ? actingSeatForTurn(state) : state.turnSeat;
-    const player = state.players?.[seat];
-    if (!player) return false;
-    if (Number.isSafeInteger(player.forfeitedAt)) {
-      const next = structuredClone(state);
-      next.turnSeat = nextActiveSeat(next, state.turnSeat);
-      next.updatedAt = now;
-      next.revision = Number(next.revision ?? 0) + 1;
-      await this.ctx.storage.put(STATE_KEY, next);
-      broadcastStateChanged(this.ctx, next);
-      return true;
+    const actingSeat = actingSeatForTurn(state);
+    if (
+      !Number.isInteger(actingSeat) ||
+      actingSeat < 0 ||
+      actingSeat >= state.players.length
+    ) {
+      return false;
     }
 
-    const next = structuredClone(state);
-    const nextPlayer = next.players[seat];
-    const counts = {
-      ...(next.turnTimeoutCounts && typeof next.turnTimeoutCounts === "object"
-        ? next.turnTimeoutCounts
-        : {}),
-    };
-    const count = Math.max(0, Number(counts[nextPlayer.playerId]) || 0) + 1;
-    counts[nextPlayer.playerId] = count;
-    next.turnTimeoutCounts = counts;
-    next.turnTimeoutNotice = {
-      playerId: nextPlayer.playerId,
-      count,
-      at: now,
-    };
-
-    if (Array.isArray(next.consecutiveSixes) && seat >= 0 && seat < next.consecutiveSixes.length) {
-      next.consecutiveSixes[seat] = 0;
-    }
-
-    if (count >= MAX_TURN_ROLL_TIMEOUTS) {
-      nextPlayer.forfeitedAt = now;
-      const remaining = next.players.filter((candidate) =>
-        !Number.isSafeInteger(candidate.forfeitedAt),
-      );
-      if (isTeamUp(next) || remaining.length <= 1) {
-        next.status = "FINISHED";
-        next.finishedAt = now;
-        next.pendingRoll = null;
-        if (isTeamUp(next)) {
-          next.winnerPlayerId = null;
-          next.winnerTeamId = nextPlayer.teamId === "A" ? "B" : "A";
-        } else {
-          next.winnerPlayerId = remaining[0]?.playerId ?? null;
-          next.winnerTeamId = null;
-        }
-      } else {
-        next.turnSeat = nextActiveSeat(next, state.turnSeat);
+    // If persisted V4 timer metadata is missing, derive it from the last
+    // authoritative turn-state write instead of restarting it on reconnect.
+    let deadlineState = state;
+    if (
+      !Number.isSafeInteger(state.turnDeadlineAt) ||
+      state.turnDeadlineSeat !== actingSeat
+    ) {
+      deadlineState = structuredClone(state);
+      const turnStartedAt = Number(state.updatedAt ?? state.createdAt ?? now);
+      const safeTurnStartedAt = Number.isSafeInteger(turnStartedAt) ? turnStartedAt : now;
+      deadlineState.turnDeadlineAt = safeTurnStartedAt + timeoutMs;
+      deadlineState.turnDeadlineSeat = actingSeat;
+      if (now < deadlineState.turnDeadlineAt) {
+        deadlineState.revision =
+          (Number.isSafeInteger(deadlineState.revision) ? deadlineState.revision : 0) + 1;
+        await this.ctx.storage.put(STATE_KEY, deadlineState);
+        broadcastStateChanged(this.ctx, deadlineState);
+        return false;
       }
-    } else {
-      next.turnSeat = nextActiveSeat(next, state.turnSeat);
     }
 
-    next.updatedAt = now;
-    next.revision = Number(next.revision ?? 0) + 1;
-    await this.ctx.storage.put(STATE_KEY, next);
-    broadcastStateChanged(this.ctx, next);
+    if (now < deadlineState.turnDeadlineAt) return false;
+
+    const result = forfeitTimedOutTurn(deadlineState, { now });
+    await this.ctx.storage.put(STATE_KEY, result.state);
+    broadcastStateChanged(this.ctx, result.state);
+    if (result.state.status === "FINISHED") {
+      await this.recordFinishedMatchForLifecycle(result.state);
+    }
     return true;
   }
 
@@ -153,10 +136,34 @@ export class MatchRoom extends SocialMatchRoom {
     }
     if (state.pendingRoll != null) return false;
 
-    const turnStartedAt = Number(state.updatedAt ?? state.createdAt ?? 0);
-    if (!Number.isSafeInteger(turnStartedAt)) return false;
-    const deadline = turnStartedAt + TURN_ROLL_TIMEOUT_MS;
-    if (deadline <= Date.now()) return this.#expireTurnRollIfNeeded();
+    const timeoutMs = rulesetForState(state).turnRollTimeoutMs;
+    if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) {
+      const updatedAt = Number(state.updatedAt ?? state.createdAt ?? Date.now());
+      if (!Number.isSafeInteger(updatedAt)) return false;
+      await this.ctx.storage.setAlarm(updatedAt + ACTIVE_IDLE_TTL_MS);
+      return true;
+    }
+
+    const deadline = state.turnDeadlineAt;
+    if (!Number.isSafeInteger(deadline)) {
+      await this.#expireTurnRollIfNeeded();
+      const refreshed = await this.ctx.storage.get(STATE_KEY);
+      if (!Number.isSafeInteger(refreshed?.turnDeadlineAt)) return false;
+      await this.ctx.storage.setAlarm(refreshed.turnDeadlineAt);
+      return true;
+    }
+    if (deadline <= Date.now()) {
+      const expired = await this.#expireTurnRollIfNeeded();
+      if (expired) {
+        const refreshed = await this.ctx.storage.get(STATE_KEY);
+        const nextDeadline = refreshed?.turnDeadlineAt;
+        if (Number.isSafeInteger(nextDeadline)) {
+          await this.ctx.storage.setAlarm(nextDeadline);
+          return true;
+        }
+      }
+      return false;
+    }
     await this.ctx.storage.setAlarm(deadline);
     return true;
   }
@@ -213,6 +220,21 @@ export class MatchRoom extends SocialMatchRoom {
         ? next.turnSeat
         : seat,
     );
+    const nextTimeoutMs = rulesetForState(next).turnRollTimeoutMs;
+    const nextActingSeat = actingSeatForTurn(next);
+    if (
+      Number.isSafeInteger(nextTimeoutMs) &&
+      nextTimeoutMs > 0 &&
+      Number.isInteger(nextActingSeat) &&
+      nextActingSeat >= 0 &&
+      nextActingSeat < next.players.length
+    ) {
+      next.turnDeadlineSeat = nextActingSeat;
+      next.turnDeadlineAt = now + nextTimeoutMs;
+    } else {
+      next.turnDeadlineSeat = null;
+      next.turnDeadlineAt = null;
+    }
     next.updatedAt = now;
     next.revision = Number(next.revision ?? 0) + 1;
 

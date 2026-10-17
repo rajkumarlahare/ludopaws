@@ -4,6 +4,8 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.PathMeasure
 import android.graphics.RectF
 import android.graphics.Shader
 import android.os.SystemClock
@@ -85,6 +87,28 @@ class DiceView @JvmOverloads constructor(
             strokeJoin = Paint.Join.ROUND
         }
 
+    private val turnTimerTrackPaint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = dp(4.4f)
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+            color = 0xFF8A8A8A.toInt()
+            alpha = 62
+        }
+    private val turnTimerProgressPaint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = dp(4.4f)
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+            color = 0xFF8A8A8A.toInt()
+        }
+
+    private var turnDeadlineEpochMillis: Long? = null
+    private var turnDeadlineElapsedRealtimeMillis: Long? = null
+    private var turnCountdownDurationMillis = DiceTurnCountdownPolicy.TURN_DURATION_MILLIS
+
     private var diceStyleId =
         "dice_classic"
     private var previewStyleId: String? = null
@@ -147,6 +171,8 @@ class DiceView @JvmOverloads constructor(
                         )
                     }
 
+                    turnDeadlineElapsedRealtimeMillis != null -> Unit
+
                     else -> return
                 }
 
@@ -154,7 +180,7 @@ class DiceView @JvmOverloads constructor(
                 // The attention cue is a real animation, not a one-shot callback.
                 // Keep scheduling its frames while enabled, just like rolling and
                 // settling, and let every phase share this single ticker.
-                if (rolling || settling || attentionPulsing) {
+                if (rolling || settling || attentionPulsing || turnCountdownActive()) {
                     postOnAnimation(this)
                 }
             }
@@ -172,6 +198,40 @@ class DiceView @JvmOverloads constructor(
         invalidate()
     }
 
+    /**
+     * Binds countdown to the server's absolute epoch-millisecond deadline.
+     * Repeated snapshots with the same deadline do not restart its progress.
+     */
+    fun setTurnDeadlineAt(
+        deadlineEpochMillis: Long?,
+        serverNowEpochMillis: Long? = null,
+        timeoutDurationMillis: Long = DiceTurnCountdownPolicy.TURN_DURATION_MILLIS,
+    ) {
+        val safeDuration = timeoutDurationMillis.takeIf { it > 0L }
+            ?: DiceTurnCountdownPolicy.TURN_DURATION_MILLIS
+        if (
+            turnDeadlineEpochMillis == deadlineEpochMillis &&
+            turnCountdownDurationMillis == safeDuration
+        ) return
+        turnDeadlineEpochMillis = deadlineEpochMillis
+        turnCountdownDurationMillis = safeDuration
+        turnDeadlineElapsedRealtimeMillis =
+            deadlineEpochMillis?.let { deadline ->
+                val remaining = serverNowEpochMillis?.let { serverNow ->
+                    deadline - serverNow
+                } ?: (deadline - System.currentTimeMillis())
+                SystemClock.elapsedRealtime() + remaining.coerceAtLeast(0L)
+            }
+        if (turnCountdownActive()) postOnAnimation(animationTicker)
+        else if (!rolling && !settling && !attentionPulsing) removeCallbacks(animationTicker)
+        invalidate()
+    }
+
+    private fun turnCountdownActive(): Boolean =
+        turnDeadlineElapsedRealtimeMillis?.let {
+            SystemClock.elapsedRealtime() < it
+        } == true
+
     fun setAttentionEnabled(enabled: Boolean) {
         val shouldPulse =
             enabled &&
@@ -186,9 +246,12 @@ class DiceView @JvmOverloads constructor(
             attentionPhaseStartedAtMillis = SystemClock.uptimeMillis()
             postOnAnimation(animationTicker)
         } else {
-            removeCallbacks(animationTicker)
+            if (!turnCountdownActive() && !rolling && !settling) {
+                removeCallbacks(animationTicker)
+            }
             resetTransform()
             invalidate()
+            if (turnCountdownActive()) postOnAnimation(animationTicker)
         }
     }
 
@@ -320,6 +383,7 @@ class DiceView @JvmOverloads constructor(
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         reloadStyle()
+        if (turnCountdownActive()) postOnAnimation(animationTicker)
     }
 
     fun reloadStyle() {
@@ -523,12 +587,18 @@ class DiceView @JvmOverloads constructor(
                 attentionPulsing -> attentionPaint
                 else -> borderPaint
             }
+        if (turnDeadlineElapsedRealtimeMillis != null && !rolling && !settling) {
+            outlinePaint.alpha = minOf(outlinePaint.alpha, 72)
+        } else if (outlinePaint === borderPaint) {
+            borderPaint.alpha = 255
+        }
         canvas.drawRoundRect(
             rect,
             size * .17f,
             size * .17f,
             outlinePaint,
         )
+        drawTurnCountdown(canvas, rect, size, palette.borderColor)
 
         val left = size * .31f
         val pipCenter = size * .50f
@@ -586,6 +656,40 @@ class DiceView @JvmOverloads constructor(
         }
 
         canvas.restoreToCount(saveCount)
+    }
+
+    private fun drawTurnCountdown(
+        canvas: Canvas,
+        rect: RectF,
+        size: Float,
+        teamColor: Int,
+    ) {
+        val deadline = turnDeadlineElapsedRealtimeMillis ?: return
+        val fraction = DiceTurnCountdownPolicy.remainingFraction(
+            deadlineElapsedRealtimeMillis = deadline,
+            nowElapsedRealtimeMillis = SystemClock.elapsedRealtime(),
+            timeoutDurationMillis = turnCountdownDurationMillis,
+        ) ?: return
+
+        val radius = (size * .17f - dp(2.2f)).coerceAtLeast(0f)
+        val path = Path().apply {
+            addRoundRect(rect, radius, radius, Path.Direction.CW)
+        }
+        val measure = PathMeasure(path, false)
+        val length = measure.length
+        if (length <= 0f) return
+
+        turnTimerTrackPaint.color = teamColor
+        turnTimerProgressPaint.color = teamColor
+        turnTimerTrackPaint.alpha = 62
+        turnTimerProgressPaint.alpha = if (fraction <= 0f) 0 else 255
+        canvas.drawPath(path, turnTimerTrackPaint)
+
+        if (fraction > 0f) {
+            val progressPath = Path()
+            measure.getSegment(0f, length * fraction.coerceIn(0f, 1f), progressPath, true)
+            canvas.drawPath(progressPath, turnTimerProgressPaint)
+        }
     }
 
     private fun applyFrame(

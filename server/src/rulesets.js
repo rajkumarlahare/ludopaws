@@ -6,6 +6,11 @@ export const RULESET_KEY = "CLASSIC_V2";
 export const TEAM_RULESET_KEY = "TEAM_UP_V2";
 export const RULESET_V3_KEY = "CLASSIC_V3";
 export const TEAM_RULESET_V3_KEY = "TEAM_UP_V3";
+export const RULESET_V4_KEY = "CLASSIC_V4";
+export const TEAM_RULESET_V4_KEY = "TEAM_UP_V4";
+
+export const TURN_ROLL_TIMEOUT_MS = 15_000;
+export const MAX_MISSED_ROLLS_BEFORE_FORFEIT = 4;
 
 export const TEAM_ASSIGNMENTS = Object.freeze(["A", "B", "A", "B"]);
 
@@ -98,6 +103,27 @@ export const TEAM_RULESET_V3 = Object.freeze({
   winCondition: "BOTH_PARTNERS_ALL_TOKENS_HOME",
 });
 
+/**
+ * V4 adds server-authoritative turn deadlines and Team-Up stack protection.
+ * Previous rulesets remain immutable for existing match/proof compatibility.
+ */
+export const RULESET_V4 = Object.freeze({
+  ...RULESET_V3,
+  id: "ludoproof-standard-v4",
+  turnRollTimeoutMs: TURN_ROLL_TIMEOUT_MS,
+  maxMissedRollsBeforeForfeit: MAX_MISSED_ROLLS_BEFORE_FORFEIT,
+  turnTimeoutPolicy: "ADVANCE_TURN_AND_FORFEIT_AFTER_LIMIT",
+});
+
+export const TEAM_RULESET_V4 = Object.freeze({
+  ...TEAM_RULESET_V3,
+  id: "ludoproof-team-v4",
+  teamStackProtection: "SAFE_WHEN_TEAM_HAS_AT_LEAST_TWO_TOKENS_ON_CELL",
+  turnRollTimeoutMs: TURN_ROLL_TIMEOUT_MS,
+  maxMissedRollsBeforeForfeit: MAX_MISSED_ROLLS_BEFORE_FORFEIT,
+  turnTimeoutPolicy: "ADVANCE_TURN_AND_FORFEIT_AFTER_LIMIT",
+});
+
 export function rulesetKeyForState(state, { teamUp = false } = {}) {
   const key = state?.rulesetKey;
   if (key == null) {
@@ -120,6 +146,10 @@ export function rulesetForKey(key) {
       return RULESET_V3;
     case TEAM_RULESET_V3_KEY:
       return TEAM_RULESET_V3;
+    case RULESET_V4_KEY:
+      return RULESET_V4;
+    case TEAM_RULESET_V4_KEY:
+      return TEAM_RULESET_V4;
     default: {
       const error = new Error(`unsupported ruleset key: ${String(key)}`);
       error.code = "UNSUPPORTED_RULESET";

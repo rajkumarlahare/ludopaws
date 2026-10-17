@@ -225,11 +225,18 @@ for (const marker of ['class LudoPawsFeedbackLedger', 'LinkedHashSet', 'fun once
   if (!ledgerSource.includes(marker)) throw new Error(`Exactly-once feedback ledger is missing ${marker}`);
 }
 
-if (!onlineActionsSource.includes('GameSoundFeedback.roll(this)') || !onlineActionsSource.includes('diceView.startRolling()')) {
-  throw new Error('Online roll-start audio must begin with the rolling animation.');
+const onlineRollAnimationIndex = onlineActionsSource.indexOf('diceView.startRolling()');
+const onlineRollLedgerIndex = onlineActionsSource.indexOf('OnlineLudoPawsPresentation.noteLocalRollStarted(this, code, rollEventIndex)');
+const onlineRollSoundIndex = onlineActionsSource.indexOf('GameSoundFeedback.roll(this, rollEventIndex)');
+if (
+  onlineRollAnimationIndex < 0 ||
+  onlineRollLedgerIndex < onlineRollAnimationIndex ||
+  onlineRollSoundIndex < onlineRollLedgerIndex
+) {
+  throw new Error('Online roll must start its animation, record the local event once, then play the event-indexed roll sound.');
 }
-if (!onlinePresentationSource.includes('GameSoundFeedback.diceSettle(activity)')) {
-  throw new Error('Online committed roll must use the dice-settle cue, not restart the roll rattle.');
+if (!onlinePresentationSource.includes('GameSoundFeedback.diceSettle(activity, eventIndex)')) {
+  throw new Error('Online committed roll must use the event-indexed dice-settle cue, not restart the roll rattle.');
 }
 for (const marker of [
   'GameSoundFeedback.diceSettle(context)',

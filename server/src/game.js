@@ -9,11 +9,15 @@ import {
   RULESET_KEY,
   RULESET_V3,
   RULESET_V3_KEY,
+  RULESET_V4,
+  RULESET_V4_KEY,
   TEAM_ASSIGNMENTS,
   TEAM_RULESET,
   TEAM_RULESET_KEY,
   TEAM_RULESET_V3,
   TEAM_RULESET_V3_KEY,
+  TEAM_RULESET_V4,
+  TEAM_RULESET_V4_KEY,
   rulesetForKey,
   rulesetKeyForState,
 } from "./rulesets.js";
@@ -34,11 +38,15 @@ export {
   RULESET_KEY,
   RULESET_V3,
   RULESET_V3_KEY,
+  RULESET_V4,
+  RULESET_V4_KEY,
   TEAM_ASSIGNMENTS,
   TEAM_RULESET,
   TEAM_RULESET_KEY,
   TEAM_RULESET_V3,
   TEAM_RULESET_V3_KEY,
+  TEAM_RULESET_V4,
+  TEAM_RULESET_V4_KEY,
 };
 
 export function isTeamUp(state) {
@@ -53,11 +61,13 @@ export function rulesetForState(state) {
         LEGACY_TEAM_RULESET_KEY,
         TEAM_RULESET_KEY,
         TEAM_RULESET_V3_KEY,
+        TEAM_RULESET_V4_KEY,
       ])
     : new Set([
         LEGACY_RULESET_KEY,
         RULESET_KEY,
         RULESET_V3_KEY,
+        RULESET_V4_KEY,
       ]);
 
   if (!allowed.has(key)) {
@@ -239,6 +249,13 @@ export function publicState(state) {
     ...base,
     pendingRoll,
     rulesetId: rulesetForState(state).id,
+    turnDeadlineAt: Number.isSafeInteger(state.turnDeadlineAt)
+      ? state.turnDeadlineAt
+      : null,
+    turnRollTimeoutMs: Number.isSafeInteger(rulesetForState(state).turnRollTimeoutMs)
+      ? rulesetForState(state).turnRollTimeoutMs
+      : null,
+    serverNow: Date.now(),
     ...(isV3State(state)
       ? { openingRollConsumed: openingRollState(state) }
       : {}),
@@ -249,7 +266,10 @@ function isV3State(state) {
   const key = rulesetKeyForState(state, {
     teamUp: isTeamUp(state),
   });
-  return key === RULESET_V3_KEY || key === TEAM_RULESET_V3_KEY;
+  return key === RULESET_V3_KEY ||
+    key === TEAM_RULESET_V3_KEY ||
+    key === RULESET_V4_KEY ||
+    key === TEAM_RULESET_V4_KEY;
 }
 
 function openingRollState(state) {

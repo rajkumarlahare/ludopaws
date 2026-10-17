@@ -26,7 +26,7 @@ class TeamMatchmakingApi(
                 .put("displayName", displayName)
                 .put("clientRequestId", clientRequestId)
                 .put("characterId", characterId)
-                .put("rulesetKey", "TEAM_UP_V3"),
+                .put("rulesetKey", "TEAM_UP_V4"),
         )
 
     fun status(

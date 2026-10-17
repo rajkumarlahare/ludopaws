@@ -1,15 +1,20 @@
 package com.rekixo.ludopaws.ui.online
 
-import android.app.AlertDialog
+import android.app.Dialog
 import android.os.Build
 import android.view.Gravity
 import android.view.View
+import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.window.OnBackInvokedDispatcher
 import com.rekixo.ludopaws.*
 import com.rekixo.ludopaws.feature.online.*
+import com.rekixo.ludopaws.ui.dialogs.baseDialog
+import com.rekixo.ludopaws.ui.dialogs.dialogPanel
+import com.rekixo.ludopaws.ui.dialogs.fullWidthParams
+import com.rekixo.ludopaws.ui.dialogs.sizeDialog
 
 internal fun MainActivity.registerOnlineBackCallback() {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -25,50 +30,117 @@ internal fun MainActivity.requestRemoteExit() {
     val hasUnfinishedMatch =
         !matchId.isNullOrBlank() &&
             currentState?.status != "FINISHED"
-    val activeMatch =
-        currentState?.status == "ACTIVE"
+    val activeMatch = currentState?.status == "ACTIVE"
 
     if (!hasUnfinishedMatch) {
-        if (abandonRemoteSessionState()) {
-            finish()
-        }
+        remoteExitConfirmationDialog?.dismiss()
+        remoteExitConfirmationDialog = null
+        if (abandonRemoteSessionState()) finish()
+        return
+    }
+    if (
+        isFinishing ||
+        isDestroyed ||
+        remoteExitConfirmationDialog?.isShowing == true
+    ) {
         return
     }
 
-    AlertDialog.Builder(this)
-        .setTitle(
-            if (gameMode == GameMode.TEAM_UP) {
-                "Leave Team Up?"
-            } else {
-                "Leave Match?"
-            },
-        )
-        .setMessage(
-            if (activeMatch && gameMode == GameMode.TEAM_UP) {
-                "Leaving an active 2 vs 2 match forfeits your whole team. " +
-                    "Cancel to stay in the match."
-            } else if (activeMatch) {
-                "Leaving attempts a server-side forfeit. Any ranked result is saved only after the server confirms the match is finished."
-            } else if (gameMode == GameMode.TEAM_UP) {
-                "Leave this Team Up room? If the match is already active, leaving attempts to forfeit your whole team."
-            } else {
-                "Your match is not confirmed as finished. Leaving attempts a server-side forfeit if it is active."
-            },
-        )
-        .setNegativeButton("CANCEL", null)
-        .setPositiveButton(
-            if (gameMode == GameMode.TEAM_UP) {
-                "EXIT TEAM"
-            } else {
-                "LEAVE MATCH"
-            },
-        ) { _, _ ->
-            if (abandonRemoteSessionState()) {
-                finish()
+    val dialog = baseDialog(this)
+    dialog.setCanceledOnTouchOutside(false)
+    val teamUp = gameMode == GameMode.TEAM_UP
+    val panel = dialogPanel(
+        context = this,
+        title = if (teamUp) "LEAVE TEAM UP?" else "LEAVE MATCH?",
+        subtitle = if (activeMatch) "MATCH IN PROGRESS" else "ROOM NOT FINISHED",
+        dialog = dialog,
+        usePlywoodSurface = true,
+        usePlywoodCloseButton = true,
+        showBrandBadge = false,
+    )
+
+    panel.addView(
+        TextView(this).apply {
+            text = when {
+                activeMatch && teamUp ->
+                    "Leaving this active 2 vs 2 match forfeits your whole team. Cancel to keep playing."
+                activeMatch ->
+                    "Leaving attempts a server-side forfeit. Ranked results are saved only after the server confirms the match is finished."
+                teamUp ->
+                    "This Team Up room is not finished. If it becomes active before you leave, forfeiting may affect your whole team."
+                else ->
+                    "This match is not confirmed as finished. Leaving attempts a server-side forfeit if it is active."
             }
+            LudoProofTheme.body(
+                this,
+                if (isCompactOnline()) 12f else 13f,
+                centered = true,
+                bright = true,
+            )
+            setPadding(dp(8), dp(12), dp(8), dp(4))
+        },
+        fullWidthParams(this, 8),
+    )
+
+    panel.addView(
+        TextView(this).apply {
+            text = "Cancel to stay in the match, or confirm to leave."
+            LudoProofTheme.body(
+                this,
+                if (isCompactOnline()) 10.5f else 11.5f,
+                centered = true,
+            )
+        },
+        fullWidthParams(this, 4),
+    )
+
+    val actions = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER
+    }
+    actions.addView(
+        Button(this).apply {
+            text = "CANCEL"
+            contentDescription = "Cancel exit and continue match"
+            LudoProofTheme.secondary(this)
+            setOnClickListener { dialog.dismiss() }
+        },
+        LinearLayout.LayoutParams(
+            0,
+            dp(if (isCompactOnline()) 48 else 52),
+            1f,
+        ),
+    )
+    actions.addView(
+        Button(this).apply {
+            text = if (teamUp) "EXIT TEAM" else "LEAVE MATCH"
+            contentDescription = if (teamUp) "Confirm exit and forfeit Team Up match" else "Confirm leave match"
+            LudoProofTheme.danger(this)
+            setOnClickListener {
+                // Keep the dialog open if the secure forfeit could not be persisted.
+                if (abandonRemoteSessionState()) {
+                    dialog.dismiss()
+                    finish()
+                }
+            }
+        },
+        LinearLayout.LayoutParams(
+            0,
+            dp(if (isCompactOnline()) 48 else 52),
+            1f,
+        ).apply { marginStart = dp(10) },
+    )
+    panel.addView(actions, fullWidthParams(this, 14))
+
+    dialog.setContentView(panel)
+    sizeDialog(dialog, if (isCompactOnline()) 0.92f else 0.78f)
+    dialog.setOnDismissListener {
+        if (remoteExitConfirmationDialog === dialog) {
+            remoteExitConfirmationDialog = null
         }
-        .setCancelable(false)
-        .show()
+    }
+    remoteExitConfirmationDialog = dialog
+    dialog.show()
 }
 
 internal fun MainActivity.onlineHero(): FrameLayout =

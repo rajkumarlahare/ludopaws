@@ -9,6 +9,16 @@ package com.rekixo.ludopaws.core.audio
  * raw resources and finally to the generated sound.
  */
 object LudoPawsAudioCatalog {
+    /**
+     * Returns one stable take for a shared event. Online peers use the same
+     * event index so they select the same authored roll/settle clip.
+     */
+    fun takeForEvent(family: List<String>, eventIndex: Int): List<String> {
+        if (family.isEmpty()) return emptyList()
+        val index = Math.floorMod(eventIndex, family.size)
+        return listOf(family[index])
+    }
+
     object Sfx {
         val MOVE_STEP =
             listOf(
