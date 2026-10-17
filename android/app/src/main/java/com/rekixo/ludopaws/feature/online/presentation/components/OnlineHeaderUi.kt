@@ -116,6 +116,17 @@ internal fun MainActivity.requestRemoteExit() {
             text = if (teamUp) "EXIT TEAM" else "LEAVE MATCH"
             contentDescription = if (teamUp) "Confirm exit and forfeit Team Up match" else "Confirm leave match"
             LudoProofTheme.danger(this)
+            // The themed default is 17sp with 16dp horizontal padding. On compact
+            // phones the equal-width action buttons cannot fit "LEAVE MATCH", so
+            // Android wraps the second word and clips it at the button's fixed height.
+            // Keep the complete label on one centered line with a compact hit target.
+            textSize = if (isCompactOnline()) 13.5f else 15f
+            isSingleLine = true
+            maxLines = 1
+            gravity = Gravity.CENTER
+            setPadding(dp(8), 0, dp(8), 0)
+            minWidth = 0
+            minHeight = dp(if (isCompactOnline()) 48 else 52)
             setOnClickListener {
                 // Keep the dialog open if the secure forfeit could not be persisted.
                 if (abandonRemoteSessionState()) {
