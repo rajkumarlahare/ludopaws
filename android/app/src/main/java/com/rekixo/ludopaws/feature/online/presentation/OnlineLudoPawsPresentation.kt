@@ -121,8 +121,8 @@ internal object OnlineLudoPawsPresentation {
         host.voiceControls.visibility = View.GONE
         runCatching {
             activity.boardFrame.removeView(host.board)
-            activity.matchStatusPanel.removeView(host.topRail)
-            activity.actionPanel.removeView(host.bottomRail)
+            activity.boardFrame.removeView(host.topRail)
+            activity.boardFrame.removeView(host.bottomRail)
         }
         activity.boardFrame.tag = null
         activity.boardView.visibility = View.VISIBLE
@@ -215,27 +215,31 @@ internal object OnlineLudoPawsPresentation {
         )
 
         val topRail = playerRail(activity)
-        activity.matchStatusPanel.addView(
-            topRail,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            ).apply {
-                topMargin = dp(activity, 2)
-            },
-        )
-
         val bottomRail = playerRail(activity)
-        activity.actionPanel.addView(
-            bottomRail,
-            0,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            ).apply {
-                bottomMargin = dp(activity, 2)
-            },
-        )
+
+        // Anchor both player rails to the board frame itself, not the status/action
+        // panels in the scrolling column. This makes their distance from the board
+        // invariant across Online, Team Up, and Friends layouts and screen heights.
+        activity.boardFrame.apply {
+            clipChildren = false
+            clipToPadding = false
+            addView(
+                topRail,
+                FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    Gravity.TOP,
+                ),
+            )
+            addView(
+                bottomRail,
+                FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    Gravity.BOTTOM,
+                ),
+            )
+        }
 
         val voiceStatus =
             TextView(activity).apply {
@@ -441,31 +445,19 @@ internal object OnlineLudoPawsPresentation {
      */
     private fun alignPlayerRailsToBoard(activity: MainActivity, host: Host) {
         val board = activity.boardFrame
-        activity.matchStatusPanel.clipChildren = false
-        activity.matchStatusPanel.clipToPadding = false
-        activity.actionPanel.clipChildren = false
-        activity.actionPanel.clipToPadding = false
-
         board.post {
             if (board.width <= 0 || board.height <= 0) return@post
-            val boardLocation = IntArray(2)
-            board.getLocationOnScreen(boardLocation)
             val gap = dp(activity, 8)
 
+            // Rails are children of boardFrame, so use board-local coordinates.
+            // Set absolute translations (never +=) to avoid drift on every rerender.
             host.topRail.post {
                 if (host.topRail.height <= 0) return@post
-                val railLocation = IntArray(2)
-                host.topRail.getLocationOnScreen(railLocation)
-                val targetBottom = boardLocation[1] - gap
-                host.topRail.translationY +=
-                    (targetBottom - (railLocation[1] + host.topRail.height)).toFloat()
+                host.topRail.translationY = -(host.topRail.height + gap).toFloat()
             }
             host.bottomRail.post {
                 if (host.bottomRail.height <= 0) return@post
-                val railLocation = IntArray(2)
-                host.bottomRail.getLocationOnScreen(railLocation)
-                val targetTop = boardLocation[1] + board.height + gap
-                host.bottomRail.translationY += (targetTop - railLocation[1]).toFloat()
+                host.bottomRail.translationY = gap.toFloat()
             }
         }
     }
