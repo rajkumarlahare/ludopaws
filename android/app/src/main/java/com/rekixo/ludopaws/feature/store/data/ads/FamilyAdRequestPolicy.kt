@@ -5,7 +5,6 @@ import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AgeRestrictedTreatment
 import com.google.android.gms.ads.MobileAds
 import com.google.android.gms.ads.RequestConfiguration
-import com.google.android.ump.ConsentRequestParameters
 import com.rekixo.ludopaws.feature.safety.AgeSafetyPolicy
 import com.rekixo.ludopaws.feature.safety.AgeRange
 
@@ -31,13 +30,6 @@ internal object FamilyAdRequestPolicy {
                 .build(),
         )
     }
-
-    fun consentRequestParameters(context: Context): ConsentRequestParameters =
-        ConsentRequestParameters.Builder()
-            .setTagForUnderAgeOfConsent(
-                AgeSafetyPolicy.isUnderAgeOfConsent(AgeSafetyPolicy.selectedAgeRange(context)),
-            )
-            .build()
 
     fun createAdRequest(context: Context): AdRequest {
         configure(context)
