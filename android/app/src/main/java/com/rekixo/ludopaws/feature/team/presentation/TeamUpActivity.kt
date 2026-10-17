@@ -77,6 +77,7 @@ class TeamUpActivity : Activity() {
     private var requestInFlight = false
     private var stopped = false
     private var validatingRestoredSearch = false
+    private var restartingRestoredSearch = false
 
     private lateinit var quickTeamButton: FrameLayout
     private lateinit var cancelButton: Button
@@ -90,7 +91,7 @@ class TeamUpActivity : Activity() {
     private val pollRunnable =
         object : Runnable {
             override fun run() {
-                if (!stopped && ticketStore.load() != null) {
+                if (!stopped && !restartingRestoredSearch && ticketStore.load() != null) {
                     pollSearch()
                     if (!validatingRestoredSearch) updateTimer()
                 }
@@ -104,11 +105,19 @@ class TeamUpActivity : Activity() {
         super.onCreate(savedInstanceState)
         LudoProofTheme.configureWindow(this)
         selectedCharacterId = CharacterSelectionStore(this).load().characterId
-        // A persisted ticket may belong to an earlier app session. Keep its old
-        // elapsed time hidden until the server confirms that the search is active.
-        validatingRestoredSearch = ticketStore.load() != null
+        // A persisted ticket from a prior Team Up page session must not silently
+        // reuse its old elapsed timer or server-side bot fallback deadline. On a
+        // genuinely new Activity launch, cancel the old request before starting a
+        // fresh search. Configuration/state restoration continues the active search.
+        val restoredTicket = ticketStore.load()
+        val startFreshSearch = savedInstanceState == null && restoredTicket != null
+        validatingRestoredSearch = restoredTicket != null
+        restartingRestoredSearch = startFreshSearch
         buildUi()
         renderSearchState()
+        if (startFreshSearch) {
+            restartRestoredSearch(requireNotNull(restoredTicket))
+        }
     }
 
     override fun onStart() {
@@ -748,6 +757,7 @@ class TeamUpActivity : Activity() {
             startedAt = System.currentTimeMillis(),
         )
         validatingRestoredSearch = false
+        restartingRestoredSearch = false
         runCatching { ticketStore.save(ticket) }
             .onFailure {
                 showStatus("Could not save Team Up search. Try again.")
@@ -767,6 +777,47 @@ class TeamUpActivity : Activity() {
                 )
             },
             onSuccess = ::applyMatchmakingResponse,
+        )
+    }
+
+    private fun restartRestoredSearch(ticket: TeamMatchmakingTicket) {
+        if (requestInFlight || executor.isShutdown || isFinishing || isDestroyed) return
+        restartingRestoredSearch = true
+        validatingRestoredSearch = true
+        timerText.text = "SEARCH  00:00"
+        showStatus("Resetting the previous Team Up search…")
+
+        runRequest(
+            action = {
+                val credential = ensureLeaderboardCredential()
+                api.cancel(
+                    profileToken = credential.profileToken,
+                    clientRequestId = ticket.requestId,
+                )
+            },
+            onSuccess = { response ->
+                if (response.optString("status") == "MATCHED") {
+                    // The previous search won the race with cancellation; retrieve
+                    // its authoritative assignment rather than abandoning a match.
+                    restartingRestoredSearch = false
+                    validatingRestoredSearch = true
+                    showStatus("A team was found in the previous search • reconnecting…")
+                    pollSearch()
+                } else {
+                    ticketStore.clear()
+                    restartingRestoredSearch = false
+                    validatingRestoredSearch = false
+                    beginSearch()
+                }
+            },
+            onFailure = {
+                // Preserve the ticket if the server could not confirm cancellation;
+                // otherwise a new client request could be rejected as already queued.
+                restartingRestoredSearch = true
+                validatingRestoredSearch = true
+                timerText.text = "SEARCH  CHECKING…"
+                showStatus("Could not restart the previous search. Check the connection or cancel it and try again.")
+            },
         )
     }
 
@@ -801,6 +852,8 @@ class TeamUpActivity : Activity() {
             },
             onSuccess = { response ->
                 if (response.optString("status") == "MATCHED") {
+                    restartingRestoredSearch = false
+                    validatingRestoredSearch = true
                     showStatus(
                         if (response.optBoolean("pending", false)) {
                             "A team match is being finalized and can no longer be cancelled. Reconnecting…"
@@ -810,6 +863,8 @@ class TeamUpActivity : Activity() {
                     )
                     pollSearch()
                 } else {
+                    restartingRestoredSearch = false
+                    validatingRestoredSearch = false
                     ticketStore.clear()
                     renderSearchState()
                     showStatus("Team search cancelled.")
@@ -936,6 +991,7 @@ class TeamUpActivity : Activity() {
         action: () -> JSONObject,
         onSuccess: (JSONObject) -> Unit,
         quietFailure: Boolean = false,
+        onFailure: ((Exception) -> Unit)? = null,
     ) {
         if (requestInFlight || executor.isShutdown || isFinishing || isDestroyed) return
         requestInFlight = true
@@ -957,7 +1013,9 @@ class TeamUpActivity : Activity() {
                         requestInFlight = false
                         if (isFinishing || isDestroyed) return@post
                         updateButtons()
-                        if (!quietFailure) {
+                        if (onFailure != null) {
+                            onFailure(error)
+                        } else if (!quietFailure) {
                             showStatus(
                                 "Team search error: " +
                                     (error.message ?: "connection failed"),
