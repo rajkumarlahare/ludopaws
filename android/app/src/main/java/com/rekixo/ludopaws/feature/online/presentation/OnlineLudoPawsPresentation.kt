@@ -429,7 +429,45 @@ internal object OnlineLudoPawsPresentation {
             preferredBottomLeftColor = preferredBottomLeftColor,
             characterIdsBySeat = characterIdsBySeat,
         )
+        alignPlayerRailsToBoard(activity, host)
         bindTurnCountdown(activity, state)
+    }
+
+    /**
+     * The match panels are laid out before and after the board in the scrolling page.
+     * On tall phones this leaves a large visual gap, even though the board itself is
+     * correctly positioned. Move only the player rails toward the board; never resize
+     * or reposition the board view.
+     */
+    private fun alignPlayerRailsToBoard(activity: MainActivity, host: Host) {
+        val board = activity.boardFrame
+        activity.matchStatusPanel.clipChildren = false
+        activity.matchStatusPanel.clipToPadding = false
+        activity.actionPanel.clipChildren = false
+        activity.actionPanel.clipToPadding = false
+
+        board.post {
+            if (board.width <= 0 || board.height <= 0) return@post
+            val boardLocation = IntArray(2)
+            board.getLocationOnScreen(boardLocation)
+            val gap = dp(activity, 8)
+
+            host.topRail.post {
+                if (host.topRail.height <= 0) return@post
+                val railLocation = IntArray(2)
+                host.topRail.getLocationOnScreen(railLocation)
+                val targetBottom = boardLocation[1] - gap
+                host.topRail.translationY =
+                    (targetBottom - (railLocation[1] + host.topRail.height)).toFloat()
+            }
+            host.bottomRail.post {
+                if (host.bottomRail.height <= 0) return@post
+                val railLocation = IntArray(2)
+                host.bottomRail.getLocationOnScreen(railLocation)
+                val targetTop = boardLocation[1] + board.height + gap
+                host.bottomRail.translationY = (targetTop - railLocation[1]).toFloat()
+            }
+        }
     }
 
     private fun bindTurnCountdown(activity: MainActivity, state: MatchSnapshot) {
