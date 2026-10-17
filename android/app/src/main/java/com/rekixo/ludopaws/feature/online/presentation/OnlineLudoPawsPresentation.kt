@@ -438,25 +438,24 @@ internal object OnlineLudoPawsPresentation {
     }
 
     /**
-     * The match panels are laid out before and after the board in the scrolling page.
-     * On tall phones this leaves a large visual gap, even though the board itself is
-     * correctly positioned. Move only the player rails toward the board; never resize
-     * or reposition the board view.
+     * Player rails are anchored to boardFrame, so align them using board-local offsets.
+     * Absolute translations keep the 8dp gap stable across rerenders without cumulative
+     * drift, and never resize or reposition the board view.
      */
     private fun alignPlayerRailsToBoard(activity: MainActivity, host: Host) {
         val board = activity.boardFrame
-        board.post {
-            if (board.width <= 0 || board.height <= 0) return@post
+        board.post boardPost@{
+            if (board.width <= 0 || board.height <= 0) return@boardPost
             val gap = dp(activity, 8)
 
             // Rails are children of boardFrame, so use board-local coordinates.
             // Set absolute translations (never +=) to avoid drift on every rerender.
-            host.topRail.post {
-                if (host.topRail.height <= 0) return@post
+            host.topRail.post topRailPost@{
+                if (host.topRail.height <= 0) return@topRailPost
                 host.topRail.translationY = -(host.topRail.height + gap).toFloat()
             }
-            host.bottomRail.post {
-                if (host.bottomRail.height <= 0) return@post
+            host.bottomRail.post bottomRailPost@{
+                if (host.bottomRail.height <= 0) return@bottomRailPost
                 host.bottomRail.translationY = gap.toFloat()
             }
         }
