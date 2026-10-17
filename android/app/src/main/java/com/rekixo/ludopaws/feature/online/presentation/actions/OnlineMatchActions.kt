@@ -266,9 +266,9 @@ internal fun MainActivity.rollVerifiedDice() {
         GameSoundFeedback.roll(this, rollEventIndex)
         verificationText.text =
             if (decision.kind == OnlineRollActionKind.NEW_ROLL) {
-                "Rolling and verifying dice result…"
+                "Rolling securely on the match server…"
             } else {
-                "Resuming verified dice result…"
+                "Recovering the previous dice result…"
             }
 
         runNetwork(
