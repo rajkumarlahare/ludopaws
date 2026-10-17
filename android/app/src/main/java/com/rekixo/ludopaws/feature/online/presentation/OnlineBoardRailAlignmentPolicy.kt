@@ -3,11 +3,10 @@ package com.rekixo.ludopaws.feature.online
 import kotlin.math.roundToInt
 
 /**
- * Computes the rail translation from the rail's un-translated screen bounds.
+ * Computes absolute rail translation from visible profile/dice anchor bounds.
  *
- * The same measured bounds always produce the same result. Callers must set this
- * absolute value instead of accumulating deltas, otherwise rerenders/relayouts
- * can make profile and dice rails drift away from the board.
+ * Anchor bounds exclude reserved quick-chat space and refer to the square board,
+ * not the flexible viewport container. Recalculation is deterministic.
  */
 internal object OnlineBoardRailAlignmentPolicy {
     data class Translation(
@@ -18,14 +17,14 @@ internal object OnlineBoardRailAlignmentPolicy {
     fun calculate(
         boardTopOnScreen: Int,
         boardHeight: Int,
-        topRailTopOnScreen: Int,
-        topRailHeight: Int,
-        bottomRailTopOnScreen: Int,
+        topAnchorTopOnScreen: Int,
+        topAnchorHeight: Int,
+        bottomAnchorTopOnScreen: Int,
         gapPx: Int,
     ): Translation =
         Translation(
-            top = (boardTopOnScreen - gapPx - topRailTopOnScreen - topRailHeight).toFloat(),
-            bottom = (boardTopOnScreen + boardHeight + gapPx - bottomRailTopOnScreen).toFloat(),
+            top = (boardTopOnScreen - gapPx - topAnchorTopOnScreen - topAnchorHeight).toFloat(),
+            bottom = (boardTopOnScreen + boardHeight + gapPx - bottomAnchorTopOnScreen).toFloat(),
         )
 
     fun dpToPx(dp: Int, density: Float): Int =

@@ -9,9 +9,9 @@ class OnlineBoardRailAlignmentPolicyTest {
         val result = OnlineBoardRailAlignmentPolicy.calculate(
             boardTopOnScreen = 500,
             boardHeight = 360,
-            topRailTopOnScreen = 390,
-            topRailHeight = 72,
-            bottomRailTopOnScreen = 900,
+            topAnchorTopOnScreen = 390,
+            topAnchorHeight = 72,
+            bottomAnchorTopOnScreen = 900,
             gapPx = 8,
         )
 
@@ -24,21 +24,37 @@ class OnlineBoardRailAlignmentPolicyTest {
         val first = OnlineBoardRailAlignmentPolicy.calculate(
             boardTopOnScreen = 500,
             boardHeight = 360,
-            topRailTopOnScreen = 390,
-            topRailHeight = 72,
-            bottomRailTopOnScreen = 900,
+            topAnchorTopOnScreen = 390,
+            topAnchorHeight = 72,
+            bottomAnchorTopOnScreen = 900,
             gapPx = 8,
         )
         val afterRelayout = OnlineBoardRailAlignmentPolicy.calculate(
             boardTopOnScreen = 500,
             boardHeight = 360,
-            topRailTopOnScreen = 390,
-            topRailHeight = 72,
-            bottomRailTopOnScreen = 900,
+            topAnchorTopOnScreen = 390,
+            topAnchorHeight = 72,
+            bottomAnchorTopOnScreen = 900,
             gapPx = 8,
         )
 
         assertEquals(first, afterRelayout)
+    }
+
+    @Test
+    fun visibleProfileAnchorsAlignEvenWhenReservedFooterIsOutsideTheirBounds() {
+        val result = OnlineBoardRailAlignmentPolicy.calculate(
+            boardTopOnScreen = 500,
+            boardHeight = 360,
+            topAnchorTopOnScreen = 402,
+            topAnchorHeight = 70,
+            bottomAnchorTopOnScreen = 866,
+            gapPx = 8,
+        )
+
+        // Position only profile/dice content; reserved footer space is outside these anchors.
+        assertEquals(20f, result.top, 0f)
+        assertEquals(2f, result.bottom, 0f)
     }
 
     @Test

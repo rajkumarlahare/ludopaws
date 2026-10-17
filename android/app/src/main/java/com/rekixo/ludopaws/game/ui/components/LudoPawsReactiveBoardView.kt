@@ -2,6 +2,7 @@ package com.rekixo.ludopaws
 
 import android.content.Context
 import android.graphics.ColorMatrix
+import android.graphics.Rect
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
 import android.util.AttributeSet
@@ -223,6 +224,28 @@ class LudoPawsReactiveBoardView @JvmOverloads constructor(
 
     fun cancelPendingMovePreview(authoritative: MatchSnapshot?) {
         pawn3DScene.cancelPendingMovePreview(authoritative)
+    }
+
+    /**
+     * Returns the on-screen bounds of the measured square board artwork, not this
+     * wrapper's possibly tall flexible viewport. Online rails must target this rect.
+     */
+    internal fun visibleBoardBoundsOnScreen(): Rect? {
+        if (
+            board.visibility != View.VISIBLE ||
+            board.width <= 0 ||
+            board.height <= 0
+        ) {
+            return null
+        }
+        val location = IntArray(2)
+        board.getLocationOnScreen(location)
+        return Rect(
+            location[0],
+            location[1],
+            location[0] + board.width,
+            location[1] + board.height,
+        )
     }
 
     fun reloadStyle() {

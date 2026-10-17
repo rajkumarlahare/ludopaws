@@ -47,6 +47,9 @@ internal object OnlineLudoPawsPresentation {
         var activeDicePlayerId: String? = null,
         var railAlignmentListener: ViewTreeObserver.OnGlobalLayoutListener? = null,
         var railDiagnosticKey: String? = null,
+        val topProfileCards: MutableList<View> = mutableListOf(),
+        val bottomProfileCards: MutableList<View> = mutableListOf(),
+        var activeDiceProfileCard: View? = null,
     )
 
     fun render(
@@ -120,10 +123,16 @@ internal object OnlineLudoPawsPresentation {
         }
         host.railAlignmentListener = null
         host.railDiagnosticKey = null
+        host.topProfileCards.clear()
+        host.bottomProfileCards.clear()
+        host.activeDiceProfileCard = null
         host.feedbackLedger.clear()
         host.railBindingKey = null
         host.activeDiceControl = null
         host.activeDicePlayerId = null
+        host.activeDiceProfileCard = null
+        host.topProfileCards.clear()
+        host.bottomProfileCards.clear()
         host.board.bind(
             state = null,
             playerId = null,
@@ -395,6 +404,9 @@ internal object OnlineLudoPawsPresentation {
         host.railBindingKey = bindingKey
         host.activeDiceControl = null
         host.activeDicePlayerId = null
+        host.activeDiceProfileCard = null
+        host.topProfileCards.clear()
+        host.bottomProfileCards.clear()
         host.topRail.visibility = View.VISIBLE
         host.bottomRail.visibility = View.VISIBLE
         host.topRail.removeAllViews()
@@ -472,27 +484,50 @@ internal object OnlineLudoPawsPresentation {
      * Align from final screen bounds once the active layout has completed.
      * Translation is absolute and repeatable; the board itself is never moved.
      */
+    /**
+     * Align visible profile-card/dice bounds to the actual square board.
+     * The boardFrame is a flexible viewport slot on tall phones, not the visible
+     * board bounds, and player rails reserve a quick-chat row outside the card.
+     */
     private fun alignPlayerRailsToBoard(activity: MainActivity, host: Host) {
-        val board = activity.boardFrame
+        val boardFrame = activity.boardFrame
         activity.matchStatusPanel.clipChildren = false
         activity.matchStatusPanel.clipToPadding = false
         activity.actionPanel.clipChildren = false
         activity.actionPanel.clipToPadding = false
 
+        alignDiceWithProfileCard(host)
+
+        val boardBounds = host.board.visibleBoardBoundsOnScreen()
+        val topContentBounds =
+            visiblePlayerContentBounds(
+                rail = host.topRail,
+                profileCards = host.topProfileCards,
+                diceControl = host.activeDiceControl,
+            )
+        val bottomContentBounds =
+            visiblePlayerContentBounds(
+                rail = host.bottomRail,
+                profileCards = host.bottomProfileCards,
+                diceControl = host.activeDiceControl,
+            )
+
         if (
-            board.visibility != View.VISIBLE ||
+            boardFrame.visibility != View.VISIBLE ||
+            boardBounds == null ||
             host.topRail.visibility != View.VISIBLE ||
             host.bottomRail.visibility != View.VISIBLE ||
-            board.width <= 0 ||
-            board.height <= 0 ||
-            host.topRail.height <= 0 ||
-            host.bottomRail.height <= 0
+            topContentBounds == null ||
+            bottomContentBounds == null
         ) {
+            val frameLocation = IntArray(2)
+            boardFrame.getLocationOnScreen(frameLocation)
             val deferredKey =
-                "deferred:boardVis=" + board.visibility +
-                    ",board=" + board.width + "x" + board.height +
-                    ",topVis=" + host.topRail.visibility + ",topH=" + host.topRail.height +
-                    ",bottomVis=" + host.bottomRail.visibility + ",bottomH=" + host.bottomRail.height
+                "deferred:frame=" + boardFrame.width + "x" + boardFrame.height +
+                    "@y" + frameLocation[1] +
+                    ",square=" + (boardBounds?.toShortString() ?: "unmeasured") +
+                    ",topContent=" + (topContentBounds?.toString() ?: "unmeasured") +
+                    ",bottomContent=" + (bottomContentBounds?.toString() ?: "unmeasured")
             if (host.railDiagnosticKey != deferredKey) {
                 host.railDiagnosticKey = deferredKey
                 Log.w(TAG, "alignment deferred: " + deferredKey)
@@ -500,30 +535,34 @@ internal object OnlineLudoPawsPresentation {
             return
         }
 
-        val boardLocation = IntArray(2)
-        val topRailLocation = IntArray(2)
-        val bottomRailLocation = IntArray(2)
-        board.getLocationOnScreen(boardLocation)
-        host.topRail.getLocationOnScreen(topRailLocation)
-        host.bottomRail.getLocationOnScreen(bottomRailLocation)
-
+        val frameLocation = IntArray(2)
+        boardFrame.getLocationOnScreen(frameLocation)
         val gap = dp(activity, 8)
-        val topRailBaseTop = topRailLocation[1] - host.topRail.translationY.toInt()
-        val bottomRailBaseTop = bottomRailLocation[1] - host.bottomRail.translationY.toInt()
+        // Child locations include the rail translation. Remove it so the policy
+        // returns absolute values and repeated relayouts cannot accumulate drift.
+        val topContentBaseTop =
+            topContentBounds.first - host.topRail.translationY.roundToInt()
+        val bottomContentBaseTop =
+            bottomContentBounds.first - host.bottomRail.translationY.roundToInt()
+        val topContentHeight = topContentBounds.second - topContentBounds.first
         val translation = OnlineBoardRailAlignmentPolicy.calculate(
-            boardTopOnScreen = boardLocation[1],
-            boardHeight = board.height,
-            topRailTopOnScreen = topRailBaseTop,
-            topRailHeight = host.topRail.height,
-            bottomRailTopOnScreen = bottomRailBaseTop,
+            boardTopOnScreen = boardBounds.top,
+            boardHeight = boardBounds.height(),
+            topAnchorTopOnScreen = topContentBaseTop,
+            topAnchorHeight = topContentHeight,
+            bottomAnchorTopOnScreen = bottomContentBaseTop,
             gapPx = gap,
         )
 
         val diagnosticKey =
-            "boardY=" + boardLocation[1] + ",boardH=" + board.height +
-                ",topBaseY=" + topRailBaseTop + ",topH=" + host.topRail.height +
+            "frame=" + boardFrame.width + "x" + boardFrame.height +
+                "@y" + frameLocation[1] +
+                ",square=" + boardBounds.toShortString() +
+                ",topContent=" + topContentBounds +
+                ",topBaseY=" + topContentBaseTop +
                 ",topTarget=" + translation.top +
-                ",bottomBaseY=" + bottomRailBaseTop + ",bottomH=" + host.bottomRail.height +
+                ",bottomContent=" + bottomContentBounds +
+                ",bottomBaseY=" + bottomContentBaseTop +
                 ",bottomTarget=" + translation.bottom
         if (host.railDiagnosticKey != diagnosticKey) {
             host.railDiagnosticKey = diagnosticKey
@@ -536,6 +575,64 @@ internal object OnlineLudoPawsPresentation {
         if (kotlin.math.abs(host.bottomRail.translationY - translation.bottom) > 0.5f) {
             host.bottomRail.translationY = translation.bottom
         }
+    }
+
+    private fun visiblePlayerContentBounds(
+        rail: LinearLayout,
+        profileCards: List<View>,
+        diceControl: FrameLayout?,
+    ): Pair<Int, Int>? {
+        var top = Int.MAX_VALUE
+        var bottom = Int.MIN_VALUE
+
+        fun include(view: View) {
+            if (view.visibility != View.VISIBLE || view.width <= 0 || view.height <= 0) return
+            val location = IntArray(2)
+            view.getLocationOnScreen(location)
+            top = minOf(top, location[1])
+            bottom = maxOf(bottom, location[1] + view.height)
+        }
+
+        profileCards.forEach(::include)
+        if (diceControl != null && isDescendantOf(diceControl, rail)) {
+            include(diceControl)
+        }
+        return if (top < bottom) top to bottom else null
+    }
+
+    private fun alignDiceWithProfileCard(host: Host) {
+        val dice = host.activeDiceControl ?: return
+        val card = host.activeDiceProfileCard ?: return
+        if (
+            dice.visibility != View.VISIBLE ||
+            card.visibility != View.VISIBLE ||
+            dice.width <= 0 ||
+            dice.height <= 0 ||
+            card.width <= 0 ||
+            card.height <= 0
+        ) {
+            return
+        }
+
+        val diceLocation = IntArray(2)
+        val cardLocation = IntArray(2)
+        dice.getLocationOnScreen(diceLocation)
+        card.getLocationOnScreen(cardLocation)
+        val cardCenter = cardLocation[1] + card.height / 2f
+        val diceCenter = diceLocation[1] + dice.height / 2f
+        val correction = cardCenter - diceCenter
+        if (kotlin.math.abs(correction) > 0.5f) {
+            dice.translationY += correction
+        }
+    }
+
+    private fun isDescendantOf(view: View, ancestor: View): Boolean {
+        var current: View? = view
+        while (current != null) {
+            if (current === ancestor) return true
+            current = current.parent as? View
+        }
+        return false
     }
 
     private fun bindTurnCountdown(activity: MainActivity, state: MatchSnapshot) {
@@ -616,12 +713,7 @@ internal object OnlineLudoPawsPresentation {
                         enabled = localPlayer &&
                             activity.canSubmitOnlineGameplayAction() &&
                             activity.onlineRollActionDecision(state).enabled,
-                    ).apply {
-                        // Keep the dice visually aligned with the profile card, not its chat footer.
-                        if (reserveProfileFooter) {
-                            translationY = -dp(activity, 10).toFloat()
-                        }
-                    }
+                    )
                 } else {
                     null
                 }
@@ -644,6 +736,14 @@ internal object OnlineLudoPawsPresentation {
                         portraitOnEnd = alignEnd,
                     )
                 }
+            if (rail === quickChatHost.topRail) {
+                quickChatHost.topProfileCards += playerCard
+            } else {
+                quickChatHost.bottomProfileCards += playerCard
+            }
+            if (activeDiceControl != null) {
+                quickChatHost.activeDiceProfileCard = playerCard
+            }
             val showQuickChat =
                 quickChatEnabled && localPlayer && state.status == "ACTIVE"
             val quickChatButton =
@@ -690,20 +790,48 @@ internal object OnlineLudoPawsPresentation {
                         }
                     }
                 }
+            val isTopRail = rail === quickChatHost.topRail
+            val chatSlot =
+                if (reserveProfileFooter) {
+                    FrameLayout(activity).apply {
+                        clipChildren = false
+                        clipToPadding = false
+                        addView(
+                            quickChatButton,
+                            FrameLayout.LayoutParams(
+                                dp(activity, 36),
+                                dp(activity, 36),
+                                Gravity.TOP or Gravity.CENTER_HORIZONTAL,
+                            ),
+                        )
+                    }
+                } else {
+                    null
+                }
+            val chatSlotParams =
+                LinearLayout.LayoutParams(
+                    playerWidth,
+                    dp(activity, 37),
+                ).apply {
+                    topMargin = dp(activity, 1)
+                }
             val profileColumn =
                 LinearLayout(activity).apply {
                     orientation = LinearLayout.VERTICAL
                     gravity = Gravity.CENTER_HORIZONTAL
                     clipChildren = false
                     clipToPadding = false
-                    // Match the Robot/Bot rail: keep the profile aligned with the dice
-                    // while the quick-chat footer occupies its own reserved row.
+                    // Keep the reserved chat row on the outward side of the card,
+                    // rather than between the board and the profile.
                     setPadding(
                         0,
-                        if (reserveProfileFooter) dp(activity, 18) else 0,
+                        if (reserveProfileFooter && !isTopRail) dp(activity, 18) else 0,
                         0,
                         0,
                     )
+                    if (reserveProfileFooter && isTopRail) {
+                        addView(requireNotNull(chatSlot), chatSlotParams)
+                    }
                     addView(
                         playerCard,
                         LinearLayout.LayoutParams(
@@ -711,31 +839,8 @@ internal object OnlineLudoPawsPresentation {
                             LinearLayout.LayoutParams.WRAP_CONTENT,
                         ),
                     )
-                    if (reserveProfileFooter) {
-                        // Reserve an identical footer for every player so cards never jump
-                        // when the local quick-chat control appears or disappears.
-                        val chatSlot =
-                            FrameLayout(activity).apply {
-                                clipChildren = false
-                                clipToPadding = false
-                                addView(
-                                    quickChatButton,
-                                    FrameLayout.LayoutParams(
-                                        dp(activity, 36),
-                                        dp(activity, 36),
-                                        Gravity.TOP or Gravity.CENTER_HORIZONTAL,
-                                    ),
-                                )
-                            }
-                        addView(
-                            chatSlot,
-                            LinearLayout.LayoutParams(
-                                playerWidth,
-                                dp(activity, 37),
-                            ).apply {
-                                topMargin = dp(activity, 1)
-                            },
-                        )
+                    if (reserveProfileFooter && !isTopRail) {
+                        addView(requireNotNull(chatSlot), chatSlotParams)
                     }
                 }
             slotHost.addView(
