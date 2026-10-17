@@ -498,6 +498,7 @@ internal object OnlineLudoPawsPresentation {
                     player.playerId == activePlayer?.playerId
             val localPlayer = player.playerId == activity.playerId
             val playerWidth = dp(activity, 112)
+            val quickChatEnabled = GameSettingsStore(activity).snapshot().quickChatEnabled
             val reserveProfileFooter =
                 quickChatEnabled &&
                     state.status == "ACTIVE"
@@ -537,8 +538,6 @@ internal object OnlineLudoPawsPresentation {
                         portraitOnEnd = alignEnd,
                     )
                 }
-            val quickChatEnabled =
-                GameSettingsStore(activity).snapshot().quickChatEnabled
             val showQuickChat =
                 quickChatEnabled && localPlayer && state.status == "ACTIVE"
             val quickChatButton =
