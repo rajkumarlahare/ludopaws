@@ -450,22 +450,29 @@ internal object OnlineLudoPawsPresentation {
             if (board.width <= 0 || board.height <= 0) return@post
             val boardLocation = IntArray(2)
             board.getLocationOnScreen(boardLocation)
+            val topRailLocation = IntArray(2)
+            val bottomRailLocation = IntArray(2)
+            host.topRail.getLocationOnScreen(topRailLocation)
+            host.bottomRail.getLocationOnScreen(bottomRailLocation)
             val gap = dp(activity, 8)
+            val translation = OnlineBoardRailAlignmentPolicy.calculate(
+                boardTopOnScreen = boardLocation[1],
+                boardHeight = board.height,
+                topRailTopOnScreen = topRailLocation[1],
+                topRailHeight = host.topRail.height,
+                bottomRailTopOnScreen = bottomRailLocation[1],
+                gapPx = gap,
+            )
 
+            // Absolute assignments make repeated calls idempotent. Adding deltas
+            // to the existing translations can drift when layout callbacks fire again.
             host.topRail.post {
                 if (host.topRail.height <= 0) return@post
-                val railLocation = IntArray(2)
-                host.topRail.getLocationOnScreen(railLocation)
-                val targetBottom = boardLocation[1] - gap
-                host.topRail.translationY +=
-                    (targetBottom - (railLocation[1] + host.topRail.height)).toFloat()
+                host.topRail.translationY = translation.top
             }
             host.bottomRail.post {
                 if (host.bottomRail.height <= 0) return@post
-                val railLocation = IntArray(2)
-                host.bottomRail.getLocationOnScreen(railLocation)
-                val targetTop = boardLocation[1] + board.height + gap
-                host.bottomRail.translationY += (targetTop - railLocation[1]).toFloat()
+                host.bottomRail.translationY = translation.bottom
             }
         }
     }
