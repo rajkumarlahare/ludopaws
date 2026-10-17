@@ -18,6 +18,17 @@ internal enum class AgeRange(
     SIXTEEN_TO_SEVENTEEN("16–17", false, true),
     EIGHTEEN_AND_OVER("18 and over", false, false);
 
+    companion object {
+        fun fromAge(age: Int): AgeRange? = when {
+            age !in 0..120 -> null
+            age <= 5 -> FIVE_AND_UNDER
+            age <= 8 -> SIX_TO_EIGHT
+            age <= 12 -> NINE_TO_TWELVE
+            age <= 15 -> THIRTEEN_TO_FIFTEEN
+            age <= 17 -> SIXTEEN_TO_SEVENTEEN
+            else -> EIGHTEEN_AND_OVER
+        }
+    }
 }
 
 internal object AgeSafetyPolicy {
