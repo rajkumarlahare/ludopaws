@@ -5,6 +5,7 @@ import {
   MatchRoom,
   expectedDigests,
 } from "../src/match-room.js";
+import { verifyFastDiceReceipt } from "../src/dice-fast.js";
 import { MatchRoom as BotMatchRoom } from "../src/match-room-bots.js";
 import {
   deriveLeaderboardIdentity,
@@ -2386,3 +2387,49 @@ test(
     );
   },
 );
+
+
+test("fast roll resolves with the local CSPRNG and retries idempotently without EntroNex", async () => {
+  const { room, host, env, ctx } = await setupActiveMatch(2);
+  let externalDiceCalls = 0;
+  env.ENTRONEX_SERVICE = {
+    async fetch() {
+      externalDiceCalls += 1;
+      throw new Error("new fast roll must not call EntroNex");
+    },
+  };
+
+  const clientSeed = "1".repeat(64);
+  const clientCommitment = await sha256Hex(
+    "entronex:v4:client-commit:" + clientSeed,
+  );
+  const request = () =>
+    roomRequest("/roll/fast", {
+      method: "POST",
+      token: host.playerToken,
+      body: { clientSeed, clientCommitment },
+    });
+
+  const first = await json(await room.fetch(request()));
+  assert.equal(first.response.status, 200);
+  assert.ok(first.body.outcome >= 1 && first.body.outcome <= 6);
+  assert.equal(first.body.proof.protocol, "ludopaws-server-csprng-v1");
+  assert.equal(await verifyFastDiceReceipt(first.body.proof), true);
+  assert.equal(first.body.state.randomEventIndex, 1);
+  assert.ok(
+    first.body.state.history.some(
+      (event) =>
+        event.fastDiceReceipt?.roundId === first.body.roundId &&
+        event.outcome === first.body.outcome,
+    ),
+  );
+  assert.equal(externalDiceCalls, 0);
+
+  const replay = await json(await room.fetch(request()));
+  assert.equal(replay.response.status, 200);
+  assert.equal(replay.body.replayed, true);
+  assert.equal(replay.body.roundId, first.body.roundId);
+  assert.equal(replay.body.outcome, first.body.outcome);
+  assert.equal(externalDiceCalls, 0);
+  assert.ok((await ctx.storage.get("match-state")).history.length >= 1);
+});
