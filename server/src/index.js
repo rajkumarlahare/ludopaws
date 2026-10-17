@@ -475,6 +475,10 @@ export default {
           path: "/start",
           method: "POST",
         },
+        roll: {
+          path: "/roll",
+          method: "POST",
+        },
         "roll/commit": {
           path: "/roll/commit",
           method: "POST",
@@ -547,11 +551,10 @@ export default {
       }
 
       let body;
+      let parsedBody = null;
       if (route.method !== "GET") {
-        body =
-          JSON.stringify(
-            await readJsonRequest(request),
-          );
+        parsedBody = await readJsonRequest(request);
+        body = JSON.stringify(parsedBody);
       }
 
       const policyKey =
@@ -569,6 +572,55 @@ export default {
         policyKey + ":" + matchId,
         RATE_POLICIES[policyKey],
       );
+
+      // A normal online roll takes two client/server round trips today:
+      // commit, then reveal. Bundle those two existing, fully guarded room operations
+      // behind one client request. Both operations still pass through the complete
+      // MatchRoom wrapper chain, preserving timeout, replay, Team Up, bot, and proof
+      // policies while removing one WAN round trip from the critical path.
+      if (action === "roll") {
+        const clientSeed = String(parsedBody?.clientSeed ?? "").trim().toLowerCase();
+        const clientCommitment = String(parsedBody?.clientCommitment ?? "").trim().toLowerCase();
+        if (
+          !/^[0-9a-f]{64}$/.test(clientSeed) ||
+          !/^[0-9a-f]{64}$/.test(clientCommitment)
+        ) {
+          throw httpError(
+            400,
+            "INVALID_ROLL_SECRET",
+            "clientSeed and clientCommitment must be 32-byte hexadecimal digests",
+          );
+        }
+        const expectedCommitment = await sha256Hex(
+          "entronex:v4:client-commit:" + clientSeed,
+        );
+        if (expectedCommitment !== clientCommitment) {
+          throw httpError(
+            400,
+            "CLIENT_COMMITMENT_MISMATCH",
+            "clientSeed does not match clientCommitment",
+          );
+        }
+
+        const commitResponse = await target.fetch(
+          new Request("https://room/roll/commit", {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ clientCommitment }),
+          }),
+        );
+        if (!commitResponse.ok) {
+          return withSecurityHeaders(commitResponse);
+        }
+        const revealResponse = await target.fetch(
+          new Request("https://room/roll/reveal", {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ clientSeed }),
+          }),
+        );
+        return withSecurityHeaders(revealResponse);
+      }
 
       const response =
         await target.fetch(
