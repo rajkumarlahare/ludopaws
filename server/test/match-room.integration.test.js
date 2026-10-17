@@ -2283,6 +2283,9 @@ test(
     await startMatch(room, host.playerToken);
     const state = await ctx.storage.get("match-state");
     state.turnSeat = 1;
+    // Keep one bot token on the board so any of the six random outcomes has
+    // a legal move; the test must not depend on randomly rolling a six.
+    state.players[1].tokens[0] = 0;
     state.updatedAt = Date.now();
     await ctx.storage.put("match-state", state);
 
@@ -2302,7 +2305,7 @@ test(
     const rollShown = await ctx.storage.get("match-state");
     assert.equal(rollShown.status, "ACTIVE");
     assert.equal(rollShown.pendingRoll?.status, "RESOLVED");
-    assert.ok(rollShown.players[1].tokens.every((position) => position === -1));
+    assert.equal(rollShown.players[1].tokens[0], 0);
     assert.equal(rollShown.botTurn?.inProgress, false);
     assert.ok(rollShown.botTurn?.runAt > Date.now());
     assert.equal(rollShown.history.at(-1)?.randomnessSource, "ludopaws-server-csprng-v1");
@@ -2316,7 +2319,7 @@ test(
     assert.equal(after.status, "ACTIVE");
     assert.equal(after.pendingRoll, null);
     assert.equal(after.randomEventIndex, 1);
-    assert.ok(after.players[1].tokens.some((position) => position === 0));
+    assert.notEqual(after.players[1].tokens[0], 0);
     assert.ok(after.history.some(
       (event) => event.playerId === after.players[1].playerId && event.moveTokenIndex != null,
     ));
