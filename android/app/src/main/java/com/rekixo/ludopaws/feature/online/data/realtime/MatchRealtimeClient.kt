@@ -10,7 +10,6 @@ import com.rekixo.ludopaws.ui.quickchat.QuickChatEmojiCatalog
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.ThreadLocalRandom
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 
 class MatchRealtimeClient(
@@ -43,13 +42,7 @@ class MatchRealtimeClient(
     private val onVoiceEnded:
         () -> Unit = {},
     private val client: OkHttpClient =
-        OkHttpClient
-            .Builder()
-            .pingInterval(
-                20,
-                TimeUnit.SECONDS,
-            )
-            .build(),
+        LudoPawsHttpClients.shared,
     private val retryDelayMillis:
         (attempt: Int) -> Long =
         { attempt ->
