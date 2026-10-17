@@ -4,7 +4,10 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
   push:
-    branches: [main, feat/ludopaws-production-readiness]
+    branches:
+      - main
+      - feat/ludopaws-production-readiness
+      - 'fix/families-policy-all-ages'
 
 permissions:
   contents: read
@@ -14,7 +17,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  rc2-readiness:
+  rc3-readiness:
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -25,5 +28,5 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
-      - name: Android RC2 release-readiness gate
+      - name: Android RC3 release-readiness gate
         run: node scripts/android-release-readiness-check.mjs

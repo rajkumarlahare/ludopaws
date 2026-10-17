@@ -144,7 +144,7 @@ internal object AgeSafetyUi {
         AlertDialog.Builder(activity)
             .setTitle("Offline play")
             .setMessage(
-                "This device is set to \${range.label}. Online accounts and multiplayer, Friends invitations, private messaging, voice chat, Quick Chat, leaderboards, in-app purchases and advertising are unavailable in this age mode. Computer and Pass & Play modes remain available offline. Never share your name, contact details, school or location with strangers online.",
+                "This device is set to ${range.label}. Online accounts and multiplayer, Friends invitations, private messaging, voice chat, Quick Chat, leaderboards, in-app purchases and advertising are unavailable in this age mode. Computer and Pass & Play modes remain available offline. Never share your name, contact details, school or location with strangers online.",
             )
             .setCancelable(false)
             .setPositiveButton("Continue") { _, _ -> onContinue() }
