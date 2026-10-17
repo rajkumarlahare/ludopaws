@@ -510,6 +510,7 @@ function shouldGuard(
       "POST" &&
     [
       "/start",
+      "/roll/fast",
       "/roll/commit",
       "/roll/reveal",
       "/move",
