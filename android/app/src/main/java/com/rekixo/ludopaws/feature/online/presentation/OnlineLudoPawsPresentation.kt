@@ -590,6 +590,14 @@ internal object OnlineLudoPawsPresentation {
                     gravity = Gravity.CENTER_HORIZONTAL
                     clipChildren = false
                     clipToPadding = false
+                    // Match the Robot/Bot rail: keep the profile aligned with the dice
+                    // while the quick-chat footer occupies its own reserved row.
+                    setPadding(
+                        0,
+                        if (reserveProfileFooter) dp(activity, 18) else 0,
+                        0,
+                        0,
+                    )
                     addView(
                         playerCard,
                         LinearLayout.LayoutParams(
