@@ -49,8 +49,6 @@ function runPreflight({ adsEnabled, billingEnabled = false, routeConfigured = tr
         ...process.env,
         CLOUDFLARE_API_TOKEN: "test-token-not-used-by-preflight",
         CLOUDFLARE_ACCOUNT_ID: "8f31060fbcfee2b3e9309138cad7f12f",
-        ENTRONEX_TOKEN_MODE: "preserve",
-        ENTRONEX_API_TOKEN: "",
         LUDOPROOF_SESSION_HMAC_KEY: "",
       },
     });
@@ -80,7 +78,7 @@ test("production preflight requires the API hostname to target the deployed Work
 
 test("deployment workflow checks the Cloudflare private key before enabling Billing and verifies expected live flags", () => {
   const workflow = fs.readFileSync(path.join(repoRoot, ".github", "workflows", "deploy-cloudflare.yml"), "utf8");
-  const secretStep = workflow.split("name: Verify Google Play service-account secret when Billing is enabled")[1]?.split("name: Wrangler production dry run")[0] ?? "";
+  const secretStep = workflow.split("name: Verify Google Play service-account secret when Billing is enabled")[1]?.split("name: Repository security gate")[0] ?? "";
   assert.ok(secretStep.includes("GOOGLE_PLAY_SERVICE_ACCOUNT_PRIVATE_KEY"));
   assert.ok(secretStep.includes("vars.GOOGLE_PLAY_BILLING_ENABLED == 'true'"));
   const statusStep = workflow.split("name: Verify store status route and feature flags")[1]?.split("name: Verify live production game flow")[0] ?? "";

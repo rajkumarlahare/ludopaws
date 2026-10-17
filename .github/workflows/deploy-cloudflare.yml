@@ -1,8 +1,7 @@
-name: LudoProof Cloudflare Production
+name: Ludo Paws Cloudflare Production
 
-# Production deploys require an explicit operator dispatch; merges and variable changes
-# CLOUDFLARE_DEPLOY_ENABLED does not opt into automatic pushes; workflow_dispatch is required.
-# must never automatically publish code to the live Cloudflare Worker.
+# Production deploys require an explicit operator dispatch from main.
+# Nothing deploys to the live Worker on push or pull-request events.
 on:
   workflow_dispatch:
 
@@ -10,12 +9,11 @@ permissions:
   contents: read
 
 concurrency:
-  group: ludoproof-cloudflare-production
+  group: ludopaws-cloudflare-production
   cancel-in-progress: false
 
 jobs:
   deploy:
-    # An explicit dispatch from a feature branch must not publish code to production.
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -23,7 +21,6 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: 8f31060fbcfee2b3e9309138cad7f12f
-      ENTRONEX_API_TOKEN: ${{ secrets.ENTRONEX_API_TOKEN }}
       LUDOPROOF_SESSION_HMAC_KEY: ${{ secrets.LUDOPROOF_SESSION_HMAC_KEY }}
       GOOGLE_SIGN_IN_WEB_CLIENT_ID: ${{ vars.GOOGLE_SIGN_IN_WEB_CLIENT_ID }}
       LUDOPROOF_ACCOUNT_WEB_ORIGIN: ${{ vars.LUDOPROOF_ACCOUNT_WEB_ORIGIN }}
@@ -52,86 +49,6 @@ jobs:
 
       - name: Test Cloudflare runtime configuration
         run: node --test scripts/cloudflare-runtime-config.test.mjs
-
-      - name: Prepare EntroNex customer credential
-        working-directory: server
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          if [ -n "${ENTRONEX_API_TOKEN:-}" ]; then
-            echo "::add-mask::$ENTRONEX_API_TOKEN"
-            echo "ENTRONEX_TOKEN_MODE=operator" >> "$GITHUB_ENV"
-            echo "Using operator-supplied EntroNex customer credential."
-            exit 0
-          fi
-
-          upstream_file="$(mktemp)"
-          game_file="$(mktemp)"
-          trap 'rm -f "$upstream_file" "$game_file"' EXIT
-
-          npx --yes wrangler@4.135.0 secret list --name entronex-v4-eval --format json > "$upstream_file"
-
-          upstream_has="$(
-            node -e '
-              const fs = require("node:fs");
-              const value = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
-              const list = Array.isArray(value) ? value : (value.secrets ?? []);
-              process.stdout.write(
-                list.some((entry) => entry?.name === "ENTRONEX_EVAL_CUSTOMER_TOKEN")
-                  ? "yes"
-                  : "no"
-              );
-            ' "$upstream_file"
-          )"
-
-          game_has="no"
-          if npx --yes wrangler@4.135.0 secret list --name ludoproof-game-api --format json > "$game_file" 2>/dev/null; then
-            game_has="$(
-              node -e '
-                const fs = require("node:fs");
-                const value = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
-                const list = Array.isArray(value) ? value : (value.secrets ?? []);
-                process.stdout.write(
-                  list.some((entry) => entry?.name === "ENTRONEX_API_TOKEN")
-                    ? "yes"
-                    : "no"
-                );
-              ' "$game_file"
-            )"
-          fi
-
-          if [ "$upstream_has" = "yes" ] && [ "$game_has" = "yes" ]; then
-            echo "ENTRONEX_TOKEN_MODE=preserve" >> "$GITHUB_ENV"
-            echo "Preserving the existing synchronized EntroNex customer credential."
-            exit 0
-          fi
-
-          if [ "$upstream_has" = "no" ] && [ "$game_has" = "no" ]; then
-            generated_token="$(
-              node -e '
-                const { randomBytes } = require("node:crypto");
-                process.stdout.write(
-                  "ent_cf_eval_" +
-                    randomBytes(4).toString("hex") +
-                    "." +
-                    randomBytes(32).toString("base64url")
-                );
-              '
-            )"
-            echo "::add-mask::$generated_token"
-            {
-              echo "ENTRONEX_API_TOKEN=$generated_token"
-              echo "ENTRONEX_TOKEN_MODE=bootstrap"
-            } >> "$GITHUB_ENV"
-            unset generated_token
-            echo "Prepared a new EntroNex customer credential for post-test bootstrap."
-            exit 0
-          fi
-
-          echo "EntroNex customer credential is present on only one Worker." >&2
-          echo "Set the production ENTRONEX_API_TOKEN secret once to perform an explicit synchronized rotation." >&2
-          exit 2
 
       - name: Validate production configuration
         run: node scripts/cloudflare-deploy-preflight.mjs
@@ -178,57 +95,26 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
-          if [ "${ENTRONEX_TOKEN_MODE:-}" = "preserve" ]; then
-            secret_file="$(mktemp)"
-            trap 'rm -f "$secret_file"' EXIT
-            npx --yes wrangler@4.135.0 secret list --format json > "$secret_file"
-            node -e '
-              const fs = require("node:fs");
-              const value = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
-              const list = Array.isArray(value) ? value : (value.secrets ?? []);
-              if (!list.some((entry) => entry?.name === "ENTRONEX_API_TOKEN")) {
-                console.error("Preserved EntroNex token is missing from the deployed LudoProof Worker.");
-                process.exit(2);
-              }
-            ' "$secret_file"
-            echo "Preserved existing synchronized EntroNex customer credential."
-          elif [ -n "${ENTRONEX_API_TOKEN:-}" ]; then
-            printf '%s' "$ENTRONEX_API_TOKEN" | npx --yes wrangler@4.135.0 secret put ENTRONEX_EVAL_CUSTOMER_TOKEN --name entronex-v4-eval
-
-            if ! printf '%s' "$ENTRONEX_API_TOKEN" | npx --yes wrangler@4.135.0 secret put ENTRONEX_API_TOKEN; then
-              if [ "${ENTRONEX_TOKEN_MODE:-}" = "bootstrap" ]; then
-                curl --fail --silent --show-error                   -X DELETE                   -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"                   "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/entronex-v4-eval/secrets/ENTRONEX_EVAL_CUSTOMER_TOKEN"                   >/dev/null || true
-              fi
-              echo "Failed to synchronize the EntroNex customer credential into LudoProof." >&2
-              exit 2
-            fi
-
-            echo "Synchronized EntroNex customer credential across both Workers."
-          else
-            echo "EntroNex deployment mode requires a customer credential but none is available." >&2
-            exit 2
-          fi
-
           if [ -n "${LUDOPROOF_SESSION_HMAC_KEY:-}" ]; then
             printf '%s' "$LUDOPROOF_SESSION_HMAC_KEY" | npx --yes wrangler@4.135.0 secret put LUDOPROOF_SESSION_HMAC_KEY
             echo "Synced operator-managed LUDOPROOF_SESSION_HMAC_KEY."
           else
-            npx --yes wrangler@4.135.0 secret list --format json > /tmp/ludoproof-secrets.json
+            secret_file="$(mktemp)"
+            trap 'rm -f "$secret_file"' EXIT
+            npx --yes wrangler@4.135.0 secret list --format json > "$secret_file"
             if node -e '
               const fs = require("node:fs");
-              const value = JSON.parse(fs.readFileSync("/tmp/ludoproof-secrets.json", "utf8"));
+              const value = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
               const list = Array.isArray(value) ? value : (value.secrets ?? []);
               process.exit(list.some((entry) => entry?.name === "LUDOPROOF_SESSION_HMAC_KEY") ? 0 : 1);
-            '; then
+            ' "$secret_file"; then
               echo "Preserving existing Cloudflare-managed LUDOPROOF_SESSION_HMAC_KEY."
             else
               generated_hmac="$(node -e 'process.stdout.write(require("node:crypto").randomBytes(48).toString("base64url"))')"
               printf '%s' "$generated_hmac" | npx --yes wrangler@4.135.0 secret put LUDOPROOF_SESSION_HMAC_KEY
               unset generated_hmac
-              echo "Generated LUDOPROOF_SESSION_HMAC_KEY directly inside the deployment channel."
+              echo "Generated LUDOPROOF_SESSION_HMAC_KEY inside the deployment channel."
             fi
-            rm -f /tmp/ludoproof-secrets.json
           fi
 
       - name: Verify public health
@@ -243,27 +129,19 @@ jobs:
           set -euo pipefail
           ready_file="$(mktemp)"
           trap 'rm -f "$ready_file"' EXIT
-
           status=""
           for attempt in $(seq 1 12); do
-            status="$(
-              curl --silent --show-error                 --output "$ready_file"                 --write-out '%{http_code}'                 "$LUDOPROOF_WORKER_URL/ready"                 || true
-            )"
-            if [ "$status" = "200" ]; then
-              break
-            fi
+            status="$(curl --silent --show-error --output "$ready_file" --write-out '%{http_code}' "$LUDOPROOF_WORKER_URL/ready" || true)"
+            if [ "$status" = "200" ]; then break; fi
             sleep 5
           done
-
           body="$(cat "$ready_file")"
           echo "Readiness HTTP status: $status"
           echo "Readiness response: $body"
-
           if [ "$status" != "200" ]; then
             echo "Worker readiness endpoint did not reach HTTP 200." >&2
             exit 22
           fi
-
           READY_FILE="$ready_file" node -e '
             const fs = require("node:fs");
             const body = JSON.parse(fs.readFileSync(process.env.READY_FILE, "utf8"));
@@ -276,14 +154,11 @@ jobs:
               console.error("The production API hostname is not serving the expected deployed AdMob SSV configuration.");
               process.exit(4);
             }
-            // Operational readiness is not independent certification. Until
-            // the independent-review gate is deliberately changed,
-            // require an explicit false claim (missing is not good enough).
             if (body.productionClaim !== false) {
               console.error("Worker readiness must explicitly report productionClaim=false until independent review is completed.");
               process.exit(3);
             }
-            console.log("LudoProof API route is operational; Rewarded Ads configuration matches the validated deployment; productionClaim=false.");
+            console.log("Ludo Paws API route is operational; Rewarded Ads configuration matches; productionClaim=false.");
           '
 
       - name: Verify store status route and feature flags
@@ -292,8 +167,7 @@ jobs:
           set -euo pipefail
           status_file="$(mktemp)"
           trap 'rm -f "$status_file"' EXIT
-          curl --fail --silent --show-error --retry 6 --retry-delay 5 --retry-all-errors \
-            "$LUDOPROOF_WORKER_URL/api/store/status" > "$status_file"
+          curl --fail --silent --show-error --retry 6 --retry-delay 5 --retry-all-errors "$LUDOPROOF_WORKER_URL/api/store/status" > "$status_file"
           node -e '
             const fs = require("node:fs");
             const body = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
@@ -311,15 +185,10 @@ jobs:
               body.rewardedAdsAvailable !== expectedRewardedAds ||
               androidRewardedAds !== expectedRewardedAds
             ) {
-              console.error("Production store status does not match validated feature configuration. One-time Billing and Rewarded Ads flags must match their explicitly configured values.");
+              console.error("Production store status does not match validated feature configuration.");
               process.exit(3);
             }
-            console.log(
-              "Branded API store status verified; Billing " +
-                (expectedBilling ? "enabled by explicit validated configuration, " : "disabled, ") +
-                "Rewarded Ads " +
-                (expectedRewardedAds ? "enabled by explicit validated configuration." : "disabled.")
-            );
+            console.log("Store status verified; Billing " + (expectedBilling ? "enabled." : "disabled.") + " Rewarded Ads " + (expectedRewardedAds ? "enabled." : "disabled."));
           ' "$status_file"
 
       - name: Verify live production game flow

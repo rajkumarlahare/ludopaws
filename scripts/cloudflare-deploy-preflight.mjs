@@ -1,110 +1,28 @@
 import fs from "node:fs";
-import {
-  createHash,
-  createPublicKey,
-} from "node:crypto";
 
-const required = [
-  "CLOUDFLARE_API_TOKEN",
-  "CLOUDFLARE_ACCOUNT_ID",
-];
-
-const missing =
-  required.filter(
-    (name) =>
-      !String(
-        process.env[name] ?? "",
-      ).trim(),
-  );
-
+const required = ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"];
+const missing = required.filter((name) => !String(process.env[name] ?? "").trim());
 if (missing.length > 0) {
-  console.error(
-    "Cloudflare production deploy is missing required configuration: " +
-      missing.join(", "),
-  );
+  console.error("Cloudflare production deploy is missing required configuration: " + missing.join(", "));
+  process.exit(2);
+}
+if (!/^[0-9a-f]{32}$/i.test(String(process.env.CLOUDFLARE_ACCOUNT_ID))) {
+  console.error("CLOUDFLARE_ACCOUNT_ID must be a 32-character Cloudflare account ID.");
   process.exit(2);
 }
 
-if (
-  !/^[0-9a-f]{32}$/i.test(
-    String(
-      process.env.CLOUDFLARE_ACCOUNT_ID,
-    ),
-  )
-) {
-  console.error(
-    "CLOUDFLARE_ACCOUNT_ID must be a 32-character Cloudflare account ID.",
-  );
+const optionalHmac = String(process.env.LUDOPROOF_SESSION_HMAC_KEY ?? "");
+if (optionalHmac.length > 0 && optionalHmac.length < 32) {
+  console.error("LUDOPROOF_SESSION_HMAC_KEY must contain at least 32 characters when supplied.");
   process.exit(2);
 }
 
-const entronexTokenMode =
-  String(
-    process.env.ENTRONEX_TOKEN_MODE ??
-      "",
-  );
-
-if (
-  ![
-    "operator",
-    "bootstrap",
-    "preserve",
-  ].includes(
-    entronexTokenMode,
-  )
-) {
-  console.error(
-    "ENTRONEX_TOKEN_MODE was not prepared by the deployment workflow.",
-  );
-  process.exit(2);
-}
-
-if (
-  entronexTokenMode !==
-    "preserve" &&
-  String(
-    process.env.ENTRONEX_API_TOKEN,
-  ).length < 20
-) {
-  console.error(
-    "ENTRONEX_API_TOKEN is too short to be a valid server credential.",
-  );
-  process.exit(2);
-}
-
-const optionalHmac =
-  String(
-    process.env
-      .LUDOPROOF_SESSION_HMAC_KEY ??
-      "",
-  );
-if (
-  optionalHmac.length > 0 &&
-  optionalHmac.length < 32
-) {
-  console.error(
-    "LUDOPROOF_SESSION_HMAC_KEY must contain at least 32 characters when supplied.",
-  );
-  process.exit(2);
-}
-
-const wrangler =
-  JSON.parse(
-    fs.readFileSync(
-      "server/wrangler.json",
-      "utf8",
-    ),
-  );
-const vars =
-  wrangler?.vars ?? {};
-
-const apiRouteConfigured = Array.isArray(wrangler?.routes) &&
-  wrangler.routes.some((route) =>
-    route?.pattern === "api.ludopaws.rekixo.com/*" &&
-    route?.zone_name === "rekixo.com"
-  );
+const wrangler = JSON.parse(fs.readFileSync("server/wrangler.json", "utf8"));
+const vars = wrangler?.vars ?? {};
+const apiRouteConfigured = Array.isArray(wrangler?.routes) && wrangler.routes.some((route) =>
+  route?.pattern === "api.ludopaws.rekixo.com/*" && route?.zone_name === "rekixo.com");
 if (!apiRouteConfigured) {
-  console.error("Cloudflare production config must explicitly route api.ludopaws.rekixo.com/* through the ludoproof-game-api Worker.");
+  console.error("Cloudflare production config must explicitly route api.ludopaws.rekixo.com/* through the Ludo Paws Worker.");
   process.exit(2);
 }
 
@@ -139,70 +57,4 @@ if (vars.LUDOPROOF_ADMOB_SSV_ENABLED === "true" &&
   console.error("AdMob SSV is enabled but LUDOPROOF_ADMOB_REWARDED_AD_UNIT_ID is missing or malformed.");
   process.exit(2);
 }
-
-
-const fingerprint =
-  String(
-    vars.ENTRONEX_SIGNING_KEY_FINGERPRINT ??
-      "",
-  ).toLowerCase();
-const publicKeyPemB64 =
-  String(
-    vars.ENTRONEX_SIGNING_PUBLIC_KEY_PEM_B64 ??
-      "",
-  );
-
-if (
-  vars.ENTRONEX_SIGNING_KEY_ID !==
-    "cf-v4-eval-sign-1" ||
-  vars.ENTRONEX_TENANT_ID !==
-    "cloudflare_v4_eval" ||
-  !/^[0-9a-f]{64}$/.test(
-    fingerprint,
-  ) ||
-  !publicKeyPemB64
-) {
-  console.error(
-    "Pinned EntroNex public trust material is incomplete or unexpected.",
-  );
-  process.exit(2);
-}
-
-let publicKey;
-try {
-  const pem =
-    Buffer.from(
-      publicKeyPemB64,
-      "base64",
-    ).toString("utf8");
-  publicKey =
-    createPublicKey(
-      pem,
-    );
-} catch {
-  console.error(
-    "Pinned EntroNex public key is not a valid SPKI PEM.",
-  );
-  process.exit(2);
-}
-
-const recomputed =
-  createHash("sha256")
-    .update(
-      publicKey.export({
-        type: "spki",
-        format: "der",
-      }),
-    )
-    .digest("hex");
-
-if (recomputed !== fingerprint) {
-  console.error(
-    "Pinned EntroNex public key does not match its configured fingerprint.",
-  );
-  process.exit(2);
-}
-
-console.log(
-  "Cloudflare production deploy preflight passed.",
-);
+console.log("Cloudflare production deploy preflight passed.");

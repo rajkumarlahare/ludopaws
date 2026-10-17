@@ -39,7 +39,7 @@ test("POST /api/matches/:id/roll resolves through one fast-dice room request", a
             const url = new URL(request.url);
             const body = request.method === "POST" ? await request.json() : null;
             observed.push({ path: url.pathname, authorization: request.headers.get("authorization"), body });
-            if (url.pathname === "/roll/fast") {
+            if (url.pathname === "/roll") {
               return Response.json({
                 ok: true,
                 outcome: 4,
@@ -56,7 +56,7 @@ test("POST /api/matches/:id/roll resolves through one fast-dice room request", a
 
   const clientSeed = "1".repeat(64);
   const clientCommitment = await sha256Hex(
-    "entronex:v4:client-commit:" + clientSeed,
+    "ludopaws:native-roll:v1:client-commit:" + clientSeed,
   );
   const response = await worker.fetch(
     new Request("https://api.example.test/api/matches/LPABCDEFGH/roll", {
@@ -74,7 +74,7 @@ test("POST /api/matches/:id/roll resolves through one fast-dice room request", a
   assert.equal(response.status, 200);
   assert.equal((await response.json()).outcome, 4);
   assert.equal(limiter.calls, 1);
-  assert.deepEqual(observed.map((entry) => entry.path), ["/roll/fast"]);
+  assert.deepEqual(observed.map((entry) => entry.path), ["/roll"]);
   assert.deepEqual(observed[0].body, { clientSeed, clientCommitment });
   assert.ok(observed.every((entry) => entry.authorization === "Bearer test-player-token"));
 });

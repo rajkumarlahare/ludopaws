@@ -552,8 +552,7 @@ export default {
       // New online rolls use one client-to-Worker request and one room request.
       // The room executes the existing authoritative game-rule transition under its
       // serialized mutation queue, generates a server-CSPRNG receipt, and persists the
-      // result once. Legacy commit/reveal endpoints remain available for in-flight
-      // sessions and recovery during rollout. This is a trusted-server model, not an
+      // result once. Legacy split roll endpoints have been removed. This is a trusted-server model, not an
       // independent third-party randomness attestation.
       if (action === "roll") {
         const clientSeed = String(parsedBody?.clientSeed ?? "").trim().toLowerCase();
@@ -580,7 +579,7 @@ export default {
         }
 
         const rollResponse = await target.fetch(
-          new Request("https://room/roll/fast", {
+          new Request("https://room/roll", {
             method: "POST",
             headers,
             body: JSON.stringify({ clientSeed, clientCommitment }),
