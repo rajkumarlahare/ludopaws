@@ -27,8 +27,8 @@ import android.widget.TextView
 
 internal object AgeSafetyUi {
     /**
-     * Neutral, full-window age screen: every band has equal visual weight and none is
-     * preselected. Choice is saved locally before account bootstrap or ad requests.
+     * Neutral, full-window birthdate screen: no date is pre-filled and no age is suggested.
+     * The full date is validated locally; only the resulting age band is stored on-device.
      */
     fun showAgeRangeIfNeeded(activity: Activity, onSelected: () -> Unit) {
         if (AgeSafetyPolicy.hasSelectedAgeRange(activity)) {
@@ -87,7 +87,7 @@ internal object AgeSafetyUi {
             text = "CONTINUE"
             setOnClickListener {
                 val age = ageFromBirthDate(birthDate.text.toString().trim())
-                val selected = age?.let(AgeRange::fromAge)
+                val selected = age?.let { AgeRange.fromAge(it) }
                 if (selected == null) {
                     birthDate.error = "Enter a valid past date as DD/MM/YYYY."
                     return@setOnClickListener
