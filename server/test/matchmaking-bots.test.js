@@ -171,6 +171,26 @@ test("bot settings are bounded and bots receive non-profile identities", () => {
   assert.ok(bots.every((bot) => bot.characterId !== "dog"));
 });
 
+test("bot participant creation supports both V4 rulesets", () => {
+  const onlineBots = createBotParticipants({
+    count: 1,
+    playerCount: 2,
+    matchMode: "ONLINE",
+    rulesetKey: "CLASSIC_V4",
+  });
+  const teamBots = createBotParticipants({
+    count: 1,
+    playerCount: 4,
+    matchMode: "TEAM_UP",
+    rulesetKey: "TEAM_UP_V4",
+  });
+
+  assert.equal(onlineBots[0].rulesetKey, "CLASSIC_V4");
+  assert.equal(teamBots[0].rulesetKey, "TEAM_UP_V4");
+  assert.equal(onlineBots[0].playerType, "BOT");
+  assert.equal(teamBots[0].playerType, "BOT");
+});
+
 test("disabling bot fill keeps an expired real-player search queued without creating a match", async () => {
   const env = makeEnv();
   env.LUDOPROOF_BOT_MATCH_FILL_ENABLED = "false";
