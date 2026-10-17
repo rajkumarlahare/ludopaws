@@ -144,8 +144,8 @@ internal object OnlineLudoPawsPresentation {
         host.voiceControls.visibility = View.GONE
         runCatching {
             activity.boardFrame.removeView(host.board)
-            activity.matchStatusPanel.removeView(host.topRail)
-            activity.actionPanel.removeView(host.bottomRail)
+            activity.arcadeRootView.removeView(host.topRail)
+            activity.arcadeRootView.removeView(host.bottomRail)
         }
         activity.boardFrame.tag = null
         activity.boardView.visibility = View.VISIBLE
@@ -237,28 +237,32 @@ internal object OnlineLudoPawsPresentation {
             ),
         )
 
+        // Player rails must live in the screen-level overlay, not inside the
+        // small matchStatusPanel/actionPanel containers. Alignment intentionally
+        // moves them across the content column, and those original parents clip
+        // children once the translation carries a rail outside the panel bounds.
         val topRail = playerRail(activity)
-        activity.matchStatusPanel.addView(
-            topRail,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            ).apply {
-                topMargin = dp(activity, 2)
-            },
-        )
-
         val bottomRail = playerRail(activity)
-        activity.actionPanel.addView(
-            bottomRail,
-            0,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            ).apply {
-                bottomMargin = dp(activity, 2)
-            },
+        activity.arcadeRootView.clipChildren = false
+        activity.arcadeRootView.clipToPadding = false
+        activity.arcadeRootView.addView(
+            topRail,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP,
+            ),
         )
+        activity.arcadeRootView.addView(
+            bottomRail,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP,
+            ),
+        )
+        topRail.bringToFront()
+        bottomRail.bringToFront()
 
         val voiceStatus =
             TextView(activity).apply {
