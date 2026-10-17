@@ -573,11 +573,12 @@ export default {
         RATE_POLICIES[policyKey],
       );
 
-      // A normal online roll takes two client/server round trips today:
-      // commit, then reveal. Bundle those two existing, fully guarded room operations
-      // behind one client request. Both operations still pass through the complete
-      // MatchRoom wrapper chain, preserving timeout, replay, Team Up, bot, and proof
-      // policies while removing one WAN round trip from the critical path.
+      // New online rolls use one client-to-Worker request and one room request.
+      // The room executes the existing authoritative game-rule transition under its
+      // serialized mutation queue, generates a server-CSPRNG receipt, and persists the
+      // result once. Legacy commit/reveal endpoints remain available for in-flight
+      // sessions and recovery during rollout. This is a trusted-server model, not an
+      // independent third-party randomness attestation.
       if (action === "roll") {
         const clientSeed = String(parsedBody?.clientSeed ?? "").trim().toLowerCase();
         const clientCommitment = String(parsedBody?.clientCommitment ?? "").trim().toLowerCase();
