@@ -2324,8 +2324,14 @@ test(
       (event) => event.playerId === after.players[1].playerId && event.moveTokenIndex != null,
     ));
     assert.ok(after.history.some((event) => event.randomnessSource === "ludopaws-server-csprng-v1"));
-    assert.equal(after.botTurn?.eventIndex, 1);
-    assert.equal(after.botTurn?.inProgress, false);
+    if (after.botTurn) {
+      // A six grants an extra turn and schedules the bot again; another face
+      // correctly passes the turn to the human and clears the bot metadata.
+      assert.equal(after.botTurn.eventIndex, 1);
+      assert.equal(after.botTurn.inProgress, false);
+    } else {
+      assert.notEqual(after.turnSeat, 1);
+    }
   },
 );
 
