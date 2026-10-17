@@ -40,6 +40,7 @@ import {
   fairnessSummary,
   sealFairnessEvent,
 } from "./fairness.js";
+import { createFastDiceReceipt } from "./dice-fast.js";
 import {
   normalizeLeaderboardProfileId,
 } from "./leaderboard-core.js";
@@ -120,6 +121,9 @@ export class MatchRoom {
       }
       if (request.method === "POST" && url.pathname === "/start") {
         return await this.#mutate(() => this.#start(request));
+      }
+      if (request.method === "POST" && url.pathname === "/roll/fast") {
+        return await this.#mutate(() => this.#fastRoll(request, body));
       }
       if (request.method === "POST" && url.pathname === "/roll/commit") {
         return await this.#mutate(() => this.#commitRoll(request, body));
@@ -757,6 +761,183 @@ export class MatchRoom {
         publicStateWithHistory(
           next,
         ),
+    });
+  }
+
+  async #fastRoll(request, body) {
+    const clientSeed = requireDigest(body?.clientSeed, "clientSeed");
+    const clientCommitment = requireDigest(body?.clientCommitment, "clientCommitment").toLowerCase();
+    const expectedCommitment = await sha256Hex(
+      "entronex:v4:client-commit:" + clientSeed,
+    );
+    if (expectedCommitment !== clientCommitment) {
+      throw httpError(
+        400,
+        "CLIENT_COMMITMENT_MISMATCH",
+        "clientSeed does not match clientCommitment",
+      );
+    }
+
+    let state = await this.#requireState();
+    const player = await this.#authorize(state, request);
+    const history = Array.isArray(state.history) ? state.history : [];
+
+    const replayFastEvent = (event) => {
+      const pending = state.pendingRoll;
+      const awaitingMove =
+        pending?.status === "RESOLVED" &&
+        pending.eventIndex === event.eventIndex &&
+        pending.playerId === player.playerId;
+      return json(200, {
+        replayed: true,
+        outcome: event.outcome,
+        proofDigest: event.proofDigest,
+        roundId: event.roundId,
+        legalTokenIndexes: awaitingMove
+          ? (pending.legalTokenIndexes ?? [])
+          : (event.legalTokenIndexes ?? []),
+        awaitingMove,
+        forfeitedThirdSix: Boolean(event.forfeitedThirdSix),
+        proof: event.fastDiceReceipt,
+        state: publicStateWithHistory(state),
+      });
+    };
+
+    if (state.pendingRoll) {
+      const pending = state.pendingRoll;
+      if (
+        pending.playerId !== player.playerId ||
+        pending.clientCommitment !== clientCommitment
+      ) {
+        throw httpError(
+          409,
+          "ROLL_ALREADY_PENDING",
+          "this turn already has a different pending roll",
+        );
+      }
+
+      const pendingEvent = [...history].reverse().find(
+        (event) =>
+          event.eventIndex === pending.eventIndex &&
+          event.playerId === player.playerId &&
+          event.clientCommitment === clientCommitment &&
+          event.fastDiceReceipt,
+      );
+      if (pendingEvent) return replayFastEvent(pendingEvent);
+
+      // Allow an old app's already-committed roll to finish after an app/server
+      // update. New rolls never enter the EntroNex path.
+      if (["COMMITTED", "RESOLVING"].includes(pending.status)) {
+        return this.#revealRoll(request, { clientSeed });
+      }
+      if (pending.status === "CREATING") {
+        const committed = await this.#commitRoll(request, { clientCommitment });
+        if (!committed.ok) return committed;
+        return this.#revealRoll(request, { clientSeed });
+      }
+      throw httpError(409, "ROLL_BUSY", "roll is currently resolving");
+    }
+
+    const previous = [...history].reverse().find(
+      (event) =>
+        event.playerId === player.playerId &&
+        event.clientCommitment === clientCommitment &&
+        event.status === "RESOLVED",
+    );
+    if (previous?.fastDiceReceipt) return replayFastEvent(previous);
+    if (previous) {
+      return this.#replayHistoricalReveal(state, player, clientCommitment);
+    }
+
+    const eventIndex = state.randomEventIndex;
+    const actorHash = await sha256Hex(
+      "ludoproof:actor:v1:" + player.playerId,
+    );
+    const snapshot = {
+      ...authoritativeStateForRandomness(state),
+      history: historyForHash(history),
+    };
+    const previousStateHash = await sha256Hex(
+      "entronex:v4:game-state:" + canonicalJson(snapshot),
+    );
+    const rulesetHash = await rulesetHashForState(state);
+    const now = Date.now();
+
+    const receipt = await createFastDiceReceipt({
+      matchId: state.matchId,
+      eventIndex,
+      playerId: player.playerId,
+      clientCommitment,
+      issuedAt: now,
+    });
+    const reserved = reserveRoll(state, {
+      playerId: player.playerId,
+      clientCommitment,
+      eventIndex,
+      actorHash,
+      previousStateHash,
+      rulesetHash,
+      now,
+    });
+    const committed = attachRoundCommitment(reserved, {
+      roundId: receipt.roundId,
+      serverCommitment: receipt.serverCommitment,
+      revealDeadlineAt: now + ROLL_REVEAL_TIMEOUT_MS,
+      now,
+    });
+    const result = registerResolvedRoll(committed, {
+      outcome: receipt.outcome,
+      proofDigest: receipt.proofDigest,
+      now,
+    });
+    const latest = result.state;
+    const fairnessEvent = sealFairnessEvent(history, {
+      eventIndex,
+      eventId: `roll:${eventIndex}`,
+      playerId: player.playerId,
+      color: state.players[state.pendingRoll?.seat ?? player.seat]?.color ?? player.color,
+      roundId: receipt.roundId,
+      serverCommitment: receipt.serverCommitment,
+      clientCommitment,
+      actorHash,
+      previousStateHash,
+      rulesetHash,
+      proofDigest: receipt.proofDigest,
+      outcome: receipt.outcome,
+      moveTokenIndex: null,
+      captures: 0,
+      status: "RESOLVED",
+      resolvedAt: now,
+    });
+    latest.history = [
+      ...history,
+      {
+        ...fairnessEvent,
+        fastDiceReceipt: receipt,
+        randomnessSource: receipt.protocol,
+        legalTokenIndexes: result.legalTokenIndexes,
+        forfeitedThirdSix: result.forfeitedThirdSix === true,
+      },
+    ].slice(-200);
+
+    await this.#persist(latest);
+    console.info("ludopaws_dice_perf", {
+      phase: "server_csprng_roll",
+      matchId: state.matchId,
+      eventIndex,
+      elapsedMs: Date.now() - now,
+    });
+
+    return json(200, {
+      replayed: false,
+      outcome: receipt.outcome,
+      proofDigest: receipt.proofDigest,
+      roundId: receipt.roundId,
+      legalTokenIndexes: result.legalTokenIndexes,
+      awaitingMove: result.awaitingMove,
+      forfeitedThirdSix: result.forfeitedThirdSix,
+      proof: receipt,
+      state: publicStateWithHistory(latest),
     });
   }
 
