@@ -216,13 +216,20 @@ export class MatchRoom extends LifecycleMatchRoom {
         bot.joinRequestId,
       );
 
+      let justRevealedRoll = false;
       if (!state.pendingRoll) {
         await this.#internalPlayerRequest(
-          "/roll/commit",
+          "/roll/fast",
           identity.playerToken,
-          { clientCommitment: turn.clientCommitment },
+          {
+            clientSeed: turn.clientSeed,
+            clientCommitment: turn.clientCommitment,
+          },
         );
         state = await this.ctx.storage.get(STATE_KEY);
+        justRevealedRoll =
+          state?.pendingRoll?.playerId === bot.playerId &&
+          state?.pendingRoll?.status === "RESOLVED";
       }
 
       let pending = state?.pendingRoll;
@@ -231,7 +238,8 @@ export class MatchRoom extends LifecycleMatchRoom {
         return;
       }
 
-      let justRevealedRoll = false;
+      // Finish a legacy in-progress reveal if a bot turn was interrupted across
+      // a version switch. All newly-created bot rolls use the one-call CSPRNG path.
       if (pending.status !== "RESOLVED") {
         await this.#internalPlayerRequest(
           "/roll/reveal",
