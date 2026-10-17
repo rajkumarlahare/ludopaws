@@ -446,27 +446,35 @@ internal object OnlineLudoPawsPresentation {
         activity.actionPanel.clipChildren = false
         activity.actionPanel.clipToPadding = false
 
+        // Each run starts from the current base bounds (screen location with the
+        // previously applied translation removed) and assigns a fresh absolute
+        // translation. This prevents drift across repeated renders and relayouts.
         board.post {
-            if (board.width <= 0 || board.height <= 0) return@post
-            val boardLocation = IntArray(2)
-            board.getLocationOnScreen(boardLocation)
-            val gap = dp(activity, 8)
+            if (board.width <= 0 || board.height <= 0 ||
+                host.topRail.height <= 0 || host.bottomRail.height <= 0
+            ) return@post
 
-            host.topRail.post {
-                if (host.topRail.height <= 0) return@post
-                val railLocation = IntArray(2)
-                host.topRail.getLocationOnScreen(railLocation)
-                val targetBottom = boardLocation[1] - gap
-                host.topRail.translationY +=
-                    (targetBottom - (railLocation[1] + host.topRail.height)).toFloat()
-            }
-            host.bottomRail.post {
-                if (host.bottomRail.height <= 0) return@post
-                val railLocation = IntArray(2)
-                host.bottomRail.getLocationOnScreen(railLocation)
-                val targetTop = boardLocation[1] + board.height + gap
-                host.bottomRail.translationY += (targetTop - railLocation[1]).toFloat()
-            }
+            val boardLocation = IntArray(2)
+            val topRailLocation = IntArray(2)
+            val bottomRailLocation = IntArray(2)
+            board.getLocationOnScreen(boardLocation)
+            host.topRail.getLocationOnScreen(topRailLocation)
+            host.bottomRail.getLocationOnScreen(bottomRailLocation)
+
+            val gap = dp(activity, 8)
+            val topRailBaseTop = topRailLocation[1] - host.topRail.translationY.toInt()
+            val bottomRailBaseTop = bottomRailLocation[1] - host.bottomRail.translationY.toInt()
+            val translation = OnlineBoardRailAlignmentPolicy.calculate(
+                boardTopOnScreen = boardLocation[1],
+                boardHeight = board.height,
+                topRailTopOnScreen = topRailBaseTop,
+                topRailHeight = host.topRail.height,
+                bottomRailTopOnScreen = bottomRailBaseTop,
+                gapPx = gap,
+            )
+
+            host.topRail.translationY = translation.top
+            host.bottomRail.translationY = translation.bottom
         }
     }
 
