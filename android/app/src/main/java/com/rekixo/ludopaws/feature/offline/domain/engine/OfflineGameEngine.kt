@@ -44,7 +44,7 @@ class OfflineGameEngine(
 
     fun snapshot(): MatchSnapshot? = state?.toSnapshot()
 
-    fun lastRandomnessAudit(): OfflineRandomnessAudit? = state?.lastAudit
+    fun lastNativeDiceReceipt(): NativeDiceReceipt? = state?.lastAudit
 
     fun activePlayerId(): String? =
         state?.players?.getOrNull(state?.turnSeat ?: -1)?.playerId
@@ -134,56 +134,45 @@ class OfflineGameEngine(
         val event = current.eventIndex
         val player = current.players[seat]
 
-        val result =
-            OfflineLudoV3Binding.deriveRoll(
-                matchId = current.matchId,
-                status = current.status,
-                players =
-                    current.players.map { bindingPlayer ->
-                        OfflineV3BindingPlayer(
-                            playerId = bindingPlayer.playerId,
-                            color = bindingPlayer.color,
-                            tokens = bindingPlayer.tokens.toList(),
-                        )
-                    },
-                turnSeat = current.turnSeat,
-                eventIndex = event,
-                consecutiveSixes = current.consecutiveSixes.toList(),
-                openingRollConsumed = current.openingRollConsumed.toList(),
-                winnerPlayerId = current.winnerPlayerId,
-                history =
-                    current.history.map { history ->
-                        OfflineV3BindingHistory(
-                            eventIndex = history.eventIndex,
-                            playerId = history.playerId,
-                            clientCommitment = history.clientCommitment,
-                            proofDigest = history.proofDigest,
-                            randomOutcome = history.randomOutcome,
-                            effectiveOutcome = history.outcome,
-                            moveTokenIndex = history.moveTokenIndex,
-                            captures = history.captures,
-                            fairnessDigest = history.fairnessDigest,
-                        )
-                    },
-            )
-
-        check(result.outcome in 1..6) {
-            "Local EntroNex v4 outcome is outside the locked Ludo range"
+        val stateMaterial = NativeDiceEngine.canonicalJson(
+            mapOf(
+                "matchId" to current.matchId,
+                "status" to current.status,
+                "players" to current.players.map { bindingPlayer ->
+                    mapOf(
+                        "playerId" to bindingPlayer.playerId,
+                        "color" to bindingPlayer.color,
+                        "tokens" to bindingPlayer.tokens.toList(),
+                    )
+                },
+                "turnSeat" to current.turnSeat,
+                "eventIndex" to event,
+                "consecutiveSixes" to current.consecutiveSixes.toList(),
+                "openingRollConsumed" to current.openingRollConsumed.toList(),
+                "winnerPlayerId" to current.winnerPlayerId,
+                "history" to current.history.map { history ->
+                    mapOf(
+                        "eventIndex" to history.eventIndex,
+                        "playerId" to history.playerId,
+                        "outcome" to history.outcome,
+                        "moveTokenIndex" to history.moveTokenIndex,
+                        "captures" to history.captures,
+                        "fairnessDigest" to history.fairnessDigest,
+                    )
+                },
+            ),
+        )
+        val audit = NativeDiceEngine.createReceipt(
+            matchId = current.matchId,
+            eventIndex = event,
+            playerId = player.playerId,
+            stateMaterial = stateMaterial,
+        )
+        check(audit.outcome in 1..6 && audit.verify()) {
+            "Native Ludo Paws dice receipt verification failed"
         }
-        check(EntroNexV4Local.verify(result)) {
-            "Local EntroNex v4 proof verification failed"
-        }
+        val randomOutcome = audit.outcome
 
-        val audit =
-            OfflineRandomnessAudit.fromResult(
-                eventIndex = event,
-                result = result,
-            )
-        check(audit.verify()) {
-            "Local EntroNex v4 audit verification failed"
-        }
-
-        val randomOutcome = result.outcome
         val openingRollApplied =
             LudoTurnAutomationPolicy.shouldGuaranteeOpeningSix(
                 tokens = player.tokens,
@@ -221,16 +210,15 @@ class OfflineGameEngine(
                     eventIndex = event,
                     playerId = player.playerId,
                     color = player.color,
-                    roundId = result.roundId,
-                    serverCommitment = result.serverCommitment,
-                    clientCommitment = result.clientCommitment,
-                    actorHash = result.config.context.subjectHash,
-                    previousStateHash = result.config.context.previousStateHash,
-                    rulesetHash = result.config.context.metadataDigest,
-                    proofDigest = result.proofDigest,
-                    // The proof receipt always records the actual verified
-                    // EntroNex result. Gameplay may apply the versioned opening
-                    // bonus separately.
+                    roundId = audit.roundId,
+                    serverCommitment = null,
+                    clientCommitment = null,
+                    actorHash = audit.actorHash,
+                    previousStateHash = audit.previousStateHash,
+                    rulesetHash = audit.rulesetHash,
+                    proofDigest = audit.proofDigest,
+                    // Store the native random face; the opening-roll bonus is
+                    // a separate deterministic gameplay rule.
                     outcome = randomOutcome,
                 ),
                 current.history
@@ -247,13 +235,13 @@ class OfflineGameEngine(
                 eventIndex = event,
                 playerId = player.playerId,
                 color = player.color,
-                roundId = result.roundId,
-                serverCommitment = result.serverCommitment,
-                clientCommitment = result.clientCommitment,
-                actorHash = result.config.context.subjectHash,
-                previousStateHash = result.config.context.previousStateHash,
-                rulesetHash = result.config.context.metadataDigest,
-                proofDigest = result.proofDigest,
+                roundId = audit.roundId,
+                serverCommitment = null,
+                clientCommitment = null,
+                actorHash = audit.actorHash,
+                previousStateHash = audit.previousStateHash,
+                rulesetHash = audit.rulesetHash,
+                proofDigest = audit.proofDigest,
                 fairnessProtocol = fairnessMaterial.fairnessProtocol,
                 previousFairnessDigest = fairnessMaterial.previousFairnessDigest,
                 fairnessDigest = fairnessMaterial.fairnessDigest,
@@ -296,9 +284,9 @@ class OfflineGameEngine(
         current.pendingOutcome = outcome
         current.pendingLegal = legal.toMutableSet()
         current.pendingEventIndex = event
-        current.pendingRoundId = result.roundId
-        current.pendingClientCommitment = result.clientCommitment
-        current.pendingProofDigest = result.proofDigest
+        current.pendingRoundId = audit.roundId
+        current.pendingClientCommitment = null
+        current.pendingProofDigest = audit.proofDigest
         current.revision += 1
         persist()
         return current.toSnapshot()
@@ -772,7 +760,7 @@ class OfflineGameEngine(
                 finishedPlayerIds = restoredFinishedPlayerIds,
                 history = history,
                 lastAudit =
-                    OfflineRandomnessAudit.fromJson(
+                    NativeDiceReceipt.fromJson(
                         json.optJSONObject("lastAudit"),
                     ),
                 revision = json.optInt("revision", 1),
@@ -920,10 +908,7 @@ class OfflineGameEngine(
                         eventIndex = pendingEventIndex ?: (eventIndex - 1),
                         eventId = "roll:${pendingEventIndex ?: (eventIndex - 1)}",
                         roundId = pendingRoundId,
-                        serverCommitment =
-                            lastAudit
-                                ?.takeIf { it.eventIndex == pendingEventIndex }
-                                ?.serverCommitment,
+                        serverCommitment = null,
                         clientCommitment = pendingClientCommitment,
                         revealDeadlineAt = null,
                         proofDigest = pendingProofDigest,
@@ -935,7 +920,7 @@ class OfflineGameEngine(
                     )
                 },
             winnerPlayerId = winnerPlayerId,
-            rulesetId = OfflineLudoV3Binding.RULESET_ID,
+            rulesetId = NativeDiceEngine.RULESET_ID,
             history = history.map { it.toSnapshot() },
             finishOrderPlayerIds = finishedPlayerIds.toList(),
         )
@@ -1025,7 +1010,7 @@ class OfflineGameEngine(
         var winnerPlayerId: String?,
         val finishedPlayerIds: MutableList<String>,
         val history: MutableList<LocalHistoryEvent>,
-        var lastAudit: OfflineRandomnessAudit?,
+        var lastAudit: NativeDiceReceipt?,
         var revision: Int,
     )
 
