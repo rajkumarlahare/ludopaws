@@ -565,6 +565,45 @@ test("Online 2-player fallback adds exactly one bot for a lone queued human", as
   );
 });
 
+test("Team Up V4 fallback fills bots and starts an authoritative V4 match", async () => {
+  const env = makeEnv();
+  const queue = new TeamMatchmakerQueue({ storage: new FakeStorage() }, env);
+  const player = human(61, 4, true);
+  const search = await parse(await queue.fetch(
+    request("/search", {
+      clientRequestId: player.clientRequestId,
+      displayName: player.displayName,
+      characterId: player.characterId,
+      rulesetKey: "TEAM_UP_V4",
+    }, player.profileToken),
+  ));
+  assert.equal(search.status, 202);
+  assert.equal(search.body.status, "SEARCHING");
+
+  await backdateQueue(queue, "team-matchmaking-state-v1");
+  await queue.alarm();
+
+  const matched = await parse(await queue.fetch(
+    request("/status", {
+      clientRequestId: player.clientRequestId,
+    }, player.profileToken),
+  ));
+  assert.equal(matched.status, 200);
+  assert.equal(matched.body.status, "MATCHED");
+  assert.equal(matched.body.state.status, "ACTIVE");
+  assert.equal(matched.body.state.matchMode, "TEAM_UP");
+  assert.equal(matched.body.state.rulesetId, "ludoproof-team-v4");
+  assert.equal(matched.body.state.players.length, 4);
+  assert.deepEqual(
+    matched.body.state.players.map((seat) => seat.playerType),
+    ["HUMAN", "BOT", "BOT", "BOT"],
+  );
+  assert.deepEqual(
+    matched.body.state.players.map((seat) => seat.teamId),
+    ["A", "B", "A", "B"],
+  );
+});
+
 test("Team Up fallback can fill all three empty seats with bots", async () => {
   const env = makeEnv();
   const queue = new TeamMatchmakerQueue({ storage: new FakeStorage() }, env);
