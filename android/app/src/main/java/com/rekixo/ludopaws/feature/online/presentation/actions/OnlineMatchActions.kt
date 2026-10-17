@@ -266,33 +266,46 @@ internal fun MainActivity.rollVerifiedDice() {
         GameSoundFeedback.roll(this, rollEventIndex)
         verificationText.text =
             if (decision.kind == OnlineRollActionKind.NEW_ROLL) {
-                "Verifying committed EntroNex roll…"
+                "Rolling and verifying dice result…"
             } else {
-                "Resuming committed EntroNex roll…"
+                "Resuming verified dice result…"
             }
 
         runNetwork(
             action = {
-                when (decision.kind) {
-                    OnlineRollActionKind.NEW_ROLL,
-                    OnlineRollActionKind.RESUME_COMMIT_THEN_REVEAL,
-                    ->
+                val revealed = when (decision.kind) {
+                    OnlineRollActionKind.NEW_ROLL ->
+                        // One client request bundles the existing server commit/reveal
+                        // operations. Recovery paths deliberately keep their legacy calls.
+                        api.roll(
+                            code,
+                            token,
+                            resumableSecret.clientSeed,
+                            resumableSecret.clientCommitment,
+                        )
+
+                    OnlineRollActionKind.RESUME_COMMIT_THEN_REVEAL -> {
                         api.commitRoll(
                             code,
                             token,
                             resumableSecret.clientCommitment,
                         )
+                        api.revealRoll(
+                            code,
+                            token,
+                            resumableSecret.clientSeed,
+                        )
+                    }
 
-                    OnlineRollActionKind.RESUME_REVEAL_ONLY -> Unit
+                    OnlineRollActionKind.RESUME_REVEAL_ONLY ->
+                        api.revealRoll(
+                            code,
+                            token,
+                            resumableSecret.clientSeed,
+                        )
+
                     else -> error("Online roll action changed before submission")
                 }
-
-                val revealed =
-                    api.revealRoll(
-                        code,
-                        token,
-                        resumableSecret.clientSeed,
-                    )
 
                 pendingRollStore.clear()
                 pendingSecret = null
