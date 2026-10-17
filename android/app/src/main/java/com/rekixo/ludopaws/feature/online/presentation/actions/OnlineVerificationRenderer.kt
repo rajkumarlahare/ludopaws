@@ -69,10 +69,9 @@ internal fun MainActivity.updateVerification(
             }
 
             when (pending?.status) {
-                "CREATING" -> "COMMITTING • Preparing server commitment…"
-                "COMMITTED" ->
-                    "COMMITTED • Server commitment secured. Reveal can resume safely."
-                "RESOLVING" -> "VERIFYING • Resolving committed EntroNex round…"
+                "CREATING" -> "WAITING • Settling a previous turn…"
+                "COMMITTED" -> "WAITING • Settling a previous turn…"
+                "RESOLVING" -> "WAITING • Settling a previous turn…"
                 "RESOLVED" ->
                     "VERIFYING • Waiting for the complete proof before showing a verified result."
                 else -> "No verified roll yet."
@@ -112,18 +111,13 @@ internal fun MainActivity.onlineRollActionDecision(
         state.status == "ACTIVE" &&
             mySeat >= 0 &&
             actionableSeat == mySeat
-    val secret = pendingSecret
-
     return OnlineRollActionPolicy.resolve(
         isOnline = isOnline,
         hasAuthoritativeState = hasAuthoritativeActionState(),
         matchStatus = state.status,
         myTurn = myTurn,
         pendingStatus = state.pendingRoll?.status,
-        remoteClientCommitment = state.pendingRoll?.clientCommitment,
-        currentMatchId = state.matchId,
-        localSecretMatchId = secret?.matchId,
-        localClientCommitment = secret?.clientCommitment,
+        pendingStatus = state.pendingRoll?.status,
     )
 }
 

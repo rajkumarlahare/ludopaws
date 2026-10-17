@@ -16,7 +16,7 @@ object SeedCommitment {
             "%02x".format(it.toInt() and 0xff)
         }
         val commitment = sha256Hex(
-            "entronex:v4:client-commit:$seed",
+            "ludopaws:native-roll:v1:client-commit:$seed",
         )
         return PreparedRoll(seed, commitment)
     }

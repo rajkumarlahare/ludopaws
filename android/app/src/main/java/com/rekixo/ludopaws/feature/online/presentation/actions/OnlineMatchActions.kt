@@ -264,58 +264,26 @@ internal fun MainActivity.rollVerifiedDice() {
         diceView.startRolling()
         OnlineLudoPawsPresentation.noteLocalRollStarted(this, code, rollEventIndex)
         GameSoundFeedback.roll(this, rollEventIndex)
-        verificationText.text =
-            if (decision.kind == OnlineRollActionKind.NEW_ROLL) {
-                "Rolling securely on the match server…"
-            } else {
-                "Recovering the previous dice result…"
-            }
+        verificationText.text = "Rolling with native LudoPaws dice…"
 
         runNetwork(
             action = {
-                val revealed = when (decision.kind) {
-                    OnlineRollActionKind.NEW_ROLL ->
-                        // One client request bundles the existing server commit/reveal
-                        // operations. Recovery paths deliberately keep their legacy calls.
-                        api.roll(
-                            code,
-                            token,
-                            resumableSecret.clientSeed,
-                            resumableSecret.clientCommitment,
-                        )
-
-                    OnlineRollActionKind.RESUME_COMMIT_THEN_REVEAL -> {
-                        api.commitRoll(
-                            code,
-                            token,
-                            resumableSecret.clientCommitment,
-                        )
-                        api.revealRoll(
-                            code,
-                            token,
-                            resumableSecret.clientSeed,
-                        )
-                    }
-
-                    OnlineRollActionKind.RESUME_REVEAL_ONLY ->
-                        api.revealRoll(
-                            code,
-                            token,
-                            resumableSecret.clientSeed,
-                        )
-
-                    else -> error("Online roll action changed before submission")
-                }
-
+                // Native rolls are atomic and idempotent: a retry with the same
+                // local request secret returns the same stored result.
+                val result = api.roll(
+                    code,
+                    token,
+                    resumableSecret.clientSeed,
+                    resumableSecret.clientCommitment,
+                )
                 pendingRollStore.clear()
                 pendingSecret = null
-                revealed
+                result
             },
             reconcileOnError = true,
             prioritizeGameplay = true,
             onComplete = { releaseOnlineGameplayRequest() },
-        )
-    }
+        )    }
 }
 
 internal fun MainActivity.moveToken(

@@ -2,8 +2,6 @@ package com.rekixo.ludopaws.feature.online
 
 enum class OnlineRollActionKind {
     NEW_ROLL,
-    RESUME_COMMIT_THEN_REVEAL,
-    RESUME_REVEAL_ONLY,
     WAIT_FOR_RECOVERY,
     MOVE_REQUIRED,
     DISABLED,
@@ -16,12 +14,9 @@ data class OnlineRollActionDecision(
 )
 
 /**
- * Fail-closed presentation/action policy for EntroNex commit/reveal recovery.
- *
- * A server-side pending roll belongs to the exact client commitment that opened
- * it. Android may resume that roll only when the locally protected seed matches
- * the authoritative commitment. Cached/offline snapshots are presentation-only
- * and may never authorize a new or resumed mutation.
+ * Native roll requests resolve atomically on the authoritative match server.
+ * A resolved result requires a move; any stale pre-migration pending turn waits
+ * for lifecycle timeout rather than calling a retired split roll endpoint.
  */
 object OnlineRollActionPolicy {
     fun resolve(
@@ -30,14 +25,8 @@ object OnlineRollActionPolicy {
         matchStatus: String,
         myTurn: Boolean,
         pendingStatus: String?,
-        remoteClientCommitment: String?,
-        currentMatchId: String?,
-        localSecretMatchId: String?,
-        localClientCommitment: String?,
     ): OnlineRollActionDecision {
-        if (matchStatus != "ACTIVE" || !myTurn) {
-            return disabled()
-        }
+        if (matchStatus != "ACTIVE" || !myTurn) return disabled()
         if (!isOnline) {
             return OnlineRollActionDecision(
                 kind = OnlineRollActionKind.DISABLED,
@@ -52,15 +41,6 @@ object OnlineRollActionPolicy {
                 label = "SYNCING MATCH",
             )
         }
-
-        if (pendingStatus == null) {
-            return OnlineRollActionDecision(
-                kind = OnlineRollActionKind.NEW_ROLL,
-                enabled = true,
-                label = "ROLL VERIFIED DICE",
-            )
-        }
-
         if (pendingStatus == "RESOLVED") {
             return OnlineRollActionDecision(
                 kind = OnlineRollActionKind.MOVE_REQUIRED,
@@ -68,52 +48,23 @@ object OnlineRollActionPolicy {
                 label = "MOVE A TOKEN",
             )
         }
-
-        val matchingSecret =
-            currentMatchId != null &&
-                localSecretMatchId == currentMatchId &&
-                !localClientCommitment.isNullOrBlank() &&
-                !remoteClientCommitment.isNullOrBlank() &&
-                localClientCommitment == remoteClientCommitment
-
-        if (!matchingSecret) {
+        if (pendingStatus != null) {
             return OnlineRollActionDecision(
                 kind = OnlineRollActionKind.WAIT_FOR_RECOVERY,
                 enabled = false,
-                label = "WAITING FOR ROLL RECOVERY",
+                label = "WAITING FOR PREVIOUS TURN",
             )
         }
-
-        return when (pendingStatus) {
-            "CREATING" ->
-                OnlineRollActionDecision(
-                    kind = OnlineRollActionKind.RESUME_COMMIT_THEN_REVEAL,
-                    enabled = true,
-                    label = "RESUME VERIFIED ROLL",
-                )
-
-            "COMMITTED",
-            "RESOLVING",
-            ->
-                OnlineRollActionDecision(
-                    kind = OnlineRollActionKind.RESUME_REVEAL_ONLY,
-                    enabled = true,
-                    label = "RESUME VERIFIED ROLL",
-                )
-
-            else ->
-                OnlineRollActionDecision(
-                    kind = OnlineRollActionKind.WAIT_FOR_RECOVERY,
-                    enabled = false,
-                    label = "WAITING FOR ROLL RECOVERY",
-                )
-        }
+        return OnlineRollActionDecision(
+            kind = OnlineRollActionKind.NEW_ROLL,
+            enabled = true,
+            label = "ROLL DICE",
+        )
     }
 
-    private fun disabled() =
-        OnlineRollActionDecision(
-            kind = OnlineRollActionKind.DISABLED,
-            enabled = false,
-            label = "ROLL VERIFIED DICE",
-        )
+    private fun disabled() = OnlineRollActionDecision(
+        kind = OnlineRollActionKind.DISABLED,
+        enabled = false,
+        label = "ROLL DICE",
+    )
 }

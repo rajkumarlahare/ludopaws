@@ -272,22 +272,6 @@ class GameApi(
                 .put("clientCommitment", clientCommitment),
         )
 
-    fun commitRoll(matchId: String, playerToken: String, clientCommitment: String): JSONObject =
-        request(
-            method = "POST",
-            path = "/api/matches/${matchId.uppercase()}/roll/commit",
-            playerToken = playerToken,
-            body = JSONObject().put("clientCommitment", clientCommitment),
-        )
-
-    fun revealRoll(matchId: String, playerToken: String, clientSeed: String): JSONObject =
-        request(
-            method = "POST",
-            path = "/api/matches/${matchId.uppercase()}/roll/reveal",
-            playerToken = playerToken,
-            body = JSONObject().put("clientSeed", clientSeed),
-        )
-
     fun move(
         matchId: String,
         playerToken: String,
