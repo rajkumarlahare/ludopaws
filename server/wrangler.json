@@ -163,5 +163,39 @@
       "head_sampling_rate": 1,
       "persist": true
     }
-  }
+  },
+  "ratelimits": [
+    {
+      "name": "LUDOPROOF_MATCH_CREATE_LIMITER",
+      "namespace_id": "8610172026101701",
+      "simple": {
+        "limit": 12,
+        "period": 60
+      }
+    },
+    {
+      "name": "LUDOPROOF_MATCH_JOIN_LIMITER",
+      "namespace_id": "8610172026101702",
+      "simple": {
+        "limit": 30,
+        "period": 60
+      }
+    },
+    {
+      "name": "LUDOPROOF_MATCH_STATE_LIMITER",
+      "namespace_id": "8610172026101703",
+      "simple": {
+        "limit": 120,
+        "period": 60
+      }
+    },
+    {
+      "name": "LUDOPROOF_MATCH_MUTATION_LIMITER",
+      "namespace_id": "8610172026101704",
+      "simple": {
+        "limit": 90,
+        "period": 60
+      }
+    }
+  ]
 }
