@@ -3,6 +3,7 @@ package com.rekixo.ludopaws.core.audio
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.SoundPool
+import android.util.Log
 import androidx.annotation.RawRes
 
 /**
@@ -240,6 +241,7 @@ object LudoPawsSoundPool {
                 pending[lowestIndex] = request
             }
         }
+        Log.d(TAG, "PLAY_QUEUED key=" + key + " ready=false queued=" + pendingByKey[key]?.size)
         return true
     }
 
@@ -271,20 +273,30 @@ object LudoPawsSoundPool {
 
         created.setOnLoadCompleteListener { soundPool, soundId, status ->
             synchronized(this) {
-                if (
-                    soundPool !== pool ||
-                    status != 0
-                ) {
+                if (soundPool !== pool) return@synchronized
+                val sourceKey = sourceKeyBySoundId[soundId]
+                if (status != 0) {
+                    val queuedCount = sourceKey?.let { pendingByKey[it]?.size } ?: 0
+                    Log.e(
+                        TAG,
+                        "LOAD_FAILED soundId=" + soundId + " key=" + (sourceKey ?: "unknown") +
+                            " status=" + status + " pending=" + queuedCount,
+                    )
                     return@synchronized
                 }
                 readySoundIds += soundId
-                val sourceKey =
-                    sourceKeyBySoundId[soundId]
-                        ?: return@synchronized
-                val sample =
-                    samplesByKey[sourceKey]
-                        ?: return@synchronized
+                if (sourceKey == null) {
+                    Log.w(TAG, "LOAD_COMPLETE_WITHOUT_KEY soundId=" + soundId)
+                    return@synchronized
+                }
+                val sample = samplesByKey[sourceKey]
+                if (sample == null) {
+                    Log.w(TAG, "LOAD_COMPLETE_WITHOUT_SAMPLE soundId=" + soundId + " key=" + sourceKey)
+                    return@synchronized
+                }
                 sample.ready = true
+                val queuedCount = pendingByKey[sourceKey]?.size ?: 0
+                Log.d(TAG, "LOAD_COMPLETE soundId=" + soundId + " key=" + sourceKey + " queued=" + queuedCount)
                 flushPending(
                     soundPool = soundPool,
                     sourceKey = sourceKey,
@@ -302,15 +314,20 @@ object LudoPawsSoundPool {
         sourceKey: String,
         loader: (SoundPool) -> Int,
     ): Sample? {
+        val loadResult = runCatching { loader(soundPool) }
         val soundId =
-            runCatching {
-                loader(soundPool)
-            }
-                .getOrNull()
-                ?.takeIf {
-                    it > 0
+            loadResult.getOrNull()
+                ?.takeIf { it > 0 }
+                ?: run {
+                    val error = loadResult.exceptionOrNull()
+                    if (error != null) {
+                        Log.e(TAG, "LOAD_REQUEST_FAILED key=" + sourceKey, error)
+                    } else {
+                        Log.e(TAG, "LOAD_REQUEST_FAILED key=" + sourceKey +
+                            " invalidSoundId=" + loadResult.getOrNull())
+                    }
+                    return null
                 }
-                ?: return null
 
         val sample =
             Sample(
@@ -325,6 +342,8 @@ object LudoPawsSoundPool {
                 sourceKey = sourceKey,
                 sample = sample,
             )
+        } else {
+            Log.d(TAG, "LOAD_REQUESTED soundId=" + soundId + " key=" + sourceKey)
         }
         return sample
     }
@@ -357,8 +376,8 @@ object LudoPawsSoundPool {
         volume: Float,
         rate: Float,
         priority: Int,
-    ): Boolean =
-        runCatching {
+    ): Boolean {
+        val streamId = runCatching {
             soundPool.play(
                 soundId,
                 volume,
@@ -366,9 +385,17 @@ object LudoPawsSoundPool {
                 priority,
                 0,
                 rate,
-            ) != 0
-        }.getOrDefault(false)
+            )
+        }.getOrDefault(0)
+        if (streamId == 0) {
+            Log.w(TAG, "PLAY_REFUSED soundId=" + soundId + " priority=" + priority)
+            return false
+        }
+        Log.d(TAG, "PLAY_STARTED soundId=" + soundId + " streamId=" + streamId + " priority=" + priority)
+        return true
+    }
 
+    private const val TAG = "LudoPawsAudio"
     private const val MAX_STREAMS = 8
     private const val MAX_PENDING_PER_SAMPLE = 3
     private const val LOW_PRIORITY_COALESCE_THRESHOLD = 2

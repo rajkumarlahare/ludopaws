@@ -1,6 +1,7 @@
 package com.rekixo.ludopaws.feature.online
 
 import android.os.SystemClock
+import android.util.Log
 import android.view.Gravity
 import android.view.View
 import android.view.ViewTreeObserver
@@ -45,6 +46,7 @@ internal object OnlineLudoPawsPresentation {
         var activeDiceControl: FrameLayout? = null,
         var activeDicePlayerId: String? = null,
         var railAlignmentListener: ViewTreeObserver.OnGlobalLayoutListener? = null,
+        var railDiagnosticKey: String? = null,
     )
 
     fun render(
@@ -117,6 +119,7 @@ internal object OnlineLudoPawsPresentation {
             }
         }
         host.railAlignmentListener = null
+        host.railDiagnosticKey = null
         host.feedbackLedger.clear()
         host.railBindingKey = null
         host.activeDiceControl = null
@@ -462,6 +465,7 @@ internal object OnlineLudoPawsPresentation {
             }
         host.railAlignmentListener = listener
         activity.arcadeRootView.viewTreeObserver.addOnGlobalLayoutListener(listener)
+        Log.d(TAG, "alignment observer installed")
     }
 
     /**
@@ -484,6 +488,15 @@ internal object OnlineLudoPawsPresentation {
             host.topRail.height <= 0 ||
             host.bottomRail.height <= 0
         ) {
+            val deferredKey =
+                "deferred:boardVis=" + board.visibility +
+                    ",board=" + board.width + "x" + board.height +
+                    ",topVis=" + host.topRail.visibility + ",topH=" + host.topRail.height +
+                    ",bottomVis=" + host.bottomRail.visibility + ",bottomH=" + host.bottomRail.height
+            if (host.railDiagnosticKey != deferredKey) {
+                host.railDiagnosticKey = deferredKey
+                Log.w(TAG, "alignment deferred: " + deferredKey)
+            }
             return
         }
 
@@ -505,6 +518,17 @@ internal object OnlineLudoPawsPresentation {
             bottomRailTopOnScreen = bottomRailBaseTop,
             gapPx = gap,
         )
+
+        val diagnosticKey =
+            "boardY=" + boardLocation[1] + ",boardH=" + board.height +
+                ",topBaseY=" + topRailBaseTop + ",topH=" + host.topRail.height +
+                ",topTarget=" + translation.top +
+                ",bottomBaseY=" + bottomRailBaseTop + ",bottomH=" + host.bottomRail.height +
+                ",bottomTarget=" + translation.bottom
+        if (host.railDiagnosticKey != diagnosticKey) {
+            host.railDiagnosticKey = diagnosticKey
+            Log.d(TAG, "alignment calculated: " + diagnosticKey + " gapPx=" + gap)
+        }
 
         if (kotlin.math.abs(host.topRail.translationY - translation.top) > 0.5f) {
             host.topRail.translationY = translation.top
@@ -919,4 +943,6 @@ internal object OnlineLudoPawsPresentation {
         value: Int,
     ): Int =
         (value * activity.resources.displayMetrics.density).roundToInt()
+
+    private const val TAG = "LudoPawsRail"
 }

@@ -1,6 +1,7 @@
 package com.rekixo.ludopaws.feature.settings.data.local
 
 import android.content.Context
+import android.util.Log
 import com.rekixo.ludopaws.core.audio.LudoPawsAudioCatalog
 import com.rekixo.ludopaws.feature.characters.data.audio.LudoPawsAudioAssetPlayer
 import com.rekixo.ludopaws.feature.characters.data.audio.LudoPawsProceduralAudio
@@ -382,19 +383,25 @@ object GameSoundFeedback {
         priority: Int,
         assetPaths: List<String>,
     ) {
-        if (!GameSettingsStore(context).snapshot().soundEnabled) return
-        if (
-            eventIndex != null &&
-            LudoPawsAudioAssetPlayer.playAuthoredSfxForEvent(
-                context = context,
-                assetPaths = assetPaths,
-                eventIndex = eventIndex,
-                volume = volume,
-                priority = priority,
-            )
-        ) {
+        val soundName = names.firstOrNull() ?: "unknown"
+        if (!GameSettingsStore(context).snapshot().soundEnabled) {
+            Log.w(TAG, "EVENT_SUPPRESSED sound=" + soundName + " reason=sound-disabled eventIndex=" + eventIndex)
             return
         }
+        Log.d(TAG, "EVENT_REQUEST sound=" + soundName + " eventIndex=" + eventIndex + " priority=" + priority)
+        val authoredAccepted =
+            eventIndex != null &&
+                LudoPawsAudioAssetPlayer.playAuthoredSfxForEvent(
+                    context = context,
+                    assetPaths = assetPaths,
+                    eventIndex = eventIndex,
+                    volume = volume,
+                    priority = priority,
+                )
+        Log.d(TAG, "EVENT_AUTHORED sound=" + soundName + " eventIndex=" + eventIndex + " accepted=" + authoredAccepted)
+        if (authoredAccepted) return
+
+        Log.w(TAG, "EVENT_FALLBACK sound=" + soundName + " eventIndex=" + eventIndex)
         LudoPawsAudioAssetPlayer.playSfx(
             context = context,
             rawResourceNames = names,
@@ -456,6 +463,7 @@ object GameSoundFeedback {
         )
     }
 
+    private const val TAG = "LudoPawsAudio"
     private const val PRIORITY_UI = 0
     private const val PRIORITY_MOVEMENT = 1
     private const val PRIORITY_JUMP = 2
