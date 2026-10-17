@@ -602,24 +602,14 @@ export default {
           );
         }
 
-        const commitResponse = await target.fetch(
-          new Request("https://room/roll/commit", {
+        const rollResponse = await target.fetch(
+          new Request("https://room/roll/fast", {
             method: "POST",
             headers,
-            body: JSON.stringify({ clientCommitment }),
+            body: JSON.stringify({ clientSeed, clientCommitment }),
           }),
         );
-        if (!commitResponse.ok) {
-          return withSecurityHeaders(commitResponse);
-        }
-        const revealResponse = await target.fetch(
-          new Request("https://room/roll/reveal", {
-            method: "POST",
-            headers,
-            body: JSON.stringify({ clientSeed }),
-          }),
-        );
-        return withSecurityHeaders(revealResponse);
+        return withSecurityHeaders(rollResponse);
       }
 
       const response =
