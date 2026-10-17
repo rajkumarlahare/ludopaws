@@ -1,8 +1,3 @@
-import { hasPinnedEntroNexTrust } from "./entronex-trust.js";
-import {
-  entronexFetch,
-  hasEntroNexServiceBinding,
-} from "./entronex-transport.js";
 import { checkFastMatchRateLimit } from "./match-rate-limit.js";
 import {
   deterministicMatchId,
@@ -49,7 +44,6 @@ export default {
           production: false,
           game: "LudoProof",
           ruleset: "ludoproof-standard-v1",
-          entronex: "v4-evaluation",
         });
       }
 
@@ -60,8 +54,6 @@ export default {
           ok: true,
           service: "ludoproof-game-api",
           releasePhase: RELEASE_PHASE,
-          entronexConfigured:
-            checks.entronexConfigured,
           checks,
         });
       }
@@ -70,28 +62,20 @@ export default {
         const checks =
           configurationChecks(env);
         const configured =
-          checks.entronexConfigured &&
           checks.matchStoreConfigured &&
           checks.rateGateConfigured &&
           checks.leaderboardConfigured &&
           checks.matchmakerConfigured &&
           checks.friendsConfigured;
-        const entronexReachable =
-          configured
-            ? await probeEntroNex(env)
-            : false;
         const ready =
           configured &&
-          checks.sessionKeyConfigured &&
-          entronexReachable;
+          checks.sessionKeyConfigured;
         return json(ready ? 200 : 503, {
           ok: ready,
           ready,
           service: "ludoproof-game-api",
           releasePhase: RELEASE_PHASE,
           ruleset: "ludoproof-standard-v1",
-          entronex: "v4-evaluation",
-          entronexReachable,
           checks,
           productionClaim: false,
         });
@@ -479,14 +463,6 @@ export default {
           path: "/roll",
           method: "POST",
         },
-        "roll/commit": {
-          path: "/roll/commit",
-          method: "POST",
-        },
-        "roll/reveal": {
-          path: "/roll/reveal",
-          method: "POST",
-        },
         move: {
           path: "/move",
           method: "POST",
@@ -593,7 +569,7 @@ export default {
           );
         }
         const expectedCommitment = await sha256Hex(
-          "entronex:v4:client-commit:" + clientSeed,
+          "ludopaws:native-roll:v1:client-commit:" + clientSeed,
         );
         if (expectedCommitment !== clientCommitment) {
           throw httpError(
@@ -849,115 +825,15 @@ function leaderboard(env) {
   return env.LUDOPROOF_LEADERBOARD.get(id);
 }
 
-async function probeEntroNex(env) {
-  const baseUrl =
-    String(
-      env.ENTRONEX_BASE_URL,
-    ).replace(/\/$/, "");
-
-  try {
-    const response =
-      await entronexFetch(
-        env,
-        baseUrl + "/health",
-        {
-          method: "GET",
-          headers: {
-            accept:
-              "application/json",
-          },
-          signal:
-            AbortSignal.timeout(
-              3_000,
-            ),
-        },
-      );
-    if (!response.ok) {
-      return false;
-    }
-
-    const length =
-      Number(
-        response.headers.get(
-          "content-length",
-        ),
-      );
-    if (
-      Number.isFinite(length) &&
-      length > 16 * 1024
-    ) {
-      return false;
-    }
-
-    const text =
-      await response.text();
-    if (
-      new TextEncoder()
-        .encode(text)
-        .byteLength >
-      16 * 1024
-    ) {
-      return false;
-    }
-    const body =
-      JSON.parse(text);
-    return (
-      body?.ok === true &&
-      (
-        body?.protocol ===
-          "v4" ||
-        body?.service ===
-          "entronex-v4-eval"
-      )
-    );
-  } catch {
-    return false;
-  }
-}
-
 function configurationChecks(env) {
-  const entronexBaseUrlConfigured =
-    typeof env.ENTRONEX_BASE_URL === "string" &&
-    env.ENTRONEX_BASE_URL.startsWith("https://");
-  const entronexTokenConfigured =
-    typeof env.ENTRONEX_API_TOKEN === "string" &&
-    env.ENTRONEX_API_TOKEN.length >= 20;
-  const entronexTrustConfigured =
-    hasPinnedEntroNexTrust(env);
-
   return {
-    entronexBaseUrlConfigured,
-    entronexTokenConfigured,
-    entronexTrustConfigured,
-    entronexServiceBindingConfigured:
-      hasEntroNexServiceBinding(env),
-    entronexConfigured:
-      entronexBaseUrlConfigured &&
-      entronexTokenConfigured &&
-      entronexTrustConfigured,
-    matchStoreConfigured:
-      Boolean(env.LUDOPROOF_MATCHES),
-    rateGateConfigured:
-      Boolean(env.LUDOPROOF_API_GATE),
-    leaderboardConfigured:
-      Boolean(env.LUDOPROOF_LEADERBOARD),
-    matchmakerConfigured:
-      Boolean(env.LUDOPROOF_MATCHMAKER),
-    friendsConfigured:
-      Boolean(env.LUDOPROOF_FRIENDS),
-    sessionKeyConfigured:
-      hasSessionKey(env),
+    matchStoreConfigured: Boolean(env.LUDOPROOF_MATCHES),
+    rateGateConfigured: Boolean(env.LUDOPROOF_API_GATE),
+    leaderboardConfigured: Boolean(env.LUDOPROOF_LEADERBOARD),
+    matchmakerConfigured: Boolean(env.LUDOPROOF_MATCHMAKER),
+    friendsConfigured: Boolean(env.LUDOPROOF_FRIENDS),
+    sessionKeyConfigured: hasSessionKey(env),
   };
-}
-
-function hasEntroNexConfig(env) {
-  return (
-    typeof env.ENTRONEX_BASE_URL === "string" &&
-    env.ENTRONEX_BASE_URL.startsWith("https://") &&
-    typeof env.ENTRONEX_API_TOKEN === "string" &&
-    env.ENTRONEX_API_TOKEN.length >= 20 &&
-    hasPinnedEntroNexTrust(env)
-  );
 }
 
 function requireMatchmakingPlayerCount(

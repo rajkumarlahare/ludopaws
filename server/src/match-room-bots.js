@@ -118,7 +118,7 @@ export class MatchRoom extends LifecycleMatchRoom {
     ) {
       const clientSeed = randomSeedHex();
       const clientCommitment = await sha256Hex(
-        "entronex:v4:client-commit:" + clientSeed,
+        "ludopaws:native-roll:v1:client-commit:" + clientSeed,
       );
       turn = {
         playerId: player.playerId,
@@ -219,7 +219,7 @@ export class MatchRoom extends LifecycleMatchRoom {
       let justRevealedRoll = false;
       if (!state.pendingRoll) {
         await this.#internalPlayerRequest(
-          "/roll/fast",
+          "/roll",
           identity.playerToken,
           {
             clientSeed: turn.clientSeed,
@@ -238,17 +238,11 @@ export class MatchRoom extends LifecycleMatchRoom {
         return;
       }
 
-      // Finish a legacy in-progress reveal if a bot turn was interrupted across
-      // a version switch. All newly-created bot rolls use the one-call CSPRNG path.
       if (pending.status !== "RESOLVED") {
-        await this.#internalPlayerRequest(
-          "/roll/reveal",
-          identity.playerToken,
-          { clientSeed: turn.clientSeed },
-        );
-        state = await this.ctx.storage.get(STATE_KEY);
-        pending = state?.pendingRoll;
-        justRevealedRoll = true;
+        // Native rolls resolve atomically. An incomplete old roll must expire
+        // through the match lifecycle instead of using an external verifier.
+        await this.#clearBotTurn(turn);
+        return;
       }
 
       if (justRevealedRoll && pending?.status === "RESOLVED") {

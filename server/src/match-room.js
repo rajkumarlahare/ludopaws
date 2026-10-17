@@ -1,12 +1,3 @@
-import { verifyProofV4 } from "./vendor/entronex-v4/v4.js";
-import {
-  hasPinnedEntroNexTrust,
-  verifyCommitmentAttestation,
-  verifyProofAttestation,
-} from "./entronex-trust.js";
-import {
-  entronexFetch,
-} from "./entronex-transport.js";
 import {
   ROLL_REVEAL_TIMEOUT_MS,
   actingSeatForTurn,
@@ -60,21 +51,10 @@ import {
 } from "./rulesets.js";
 
 const STATE_KEY = "match-state";
-const APP_ID = "ludoproof";
 const ACTIVE_IDLE_TTL_MS =
   7 * 24 * 60 * 60 * 1000;
 const FINISHED_IDLE_TTL_MS =
   24 * 60 * 60 * 1000;
-const DEFAULT_ENTRONEX_TIMEOUT_MS =
-  8_000;
-const MAX_ENTRONEX_RESPONSE_BYTES =
-  256 * 1024;
-const WORLD = Object.freeze({
-  cellsPerOutcome: 16,
-  timelineTicks: 512,
-  epochCount: 8,
-  probeCount: 3,
-});
 const QUICK_CHAT_EMOJIS = new Set([
   "👍", "😂", "😮", "😭", "😠", "🥳",
   "😅", "😛", "😎", "🤔", "😘", "🤭",
@@ -122,7 +102,7 @@ export class MatchRoom {
       if (request.method === "POST" && url.pathname === "/start") {
         return await this.#mutate(() => this.#start(request));
       }
-      if (request.method === "POST" && url.pathname === "/roll/fast") {
+      if (request.method === "POST" && url.pathname === "/roll") {
         return await this.#mutate(() => this.#fastRoll(request, body));
       }
       if (request.method === "POST" && url.pathname === "/roll/commit") {
@@ -764,11 +744,11 @@ export class MatchRoom {
     });
   }
 
-  async #fastRoll(request, body) {
+  async #roll(request, body) {
     const clientSeed = requireDigest(body?.clientSeed, "clientSeed").toLowerCase();
     const clientCommitment = requireDigest(body?.clientCommitment, "clientCommitment").toLowerCase();
     const expectedCommitment = await sha256Hex(
-      "entronex:v4:client-commit:" + clientSeed,
+      "ludopaws:native-roll:v1:client-commit:" + clientSeed,
     );
     if (expectedCommitment !== clientCommitment) {
       throw httpError(
@@ -825,17 +805,11 @@ export class MatchRoom {
       );
       if (pendingEvent) return replayFastEvent(pendingEvent);
 
-      // Allow an old app's already-committed roll to finish after an app/server
-      // update. New rolls never enter the EntroNex path.
-      if (["COMMITTED", "RESOLVING"].includes(pending.status)) {
-        return this.#revealRoll(request, { clientSeed });
-      }
-      if (pending.status === "CREATING") {
-        const committed = await this.#commitRoll(request, { clientCommitment });
-        if (!committed.ok) return committed;
-        return this.#revealRoll(request, { clientSeed });
-      }
-      throw httpError(409, "ROLL_BUSY", "roll is currently resolving");
+      throw httpError(
+        409,
+        "NATIVE_ROLL_PENDING",
+        "a previous roll is still pending; finish the move or let the turn timeout settle it",
+      );
     }
 
     const previous = [...history].reverse().find(
@@ -846,7 +820,11 @@ export class MatchRoom {
     );
     if (previous?.fastDiceReceipt) return replayFastEvent(previous);
     if (previous) {
-      return this.#replayHistoricalReveal(state, player, clientCommitment);
+      throw httpError(
+        409,
+        "CLIENT_COMMITMENT_REUSED",
+        "this native roll request was already consumed",
+      );
     }
 
     const eventIndex = state.randomEventIndex;
@@ -858,7 +836,7 @@ export class MatchRoom {
       history: historyForHash(history),
     };
     const previousStateHash = await sha256Hex(
-      "entronex:v4:game-state:" + canonicalJson(snapshot),
+      "ludopaws:native-roll:v1:game-state:" + canonicalJson(snapshot),
     );
     const rulesetHash = await rulesetHashForState(state);
     const now = Date.now();
@@ -937,311 +915,6 @@ export class MatchRoom {
       awaitingMove: result.awaitingMove,
       forfeitedThirdSix: result.forfeitedThirdSix,
       proof: receipt,
-      state: publicStateWithHistory(latest),
-    });
-  }
-
-  async #commitRoll(request, body) {
-    requireEntroNex(this.env);
-    const clientCommitment = requireDigest(
-      body?.clientCommitment,
-      "clientCommitment",
-    );
-
-    let state = await this.#requireState();
-    const player = await this.#authorize(state, request);
-
-    if (
-      !state.pendingRoll &&
-      (state.history ?? []).some(
-        (event) =>
-          event.clientCommitment ===
-          clientCommitment,
-      )
-    ) {
-      throw httpError(
-        409,
-        "CLIENT_COMMITMENT_REUSED",
-        "client commitment was already consumed by an earlier roll",
-      );
-    }
-
-    if (state.pendingRoll) {
-      const pending = state.pendingRoll;
-      if (
-        pending.playerId !== player.playerId ||
-        pending.clientCommitment !== clientCommitment
-      ) {
-        throw httpError(
-          409,
-          "ROLL_ALREADY_PENDING",
-          "this turn already has a different pending roll",
-        );
-      }
-      if (pending.status === "COMMITTED" || pending.status === "RESOLVED") {
-        return json(200, {
-          replayed: true,
-          round: commitmentSummary(pending),
-          state: publicStateWithHistory(state),
-        });
-      }
-      if (pending.status !== "CREATING") {
-        throw httpError(409, "ROLL_BUSY", "roll is currently resolving");
-      }
-    } else {
-      const eventIndex = state.randomEventIndex;
-      const actorHash = await sha256Hex(
-        "ludoproof:actor:v1:" + player.playerId,
-      );
-      const snapshot = {
-        ...authoritativeStateForRandomness(state),
-        history: historyForHash(state.history ?? []),
-      };
-      const previousStateHash = await sha256Hex(
-        "entronex:v4:game-state:" + canonicalJson(snapshot),
-      );
-      const rulesetHash =
-        await rulesetHashForState(state);
-
-      state = reserveRoll(state, {
-        playerId: player.playerId,
-        clientCommitment,
-        eventIndex,
-        actorHash,
-        previousStateHash,
-        rulesetHash,
-        now: Date.now(),
-      });
-      state.history = state.history ?? [];
-      await this.#persist(state);
-    }
-
-    const pending = state.pendingRoll;
-    const perfStartedAt = Date.now();
-    const config = buildEntroNexConfig(state.matchId, pending);
-    const expected = await expectedDigests(config);
-
-    let remote;
-    try {
-      remote = await entronexRequest(
-        this.env,
-        "/v4/rounds",
-        {
-          method: "POST",
-          body: {
-            clientCommitment,
-            ...config,
-          },
-        },
-      );
-    } catch (error) {
-      throw error;
-    }
-
-    validateRoundCommitment(remote, pending, expected, config);
-    verifyCommitmentAttestation(remote, this.env);
-    console.info("ludopaws_dice_perf", {
-      phase: "commit",
-      matchId: state.matchId,
-      eventIndex: pending.eventIndex,
-      elapsedMs: Date.now() - perfStartedAt,
-    });
-
-    let latest = await this.#requireState();
-    if (
-      !latest.pendingRoll ||
-      latest.pendingRoll.clientCommitment !== clientCommitment ||
-      latest.pendingRoll.eventIndex !== pending.eventIndex
-    ) {
-      throw httpError(409, "ROLL_STATE_CONFLICT", "roll state changed during commitment");
-    }
-
-    if (latest.pendingRoll.status === "CREATING") {
-      const committedAt = Date.now();
-      latest = attachRoundCommitment(latest, {
-        roundId: remote.roundId,
-        serverCommitment: remote.serverCommitment,
-        revealDeadlineAt:
-          committedAt +
-          ROLL_REVEAL_TIMEOUT_MS,
-        now: committedAt,
-      });
-      latest.history = state.history ?? [];
-      await this.#persist(latest);
-    }
-
-    return json(201, {
-      replayed: Boolean(remote.replayed),
-      round: commitmentSummary(latest.pendingRoll),
-      attestation: remote.attestation ?? null,
-      attestationPayload: remote.attestationPayload ?? null,
-      state: publicStateWithHistory(latest),
-    });
-  }
-
-  async #revealRoll(request, body) {
-    requireEntroNex(this.env);
-    const clientSeed = requireDigest(body?.clientSeed, "clientSeed");
-
-    let state = await this.#requireState();
-    const player = await this.#authorize(state, request);
-    const actualCommitment = await sha256Hex(
-      "entronex:v4:client-commit:" + clientSeed,
-    );
-    const pending = state.pendingRoll;
-    const revealStartedAt = Date.now();
-
-    if (!pending) {
-      return this.#replayHistoricalReveal(
-        state,
-        player,
-        actualCommitment,
-      );
-    }
-    if (pending.playerId !== player.playerId) {
-      throw httpError(403, "NOT_ROLL_OWNER", "only the rolling player can reveal");
-    }
-    if (actualCommitment !== pending.clientCommitment) {
-      throw httpError(
-        400,
-        "CLIENT_COMMITMENT_MISMATCH",
-        "revealed seed does not match the committed seed",
-      );
-    }
-    if (pending.status === "RESOLVED") {
-      const proof = await this.#loadArchivedProof(pending.roundId);
-      await validateResolvedProof(proof, pending, state.matchId);
-      return json(200, {
-        replayed: true,
-        outcome: proof.outcome,
-        proofDigest: proof.proofDigest,
-        roundId: proof.roundId,
-        legalTokenIndexes: pending.legalTokenIndexes,
-        awaitingMove: true,
-        proof,
-        state: publicStateWithHistory(state),
-      });
-    }
-    if (!["COMMITTED", "RESOLVING"].includes(pending.status)) {
-      throw httpError(409, "ROLL_NOT_COMMITTED", "server commitment is not ready");
-    }
-
-    if (pending.status === "COMMITTED") {
-      state.pendingRoll.status = "RESOLVING";
-      state.updatedAt = Date.now();
-      state.revision += 1;
-      await this.#persist(state);
-    }
-
-    let proof;
-    try {
-      proof = await entronexRequest(
-        this.env,
-        "/v4/rounds/" +
-          encodeURIComponent(pending.roundId) +
-          "/resolve",
-        {
-          method: "POST",
-          body: { clientSeed },
-        },
-      );
-    } catch (error) {
-      let latest = await this.#requireState();
-      if (
-        error?.code === "ROUND_EXPIRED" &&
-        latest.pendingRoll?.roundId ===
-          pending.roundId
-      ) {
-        const expired =
-          await this.#expirePendingIfNeeded(
-            latest,
-            Math.max(
-              Date.now(),
-              Number(
-                latest.pendingRoll
-                  .revealDeadlineAt ?? 0,
-              ),
-            ),
-            "ENTRONEX_ROUND_EXPIRED",
-          );
-        latest = expired.state;
-        if (expired.changed) {
-          await this.#persist(latest);
-        }
-      } else if (
-        latest.pendingRoll?.roundId === pending.roundId &&
-        latest.pendingRoll.status === "RESOLVING"
-      ) {
-        latest.pendingRoll.status = "COMMITTED";
-        latest.updatedAt = Date.now();
-        latest.revision += 1;
-        await this.#persist(latest);
-      }
-      throw error;
-    }
-
-    await validateResolvedProof(proof, pending, state.matchId);
-
-    assertLocalProofValid(proof);
-    verifyProofAttestation(proof, this.env);
-    console.info("ludopaws_dice_perf", {
-      phase: "reveal_verify",
-      matchId: state.matchId,
-      eventIndex: pending.eventIndex,
-      elapsedMs: Date.now() - revealStartedAt,
-    });
-
-    let latest = await this.#requireState();
-    if (
-      !latest.pendingRoll ||
-      latest.pendingRoll.roundId !== pending.roundId
-    ) {
-      throw httpError(409, "ROLL_STATE_CONFLICT", "roll state changed during resolution");
-    }
-
-    const result = registerResolvedRoll(latest, {
-      outcome: proof.outcome,
-      proofDigest: proof.proofDigest,
-      now: Date.now(),
-    });
-    latest = result.state;
-    const fairnessEvent =
-      sealFairnessEvent(
-        state.history ?? [],
-        {
-          eventIndex: pending.eventIndex,
-          eventId: pending.eventId,
-          playerId: pending.playerId,
-          color: state.players[pending.seat].color,
-          roundId: pending.roundId,
-          serverCommitment: pending.serverCommitment,
-          clientCommitment: pending.clientCommitment,
-          actorHash: pending.actorHash,
-          previousStateHash: pending.previousStateHash,
-          rulesetHash: pending.rulesetHash,
-          proofDigest: proof.proofDigest,
-          outcome: proof.outcome,
-          moveTokenIndex: null,
-          captures: 0,
-          status: "RESOLVED",
-          resolvedAt: Date.now(),
-        },
-      );
-    latest.history = [
-      ...(state.history ?? []),
-      fairnessEvent,
-    ].slice(-200);
-    await this.#persist(latest);
-
-    return json(200, {
-      replayed: Boolean(proof.replayed),
-      outcome: proof.outcome,
-      proofDigest: proof.proofDigest,
-      roundId: proof.roundId,
-      legalTokenIndexes: result.legalTokenIndexes,
-      awaitingMove: result.awaitingMove,
-      forfeitedThirdSix: result.forfeitedThirdSix,
-      proof,
       state: publicStateWithHistory(latest),
     });
   }
@@ -1526,81 +1199,6 @@ export class MatchRoom {
     } catch {
       return state;
     }
-  }
-
-  async #replayHistoricalReveal(
-    state,
-    player,
-    clientCommitment,
-  ) {
-    const event = [...(state.history ?? [])]
-      .reverse()
-      .find(
-        (candidate) =>
-          candidate.playerId === player.playerId &&
-          candidate.clientCommitment === clientCommitment,
-      );
-
-    if (!event) {
-      throw httpError(
-        409,
-        "NO_PENDING_ROLL",
-        "there is no matching committed or resolved roll",
-      );
-    }
-
-    const proof = await this.#loadArchivedProof(event.roundId);
-    const actorHash =
-      event.actorHash ??
-      (await sha256Hex(
-        "ludoproof:actor:v1:" + event.playerId,
-      ));
-    await validateResolvedProof(
-      proof,
-      {
-        ...event,
-        actorHash,
-        clientCommitment,
-      },
-      state.matchId,
-    );
-    if (
-      proof.proofDigest !== event.proofDigest ||
-      proof.outcome !== event.outcome
-    ) {
-      throw httpError(
-        502,
-        "ENTRONEX_ARCHIVE_MISMATCH",
-        "archived proof does not match the recorded game event",
-      );
-    }
-
-    return json(200, {
-      replayed: true,
-      outcome: proof.outcome,
-      proofDigest: proof.proofDigest,
-      roundId: proof.roundId,
-      legalTokenIndexes: [],
-      awaitingMove: false,
-      proof,
-      state: publicStateWithHistory(state),
-    });
-  }
-
-  async #loadArchivedProof(roundId) {
-    const proof = await entronexRequest(
-      this.env,
-      "/v4/rounds/" +
-        encodeURIComponent(roundId) +
-        "/proof",
-      {
-        method: "GET",
-        body: null,
-      },
-    );
-    assertLocalProofValid(proof);
-    verifyProofAttestation(proof, this.env);
-    return proof;
   }
 
   async #events(
@@ -2499,134 +2097,11 @@ export class MatchRoom {
 
 export async function rulesetHashForState(state) {
   return sha256Hex(
-    "entronex:v4:game-ruleset:" +
+    "ludopaws:native-roll:v1:game-ruleset:" +
       canonicalJson(
         rulesetForState(state),
       ),
   );
-}
-
-export function buildEntroNexConfig(matchId, pending) {
-  return {
-    outcomes: [1, 2, 3, 4, 5, 6],
-    context: {
-      applicationId: APP_ID,
-      sessionId: matchId,
-      eventId: pending.eventId,
-      eventType: "DICE_ROLL",
-      eventIndex: pending.eventIndex,
-      subjectHash: pending.actorHash,
-      previousStateHash: pending.previousStateHash,
-      metadataDigest: pending.rulesetHash,
-    },
-    world: WORLD,
-  };
-}
-
-export async function expectedDigests(config) {
-  const contextDigest = await sha256Hex(
-    "entronex:v4:context:" + canonicalJson(config.context),
-  );
-  const binding = {
-    applicationId: config.context.applicationId,
-    sessionId: config.context.sessionId,
-    eventType: config.context.eventType,
-    eventIndex: config.context.eventIndex,
-  };
-  const eventBindingDigest = await sha256Hex(
-    "entronex:v4:event-binding:" + canonicalJson(binding),
-  );
-  const configDigest = await sha256Hex(
-    "entronex:v4:config:" + canonicalJson(config),
-  );
-  return { contextDigest, eventBindingDigest, configDigest };
-}
-
-export function validateRoundCommitment(
-  round,
-  pending,
-  expected,
-  config,
-) {
-  const exactConfig =
-    round?.config &&
-    canonicalJson(round.config) === canonicalJson(config);
-
-  if (
-    !round ||
-    round.protocol !== "v4" ||
-    typeof round.roundId !== "string" ||
-    round.roundId.length < 1 ||
-    round.clientCommitment !== pending.clientCommitment ||
-    round.configDigest !== expected.configDigest ||
-    round.contextDigest !== expected.contextDigest ||
-    round.eventBindingDigest !== expected.eventBindingDigest ||
-    !exactConfig ||
-    !/^[0-9a-f]{64}$/i.test(round.serverCommitment ?? "")
-  ) {
-    throw httpError(
-      502,
-      "ENTRONEX_COMMITMENT_INVALID",
-      "EntroNex returned a commitment that does not match the locked game event",
-    );
-  }
-}
-
-export async function validateResolvedProof(
-  proof,
-  pending,
-  matchId,
-) {
-  const config = buildEntroNexConfig(matchId, pending);
-  const expected = await expectedDigests(config);
-  const exactConfig =
-    proof?.config &&
-    canonicalJson(proof.config) === canonicalJson(config);
-
-  if (
-    !proof ||
-    proof.algorithm !==
-      "entronex-v4-dual-commit-hkdf-sha256-context-bound" ||
-    proof.roundId !== pending.roundId ||
-    proof.serverCommitment !== pending.serverCommitment ||
-    proof.clientCommitment !== pending.clientCommitment ||
-    proof.configDigest !== expected.configDigest ||
-    proof.contextDigest !== expected.contextDigest ||
-    proof.eventBindingDigest !== expected.eventBindingDigest ||
-    !exactConfig ||
-    proof.config?.context?.applicationId !== APP_ID ||
-    proof.config.context.sessionId !== matchId ||
-    proof.config.context.eventType !== "DICE_ROLL" ||
-    proof.config.context.eventIndex !== pending.eventIndex ||
-    proof.config.context.eventId !== pending.eventId ||
-    proof.config.context.subjectHash !== pending.actorHash ||
-    proof.config.context.previousStateHash !== pending.previousStateHash ||
-    proof.config.context.metadataDigest !== pending.rulesetHash ||
-    !Number.isInteger(proof.outcome) ||
-    proof.outcome < 1 ||
-    proof.outcome > 6 ||
-    !/^[0-9a-f]{64}$/i.test(proof.proofDigest ?? "")
-  ) {
-    throw httpError(
-      502,
-      "ENTRONEX_PROOF_CONTEXT_MISMATCH",
-      "resolved proof does not match the locked Ludo event",
-    );
-  }
-}
-
-function commitmentSummary(pending) {
-  return {
-    eventIndex: pending.eventIndex,
-    eventId: pending.eventId,
-    roundId: pending.roundId,
-    serverCommitment: pending.serverCommitment,
-    clientCommitment: pending.clientCommitment,
-    previousStateHash: pending.previousStateHash,
-    rulesetHash: pending.rulesetHash,
-    revealDeadlineAt:
-      pending.revealDeadlineAt,
-  };
 }
 
 function historyForHash(history) {
@@ -2656,178 +2131,6 @@ function publicStateWithHistory(state) {
     fairness:
       fairnessSummary(history),
   };
-}
-
-export async function entronexRequest(env, path, {
-  method,
-  body,
-  authenticated = true,
-}) {
-  const baseUrl = String(env.ENTRONEX_BASE_URL ?? "").replace(/\/$/, "");
-  const headers = {
-    accept: "application/json",
-    "content-type": "application/json",
-  };
-
-  if (authenticated) {
-    headers.authorization = "Bearer " + env.ENTRONEX_API_TOKEN;
-  }
-
-  let response;
-  try {
-    response = await entronexFetch(
-      env,
-      baseUrl + path,
-      {
-        method,
-        headers,
-        signal: AbortSignal.timeout(
-          entronexTimeoutMs(env),
-        ),
-        body:
-          body == null
-            ? undefined
-            : JSON.stringify(body),
-      },
-    );
-  } catch (error) {
-    if (
-      error?.name === "TimeoutError" ||
-      error?.name === "AbortError"
-    ) {
-      throw httpError(
-        504,
-        "ENTRONEX_TIMEOUT",
-        "EntroNex request timed out",
-      );
-    }
-    throw httpError(502, "ENTRONEX_UNAVAILABLE", "EntroNex request failed");
-  }
-
-  const text =
-    await readTextLimited(
-      response,
-      MAX_ENTRONEX_RESPONSE_BYTES,
-    );
-  let parsed = {};
-  try {
-    parsed = text ? JSON.parse(text) : {};
-  } catch {
-    throw httpError(502, "ENTRONEX_BAD_RESPONSE", "EntroNex returned non-JSON data");
-  }
-
-  if (!response.ok) {
-    const error = httpError(
-      response.status >= 500 ? 502 : response.status,
-      parsed.error ?? "ENTRONEX_ERROR",
-      parsed.message ?? "EntroNex rejected the request",
-    );
-    error.remoteStatus = response.status;
-    throw error;
-  }
-
-  return parsed;
-}
-
-function entronexTimeoutMs(env) {
-  const value =
-    Number(
-      env?.ENTRONEX_REQUEST_TIMEOUT_MS,
-    );
-  return Number.isSafeInteger(value) &&
-    value >= 100 &&
-    value <= 30_000
-    ? value
-    : DEFAULT_ENTRONEX_TIMEOUT_MS;
-}
-
-async function readTextLimited(
-  response,
-  maxBytes,
-) {
-  const declared =
-    Number(
-      response.headers.get(
-        "content-length",
-      ),
-    );
-  if (
-    Number.isFinite(declared) &&
-    declared > maxBytes
-  ) {
-    throw httpError(
-      502,
-      "ENTRONEX_RESPONSE_TOO_LARGE",
-      "EntroNex response exceeded the maximum allowed size",
-    );
-  }
-
-  if (!response.body) {
-    return "";
-  }
-
-  const reader =
-    response.body.getReader();
-  const chunks = [];
-  let total = 0;
-
-  try {
-    while (true) {
-      const { done, value } =
-        await reader.read();
-      if (done) break;
-      total += value.byteLength;
-      if (total > maxBytes) {
-        await reader.cancel();
-        throw httpError(
-          502,
-          "ENTRONEX_RESPONSE_TOO_LARGE",
-          "EntroNex response exceeded the maximum allowed size",
-        );
-      }
-      chunks.push(value);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-
-  const bytes =
-    new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return new TextDecoder()
-    .decode(bytes);
-}
-
-function assertLocalProofValid(proof) {
-  const verification =
-    verifyProofV4(proof);
-  if (verification.valid !== true) {
-    throw httpError(
-      502,
-      "ENTRONEX_PROOF_INVALID",
-      "EntroNex proof failed local mathematical verification",
-    );
-  }
-}
-
-function requireEntroNex(env) {
-  if (
-    typeof env.ENTRONEX_BASE_URL !== "string" ||
-    !env.ENTRONEX_BASE_URL.startsWith("https://") ||
-    typeof env.ENTRONEX_API_TOKEN !== "string" ||
-    env.ENTRONEX_API_TOKEN.length < 20 ||
-    !hasPinnedEntroNexTrust(env)
-  ) {
-    throw httpError(
-      503,
-      "ENTRONEX_NOT_CONFIGURED",
-      "game backend is not configured with EntroNex",
-    );
-  }
 }
 
 function optionalTargetPlayerCount(
