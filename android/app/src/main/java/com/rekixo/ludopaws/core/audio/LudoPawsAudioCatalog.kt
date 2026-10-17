@@ -19,6 +19,15 @@ object LudoPawsAudioCatalog {
         return listOf(family[index])
     }
 
+    /**
+     * Selects deterministically from asset paths confirmed to exist in the APK.
+     * Missing numbered variants must never make a valid authored sound disappear.
+     */
+    fun takeAvailableForEvent(availableAssetPaths: List<String>, eventIndex: Int): String? {
+        if (availableAssetPaths.isEmpty()) return null
+        return availableAssetPaths[Math.floorMod(eventIndex, availableAssetPaths.size)]
+    }
+
     object Sfx {
         val MOVE_STEP =
             listOf(

@@ -202,41 +202,42 @@ object LudoPawsSoundPool {
             sample.soundId in readySoundIds
         ) {
             sample.ready = true
-            playNow(
+            // Let the caller fall back when SoundPool cannot start a stream.
+            return playNow(
                 soundPool = soundPool,
                 soundId = sample.soundId,
                 volume = safeVolume,
                 rate = safeRate,
                 priority = safePriority,
             )
-        } else {
-            val pending =
-                pendingByKey.getOrPut(key) {
-                    mutableListOf()
-                }
-            val request =
-                PendingPlay(
-                    volume = safeVolume,
-                    rate = safeRate,
-                    priority = safePriority,
-                )
+        }
 
-            // Don't replay a backlog of tiny footsteps after an asynchronous
-            // sample load. Critical events may displace lower-priority pending
-            // feedback when a particular sample has already reached its bound.
-            if (safePriority <= LOW_PRIORITY_COALESCE_THRESHOLD) {
-                if (pending.isEmpty()) pending += request
-            } else if (pending.size < MAX_PENDING_PER_SAMPLE) {
-                pending += request
-            } else {
-                val lowestIndex =
-                    pending.indices.minByOrNull { pending[it].priority }
-                if (
-                    lowestIndex != null &&
-                    pending[lowestIndex].priority < safePriority
-                ) {
-                    pending[lowestIndex] = request
-                }
+        val pending =
+            pendingByKey.getOrPut(key) {
+                mutableListOf()
+            }
+        val request =
+            PendingPlay(
+                volume = safeVolume,
+                rate = safeRate,
+                priority = safePriority,
+            )
+
+        // Don't replay a backlog of tiny footsteps after an asynchronous
+        // sample load. Critical events may displace lower-priority pending
+        // feedback when a particular sample has already reached its bound.
+        if (safePriority <= LOW_PRIORITY_COALESCE_THRESHOLD) {
+            if (pending.isEmpty()) pending += request
+        } else if (pending.size < MAX_PENDING_PER_SAMPLE) {
+            pending += request
+        } else {
+            val lowestIndex =
+                pending.indices.minByOrNull { pending[it].priority }
+            if (
+                lowestIndex != null &&
+                pending[lowestIndex].priority < safePriority
+            ) {
+                pending[lowestIndex] = request
             }
         }
         return true
@@ -356,7 +357,7 @@ object LudoPawsSoundPool {
         volume: Float,
         rate: Float,
         priority: Int,
-    ) {
+    ): Boolean =
         runCatching {
             soundPool.play(
                 soundId,
@@ -365,9 +366,8 @@ object LudoPawsSoundPool {
                 priority,
                 0,
                 rate,
-            )
-        }
-    }
+            ) != 0
+        }.getOrDefault(false)
 
     private const val MAX_STREAMS = 8
     private const val MAX_PENDING_PER_SAMPLE = 3

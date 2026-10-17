@@ -3,6 +3,7 @@ package com.rekixo.ludopaws.feature.online
 import android.os.SystemClock
 import android.view.Gravity
 import android.view.View
+import android.view.ViewTreeObserver
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -43,6 +44,7 @@ internal object OnlineLudoPawsPresentation {
         var railBindingKey: String? = null,
         var activeDiceControl: FrameLayout? = null,
         var activeDicePlayerId: String? = null,
+        var railAlignmentListener: ViewTreeObserver.OnGlobalLayoutListener? = null,
     )
 
     fun render(
@@ -56,6 +58,7 @@ internal object OnlineLudoPawsPresentation {
                     activity.boardFrame.tag = it
                 }
 
+        ensureRailAlignmentObserver(activity, host)
         val characterIdsBySeat =
             OnlineLudoPawsCharacterPolicy.characterIdsBySeat(current)
         val localColor =
@@ -106,6 +109,14 @@ internal object OnlineLudoPawsPresentation {
 
     fun clear(activity: MainActivity) {
         val host = host(activity) ?: return
+        host.railAlignmentListener?.let { listener ->
+            runCatching {
+                activity.arcadeRootView.viewTreeObserver.let { observer ->
+                    if (observer.isAlive) observer.removeOnGlobalLayoutListener(listener)
+                }
+            }
+        }
+        host.railAlignmentListener = null
         host.feedbackLedger.clear()
         host.railBindingKey = null
         host.activeDiceControl = null
@@ -373,6 +384,7 @@ internal object OnlineLudoPawsPresentation {
                 control.isFocusable = enabled
                 activity.diceView.setAttentionEnabled(enabled)
             }
+            alignPlayerRailsToBoard(activity, host)
             bindTurnCountdown(activity, state)
             return
         }
@@ -439,6 +451,23 @@ internal object OnlineLudoPawsPresentation {
      * correctly positioned. Move only the player rails toward the board; never resize
      * or reposition the board view.
      */
+    private fun ensureRailAlignmentObserver(activity: MainActivity, host: Host) {
+        if (host.railAlignmentListener != null) return
+        val listener =
+            ViewTreeObserver.OnGlobalLayoutListener {
+                // render() runs before updateControls() switches the active match
+                // into its full-viewport layout. Retry after each completed layout
+                // until the board and both rails have usable measured bounds.
+                alignPlayerRailsToBoard(activity, host)
+            }
+        host.railAlignmentListener = listener
+        activity.arcadeRootView.viewTreeObserver.addOnGlobalLayoutListener(listener)
+    }
+
+    /**
+     * Align from final screen bounds once the active layout has completed.
+     * Translation is absolute and repeatable; the board itself is never moved.
+     */
     private fun alignPlayerRailsToBoard(activity: MainActivity, host: Host) {
         val board = activity.boardFrame
         activity.matchStatusPanel.clipChildren = false
@@ -446,34 +475,41 @@ internal object OnlineLudoPawsPresentation {
         activity.actionPanel.clipChildren = false
         activity.actionPanel.clipToPadding = false
 
-        // Each run starts from the current base bounds (screen location with the
-        // previously applied translation removed) and assigns a fresh absolute
-        // translation. This prevents drift across repeated renders and relayouts.
-        board.post {
-            if (board.width <= 0 || board.height <= 0 ||
-                host.topRail.height <= 0 || host.bottomRail.height <= 0
-            ) return@post
+        if (
+            board.visibility != View.VISIBLE ||
+            host.topRail.visibility != View.VISIBLE ||
+            host.bottomRail.visibility != View.VISIBLE ||
+            board.width <= 0 ||
+            board.height <= 0 ||
+            host.topRail.height <= 0 ||
+            host.bottomRail.height <= 0
+        ) {
+            return
+        }
 
-            val boardLocation = IntArray(2)
-            val topRailLocation = IntArray(2)
-            val bottomRailLocation = IntArray(2)
-            board.getLocationOnScreen(boardLocation)
-            host.topRail.getLocationOnScreen(topRailLocation)
-            host.bottomRail.getLocationOnScreen(bottomRailLocation)
+        val boardLocation = IntArray(2)
+        val topRailLocation = IntArray(2)
+        val bottomRailLocation = IntArray(2)
+        board.getLocationOnScreen(boardLocation)
+        host.topRail.getLocationOnScreen(topRailLocation)
+        host.bottomRail.getLocationOnScreen(bottomRailLocation)
 
-            val gap = dp(activity, 8)
-            val topRailBaseTop = topRailLocation[1] - host.topRail.translationY.toInt()
-            val bottomRailBaseTop = bottomRailLocation[1] - host.bottomRail.translationY.toInt()
-            val translation = OnlineBoardRailAlignmentPolicy.calculate(
-                boardTopOnScreen = boardLocation[1],
-                boardHeight = board.height,
-                topRailTopOnScreen = topRailBaseTop,
-                topRailHeight = host.topRail.height,
-                bottomRailTopOnScreen = bottomRailBaseTop,
-                gapPx = gap,
-            )
+        val gap = dp(activity, 8)
+        val topRailBaseTop = topRailLocation[1] - host.topRail.translationY.toInt()
+        val bottomRailBaseTop = bottomRailLocation[1] - host.bottomRail.translationY.toInt()
+        val translation = OnlineBoardRailAlignmentPolicy.calculate(
+            boardTopOnScreen = boardLocation[1],
+            boardHeight = board.height,
+            topRailTopOnScreen = topRailBaseTop,
+            topRailHeight = host.topRail.height,
+            bottomRailTopOnScreen = bottomRailBaseTop,
+            gapPx = gap,
+        )
 
+        if (kotlin.math.abs(host.topRail.translationY - translation.top) > 0.5f) {
             host.topRail.translationY = translation.top
+        }
+        if (kotlin.math.abs(host.bottomRail.translationY - translation.bottom) > 0.5f) {
             host.bottomRail.translationY = translation.bottom
         }
     }

@@ -7,6 +7,29 @@ import org.junit.Test
 
 class LudoPawsAudioCatalogTest {
     @Test
+    fun eventSelectionUsesOnlyPackagedTakes() {
+        val singleRollTake =
+            listOf("audio/sfx/gameplay/dice/lp_sfx_dice_roll_01 (3).wav")
+        for (eventIndex in 0..8) {
+            assertEquals(
+                singleRollTake.single(),
+                LudoPawsAudioCatalog.takeAvailableForEvent(singleRollTake, eventIndex),
+            )
+        }
+
+        val settleTakes =
+            listOf(
+                "audio/sfx/gameplay/dice/settle/lp_sfx_dice_settle_01 (1).wav",
+                "audio/sfx/gameplay/dice/settle/lp_sfx_dice_settle_01 (2).wav",
+                "audio/sfx/gameplay/dice/settle/lp_sfx_dice_settle_01 (3).wav",
+                "audio/sfx/gameplay/dice/settle/lp_sfx_dice_settle_01 (4).wav",
+            )
+        assertEquals(settleTakes[2], LudoPawsAudioCatalog.takeAvailableForEvent(settleTakes, 2))
+        assertEquals(settleTakes[0], LudoPawsAudioCatalog.takeAvailableForEvent(settleTakes, 4))
+        assertEquals(null, LudoPawsAudioCatalog.takeAvailableForEvent(emptyList(), 0))
+    }
+
+    @Test
     fun jumpAndLandingUseSeparateNumberedFamilies() {
         assertEquals(
             listOf(

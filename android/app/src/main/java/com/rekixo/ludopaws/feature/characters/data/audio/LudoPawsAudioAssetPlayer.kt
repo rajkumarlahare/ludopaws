@@ -2,6 +2,7 @@ package com.rekixo.ludopaws.feature.characters.data.audio
 
 import android.content.Context
 import android.content.res.AssetManager
+import com.rekixo.ludopaws.core.audio.LudoPawsAudioCatalog
 import com.rekixo.ludopaws.core.audio.LudoPawsSoundPool
 import com.rekixo.ludopaws.feature.characters.domain.audio.LudoPawsProceduralVocal
 
@@ -82,7 +83,8 @@ internal object LudoPawsAudioAssetPlayer {
                 }
                 .firstOrNull { it != 0 }
 
-        if (resourceId != null) {
+        if (
+            resourceId != null &&
             LudoPawsSoundPool.play(
                 context = context,
                 resourceId = resourceId,
@@ -90,6 +92,7 @@ internal object LudoPawsAudioAssetPlayer {
                 rate = playbackRate,
                 priority = priority,
             )
+        ) {
             return
         }
 
@@ -171,6 +174,34 @@ internal object LudoPawsAudioAssetPlayer {
         return false
     }
 
+    /**
+     * Select a stable event take from paths actually packaged in the APK instead of
+     * indexing the expected catalog first and possibly selecting a missing file.
+     */
+    @Synchronized
+    fun playAuthoredSfxForEvent(
+        context: Context,
+        assetPaths: List<String>,
+        eventIndex: Int,
+        volume: Float,
+        playbackRate: Float = 1f,
+        priority: Int = 1,
+    ): Boolean {
+        val available = availableAssetPaths(context, assetPaths)
+        val selectedPath =
+            LudoPawsAudioCatalog.takeAvailableForEvent(
+                availableAssetPaths = available,
+                eventIndex = eventIndex,
+            ) ?: return false
+        return LudoPawsSoundPool.playAsset(
+            context = context,
+            assetPath = selectedPath,
+            volume = volume,
+            rate = playbackRate,
+            priority = priority,
+        )
+    }
+
     fun playSfx(
         context: Context,
         rawResourceNames: List<String>,
@@ -203,7 +234,8 @@ internal object LudoPawsAudioAssetPlayer {
                 }
                 .firstOrNull { it != 0 }
 
-        if (resourceId != null) {
+        if (
+            resourceId != null &&
             LudoPawsSoundPool.play(
                 context = context,
                 resourceId = resourceId,
@@ -211,6 +243,7 @@ internal object LudoPawsAudioAssetPlayer {
                 rate = playbackRate,
                 priority = priority,
             )
+        ) {
             return
         }
 

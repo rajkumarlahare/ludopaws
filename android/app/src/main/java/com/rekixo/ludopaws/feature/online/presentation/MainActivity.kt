@@ -25,6 +25,7 @@ import com.rekixo.ludopaws.ui.game.addGameTopActions
 import com.rekixo.ludopaws.core.ui.art.plywoodBackground
 import com.rekixo.ludopaws.ui.online.*
 import com.rekixo.ludopaws.feature.online.*
+import com.rekixo.ludopaws.feature.settings.data.local.GameSoundFeedback
 import com.rekixo.ludopaws.feature.online.FriendsVoiceChatSession
 import com.rekixo.ludopaws.feature.store.data.ads.PostWinInterstitialAdController
 import com.rekixo.ludopaws.feature.store.data.ads.PostWinInterstitialExitGate
@@ -521,6 +522,7 @@ class MainActivity : ComponentActivity() {
         LudoProofTheme.configureWindow(
             this,
         )
+        GameSoundFeedback.preloadDiceFeedback(this)
 
         if (
             shouldRestoreSavedSession

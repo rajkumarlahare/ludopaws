@@ -10,6 +10,7 @@ import android.widget.CompoundButton
 import android.widget.ImageButton
 import android.widget.TextView
 import com.rekixo.ludopaws.feature.settings.data.local.GameSettingsStore
+import com.rekixo.ludopaws.feature.settings.data.local.GameSoundFeedback
 import java.util.Collections
 import java.util.WeakHashMap
 
@@ -89,12 +90,21 @@ object UiClickSoundInstaller {
         val context = view.context.applicationContext
         if (!GameSettingsStore(context).snapshot().soundEnabled) return
 
-        val assetPath = resolveClickAsset(context) ?: return
-        LudoPawsSoundPool.playAsset(
-            context = context,
-            assetPath = assetPath,
-            volume = CLICK_VOLUME,
-        )
+        val assetPath = resolveClickAsset(context)
+        if (assetPath == null) {
+            GameSoundFeedback.click(context)
+            return
+        }
+        if (
+            !LudoPawsSoundPool.playAsset(
+                context = context,
+                assetPath = assetPath,
+                volume = CLICK_VOLUME,
+            )
+        ) {
+            // If SoundPool refuses a stream, try the common authored/procedural fallback.
+            GameSoundFeedback.click(context)
+        }
     }
 
     private fun resolveClickAsset(context: android.content.Context): String? {

@@ -88,6 +88,20 @@ object GameSoundFeedback {
      * legacy raw/procedural fallback. The authored jump clip is never used as a
      * normal footfall.
      */
+    /** Preloads roll/settle audio to avoid first-tap load latency in online matches. */
+    fun preloadDiceFeedback(context: Context) {
+        preload(
+            context = context,
+            rawResourceNames = listOf("lp_sfx_dice_roll"),
+            assetPaths = LudoPawsAudioCatalog.Sfx.DICE_ROLL,
+        )
+        preload(
+            context = context,
+            rawResourceNames = listOf("lp_sfx_dice_settle"),
+            assetPaths = LudoPawsAudioCatalog.Sfx.DICE_SETTLE,
+        )
+    }
+
     fun moveStep(
         context: Context,
         characterId: String? = null,
@@ -175,28 +189,26 @@ object GameSoundFeedback {
     ) = moveStep(context, characterId)
 
     fun roll(context: Context, eventIndex: Int? = null) =
-        play(
+        playEventForIndex(
             context = context,
+            eventIndex = eventIndex,
             names = listOf("lp_sfx_dice_roll"),
             fallback = LudoPawsProceduralAudio.Sfx.DICE_ROLL,
             volume = .50f,
             priority = PRIORITY_ROLL,
-            assetPaths = eventIndex?.let {
-                LudoPawsAudioCatalog.takeForEvent(LudoPawsAudioCatalog.Sfx.DICE_ROLL, it)
-            } ?: LudoPawsAudioCatalog.Sfx.DICE_ROLL,
+            assetPaths = LudoPawsAudioCatalog.Sfx.DICE_ROLL,
         )
 
     /** Short landing tick when the verified dice face is revealed. */
     fun diceSettle(context: Context, eventIndex: Int? = null) =
-        play(
+        playEventForIndex(
             context = context,
+            eventIndex = eventIndex,
             names = listOf("lp_sfx_dice_settle"),
             fallback = LudoPawsProceduralAudio.Sfx.DICE_SETTLE,
             volume = .32f,
             priority = PRIORITY_HIGH,
-            assetPaths = eventIndex?.let {
-                LudoPawsAudioCatalog.takeForEvent(LudoPawsAudioCatalog.Sfx.DICE_SETTLE, it)
-            } ?: LudoPawsAudioCatalog.Sfx.DICE_SETTLE,
+            assetPaths = LudoPawsAudioCatalog.Sfx.DICE_SETTLE,
         )
 
     fun six(context: Context) =
@@ -359,6 +371,38 @@ object GameSoundFeedback {
             null,
             -> false
         }
+    }
+
+    private fun playEventForIndex(
+        context: Context,
+        eventIndex: Int?,
+        names: List<String>,
+        fallback: LudoPawsProceduralAudio.Sfx,
+        volume: Float,
+        priority: Int,
+        assetPaths: List<String>,
+    ) {
+        if (!GameSettingsStore(context).snapshot().soundEnabled) return
+        if (
+            eventIndex != null &&
+            LudoPawsAudioAssetPlayer.playAuthoredSfxForEvent(
+                context = context,
+                assetPaths = assetPaths,
+                eventIndex = eventIndex,
+                volume = volume,
+                priority = priority,
+            )
+        ) {
+            return
+        }
+        LudoPawsAudioAssetPlayer.playSfx(
+            context = context,
+            rawResourceNames = names,
+            fallback = fallback,
+            volume = volume,
+            priority = priority,
+            assetPaths = assetPaths,
+        )
     }
 
     private inline fun played(block: () -> Unit): Boolean {
