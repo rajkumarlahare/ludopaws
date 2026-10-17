@@ -171,6 +171,26 @@ test("bot settings are bounded and bots receive non-profile identities", () => {
   assert.ok(bots.every((bot) => bot.characterId !== "dog"));
 });
 
+test("bot participant creation supports both V4 rulesets", () => {
+  const onlineBots = createBotParticipants({
+    count: 1,
+    playerCount: 2,
+    matchMode: "ONLINE",
+    rulesetKey: "CLASSIC_V4",
+  });
+  const teamBots = createBotParticipants({
+    count: 1,
+    playerCount: 4,
+    matchMode: "TEAM_UP",
+    rulesetKey: "TEAM_UP_V4",
+  });
+
+  assert.equal(onlineBots[0].rulesetKey, "CLASSIC_V4");
+  assert.equal(teamBots[0].rulesetKey, "TEAM_UP_V4");
+  assert.equal(onlineBots[0].playerType, "BOT");
+  assert.equal(teamBots[0].playerType, "BOT");
+});
+
 test("disabling bot fill keeps an expired real-player search queued without creating a match", async () => {
   const env = makeEnv();
   env.LUDOPROOF_BOT_MATCH_FILL_ENABLED = "false";
@@ -562,6 +582,45 @@ test("Online 2-player fallback adds exactly one bot for a lone queued human", as
   assert.equal(
     (await queue.ctx.storage.get("matchmaking-state")).queue.length,
     0,
+  );
+});
+
+test("Team Up V4 fallback fills bots and starts an authoritative V4 match", async () => {
+  const env = makeEnv();
+  const queue = new TeamMatchmakerQueue({ storage: new FakeStorage() }, env);
+  const player = human(61, 4, true);
+  const search = await parse(await queue.fetch(
+    request("/search", {
+      clientRequestId: player.clientRequestId,
+      displayName: player.displayName,
+      characterId: player.characterId,
+      rulesetKey: "TEAM_UP_V4",
+    }, player.profileToken),
+  ));
+  assert.equal(search.status, 202);
+  assert.equal(search.body.status, "SEARCHING");
+
+  await backdateQueue(queue, "team-matchmaking-state-v1");
+  await queue.alarm();
+
+  const matched = await parse(await queue.fetch(
+    request("/status", {
+      clientRequestId: player.clientRequestId,
+    }, player.profileToken),
+  ));
+  assert.equal(matched.status, 200);
+  assert.equal(matched.body.status, "MATCHED");
+  assert.equal(matched.body.state.status, "ACTIVE");
+  assert.equal(matched.body.state.matchMode, "TEAM_UP");
+  assert.equal(matched.body.state.rulesetId, "ludoproof-team-v4");
+  assert.equal(matched.body.state.players.length, 4);
+  assert.deepEqual(
+    matched.body.state.players.map((seat) => seat.playerType),
+    ["HUMAN", "BOT", "BOT", "BOT"],
+  );
+  assert.deepEqual(
+    matched.body.state.players.map((seat) => seat.teamId),
+    ["A", "B", "A", "B"],
   );
 });
 
