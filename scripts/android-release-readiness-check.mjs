@@ -95,7 +95,7 @@ requirePattern(
   "android/app/build.gradle.kts",
   appBuild,
   /versionCode\s*=\s*3\b/,
-  "RC3 must use monotonically increasing versionCode 2.",
+  "RC3 must use monotonically increasing versionCode 3.",
 );
 requirePattern(
   "android/app/build.gradle.kts",
